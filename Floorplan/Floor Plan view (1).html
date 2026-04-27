@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PinPlot — Floor Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --green:#006400;--green-mid:#008000;--green-light:#1a8a1a;--green-subtle:rgba(0,100,0,.09);
+  --online:#22c55e;--idle:#f59e0b;--offline:#ef4444;
+  --cat-vehicle:#3b82f6;--cat-equipment:#a855f7;--cat-container:#f97316;--cat-personnel:#06b6d4;
+  --font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;--radius:8px;--sidebar:280px;--panel:300px;--transition:160ms ease;
+}
+[data-theme="dark"]{
+  --bg:#0f1117;--surface:#181c25;--surface2:#1e2433;--surface3:#252b3b;
+  --border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.14);
+  --text:#e8eaf0;--text2:#9aa0b4;--text3:#5c6278;--shadow:0 2px 16px rgba(0,0,0,.55);
+  --fp-bg:#12151e;--fp-wall:#2e3548;--fp-room:#1a1f2e;--fp-room-alt:#161b28;--fp-label:rgba(148,160,180,.45);--fp-grid:rgba(255,255,255,.025);
+}
+[data-theme="light"]{
+  --bg:#eef0f4;--surface:#ffffff;--surface2:#f5f6f9;--surface3:#eceef2;
+  --border:rgba(0,0,0,.08);--border2:rgba(0,0,0,.14);
+  --text:#1a1d27;--text2:#4e5468;--text3:#9aa0b4;--shadow:0 2px 12px rgba(0,0,0,.1);
+  --fp-bg:#f8f9fb;--fp-wall:#b0b8c8;--fp-room:#ffffff;--fp-room-alt:#f2f4f8;--fp-label:rgba(100,110,130,.5);--fp-grid:rgba(0,0,0,.04);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:var(--font);font-size:13px;background:var(--bg);color:var(--text);display:flex;transition:background var(--transition),color var(--transition);}
+
+/* ── SIDEBAR ── */
+.sidebar{width:var(--sidebar);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:10;}
+.sidebar-logo{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--border);}
+.logo-icon{width:32px;height:32px;background:var(--green);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.logo-text strong{font-size:15px;font-weight:600;letter-spacing:-.3px;}
+.logo-text span{font-size:10px;color:var(--text3);display:block;}
+.sidebar-nav{flex:1;padding:12px 0;overflow-y:auto;}
+.nav-label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);padding:8px 18px 4px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 18px;cursor:pointer;color:var(--text2);font-weight:400;position:relative;transition:background var(--transition),color var(--transition);}
+.nav-item:hover{background:var(--surface2);color:var(--text);}
+.nav-item.active{background:var(--green-subtle);color:var(--green-light);font-weight:500;}
+.nav-item.active::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--green);border-radius:0 2px 2px 0;}
+.nav-item svg{width:16px;height:16px;flex-shrink:0;opacity:.75;}
+.nav-item.active svg{opacity:1;}
+.badge{background:var(--offline);color:#fff;font-size:9px;font-weight:600;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-left:auto;}
+.sidebar-footer{padding:12px;border-top:1px solid var(--border);}
+.logout-btn{display:flex;align-items:center;gap:8px;padding:8px 12px;width:100%;background:none;border:none;cursor:pointer;color:var(--text3);font-family:var(--font);font-size:13px;border-radius:var(--radius);transition:all var(--transition);}
+.logout-btn:hover{background:var(--surface2);color:var(--text);}
+
+/* ── MAIN ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.topbar{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0;z-index:9;}
+.topbar-title{font-size:15px;font-weight:600;letter-spacing:-.2px;flex:1;}
+.topbar-live{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--online);font-weight:500;background:rgba(34,197,94,.1);padding:4px 10px;border-radius:20px;border:1px solid rgba(34,197,94,.2);}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--online);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.5)}}
+.topbar-actions{display:flex;align-items:center;gap:8px;}
+.icon-btn{width:32px;height:32px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text2);transition:all var(--transition);}
+.icon-btn:hover{background:var(--surface3);color:var(--text);}
+.icon-btn svg{width:15px;height:15px;}
+.user-pill{display:flex;align-items:center;gap:8px;padding:4px 10px 4px 4px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;cursor:pointer;transition:background var(--transition);}
+.user-pill:hover{background:var(--surface3);}
+.avatar{width:26px;height:26px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;}
+.user-info strong{font-size:12px;font-weight:500;display:block;}
+.user-info span{font-size:10px;color:var(--text3);display:block;}
+
+/* ── CONTENT ── */
+.content{flex:1;display:flex;overflow:hidden;}
+
+/* ── LEFT PANEL ── */
+.left-panel{width:var(--panel);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:8;}
+.panel-header{padding:12px 14px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.search-bar{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:7px 10px;margin-bottom:10px;transition:border-color var(--transition);}
+.search-bar:focus-within{border-color:var(--green);}
+.search-bar svg{width:14px;height:14px;color:var(--text3);flex-shrink:0;}
+.search-bar input{border:none;background:none;outline:none;font-family:var(--font);font-size:12px;color:var(--text);flex:1;min-width:0;}
+.search-bar input::placeholder{color:var(--text3);}
+.status-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+.status-card{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 6px;text-align:center;cursor:pointer;transition:all var(--transition);}
+.status-card:hover{border-color:var(--border2);}
+.status-card.active-filter{border-color:var(--green);background:var(--green-subtle);}
+.status-card .count{font-size:18px;font-weight:600;font-family:var(--mono);line-height:1;color:var(--text3);}
+.status-card.active-filter .count{color:var(--green-light);}
+.count.online{color:var(--online);}
+.count.idle{color:var(--idle);}
+.count.offline{color:var(--offline);}
+.status-card .label{font-size:9px;color:var(--text3);margin-top:2px;text-transform:uppercase;letter-spacing:.05em;}
+.floor-selector{display:flex;align-items:center;gap:6px;padding:8px 14px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.floor-label{font-size:11px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0;}
+.floor-tabs{display:flex;gap:4px;flex:1;}
+.floor-tab{flex:1;padding:4px 6px;text-align:center;font-size:11px;font-weight:500;border-radius:5px;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text3);transition:all var(--transition);font-family:var(--mono);}
+.floor-tab:hover{color:var(--text);border-color:var(--border2);}
+.floor-tab.active{background:var(--green);border-color:var(--green);color:#fff;}
+.chip-bar{display:flex;gap:5px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.chip{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text2);transition:all var(--transition);white-space:nowrap;}
+.chip:hover{border-color:var(--border2);color:var(--text);}
+.chip.active{border-color:transparent;color:#fff;}
+.chip.all.active{background:var(--green);}
+.chip.vehicle.active{background:var(--cat-vehicle);}
+.chip.equipment.active{background:var(--cat-equipment);}
+.chip.container.active{background:var(--cat-container);}
+.chip.personnel.active{background:var(--cat-personnel);}
+.chip-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.asset-list{flex:1;overflow-y:auto;padding:6px 0;}
+.asset-list::-webkit-scrollbar{width:4px;}
+.asset-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
+.asset-item{display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;transition:background var(--transition);position:relative;}
+.asset-item:hover{background:var(--surface2);}
+.asset-item.selected{background:var(--green-subtle);}
+.asset-item.selected::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--green);border-radius:0 2px 2px 0;}
+.asset-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.asset-icon.vehicle{background:rgba(59,130,246,.15);}
+.asset-icon.equipment{background:rgba(168,85,247,.15);}
+.asset-icon.container{background:rgba(249,115,22,.15);}
+.asset-icon.personnel{background:rgba(6,182,212,.15);}
+.asset-info{flex:1;min-width:0;}
+.asset-name{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.asset-meta{font-size:10px;color:var(--text3);margin-top:1px;}
+.status-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.status-dot.online{background:var(--online);box-shadow:0 0 4px var(--online);}
+.status-dot.idle{background:var(--idle);}
+.status-dot.offline{background:var(--offline);}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:40px 20px;color:var(--text3);}
+.empty-state svg{width:28px;height:28px;opacity:.35;}
+.empty-state p{font-size:12px;}
+
+/* ── MAP / FLOOR PLAN AREA ── */
+.map-area{flex:1;position:relative;overflow:hidden;background:var(--fp-bg);}
+#fp-canvas{width:100%;height:100%;display:block;cursor:grab;}
+#fp-canvas:active{cursor:grabbing;}
+
+/* ── FLOATING CONTROLS ── */
+.map-controls{position:absolute;top:12px;right:12px;display:flex;flex-direction:column;gap:6px;z-index:20;}
+.map-btn-group{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);}
+.map-ctrl-btn{display:flex;align-items:center;gap:6px;padding:7px 11px;background:none;border:none;border-bottom:1px solid var(--border);color:var(--text2);font-family:var(--font);font-size:11px;font-weight:500;cursor:pointer;width:100%;transition:all var(--transition);white-space:nowrap;}
+.map-ctrl-btn:last-child{border-bottom:none;}
+.map-ctrl-btn:hover{background:var(--surface2);color:var(--text);}
+.map-ctrl-btn.active{color:var(--green-light);background:var(--green-subtle);}
+.map-ctrl-btn svg{width:13px;height:13px;flex-shrink:0;}
+
+/* ── FLOOR SWITCHER ON MAP ── */
+.floor-switcher{position:absolute;top:12px;left:12px;display:flex;flex-direction:column;gap:0;z-index:20;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);}
+.fsw-btn{padding:8px 13px;font-family:var(--mono);font-size:11px;font-weight:500;text-align:center;cursor:pointer;border:none;border-bottom:1px solid var(--border);background:var(--surface);color:var(--text2);transition:all var(--transition);min-width:44px;}
+.fsw-btn:last-child{border-bottom:none;}
+.fsw-btn:hover{background:var(--surface2);color:var(--text);}
+.fsw-btn.active{background:var(--green);color:#fff;}
+
+/* ── ZOOM CONTROLS ── */
+.zoom-ctrl{position:absolute;bottom:44px;right:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);z-index:20;}
+.zoom-btn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;background:none;border:none;border-bottom:1px solid var(--border);color:var(--text2);cursor:pointer;font-size:18px;line-height:1;transition:all var(--transition);}
+.zoom-btn:last-child{border-bottom:none;}
+.zoom-btn:hover{background:var(--surface2);color:var(--text);}
+
+/* ── ZONE LEGEND ── */
+.zone-legend{position:absolute;bottom:12px;left:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 13px;box-shadow:var(--shadow);z-index:20;display:none;}
+.zone-legend.visible{display:block;}
+.legend-title{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px;}
+.legend-item{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--text2);margin-bottom:5px;}
+.legend-item:last-child{margin-bottom:0;}
+.legend-swatch{width:11px;height:11px;border-radius:2px;flex-shrink:0;}
+
+/* ── ASSET TOOLTIP ── */
+.asset-tooltip{position:absolute;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);padding:12px 14px;min-width:190px;box-shadow:var(--shadow);z-index:30;pointer-events:none;opacity:0;transition:opacity .12s;}
+.asset-tooltip.visible{opacity:1;}
+.tt-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.tt-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;}
+.tt-name{font-size:13px;font-weight:600;}
+.tt-type{font-size:10px;color:var(--text3);margin-top:1px;}
+.tt-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;border-top:1px solid var(--border);padding-top:9px;}
+.tt-stat .lbl{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;}
+.tt-stat .val{font-size:11px;font-weight:500;margin-top:1px;font-family:var(--mono);color:var(--text);}
+
+/* ── CONN STATUS ── */
+.conn-status{position:absolute;bottom:12px;right:12px;display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:4px 10px;font-size:10px;color:var(--text3);font-weight:500;z-index:20;box-shadow:var(--shadow);}
+.conn-dot{width:6px;height:6px;border-radius:50%;background:var(--text3);}
+.conn-status.connected .conn-dot{background:var(--online);}
+.conn-status.connected{color:var(--text2);}
+
+/* ── SCALE RULER ── */
+.scale-ruler{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:10px;color:var(--text3);z-index:20;font-family:var(--mono);}
+.ruler-bar{width:40px;height:3px;background:var(--text3);border-radius:2px;position:relative;}
+.ruler-bar::before,.ruler-bar::after{content:'';position:absolute;top:-3px;width:1.5px;height:9px;background:var(--text3);}
+.ruler-bar::before{left:0;}
+.ruler-bar::after{right:0;}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">📍</div>
+    <div class="logo-text"><strong>PinPlot</strong><span>Customer Portal</span></div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-label">Tracking</div>
+    <div class="nav-item" onclick="navigate(this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2"/><circle cx="8" cy="8" r="6" stroke-dasharray="2 2"/></svg>Live Map
+    </div>
+    <div class="nav-item" onclick="navigate(this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="2" rx="1"/><rect x="2" y="7" width="9" height="2" rx="1"/><rect x="2" y="11" width="11" height="2" rx="1"/></svg>Asset List
+    </div>
+    <div class="nav-item" onclick="navigate(this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>Movement History
+    </div>
+    <div class="nav-label" style="margin-top:8px;">Management</div>
+    <div class="nav-item" onclick="navigate(this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/></svg>Asset Management
+    </div>
+    <div class="nav-item" onclick="navigate(this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="5" r="2.5"/><path d="M1 13c0-2.8 2.2-5 5-5h2"/><circle cx="12" cy="10" r="3"/><path d="M12 8.5v3M10.5 10h3"/></svg>User Accounts
+    </div>
+    <div class="nav-item active" onclick="navigate(this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="1"/><path d="M2 7h7M9 7v7"/></svg>Floor Plan
+      <span class="badge">2</span>
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <button class="logout-btn">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 8h7M11 6l2 2-2 2"/><path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3"/></svg>Logout
+    </button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <header class="topbar">
+    <span class="topbar-title">Floor Plan</span>
+    <div class="topbar-live"><span class="pulse"></span>Live</div>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">
+        <svg id="theme-icon" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1v1M8 14v1M1 8h1M14 8h1M3.2 3.2l.7.7M12.1 12.1l.7.7M3.2 12.8l.7-.7M12.1 3.9l.7-.7"/><circle cx="8" cy="8" r="3"/></svg>
+      </button>
+      <button class="icon-btn" onclick="toggleLayer('zones',document.getElementById('btn-zones'))" title="Toggle zones">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+      </button>
+      <button class="icon-btn" title="Export PNG" onclick="exportPNG()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 10v3a1 1 0 001 1h8a1 1 0 001-1v-3"/><path d="M8 2v7M5 9l3 3 3-3"/></svg>
+      </button>
+      <div class="user-pill">
+        <div class="avatar">RC</div>
+        <div class="user-info"><strong>Richard Cheng</strong><span>JD Sports</span></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="content">
+    <!-- LEFT PANEL -->
+    <div class="left-panel">
+      <div class="panel-header">
+        <div class="search-bar">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6.5" cy="6.5" r="4.5"/><path d="M10 10L14 14"/></svg>
+          <input type="text" placeholder="Search assets or tags…" id="search-input" oninput="filterAssets(this.value)">
+        </div>
+        <div class="status-grid">
+          <div class="status-card active-filter" id="sc-all" onclick="filterByStatus('all',this)"><div class="count" id="count-total">0</div><div class="label">Total</div></div>
+          <div class="status-card" id="sc-online" onclick="filterByStatus('online',this)"><div class="count online" id="count-online">0</div><div class="label">Online</div></div>
+          <div class="status-card" id="sc-idle" onclick="filterByStatus('idle',this)"><div class="count idle" id="count-idle">0</div><div class="label">Idle</div></div>
+          <div class="status-card" id="sc-offline" onclick="filterByStatus('offline',this)"><div class="count offline" id="count-offline">0</div><div class="label">Offline</div></div>
+        </div>
+      </div>
+      <div class="floor-selector">
+        <span class="floor-label">Floor</span>
+        <div class="floor-tabs">
+          <div class="floor-tab active" onclick="selectFloor(this,'G')">G</div>
+          <div class="floor-tab" onclick="selectFloor(this,'1F')">1F</div>
+          <div class="floor-tab" onclick="selectFloor(this,'2F')">2F</div>
+          <div class="floor-tab" onclick="selectFloor(this,'3F')">3F</div>
+        </div>
+      </div>
+      <div class="chip-bar">
+        <div class="chip all active" onclick="filterCat(this,'all')"><span class="chip-dot" style="background:var(--green)"></span>All</div>
+        <div class="chip vehicle" onclick="filterCat(this,'vehicle')"><span class="chip-dot" style="background:var(--cat-vehicle)"></span>Vehicles</div>
+        <div class="chip equipment" onclick="filterCat(this,'equipment')"><span class="chip-dot" style="background:var(--cat-equipment)"></span>Equipment</div>
+        <div class="chip container" onclick="filterCat(this,'container')"><span class="chip-dot" style="background:var(--cat-container)"></span>Containers</div>
+        <div class="chip personnel" onclick="filterCat(this,'personnel')"><span class="chip-dot" style="background:var(--cat-personnel)"></span>Personnel</div>
+      </div>
+      <div class="asset-list" id="asset-list">
+        <div class="empty-state" id="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+          <p id="empty-msg">Loading assets…</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- FLOOR PLAN CANVAS AREA -->
+    <div class="map-area" id="map-area">
+      <canvas id="fp-canvas"></canvas>
+
+      <!-- Floor switcher -->
+      <div class="floor-switcher">
+        <div class="fsw-btn active" onclick="selectFloorMap(this,'G')">G</div>
+        <div class="fsw-btn" onclick="selectFloorMap(this,'1F')">1F</div>
+        <div class="fsw-btn" onclick="selectFloorMap(this,'2F')">2F</div>
+        <div class="fsw-btn" onclick="selectFloorMap(this,'3F')">3F</div>
+      </div>
+
+      <!-- Zoom -->
+      <div class="zoom-ctrl">
+        <button class="zoom-btn" onclick="zoom(1.2)">+</button>
+        <button class="zoom-btn" onclick="zoom(1/1.2)">−</button>
+      </div>
+
+      <!-- Layer controls -->
+      <div class="map-controls">
+        <div class="map-btn-group">
+          <button class="map-ctrl-btn active" id="btn-assets" onclick="toggleLayer('assets',this)">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3"/><circle cx="8" cy="8" r="6" stroke-dasharray="2 2"/></svg>Assets
+          </button>
+          <button class="map-ctrl-btn" id="btn-zones" onclick="toggleLayer('zones',this)">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>Zones
+          </button>
+          <button class="map-ctrl-btn" id="btn-beacons" onclick="toggleLayer('beacons',this)">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="1.5" fill="currentColor"/><path d="M5 5a4.2 4.2 0 0 1 6 0M3.5 3.5a6.5 6.5 0 0 1 9 0"/></svg>Beacons
+          </button>
+        </div>
+        <div class="map-btn-group">
+          <button class="map-ctrl-btn" onclick="resetView()">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6V3h3M13 6V3h-3M3 10v3h3M13 10v3h-3"/></svg>Fit view
+          </button>
+        </div>
+      </div>
+
+      <!-- Zone legend -->
+      <div class="zone-legend" id="zone-legend">
+        <div class="legend-title">Zones</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:rgba(0,100,0,.2);border:1.5px solid rgba(0,100,0,.55)"></div>Active / Dispatch</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:rgba(239,68,68,.18);border:1.5px solid rgba(239,68,68,.5)"></div>Alert zone</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:rgba(59,130,246,.15);border:1.5px solid rgba(59,130,246,.45)"></div>Restricted</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:rgba(245,158,11,.15);border:1.5px solid rgba(245,158,11,.45)"></div>Staging</div>
+      </div>
+
+      <!-- Scale -->
+      <div class="scale-ruler"><div class="ruler-bar"></div>10 m</div>
+
+      <!-- Tooltip -->
+      <div class="asset-tooltip" id="asset-tooltip">
+        <div class="tt-header">
+          <div class="tt-icon" id="tt-icon"></div>
+          <div><div class="tt-name" id="tt-name"></div><div class="tt-type" id="tt-type"></div></div>
+        </div>
+        <div class="tt-grid" id="tt-grid"></div>
+      </div>
+
+      <!-- Conn status -->
+      <div class="conn-status" id="conn-status"><div class="conn-dot"></div><span id="conn-text">Demo mode</span></div>
+    </div>
+  </div>
+</main>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// FLOOR PLAN DEFINITIONS
+// Coordinate space: 0–1000 x 0–700 logical units per floor
+// Each floor has: outer shell, rooms (with optional label + type), doors, columns
+// ═══════════════════════════════════════════════════════
+
+const FLOORS = {
+  'G': {
+    name: 'Ground Floor — Warehouse',
+    width: 1000, height: 680,
+    // Outer building shell (polygon points)
+    shell: [[40,40],[960,40],[960,640],[700,640],[700,580],[40,580]],
+    // Rooms: {id, rect:[x,y,w,h], label, type}
+    // type: 'corridor'|'room'|'loading'|'toilet'|'stair'|'lift'|'open'
+    rooms: [
+      {id:'g-r1',  rect:[40,40,200,200],   label:'Receiving Bay', type:'loading'},
+      {id:'g-r2',  rect:[40,240,200,150],  label:'Goods-In Office', type:'room'},
+      {id:'g-r3',  rect:[40,390,200,190],  label:'Dispatch', type:'loading'},
+      {id:'g-r4',  rect:[240,40,480,440],  label:'Main Warehouse Floor', type:'open'},
+      {id:'g-r5',  rect:[720,40,240,200],  label:'Cold Storage', type:'room'},
+      {id:'g-r6',  rect:[720,240,240,180], label:'Returns Area', type:'room'},
+      {id:'g-r7',  rect:[720,420,240,100], label:'Plant Room', type:'room'},
+      {id:'g-r8',  rect:[240,480,340,100], label:'Staging Zone', type:'loading'},
+      {id:'g-r9',  rect:[580,480,140,100], label:'Battery Charging', type:'room'},
+      {id:'g-c1',  rect:[700,520,40,60],   label:'', type:'stair'},
+      {id:'g-c2',  rect:[700,460,40,60],   label:'', type:'lift'},
+      {id:'g-cor', rect:[240,440,480,40],  label:'', type:'corridor'},
+    ],
+    // Doors: {from:[x,y], to:[x,y]} — short line gap in wall
+    doors:[
+      {x:150,y:240,w:40,horiz:true},
+      {x:150,y:390,w:40,horiz:true},
+      {x:240,y:100,w:40,horiz:false},
+      {x:240,y:300,w:40,horiz:false},
+      {x:720,y:100,w:40,horiz:false},
+      {x:720,y:310,w:40,horiz:false},
+      {x:720,y:450,w:40,horiz:false},
+      {x:360,y:480,w:40,horiz:true},
+      {x:580,y:480,w:40,horiz:false},
+      {x:580,y:530,w:40,horiz:true},
+      {x:700,y:520,w:40,horiz:true},
+    ],
+    // Columns: circles
+    columns:[
+      {x:340,y:120},{x:480,y:120},{x:620,y:120},
+      {x:340,y:270},{x:480,y:270},{x:620,y:270},
+      {x:340,y:420},{x:480,y:420},{x:620,y:420},
+    ],
+  },
+  '1F': {
+    name: 'First Floor — Offices',
+    width: 1000, height: 680,
+    shell: [[40,40],[960,40],[960,640],[40,640]],
+    rooms: [
+      {id:'1-cor1', rect:[40,40,920,80],    label:'', type:'corridor'},
+      {id:'1-cor2', rect:[440,120,80,520],  label:'', type:'corridor'},
+      {id:'1-r1',  rect:[40,120,400,160],  label:'Open Plan Office A', type:'open'},
+      {id:'1-r2',  rect:[40,280,180,180],  label:'Meeting Room 1', type:'room'},
+      {id:'1-r3',  rect:[220,280,220,180], label:'Meeting Room 2', type:'room'},
+      {id:'1-r4',  rect:[40,460,400,180],  label:'Open Plan Office B', type:'open'},
+      {id:'1-r5',  rect:[520,120,200,160], label:'Server Room', type:'room'},
+      {id:'1-r6',  rect:[720,120,240,160], label:'IT & Network', type:'room'},
+      {id:'1-r7',  rect:[520,280,200,180], label:'Finance', type:'room'},
+      {id:'1-r8',  rect:[720,280,240,180], label:'HR Dept', type:'room'},
+      {id:'1-r9',  rect:[520,460,200,180], label:'Boardroom', type:'room'},
+      {id:'1-r10', rect:[720,460,180,180], label:'Director Suite', type:'room'},
+      {id:'1-r11', rect:[900,460,60,180],  label:'', type:'toilet'},
+      {id:'1-s1',  rect:[900,120,60,80],   label:'', type:'stair'},
+      {id:'1-l1',  rect:[900,200,60,80],   label:'', type:'lift'},
+      {id:'1-t1',  rect:[900,280,60,80],   label:'', type:'toilet'},
+    ],
+    doors:[
+      {x:240,y:120,w:40,horiz:true},{x:130,y:280,w:40,horiz:false},
+      {x:330,y:280,w:40,horiz:false},{x:220,y:280,w:40,horiz:true},
+      {x:220,y:460,w:40,horiz:false},{x:240,y:460,w:40,horiz:true},
+      {x:520,y:180,w:40,horiz:false},{x:720,y:180,w:40,horiz:false},
+      {x:520,y:340,w:40,horiz:false},{x:720,y:340,w:40,horiz:false},
+      {x:520,y:540,w:40,horiz:false},{x:720,y:540,w:40,horiz:false},
+      {x:900,y:200,w:40,horiz:false},{x:900,y:360,w:40,horiz:false},
+      {x:900,y:540,w:40,horiz:false},
+    ],
+    columns:[
+      {x:240,y:40},{x:440,y:40},{x:640,y:40},{x:840,y:40},
+      {x:240,y:640},{x:440,y:640},{x:640,y:640},{x:840,y:640},
+    ],
+  },
+  '2F': {
+    name: 'Second Floor — Retail',
+    width: 1000, height: 680,
+    shell: [[40,40],[960,40],[960,640],[40,640]],
+    rooms: [
+      {id:'2-r1',  rect:[40,40,920,80],   label:'', type:'corridor'},
+      {id:'2-r2',  rect:[40,120,280,380], label:'Sales Floor A', type:'open'},
+      {id:'2-r3',  rect:[320,120,280,380],label:'Sales Floor B', type:'open'},
+      {id:'2-r4',  rect:[600,120,360,180],label:'Stockroom', type:'room'},
+      {id:'2-r5',  rect:[600,300,180,200],label:'Staff Room', type:'room'},
+      {id:'2-r6',  rect:[780,300,180,200],label:'Manager Office', type:'room'},
+      {id:'2-r7',  rect:[40,500,560,140], label:'Customer Service & Checkout', type:'loading'},
+      {id:'2-r8',  rect:[600,500,260,140],label:'Returns & Fitting', type:'room'},
+      {id:'2-r9',  rect:[860,500,100,100],label:'', type:'toilet'},
+      {id:'2-r10', rect:[860,420,100,80], label:'', type:'stair'},
+      {id:'2-cor', rect:[600,120,20,380], label:'', type:'corridor'},
+    ],
+    doors:[
+      {x:200,y:120,w:40,horiz:true},{x:460,y:120,w:40,horiz:true},
+      {x:320,y:200,w:40,horiz:false},{x:600,y:180,w:40,horiz:false},
+      {x:600,y:350,w:40,horiz:false},{x:780,y:350,w:40,horiz:false},
+      {x:200,y:500,w:40,horiz:true},{x:460,y:500,w:40,horiz:true},
+      {x:600,y:540,w:40,horiz:false},{x:860,y:500,w:40,horiz:false},
+      {x:860,y:420,w:40,horiz:false},
+    ],
+    columns:[
+      {x:160,y:300},{x:260,y:300},{x:420,y:300},{x:520,y:300},
+      {x:160,y:460},{x:260,y:460},{x:420,y:460},{x:520,y:460},
+    ],
+  },
+  '3F': {
+    name: 'Third Floor — Plant & Storage',
+    width: 1000, height: 680,
+    shell: [[40,40],[700,40],[700,120],[960,120],[960,640],[40,640]],
+    rooms: [
+      {id:'3-r1',  rect:[40,40,660,80],   label:'Roof Plant Access', type:'loading'},
+      {id:'3-r2',  rect:[40,120,300,260], label:'Archive Storage A', type:'room'},
+      {id:'3-r3',  rect:[340,120,300,260],label:'Archive Storage B', type:'room'},
+      {id:'3-r4',  rect:[700,120,260,200],label:'IT Equipment Store', type:'room'},
+      {id:'3-r5',  rect:[700,320,260,200],label:'CCTV & Security Hub', type:'room'},
+      {id:'3-r6',  rect:[40,380,300,140], label:'Maintenance Workshop', type:'room'},
+      {id:'3-r7',  rect:[340,380,300,140],label:'Cleaning Supplies', type:'room'},
+      {id:'3-r8',  rect:[40,520,600,120], label:'General Storage', type:'open'},
+      {id:'3-r9',  rect:[700,520,260,120],label:'Loading Platform', type:'loading'},
+      {id:'3-c1',  rect:[640,380,60,140], label:'', type:'stair'},
+      {id:'3-c2',  rect:[640,260,60,120], label:'', type:'lift'},
+      {id:'3-cor', rect:[40,360,600,20],  label:'', type:'corridor'},
+      {id:'3-t1',  rect:[640,120,60,140], label:'', type:'toilet'},
+    ],
+    doors:[
+      {x:200,y:120,w:40,horiz:true},{x:490,y:120,w:40,horiz:true},
+      {x:340,y:200,w:40,horiz:false},{x:700,y:200,w:40,horiz:false},
+      {x:700,y:380,w:40,horiz:false},{x:640,y:430,w:40,horiz:false},
+      {x:200,y:380,w:40,horiz:true},{x:490,y:380,w:40,horiz:true},
+      {x:200,y:520,w:40,horiz:true},{x:700,y:560,w:40,horiz:false},
+    ],
+    columns:[
+      {x:200,y:240},{x:490,y:240},
+      {x:200,y:460},{x:490,y:460},
+    ],
+  }
+};
+
+// ═══════════════════════════════════════════════════════
+// ASSETS per floor
+// x,y in the same 0-1000 × 0-700 logical coordinate space
+// ═══════════════════════════════════════════════════════
+const ASSETS = [
+  // Ground floor
+  {id:'a1', name:'Forklift #1',   type:'vehicle',   emoji:'🚛', floor:'G',  status:'online',  zone:'Main Warehouse', x:400, y:200, lastSeen:'2s ago',  battery:91, tagId:'BT:V001'},
+  {id:'a2', name:'Forklift #2',   type:'vehicle',   emoji:'🚛', floor:'G',  status:'idle',    zone:'Staging Zone',   x:350, y:530, lastSeen:'48s ago', battery:73, tagId:'BT:V002'},
+  {id:'a3', name:'Pallet Jack #1',type:'vehicle',   emoji:'🔧', floor:'G',  status:'online',  zone:'Receiving Bay',  x:130, y:130, lastSeen:'5s ago',  battery:55, tagId:'BT:V003'},
+  {id:'a4', name:'Scanner A',     type:'equipment', emoji:'📷', floor:'G',  status:'online',  zone:'Goods-In Office',x:120, y:300, lastSeen:'1s ago',  battery:88, tagId:'BT:E001'},
+  {id:'a5', name:'Scanner B',     type:'equipment', emoji:'📷', floor:'G',  status:'online',  zone:'Main Warehouse', x:560, y:260, lastSeen:'3s ago',  battery:65, tagId:'BT:E002'},
+  {id:'a6', name:'Weighing Scale',type:'equipment', emoji:'⚖️',  floor:'G',  status:'idle',    zone:'Dispatch',       x:120, y:490, lastSeen:'4m ago',  battery:44, tagId:'BT:E003'},
+  {id:'a7', name:'Crate #44',     type:'container', emoji:'📦', floor:'G',  status:'idle',    zone:'Cold Storage',   x:830, y:130, lastSeen:'2m ago',  battery:null,tagId:'BT:C001'},
+  {id:'a8', name:'Crate #45',     type:'container', emoji:'📦', floor:'G',  status:'online',  zone:'Main Warehouse', x:480, y:380, lastSeen:'10s ago', battery:null,tagId:'BT:C002'},
+  {id:'a9', name:'Pallet J-88',   type:'container', emoji:'📦', floor:'G',  status:'offline', zone:'Returns Area',   x:820, y:310, lastSeen:'12m ago', battery:null,tagId:'BT:C003'},
+  {id:'a10',name:'J. Mwangi',     type:'personnel', emoji:'🧑', floor:'G',  status:'online',  zone:'Main Warehouse', x:620, y:180, lastSeen:'1s ago',  battery:78, tagId:'BT:P001'},
+  {id:'a11',name:'S. Okafor',     type:'personnel', emoji:'🧑', floor:'G',  status:'online',  zone:'Dispatch',       x:130, y:450, lastSeen:'2s ago',  battery:62, tagId:'BT:P002'},
+  // First floor
+  {id:'b1', name:'Laptop Cart',   type:'vehicle',   emoji:'🛒', floor:'1F', status:'idle',    zone:'Open Plan A',    x:200, y:200, lastSeen:'5m ago',  battery:40, tagId:'BT:V010'},
+  {id:'b2', name:'Projector A',   type:'equipment', emoji:'📽', floor:'1F', status:'online',  zone:'Meeting Room 1', x:130, y:360, lastSeen:'3s ago',  battery:null,tagId:'BT:E010'},
+  {id:'b3', name:'Projector B',   type:'equipment', emoji:'📽', floor:'1F', status:'offline', zone:'Meeting Room 2', x:330, y:370, lastSeen:'2h ago',  battery:null,tagId:'BT:E011'},
+  {id:'b4', name:'Server Rack A', type:'equipment', emoji:'🖥', floor:'1F', status:'online',  zone:'Server Room',    x:610, y:200, lastSeen:'1s ago',  battery:null,tagId:'BT:E012'},
+  {id:'b5', name:'T. Adeyemi',    type:'personnel', emoji:'🧑', floor:'1F', status:'online',  zone:'Finance',        x:610, y:360, lastSeen:'4s ago',  battery:90, tagId:'BT:P010'},
+  {id:'b6', name:'K. Chen',       type:'personnel', emoji:'🧑', floor:'1F', status:'online',  zone:'Open Plan B',    x:200, y:540, lastSeen:'6s ago',  battery:71, tagId:'BT:P011'},
+  {id:'b7', name:'Supply Crate',  type:'container', emoji:'📦', floor:'1F', status:'idle',    zone:'Open Plan A',    x:380, y:180, lastSeen:'30m ago', battery:null,tagId:'BT:C010'},
+  // Second floor
+  {id:'c1', name:'Stock Trolley', type:'vehicle',   emoji:'🛒', floor:'2F', status:'online',  zone:'Stockroom',      x:760, y:210, lastSeen:'7s ago',  battery:66, tagId:'BT:V020'},
+  {id:'c2', name:'Price Gun A',   type:'equipment', emoji:'🔫', floor:'2F', status:'online',  zone:'Sales Floor A',  x:180, y:280, lastSeen:'2s ago',  battery:55, tagId:'BT:E020'},
+  {id:'c3', name:'Price Gun B',   type:'equipment', emoji:'🔫', floor:'2F', status:'idle',    zone:'Sales Floor B',  x:440, y:280, lastSeen:'90s ago', battery:33, tagId:'BT:E021'},
+  {id:'c4', name:'Returns Box #9',type:'container', emoji:'📦', floor:'2F', status:'online',  zone:'Returns & Fitting',x:720,y:560,lastSeen:'15s ago',battery:null,tagId:'BT:C020'},
+  {id:'c5', name:'L. Fernandez',  type:'personnel', emoji:'🧑', floor:'2F', status:'online',  zone:'Sales Floor A',  x:150, y:370, lastSeen:'1s ago',  battery:85, tagId:'BT:P020'},
+  {id:'c6', name:'M. Williams',   type:'personnel', emoji:'🧑', floor:'2F', status:'online',  zone:'Customer Svc',   x:300, y:560, lastSeen:'3s ago',  battery:77, tagId:'BT:P021'},
+  {id:'c7', name:'Store Manager', type:'personnel', emoji:'🧑', floor:'2F', status:'idle',    zone:'Manager Office', x:870, y:380, lastSeen:'8m ago',  battery:58, tagId:'BT:P022'},
+  // Third floor
+  {id:'d1', name:'Maintenance Kit',type:'container',emoji:'🧰', floor:'3F', status:'online',  zone:'Maintenance',    x:170, y:450, lastSeen:'11s ago', battery:null,tagId:'BT:C030'},
+  {id:'d2', name:'CCTV Monitor',  type:'equipment', emoji:'📺', floor:'3F', status:'online',  zone:'CCTV Hub',       x:820, y:400, lastSeen:'1s ago',  battery:null,tagId:'BT:E030'},
+  {id:'d3', name:'Archive Box A', type:'container', emoji:'📦', floor:'3F', status:'idle',    zone:'Archive A',      x:170, y:240, lastSeen:'2h ago',  battery:null,tagId:'BT:C031'},
+  {id:'d4', name:'Archive Box B', type:'container', emoji:'📦', floor:'3F', status:'idle',    zone:'Archive B',      x:470, y:240, lastSeen:'2h ago',  battery:null,tagId:'BT:C032'},
+  {id:'d5', name:'P. Nkemdirim',  type:'personnel', emoji:'🧑', floor:'3F', status:'online',  zone:'CCTV Hub',       x:830, y:370, lastSeen:'5s ago',  battery:88, tagId:'BT:P030'},
+];
+
+// Zone definitions per floor (logical coords)
+const ZONES = {
+  'G': [
+    {label:'Dispatch',    rect:[40,390,200,190], fill:'rgba(0,100,0,.15)',   stroke:'rgba(0,100,0,.6)'},
+    {label:'Cold Storage',rect:[720,40,240,200],  fill:'rgba(59,130,246,.13)',stroke:'rgba(59,130,246,.5)'},
+    {label:'Alert Zone',  rect:[560,460,160,120], fill:'rgba(239,68,68,.15)',stroke:'rgba(239,68,68,.55)'},
+    {label:'Staging',     rect:[240,480,340,100], fill:'rgba(245,158,11,.13)',stroke:'rgba(245,158,11,.5)'},
+  ],
+  '1F': [
+    {label:'Server Restricted',rect:[520,120,200,160],fill:'rgba(59,130,246,.13)',stroke:'rgba(59,130,246,.5)'},
+    {label:'Boardroom (Booked)',rect:[520,460,200,180],fill:'rgba(245,158,11,.12)',stroke:'rgba(245,158,11,.45)'},
+  ],
+  '2F': [
+    {label:'Active Sales',  rect:[40,120,560,380],  fill:'rgba(0,100,0,.08)', stroke:'rgba(0,100,0,.4)'},
+    {label:'Staff Only',    rect:[600,120,360,380],  fill:'rgba(59,130,246,.11)',stroke:'rgba(59,130,246,.45)'},
+  ],
+  '3F': [
+    {label:'Secure Store',  rect:[700,120,260,400],  fill:'rgba(239,68,68,.12)',stroke:'rgba(239,68,68,.45)'},
+    {label:'Plant Access',  rect:[40,40,660,80],      fill:'rgba(245,158,11,.12)',stroke:'rgba(245,158,11,.4)'},
+  ],
+};
+
+// BLE beacon positions per floor
+const BEACONS = {
+  'G': [{x:200,y:140},{x:450,y:140},{x:700,y:140},{x:200,y:350},{x:450,y:350},{x:700,y:350},{x:350,y:530}],
+  '1F':[{x:200,y:80},{x:500,y:80},{x:750,y:80},{x:200,y:400},{x:620,y:400},{x:800,y:400}],
+  '2F':[{x:180,y:80},{x:460,y:80},{x:760,y:80},{x:180,y:450},{x:460,y:450},{x:760,y:450}],
+  '3F':[{x:200,y:80},{x:500,y:80},{x:200,y:480},{x:490,y:480},{x:800,y:480}],
+};
+
+// Room type styles
+const ROOM_STYLE = {
+  open:     {fill:'room'},
+  room:     {fill:'room-alt'},
+  corridor: {fill:'corridor'},
+  loading:  {fill:'loading'},
+  toilet:   {fill:'service'},
+  stair:    {fill:'service'},
+  lift:     {fill:'service'},
+};
+
+// ═══════════════════════════════════════════════════════
+// CANVAS RENDERER
+// ═══════════════════════════════════════════════════════
+let canvas, ctx;
+let activeFloor = 'G';
+let activeCat   = 'all';
+let activeStatus= 'all';
+let searchQ     = '';
+let layers      = {assets:true, zones:false, beacons:false};
+let selectedId  = null;
+
+// Pan / zoom state
+let panX=0, panY=0, scale=1;
+let dragging=false, lastPx=0, lastPy=0;
+
+function getThemeColors() {
+  const s = getComputedStyle(document.documentElement);
+  const get = v => s.getPropertyValue(v).trim();
+  return {
+    bg:       get('--fp-bg'),
+    wall:     get('--fp-wall'),
+    room:     get('--fp-room'),
+    roomAlt:  get('--fp-room-alt'),
+    label:    get('--fp-label'),
+    grid:     get('--fp-grid'),
+    text:     get('--text'),
+    text2:    get('--text2'),
+    text3:    get('--text3'),
+    border:   get('--border'),
+    border2:  get('--border2'),
+    green:    get('--green'),
+    surface:  get('--surface'),
+  };
+}
+
+function initCanvas() {
+  canvas = document.getElementById('fp-canvas');
+  ctx    = canvas.getContext('2d');
+  resizeCanvas();
+  window.addEventListener('resize', () => { resizeCanvas(); drawAll(); });
+
+  canvas.addEventListener('mousedown', onMouseDown);
+  canvas.addEventListener('mousemove', onMouseMove);
+  canvas.addEventListener('mouseup',   () => { dragging=false; canvas.style.cursor='grab'; });
+  canvas.addEventListener('mouseleave',() => { dragging=false; hideTooltip(); });
+  canvas.addEventListener('wheel',     onWheel, {passive:false});
+  canvas.addEventListener('click',     onClick);
+  canvas.addEventListener('dblclick',  () => resetView());
+}
+
+function resizeCanvas() {
+  const area = document.getElementById('map-area');
+  canvas.width  = area.clientWidth;
+  canvas.height = area.clientHeight;
+}
+
+function resetView() {
+  const fp = FLOORS[activeFloor];
+  const cw = canvas.width, ch = canvas.height;
+  const pad = 60;
+  const sx  = (cw - pad*2) / fp.width;
+  const sy  = (ch - pad*2) / fp.height;
+  scale = Math.min(sx, sy, 1.2);
+  panX  = (cw - fp.width  * scale) / 2;
+  panY  = (ch - fp.height * scale) / 2;
+  drawAll();
+}
+
+function zoom(factor) {
+  const cx = canvas.width/2, cy = canvas.height/2;
+  panX = cx - (cx - panX) * factor;
+  panY = cy - (cy - panY) * factor;
+  scale *= factor;
+  scale = Math.max(0.3, Math.min(4, scale));
+  drawAll();
+}
+
+function onWheel(e) {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.12 : 1/1.12;
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  panX = mx - (mx - panX) * factor;
+  panY = my - (my - panY) * factor;
+  scale *= factor;
+  scale = Math.max(0.3, Math.min(4, scale));
+  drawAll();
+}
+
+function onMouseDown(e) {
+  dragging=true; lastPx=e.clientX; lastPy=e.clientY;
+  canvas.style.cursor='grabbing';
+}
+
+function onMouseMove(e) {
+  if (dragging) {
+    panX += e.clientX - lastPx;
+    panY += e.clientY - lastPy;
+    lastPx=e.clientX; lastPy=e.clientY;
+    drawAll(); hideTooltip(); return;
+  }
+  // Hover detection for assets
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const asset = hitTestAsset(mx, my);
+  if (asset) {
+    showTooltip(asset, e.clientX - rect.left, e.clientY - rect.top);
+    canvas.style.cursor = 'pointer';
+  } else {
+    hideTooltip();
+    canvas.style.cursor = dragging ? 'grabbing' : 'grab';
+  }
+}
+
+function onClick(e) {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const asset = hitTestAsset(mx, my);
+  if (asset) {
+    selectedId = selectedId === asset.id ? null : asset.id;
+    document.querySelectorAll('.asset-item').forEach(el => el.classList.toggle('selected', el.dataset.id === selectedId));
+    if (selectedId) scrollToAsset(selectedId);
+    drawAll();
+  } else {
+    selectedId = null;
+    document.querySelectorAll('.asset-item').forEach(el => el.classList.remove('selected'));
+    drawAll();
+  }
+}
+
+function toCanvas(lx, ly) {
+  return [lx * scale + panX, ly * scale + panY];
+}
+
+function hitTestAsset(mx, my) {
+  const vis = visibleAssets();
+  const R = 14 * scale;
+  for (const a of vis) {
+    const [cx,cy] = toCanvas(a.x, a.y);
+    if (Math.hypot(mx-cx, my-cy) < R) return a;
+  }
+  return null;
+}
+
+// ─── MAIN DRAW ──────────────────────────────────────────
+function drawAll() {
+  const C = getThemeColors();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+
+  const fp = FLOORS[activeFloor];
+
+  // Background fill
+  ctx.fillStyle = C.bg;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Grid
+  drawGrid(C);
+
+  // Building
+  drawBuilding(fp, C);
+
+  // Zone overlays
+  if (layers.zones) drawZones(C);
+
+  // Beacon markers
+  if (layers.beacons) drawBeacons(C);
+
+  // Asset markers
+  if (layers.assets) drawAssets(C);
+
+  ctx.restore();
+}
+
+function drawGrid(C) {
+  const step = 50 * scale;
+  ctx.strokeStyle = C.grid;
+  ctx.lineWidth = 1;
+  const ox = ((panX % step) + step) % step;
+  const oy = ((panY % step) + step) % step;
+  ctx.beginPath();
+  for (let x = ox; x < canvas.width; x += step) { ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); }
+  for (let y = oy; y < canvas.height; y += step) { ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); }
+  ctx.stroke();
+}
+
+function drawBuilding(fp, C) {
+  const WALL = 3 * scale;
+
+  // ── Shadow under building
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.25)';
+  ctx.shadowBlur  = 18 * scale;
+  ctx.shadowOffsetX = 4 * scale;
+  ctx.shadowOffsetY = 6 * scale;
+  ctx.fillStyle = C.wall;
+  ctx.beginPath();
+  fp.shell.forEach(([x,y],i) => { const [cx,cy]=toCanvas(x,y); i?ctx.lineTo(cx,cy):ctx.moveTo(cx,cy); });
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+
+  // ── Room fills
+  for (const r of fp.rooms) {
+    const [x,y,w,h] = r.rect;
+    const [cx,cy] = toCanvas(x,y);
+    const cw = w*scale, ch = h*scale;
+    let fill;
+    switch(r.type) {
+      case 'open':     fill = C.room; break;
+      case 'room':     fill = C.roomAlt; break;
+      case 'corridor': fill = adjustAlpha(C.wall, 0.5); break;
+      case 'loading':  fill = adjustAlpha(C.green, 0.06); break;
+      case 'service':
+      case 'toilet':
+      case 'stair':
+      case 'lift':     fill = adjustAlpha(C.wall, 0.75); break;
+      default:         fill = C.roomAlt;
+    }
+    ctx.fillStyle = fill;
+    ctx.fillRect(cx, cy, cw, ch);
+
+    // Room label
+    if (r.label && scale > 0.55) {
+      ctx.fillStyle = C.label;
+      ctx.font = `${Math.max(9, 10*scale)}px ${getComputedStyle(document.documentElement).getPropertyValue('--font')}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(truncLabel(r.label, cw/scale), cx+cw/2, cy+ch/2);
+    }
+
+    // Special icons for service rooms
+    if (scale > 0.7) {
+      const icon = {stair:'⬆', lift:'🔲', toilet:'🚻'}[r.type];
+      if (icon) {
+        ctx.font = `${12*scale}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(icon, cx+cw/2, cy+ch/2);
+      }
+    }
+  }
+
+  // ── Walls (outline of rooms + shell)
+  ctx.strokeStyle = C.wall;
+  ctx.lineWidth = WALL;
+  ctx.lineJoin = 'miter';
+
+  // Shell
+  ctx.beginPath();
+  fp.shell.forEach(([x,y],i) => { const [cx,cy]=toCanvas(x,y); i?ctx.lineTo(cx,cy):ctx.moveTo(cx,cy); });
+  ctx.closePath(); ctx.stroke();
+
+  // Internal room walls
+  ctx.lineWidth = Math.max(1, 1.5 * scale);
+  for (const r of fp.rooms) {
+    if (r.type === 'corridor') continue;
+    const [x,y,w,h] = r.rect;
+    const [cx,cy] = toCanvas(x,y);
+    ctx.strokeRect(cx, cy, w*scale, h*scale);
+  }
+
+  // ── Columns
+  for (const col of fp.columns) {
+    const [cx,cy] = toCanvas(col.x, col.y);
+    const cr = 6 * scale;
+    ctx.fillStyle = C.wall;
+    ctx.strokeStyle = adjustAlpha(C.wall, 1.5);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  }
+
+  // ── Doors (gap in wall)
+  ctx.strokeStyle = C.bg;
+  ctx.lineWidth = Math.max(2, 3.5 * scale);
+  ctx.lineCap = 'butt';
+  for (const d of fp.doors) {
+    const [cx,cy] = toCanvas(d.x, d.y);
+    const len = d.w * scale;
+    ctx.beginPath();
+    if (d.horiz) { ctx.moveTo(cx, cy); ctx.lineTo(cx+len, cy); }
+    else         { ctx.moveTo(cx, cy); ctx.lineTo(cx, cy+len); }
+    ctx.stroke();
+    // Door arc
+    ctx.strokeStyle = adjustAlpha(C.wall, 0.4);
+    ctx.lineWidth = Math.max(0.5, 1 * scale);
+    ctx.beginPath();
+    if (d.horiz) ctx.arc(cx, cy, len, 0, Math.PI/2);
+    else         ctx.arc(cx, cy, len, Math.PI/2, Math.PI);
+    ctx.stroke();
+    ctx.strokeStyle = C.bg;
+    ctx.lineWidth = Math.max(2, 3.5 * scale);
+  }
+
+  // ── Floor label
+  ctx.fillStyle = C.text3;
+  ctx.font = `500 ${Math.max(10, 12*scale)}px ${getComputedStyle(document.documentElement).getPropertyValue('--mono')}`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  const [lx,ly] = toCanvas(fp.shell[0][0]+6, fp.shell[0][1]+6);
+  ctx.fillText(fp.name, lx, ly);
+}
+
+function drawZones(C) {
+  const zones = ZONES[activeFloor] || [];
+  for (const z of zones) {
+    const [x,y,w,h] = z.rect;
+    const [cx,cy] = toCanvas(x,y);
+    ctx.fillStyle   = z.fill;
+    ctx.strokeStyle = z.stroke;
+    ctx.lineWidth   = 1.5;
+    ctx.setLineDash([5*scale, 3*scale]);
+    ctx.fillRect(cx, cy, w*scale, h*scale);
+    ctx.strokeRect(cx, cy, w*scale, h*scale);
+    ctx.setLineDash([]);
+    // Zone label
+    if (scale > 0.5) {
+      ctx.fillStyle = z.stroke;
+      ctx.font = `600 ${Math.max(8, 10*scale)}px ${getComputedStyle(document.documentElement).getPropertyValue('--font')}`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(z.label, cx + 5*scale, cy + 4*scale);
+    }
+  }
+}
+
+function drawBeacons(C) {
+  const bcs = BEACONS[activeFloor] || [];
+  for (const b of bcs) {
+    const [cx,cy] = toCanvas(b.x, b.y);
+    const r = 5 * scale;
+    ctx.fillStyle = adjustAlpha(C.green, 0.18);
+    ctx.strokeStyle = adjustAlpha(C.green, 0.6);
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    // Rings
+    ctx.strokeStyle = adjustAlpha(C.green, 0.18);
+    ctx.lineWidth = 0.8;
+    [10,17].forEach(rm => { ctx.beginPath(); ctx.arc(cx, cy, rm*scale, 0, Math.PI*2); ctx.stroke(); });
+  }
+}
+
+function drawAssets(C) {
+  const vis = visibleAssets();
+  for (const a of vis) {
+    const [cx,cy] = toCanvas(a.x, a.y);
+    const R  = 13 * scale;
+    const statusColor = {online:'#22c55e', idle:'#f59e0b', offline:'#ef4444'}[a.status];
+    const catColor    = {vehicle:'#3b82f6', equipment:'#a855f7', container:'#f97316', personnel:'#06b6d4'}[a.type];
+    const isSelected  = a.id === selectedId;
+
+    // Selection ring
+    if (isSelected) {
+      ctx.strokeStyle = catColor;
+      ctx.lineWidth   = 2.5;
+      ctx.beginPath(); ctx.arc(cx, cy, R+5, 0, Math.PI*2); ctx.stroke();
+      // Pulse ring
+      ctx.globalAlpha = 0.25;
+      ctx.strokeStyle = catColor;
+      ctx.lineWidth   = 4;
+      ctx.beginPath(); ctx.arc(cx, cy, R+10, 0, Math.PI*2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // Drop shadow
+    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur  = 6;
+    ctx.shadowOffsetY = 2;
+
+    // Circle body
+    ctx.fillStyle = C.surface;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2); ctx.fill();
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+
+    // Border
+    ctx.strokeStyle = catColor;
+    ctx.lineWidth   = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2); ctx.stroke();
+
+    // Emoji
+    ctx.font = `${Math.max(10, 12*scale)}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(a.emoji, cx, cy + 0.5);
+
+    // Status dot
+    const dr = 4 * scale;
+    const dx = cx + R * 0.68, dy = cy + R * 0.68;
+    ctx.fillStyle = C.surface;
+    ctx.beginPath(); ctx.arc(dx, dy, dr+1, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = statusColor;
+    ctx.beginPath(); ctx.arc(dx, dy, dr, 0, Math.PI*2); ctx.fill();
+  }
+}
+
+function adjustAlpha(hex, factor) {
+  // Simple alpha blending helper; returns rgba string
+  // For css var strings fallback to a neutral color
+  if (!hex || hex.startsWith('rgba')) return hex || 'rgba(128,128,128,0.5)';
+  if (hex.startsWith('rgb(')) {
+    return hex.replace('rgb(', 'rgba(').replace(')', `,${factor})`);
+  }
+  return hex; // pass through
+}
+
+function truncLabel(text, maxWidth) {
+  const chars = Math.floor(maxWidth / 7);
+  return text.length > chars ? text.slice(0, chars-1) + '…' : text;
+}
+
+// ═══════════════════════════════════════════════════════
+// TOOLTIP
+// ═══════════════════════════════════════════════════════
+function showTooltip(a, mx, my) {
+  const tt = document.getElementById('asset-tooltip');
+  const catColor = {vehicle:'#3b82f6',equipment:'#a855f7',container:'#f97316',personnel:'#06b6d4'}[a.type];
+  const statusColor = {online:'#22c55e',idle:'#f59e0b',offline:'#ef4444'}[a.status];
+  document.getElementById('tt-icon').style.background = catColor+'22';
+  document.getElementById('tt-icon').textContent = a.emoji;
+  document.getElementById('tt-name').textContent = a.name;
+  document.getElementById('tt-type').innerHTML = `<span style="color:${catColor}">${a.type}</span> · <span style="color:${statusColor}">${a.status}</span>`;
+  const batt = a.battery != null ? `<div class="tt-stat"><div class="lbl">Battery</div><div class="val" style="color:${a.battery>30?'#22c55e':'#ef4444'}">${a.battery}%</div></div>` : '';
+  document.getElementById('tt-grid').innerHTML = `
+    <div class="tt-stat"><div class="lbl">Zone</div><div class="val">${a.zone}</div></div>
+    <div class="tt-stat"><div class="lbl">Last seen</div><div class="val">${a.lastSeen}</div></div>
+    ${batt}
+    <div class="tt-stat"><div class="lbl">Tag ID</div><div class="val" style="font-size:10px">${a.tagId}</div></div>
+  `;
+  const area = document.getElementById('map-area');
+  const aw = area.clientWidth, ah = area.clientHeight;
+  let tx = mx + 18, ty = my - 10;
+  if (tx + 200 > aw) tx = mx - 218;
+  if (ty + 160 > ah) ty = ah - 165;
+  tt.style.left = tx+'px'; tt.style.top = ty+'px';
+  tt.classList.add('visible');
+}
+function hideTooltip() { document.getElementById('asset-tooltip').classList.remove('visible'); }
+
+// ═══════════════════════════════════════════════════════
+// ASSET FILTERING & LIST
+// ═══════════════════════════════════════════════════════
+function visibleAssets() {
+  return ASSETS.filter(a => {
+    if (a.floor !== activeFloor) return false;
+    if (activeCat !== 'all' && a.type !== activeCat) return false;
+    if (activeStatus !== 'all' && a.status !== activeStatus) return false;
+    if (searchQ) {
+      const q = searchQ.toLowerCase();
+      if (!a.name.toLowerCase().includes(q) && !a.tagId.toLowerCase().includes(q) && !a.zone.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function updateCounts() {
+  const v = visibleAssets();
+  document.getElementById('count-total').textContent  = v.length;
+  document.getElementById('count-online').textContent  = v.filter(a=>a.status==='online').length;
+  document.getElementById('count-idle').textContent    = v.filter(a=>a.status==='idle').length;
+  document.getElementById('count-offline').textContent = v.filter(a=>a.status==='offline').length;
+}
+
+function renderList() {
+  const container = document.getElementById('asset-list');
+  const es        = document.getElementById('empty-state');
+  container.querySelectorAll('.asset-item').forEach(el=>el.remove());
+  const v = visibleAssets();
+  if (!v.length) { es.style.display='flex'; document.getElementById('empty-msg').textContent='No assets match filters'; return; }
+  es.style.display = 'none';
+  v.forEach(a => {
+    const el = document.createElement('div');
+    el.className = 'asset-item'; el.dataset.id = a.id;
+    el.innerHTML = `<div class="asset-icon ${a.type}">${a.emoji}</div><div class="asset-info"><div class="asset-name">${a.name}</div><div class="asset-meta">${a.zone} · ${a.lastSeen}</div></div><div class="status-dot ${a.status}"></div>`;
+    el.onclick = () => {
+      selectedId = selectedId === a.id ? null : a.id;
+      document.querySelectorAll('.asset-item').forEach(e=>e.classList.toggle('selected', e.dataset.id===selectedId));
+      drawAll();
+    };
+    container.appendChild(el);
+  });
+}
+
+function scrollToAsset(id) {
+  const el = document.querySelector(`.asset-item[data-id="${id}"]`);
+  if (el) el.scrollIntoView({block:'nearest', behavior:'smooth'});
+}
+
+// ═══════════════════════════════════════════════════════
+// UI HANDLERS
+// ═══════════════════════════════════════════════════════
+function filterCat(el, cat) {
+  activeCat = cat;
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  updateCounts(); renderList(); drawAll();
+}
+
+function filterByStatus(s, el) {
+  activeStatus = s;
+  document.querySelectorAll('.status-card').forEach(c=>c.classList.remove('active-filter'));
+  el.classList.add('active-filter');
+  updateCounts(); renderList(); drawAll();
+}
+
+function filterAssets(q) { searchQ=q; updateCounts(); renderList(); drawAll(); }
+
+function syncFloorUI(floor) {
+  activeFloor = floor;
+  document.querySelectorAll('.floor-tab').forEach(t=>t.classList.toggle('active', t.textContent===floor));
+  document.querySelectorAll('.fsw-btn').forEach(b=>b.classList.toggle('active', b.textContent===floor));
+  updateCounts(); renderList(); selectedId=null; resetView();
+}
+
+function selectFloor(el, floor) { syncFloorUI(floor); }
+function selectFloorMap(el, floor) { syncFloorUI(floor); }
+
+function toggleLayer(layer, btn) {
+  layers[layer] = !layers[layer];
+  btn.classList.toggle('active', layers[layer]);
+  if (layer==='zones') document.getElementById('zone-legend').classList.toggle('visible', layers[layer]);
+  drawAll();
+}
+
+function navigate(el) { document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active')); el.classList.add('active'); }
+
+function toggleTheme() {
+  const html = document.documentElement;
+  const dark = html.getAttribute('data-theme')==='dark';
+  html.setAttribute('data-theme', dark ? 'light' : 'dark');
+  const ic = document.getElementById('theme-icon');
+  ic.innerHTML = dark
+    ? '<path d="M13.5 10.5A5.5 5.5 0 016 3a7 7 0 107.5 7.5z" fill="currentColor" stroke="none"/>'
+    : '<path d="M8 1v1M8 14v1M1 8h1M14 8h1M3.2 3.2l.7.7M12.1 12.1l.7.7M3.2 12.8l.7-.7M12.1 3.9l.7-.7"/><circle cx="8" cy="8" r="3"/>';
+  setTimeout(drawAll, 30);
+}
+
+function exportPNG() {
+  const link = document.createElement('a');
+  link.download = `floor-plan-${activeFloor}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  initCanvas();
+  resetView();
+  updateCounts();
+  renderList();
+  // Animate live updates
+  setInterval(() => {
+    ASSETS.forEach(a => {
+      if (a.status==='online' && Math.random()<0.3) {
+        a.x += (Math.random()-.5)*4;
+        a.y += (Math.random()-.5)*4;
+        a.lastSeen = Math.floor(Math.random()*10)+'s ago';
+      }
+    });
+    updateCounts(); renderList(); drawAll();
+  }, 4000);
+});
+</script>
+</body>
+</html>

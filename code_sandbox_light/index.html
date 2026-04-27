@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PinPlot — Asset Tracker</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css" />
+
+  <!-- Leaflet map -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css" />
+
+  <!-- App styles -->
+  <link rel="stylesheet" href="css/style.css" />
+
+  <!-- SparkMD5 for API signature (only needed for live API mode) -->
+  <script src="https://cdn.jsdelivr.net/npm/spark-md5@3.0.2/spark-md5.min.js"></script>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ═══════════════════════════════════════════
+       HEADER
+  ═══════════════════════════════════════════ -->
+  <header id="app-header">
+    <button id="sidebar-toggle" title="Toggle sidebar">
+      <i class="fa-solid fa-bars"></i>
+    </button>
+
+    <div class="logo-wrap">
+      <div class="logo-icon"><i class="fa-solid fa-location-dot"></i></div>
+      <div>
+        PinPlot
+        <span class="logo-sub">RFID Asset Tracker</span>
+      </div>
+    </div>
+
+    <span id="page-title">Live Map</span>
+
+    <div class="header-right">
+      <span class="demo-badge"><i class="fa-solid fa-flask"></i> DEMO MODE</span>
+
+      <!-- Notifications -->
+      <div class="notif-wrap">
+        <button id="notif-btn" title="Notifications">
+          <i class="fa-solid fa-bell"></i>
+          <span id="notif-badge" style="display:none">0</span>
+        </button>
+
+        <div id="notif-panel">
+          <div class="notif-header">
+            <i class="fa-solid fa-bell"></i> Alerts &amp; Notifications
+          </div>
+          <div id="notif-list"></div>
+        </div>
+      </div>
+
+      <div class="header-avatar" title="Admin User">AU</div>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════
+       SIDEBAR NAV
+  ═══════════════════════════════════════════ -->
+  <nav id="sidebar">
+
+    <div class="nav-section">
+      <div class="nav-section-label">Tracking</div>
+
+      <button class="nav-item active" data-view="dashboard" onclick="App.navigate('dashboard')">
+        <span class="nav-icon"><i class="fa-solid fa-map"></i></span>
+        <span class="nav-label">Live Map</span>
+      </button>
+
+      <button class="nav-item" data-view="assets" onclick="App.navigate('assets')">
+        <span class="nav-icon"><i class="fa-solid fa-list"></i></span>
+        <span class="nav-label">Asset List</span>
+      </button>
+
+      <button class="nav-item" data-view="history" onclick="App.navigate('history')">
+        <span class="nav-icon"><i class="fa-solid fa-route"></i></span>
+        <span class="nav-label">Movement History</span>
+      </button>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-label">Management</div>
+
+      <button class="nav-item" data-view="asset-mgmt" onclick="App.navigate('asset-mgmt')">
+        <span class="nav-icon"><i class="fa-solid fa-tags"></i></span>
+        <span class="nav-label">Asset Management</span>
+      </button>
+
+      <button class="nav-item" data-view="accounts" onclick="App.navigate('accounts')">
+        <span class="nav-icon"><i class="fa-solid fa-users"></i></span>
+        <span class="nav-label">User Accounts</span>
+      </button>
+    </div>
+
+    <!-- Footer user -->
+    <div class="sidebar-footer">
+      <div class="sidebar-footer-avatar">AU</div>
+      <div class="sidebar-footer-info">
+        <strong>Admin User</strong>
+        <small>admin@pinplot.pro</small>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════════════════════════════
+       MAIN CONTENT
+  ═══════════════════════════════════════════ -->
+  <main id="main-content">
+
+    <!-- ─────────────────────────────────────────
+         VIEW 1: DASHBOARD / LIVE MAP
+    ───────────────────────────────────────── -->
+    <section id="view-dashboard" class="view">
+
+      <!-- Left: asset list sidebar -->
+      <aside class="map-sidebar">
+        <div class="map-sidebar-top">
+          <h2><i class="fa-solid fa-satellite-dish" style="color:var(--primary);margin-right:6px"></i> Live Assets</h2>
+          <div class="search-input-wrap">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input
+              id="map-search"
+              class="search-input"
+              type="text"
+              placeholder="Search assets or tags…"
+              oninput="App.state.searchQuery=this.value; Dashboard.renderSidebarList()"
+            />
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stat-chips">
+          <div class="stat-chip">
+            <span class="stat-num" id="stat-total">—</span>
+            <span>Total</span>
+          </div>
+          <div class="stat-chip online">
+            <span class="stat-num" id="stat-online">—</span>
+            <span>Online</span>
+          </div>
+          <div class="stat-chip idle">
+            <span class="stat-num" id="stat-idle">—</span>
+            <span>Idle</span>
+          </div>
+          <div class="stat-chip offline">
+            <span class="stat-num" id="stat-offline">—</span>
+            <span>Offline</span>
+          </div>
+        </div>
+
+        <!-- Category filter -->
+        <div class="cat-filter" id="map-cat-filter">
+          <button class="cat-btn active" onclick="filterMapCat('all', this)">All</button>
+          <button class="cat-btn" onclick="filterMapCat('grp_01', this)"><i class="fa-solid fa-car"></i> Vehicles</button>
+          <button class="cat-btn" onclick="filterMapCat('grp_02', this)"><i class="fa-solid fa-toolbox"></i> Equipment</button>
+          <button class="cat-btn" onclick="filterMapCat('grp_03', this)"><i class="fa-solid fa-box"></i> Containers</button>
+          <button class="cat-btn" onclick="filterMapCat('grp_04', this)"><i class="fa-solid fa-user-hard-hat"></i> Personnel</button>
+        </div>
+
+        <!-- Asset list -->
+        <div id="map-asset-list"></div>
+
+        <!-- Asset detail panel -->
+        <div id="asset-detail-panel"></div>
+      </aside>
+
+      <!-- Right: map -->
+      <div class="map-area">
+        <div id="map-container"></div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────
+         VIEW 2: ASSETS LIST
+    ───────────────────────────────────────── -->
+    <section id="view-assets" class="view">
+
+      <div class="view-header">
+        <h2><i class="fa-solid fa-list" style="color:var(--primary);margin-right:8px"></i>Asset List</h2>
+        <div class="search-input-wrap" style="flex:1;max-width:300px">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input
+            id="assets-search"
+            class="search-input"
+            type="text"
+            placeholder="Search name or tag…"
+            oninput="AssetsView.renderTable()"
+          />
+        </div>
+        <button class="btn btn-primary" onclick="App.navigate('asset-mgmt')">
+          <i class="fa-solid fa-plus"></i> Add Asset
+        </button>
+      </div>
+
+      <!-- Category chips -->
+      <div id="category-chips"></div>
+
+      <div class="view-body">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Asset / Tag</th>
+                <th>Category</th>
+                <th>Status</th>
+                <th>Battery</th>
+                <th>Last Location</th>
+                <th>Last Update</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="assets-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────
+         VIEW 3: MOVEMENT HISTORY
+    ───────────────────────────────────────── -->
+    <section id="view-history" class="view">
+
+      <!-- Controls bar -->
+      <div class="hist-controls">
+        <div class="hist-asset-name-wrap">
+          <label for="hist-asset-select"><i class="fa-solid fa-tag"></i> Asset / Tag</label>
+          <select
+            id="hist-asset-select"
+            onchange="HistoryView._changeAsset(this.value)"
+            style="min-width:200px"
+          ></select>
+        </div>
+
+        <div>
+          <label>From</label>
+          <input type="date" id="hist-from" value="2025-04-20" />
+          <input type="time" id="hist-from-t" value="07:00" />
+        </div>
+        <div>
+          <label>To</label>
+          <input type="date" id="hist-to" value="2025-04-20" />
+          <input type="time" id="hist-to-t" value="15:00" />
+        </div>
+
+        <button class="btn btn-primary btn-sm" onclick="App.toast('In demo mode — track data shown from sample dataset','info')">
+          <i class="fa-solid fa-magnifying-glass"></i> Load Track
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="App.toast('Exporting track as CSV…','success')">
+          <i class="fa-solid fa-download"></i> Export
+        </button>
+
+        <div style="margin-left:auto;font-size:.8rem;color:var(--text-3)">
+          <i class="fa-solid fa-microchip"></i>
+          API: <code style="color:var(--primary)">jimi.device.track.list</code>
+        </div>
+      </div>
+
+      <!-- Map + Timeline -->
+      <div class="hist-body">
+        <div id="hist-map"></div>
+
+        <aside class="hist-timeline-panel">
+          <div class="hist-timeline-header">
+            <i class="fa-solid fa-timeline" style="color:var(--primary)"></i>
+            Position Timeline
+          </div>
+
+          <!-- Legend -->
+          <div class="hist-legend">
+            <span><span class="legend-dot" style="background:#10B981"></span>Start</span>
+            <span><span class="legend-dot" style="background:#3B82F6"></span>Waypoint</span>
+            <span><span class="legend-dot" style="background:#EF4444"></span>Current</span>
+          </div>
+
+          <div style="padding:8px 16px;border-bottom:1px solid var(--border);font-size:.78rem;color:var(--text-3)">
+            <strong id="hist-asset-name" style="color:var(--text)">Truck Alpha-1</strong><br>
+            6 position stops recorded
+          </div>
+
+          <div id="hist-timeline"></div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────
+         VIEW 4: USER ACCOUNT MANAGEMENT
+    ───────────────────────────────────────── -->
+    <section id="view-accounts" class="view">
+
+      <div class="view-header">
+        <h2><i class="fa-solid fa-users" style="color:var(--primary);margin-right:8px"></i>User Accounts</h2>
+        <div class="search-input-wrap" style="flex:1;max-width:280px">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input class="search-input" type="text" placeholder="Search users…" />
+        </div>
+        <button class="btn btn-primary" onclick="AccountsView.openAddModal()">
+          <i class="fa-solid fa-user-plus"></i> Add User
+        </button>
+      </div>
+
+      <!-- API reference bar -->
+      <div style="padding:8px 20px;background:var(--bg-2);border-bottom:1px solid var(--border);font-size:.75rem;color:var(--text-3);display:flex;gap:16px;flex-wrap:wrap">
+        <span><i class="fa-solid fa-plug" style="color:var(--primary)"></i> API endpoints:
+          <code style="color:var(--primary)">jimi.user.child.list</code> ·
+          <code style="color:var(--primary)">jimi.user.child.create</code> ·
+          <code style="color:var(--primary)">jimi.user.child.update</code> ·
+          <code style="color:var(--primary)">jimi.user.child.del</code>
+        </span>
+      </div>
+
+      <div class="view-body">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Role</th>
+                <th>Type</th>
+                <th>Permissions</th>
+                <th>Devices</th>
+                <th>Created</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="accounts-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────
+         VIEW 5: ASSET MANAGEMENT
+    ───────────────────────────────────────── -->
+    <section id="view-asset-mgmt" class="view">
+
+      <div class="view-header">
+        <h2><i class="fa-solid fa-tags" style="color:var(--primary);margin-right:8px"></i>Asset Management</h2>
+        <div class="search-input-wrap" style="flex:1;max-width:280px">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input
+            id="assetmgmt-search"
+            class="search-input"
+            type="text"
+            placeholder="Search IMEI, name, tag…"
+            oninput="AssetMgmt.renderCards()"
+          />
+        </div>
+        <button class="btn btn-primary" onclick="AssetMgmt.openAddModal()">
+          <i class="fa-solid fa-plus"></i> Add Asset
+        </button>
+      </div>
+
+      <!-- Category summary bar -->
+      <div style="display:flex;gap:8px;padding:10px 20px;background:var(--bg-2);border-bottom:1px solid var(--border);overflow-x:auto">
+        <div id="assetmgmt-cat-summary"></div>
+      </div>
+
+      <!-- API reference bar -->
+      <div style="padding:8px 20px;background:var(--bg-2);border-bottom:1px solid var(--border);font-size:.75rem;color:var(--text-3);display:flex;gap:16px;flex-wrap:wrap">
+        <span><i class="fa-solid fa-plug" style="color:var(--primary)"></i> API:
+          <code style="color:var(--primary)">jimi.user.device.list</code> ·
+          <code style="color:var(--primary)">jimi.device.group.list</code> ·
+          <code style="color:var(--primary)">jimi.open.device.rfid.list</code> ·
+          <code style="color:var(--primary)">jimi.device.location.getTagMsg</code>
+        </span>
+      </div>
+
+      <div class="view-body">
+        <div id="assetmgmt-grid"></div>
+      </div>
+    </section>
+
+  </main><!-- /main-content -->
+</div><!-- /app -->
+
+
+<!-- ═══════════════════════════════════════════
+     MODAL: Add / Edit Asset
+═══════════════════════════════════════════ -->
+<div class="modal-overlay" id="asset-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <i class="fa-solid fa-tag" style="color:var(--primary)"></i>
+      <h3 id="asset-modal-title">Add New Asset</h3>
+      <button class="btn-icon" onclick="App.closeModal('asset-modal')">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <form id="asset-form" onsubmit="return false">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Device Name *</label>
+            <input id="af-name" class="form-control" type="text" placeholder="e.g. Truck Alpha-1" />
+          </div>
+          <div class="form-group">
+            <label>IMEI *</label>
+            <input id="af-imei" class="form-control" type="text" placeholder="15-digit IMEI" maxlength="15" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>RFID Tag ID</label>
+            <input id="af-rfid" class="form-control" type="text" placeholder="e.g. RFID-A001" />
+          </div>
+          <div class="form-group">
+            <label>Device Model</label>
+            <input id="af-model" class="form-control" type="text" placeholder="e.g. AT4, AT6, JM-VL03" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Category / Group</label>
+          <select id="af-group" class="form-control">
+            <option value="grp_01">Vehicles</option>
+            <option value="grp_02">Equipment</option>
+            <option value="grp_03">Containers</option>
+            <option value="grp_04">Personnel</option>
+          </select>
+        </div>
+        <div style="padding:10px 14px;background:var(--bg-3);border-radius:var(--radius-sm);font-size:.78rem;color:var(--text-3)">
+          <i class="fa-solid fa-circle-info" style="color:var(--primary)"></i>
+          Device will be registered via <code style="color:var(--primary)">jimi.open.device.bind</code> and assigned to the account.
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="App.closeModal('asset-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="AssetMgmt.save()">
+        <i class="fa-solid fa-check"></i> Save Asset
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     MODAL: Add / Edit User
+═══════════════════════════════════════════ -->
+<div class="modal-overlay" id="user-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <i class="fa-solid fa-user" style="color:var(--primary)"></i>
+      <h3 id="user-modal-title">Add User Account</h3>
+      <button class="btn-icon" onclick="App.closeModal('user-modal')">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <form id="user-form" onsubmit="return false">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Full Name *</label>
+            <input id="uf-name" class="form-control" type="text" placeholder="e.g. Sam Rivera" />
+          </div>
+          <div class="form-group">
+            <label>Account Email *</label>
+            <input id="uf-account" class="form-control" type="email" placeholder="user@company.com" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Role</label>
+            <input id="uf-role" class="form-control" type="text" placeholder="e.g. Dispatcher, Viewer" />
+          </div>
+          <div class="form-group">
+            <label>Account Type</label>
+            <select id="uf-type" class="form-control">
+              <option value="9">User</option>
+              <option value="8">Distributor</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <div class="toggle-wrap">
+            <input type="checkbox" id="uf-enabled" checked />
+            <label for="uf-enabled">Account Active</label>
+          </div>
+        </div>
+        <div style="padding:10px 14px;background:var(--bg-3);border-radius:var(--radius-sm);font-size:.78rem;color:var(--text-3)">
+          <i class="fa-solid fa-circle-info" style="color:var(--primary)"></i>
+          API: <code style="color:var(--primary)">jimi.user.child.create</code> — permissions string defaults to <code>100000</code> (view only). Edit permissions after creation.
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="App.closeModal('user-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="AccountsView.save()">
+        <i class="fa-solid fa-check"></i> Save User
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<!-- ─── Scripts ─────────────────────────────── -->
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script src="js/api.js"></script>
+
+<script>
+  // Helper: filter map sidebar by category chip
+  function filterMapCat(id, btn) {
+    App.state.selectedCategory = id;
+    document.querySelectorAll(".cat-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    Dashboard.renderSidebarList();
+  }
+
+  // Populate asset-mgmt category summary on load
+  document.addEventListener("DOMContentLoaded", () => {
+    const wrap = document.getElementById("assetmgmt-cat-summary");
+    if (wrap) {
+      wrap.style.display = "flex";
+      wrap.style.gap     = "8px";
+      wrap.style.flexWrap = "wrap";
+      wrap.innerHTML = DEMO.categories.map(c => `
+        <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:6px;background:var(--bg-3);border:1px solid var(--border);font-size:.78rem;color:var(--text-2)">
+          <i class="fa-solid ${c.icon}" style="color:${c.color}"></i>
+          <span>${c.name}</span>
+          <span style="background:var(--bg-4);padding:1px 6px;border-radius:10px;font-weight:700">${c.count}</span>
+        </div>`).join("");
+    }
+  });
+</script>
+
+</body>
+</html>

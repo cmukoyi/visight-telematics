@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Journeys - Driver & Vehicle Tracking</title>
+    <!-- Leaflet CSS for map -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f7fa;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            color: white;
+            padding: 1.5rem 2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 1.875rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 0.95rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Trips List View */
+        .trips-view {
+            display: block;
+        }
+
+        .trips-view.hidden {
+            display: none;
+        }
+
+        .controls {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .control-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .control-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 0.5rem;
+            font-size: 0.95rem;
+        }
+
+        input[type="date"],
+        input[type="search"],
+        select {
+            padding: 0.75rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+
+        input[type="date"]:focus,
+        input[type="search"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            align-items: flex-end;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2563eb;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-secondary {
+            background: #64748b;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #475569;
+        }
+
+        .btn-small {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }
+
+        /* Filter Stats */
+        .filter-stats {
+            background: #f0f9ff;
+            border-left: 4px solid #3b82f6;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1.5rem;
+            color: #1e40af;
+        }
+
+        /* Trips List */
+        .trips-grid {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .trip-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-left: 4px solid #3b82f6;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .trip-card:hover {
+            box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+            transform: translateY(-2px);
+        }
+
+        .trip-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 1rem;
+        }
+
+        .trip-title {
+            font-size: 1.125rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .trip-date {
+            font-size: 0.875rem;
+            color: #64748b;
+            margin-top: 0.25rem;
+            background: #f0f9ff;
+            padding: 0.5rem 0.75rem;
+            border-radius: 4px;
+            border-left: 3px solid #0ea5e9;
+            margin-top: 0.75rem;
+        }
+
+        .trip-date-time {
+            font-weight: 600;
+            color: #0369a1;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .trip-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .stat {
+            background: #f8fafc;
+            padding: 1rem;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .stat-unit {
+            font-size: 0.875rem;
+            color: #94a3b8;
+            margin-left: 0.25rem;
+        }
+
+        .trip-duration {
+            color: #059669;
+            font-weight: 600;
+        }
+
+        .trip-distance {
+            color: #d97706;
+            font-weight: 600;
+        }
+
+        .trip-driver {
+            font-size: 0.875rem;
+            color: #64748b;
+            margin-top: 0.5rem;
+        }
+
+        .trip-locations {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .location {
+            flex: 1;
+        }
+
+        .location-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            margin-bottom: 0.25rem;
+        }
+
+        .location-text {
+            font-size: 0.95rem;
+            color: #1e293b;
+            word-wrap: break-word;
+        }
+
+        .arrow {
+            color: #cbd5e1;
+            font-size: 1.5rem;
+        }
+
+        .trip-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .trip-time {
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+
+        .view-route-btn {
+            background: #3b82f6;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+
+        .view-route-btn:hover {
+            background: #2563eb;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #64748b;
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .empty-state h3 {
+            font-size: 1.25rem;
+            color: #1e293b;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Trip Details View */
+        .trip-details-view {
+            display: none;
+        }
+
+        .trip-details-view.active {
+            display: block;
+        }
+
+        .details-header {
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            color: white;
+        }
+
+        .back-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+            backdrop-filter: blur(10px);
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.8);
+            transform: translateX(-2px);
+        }
+
+        .details-title {
+            flex: 1;
+        }
+
+        .details-title h1 {
+            font-size: 1.5rem;
+            color: white;
+            font-weight: 700;
+        }
+
+        .details-title p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.95rem;
+            margin-top: 0.25rem;
+        }
+
+        .map-container {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+
+        #map {
+            width: 100%;
+            height: 600px;
+            background: #e5e7eb;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .map-wrapper {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border: 1px solid #e2e8f0;
+        }
+
+        .map-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 500px;
+            background: #f3f4f6;
+            color: #6b7280;
+            font-size: 1.1rem;
+        }
+
+        /* Trip Info Box */
+        .info-box {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border: 1px solid #e2e8f0;
+            margin-top: 1rem;
+        }
+
+        .info-section {
+            margin-bottom: 2rem;
+        }
+
+        .info-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .info-section-title {
+            font-size: 1.125rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .info-value {
+            font-size: 1rem;
+            color: #1e293b;
+            word-wrap: break-word;
+        }
+
+        .location-box {
+            background: #f8fafc;
+            padding: 1rem;
+            border-left: 4px solid #3b82f6;
+            border-radius: 4px;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 3px solid #e2e8f0;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 2rem auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .trip-card {
+                padding: 1rem;
+            }
+
+            .trip-stats {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .trip-locations {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .arrow {
+                transform: rotate(90deg);
+            }
+
+            #map {
+                height: 400px;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .control-group {
+                grid-template-columns: 1fr;
+            }
+
+            .button-group {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .button-group .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
+        /* Badge for zero distance */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚗 Journeys & Trips</h1>
+        <p>Track vehicle trips and analyze driver routes</p>
+    </div>
+
+    <div class="container">
+        <!-- TRIPS LIST VIEW -->
+        <div class="trips-view" id="tripsView">
+            <div class="controls">
+                <h2 style="margin-bottom: 1.5rem; color: #1e293b;">Search & Filter</h2>
+                
+                <div class="control-group">
+                    <div class="control-item">
+                        <label for="vehicleSelect">🚗 Vehicle</label>
+                        <select id="vehicleSelect">
+                            <option value="">Loading vehicles...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="control-item">
+                        <label for="startDate">📅 Start Date</label>
+                        <input type="date" id="startDate">
+                    </div>
+                    
+                    <div class="control-item">
+                        <label for="endDate">📅 End Date</label>
+                        <input type="date" id="endDate">
+                    </div>
+
+                    <div class="control-item">
+                        <label for="minDistance">📏 Min Distance (km)</label>
+                        <input type="search" id="minDistance" placeholder="0" value="0">
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn btn-primary" onclick="filterTrips()">
+                        🔍 Search Trips
+                    </button>
+                    <button class="btn btn-secondary" onclick="resetFilters()">
+                        🔄 Reset
+                    </button>
+                </div>
+            </div>
+
+            <div id="filterStats" class="filter-stats" style="display: none;">
+                <strong id="statsText"></strong>
+            </div>
+
+            <div id="tripsList" class="trips-grid"></div>
+        </div>
+
+        <!-- TRIP DETAILS VIEW -->
+        <div class="trip-details-view" id="tripDetails">
+            <div class="details-header">
+                <button class="back-btn" onclick="backToList()">
+                    ← Back to Trips
+                </button>
+                <div class="details-title">
+                    <h1 id="detailsTitle">Trip Details</h1>
+                    <p id="detailsSubtitle"></p>
+                </div>
+            </div>
+
+            <div class="map-wrapper">
+                <div class="map-container">
+                    <div id="mapLoading" class="map-loading">
+                        📍 Loading map and route data...
+                    </div>
+                    <div id="map" style="display: none;"></div>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <div class="info-section">
+                    <h3 class="info-section-title">📍 Journey Details</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Trip ID</span>
+                            <span class="info-value" id="tripId">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Duration</span>
+                            <span class="info-value" id="tripDuration">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Distance</span>
+                            <span class="info-value" id="tripDistanceDetail">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Max Speed</span>
+                            <span class="info-value" id="maxSpeed">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Average Speed</span>
+                            <span class="info-value" id="avgSpeed">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h3 class="info-section-title">🚙 Vehicle Information</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Vehicle</span>
+                            <span class="info-value" id="vehicleDesc">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Driver</span>
+                            <span class="info-value" id="driverDesc">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Key Code</span>
+                            <span class="info-value" id="keyCode">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h3 class="info-section-title">📍 Route Information</h3>
+                    <div class="info-item" style="margin-bottom: 1.5rem;">
+                        <span class="info-label">Start Location</span>
+                        <div class="location-box">
+                            <span class="info-value" id="startLocation">-</span>
+                        </div>
+                    </div>
+                    <div class="info-item" style="margin-bottom: 1.5rem;">
+                        <span class="info-label">End Location</span>
+                        <div class="location-box">
+                            <span class="info-value" id="endLocation">-</span>
+                        </div>
+                    </div>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Start Time</span>
+                            <span class="info-value" id="startTime">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">End Time</span>
+                            <span class="info-value" id="endTime">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h3 class="info-section-title">📊 Route Statistics</h3>
+                    <div id="routeStats" class="info-grid"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS for map -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script>
+        const API_URL = '/api';
+        let currentTrips = [];
+        let currentTrip = null;
+        let currentTripEvents = null;
+        let map = null;
+        let routeLayer = null;
+        let markersLayer = null;
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set default dates (last 30 days)
+            const endDate = new Date();
+            const startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+            
+            document.getElementById('startDate').valueAsDate = startDate;
+            document.getElementById('endDate').valueAsDate = endDate;
+
+            // Load vehicles
+            loadVehicles();
+        });
+
+        async function loadVehicles() {
+            try {
+                const response = await fetch(`${API_URL}/vehicles`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                const vehicles = data.vehicles || [];
+                
+                const select = document.getElementById('vehicleSelect');
+                select.innerHTML = '<option value="">Select a vehicle...</option>';
+                
+                vehicles.forEach(vehicle => {
+                    const option = document.createElement('option');
+                    option.value = vehicle.id;
+                    option.textContent = `${vehicle.description || vehicle.name} (${vehicle.imei || vehicle.id.substring(0, 8)})`;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading vehicles:', error);
+                document.getElementById('vehicleSelect').innerHTML = '<option value="">Error loading vehicles</option>';
+            }
+        }
+
+        async function filterTrips() {
+            const vehicleId = document.getElementById('vehicleSelect').value;
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const minDistance = parseFloat(document.getElementById('minDistance').value) || 0;
+
+            if (!vehicleId || !startDate || !endDate) {
+                alert('Please select a vehicle and date range');
+                return;
+            }
+
+            // Convert dates to ISO format with time
+            const startDateTime = startDate + 'T00:00:00Z';
+            const endDateTime = endDate + 'T23:59:59Z';
+
+            try {
+                const response = await fetch(`${API_URL}/trips`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        vehicleId: vehicleId,
+                        startDate: startDateTime,
+                        endDate: endDateTime
+                    })
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                const allTrips = data.trips || [];
+
+                // Filter out zero-distance trips on UI side
+                currentTrips = allTrips.filter(trip => {
+                    const distance = (trip.distance || 0) / 1000; // Convert meters to km
+                    return distance >= minDistance;
+                });
+
+                displayTrips(currentTrips, minDistance);
+            } catch (error) {
+                console.error('Error fetching trips:', error);
+                showError('Failed to load trips. Please try again.');
+            }
+        }
+
+        function displayTrips(trips, minDistance = 0) {
+            const tripsList = document.getElementById('tripsList');
+            const statsDiv = document.getElementById('filterStats');
+            const statsText = document.getElementById('statsText');
+
+            if (trips.length === 0) {
+                tripsList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <h3>No Trips Found</h3>
+                        <p>Try adjusting your filters or select a different date range</p>
+                    </div>
+                `;
+                statsDiv.style.display = 'block';
+                statsText.textContent = `0 trips found matching your criteria`;
+                return;
+            }
+
+            const totalDistance = trips.reduce((sum, trip) => sum + (trip.distance || 0), 0);
+            const totalDuration = trips.reduce((sum, trip) => sum + (trip.duration || 0), 0);
+            
+            statsDiv.style.display = 'block';
+            statsText.textContent = `Found ${trips.length} trip(s) • Total Distance: ${(totalDistance/1000).toFixed(1)} km • Total Duration: ${formatDuration(totalDuration)}`;
+
+            tripsList.innerHTML = trips.map(trip => {
+                const distance = (trip.distance || 0) / 1000; // meters to km
+                const duration = formatDuration(trip.duration || 0);
+                const startTime = new Date(trip.startUtcTimestamp);
+                const endTime = new Date(trip.endUtcTimestamp);
+                const dateStr = startTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+                const startTimeStr = startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'});
+                const endTimeStr = endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'});
+
+                return `
+                    <div class="trip-card" onclick="viewTripRoute('${trip.id}')">
+                        <div class="trip-header">
+                            <div>
+                                <div class="trip-title">🚗 ${trip.vehicle_Description || 'Unknown Vehicle'}</div>
+                                <div class="trip-date">
+                                    <div class="trip-date-time">📅 ${dateStr}</div>
+                                    <div style="font-size: 0.8rem; color: #475569;">⏱️ ${startTimeStr} → ${endTimeStr}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="trip-stats">
+                            <div class="stat">
+                                <div class="stat-label">Duration</div>
+                                <div class="stat-value trip-duration">${duration}</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-label">Distance</div>
+                                <div class="stat-value trip-distance">${distance.toFixed(2)} <span class="stat-unit">km</span></div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-label">Avg Speed</div>
+                                <div class="stat-value">${getAverageSpeed(trip).toFixed(1)} <span class="stat-unit">km/h</span></div>
+                            </div>
+                        </div>
+
+                        <div class="trip-locations">
+                            <div class="location">
+                                <div class="location-label">📍 Start</div>
+                                <div class="location-text">${trip.startLocationDescription || 'N/A'}</div>
+                            </div>
+                            <div class="arrow">→</div>
+                            <div class="location">
+                                <div class="location-label">📍 End</div>
+                                <div class="location-text">${trip.endLocationDescription || 'N/A'}</div>
+                            </div>
+                        </div>
+
+                        ${trip.driver_Description ? `<div class="trip-driver">👤 Driver: ${trip.driver_Description}</div>` : ''}
+
+                        <div class="trip-footer">
+                            <div class="trip-time">Trip ID: ${trip.id}</div>
+                            <button class="view-route-btn" onclick="viewTripRoute('${trip.id}', event)">
+                                🗺️ View Route
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function viewTripRoute(tripId, event) {
+            if (event) {
+                event.stopPropagation();
+            }
+
+            // Find trip in current trips list
+            currentTrip = currentTrips.find(t => t.id == tripId);
+            if (!currentTrip) {
+                showError('Trip not found');
+                return;
+            }
+
+            // Switch to details view
+            document.getElementById('tripsView').classList.add('hidden');
+            document.getElementById('tripDetails').classList.add('active');
+
+            // Update header
+            const startTime = new Date(currentTrip.startUtcTimestamp);
+            const endTime = new Date(currentTrip.endUtcTimestamp);
+            document.getElementById('detailsTitle').textContent = `${currentTrip.vehicle_Description || 'Trip'} Route`;
+            document.getElementById('detailsSubtitle').textContent = `${startTime.toLocaleString()} - ${endTime.toLocaleString()}`;
+
+            // Load trip events (waypoints)
+            await loadTripEvents(tripId);
+
+            // Initialize map
+            initializeMap();
+
+            // Update trip info
+            updateTripInfo();
+        }
+
+        async function loadTripEvents(tripId) {
+            try {
+                document.getElementById('mapLoading').style.display = 'flex';
+                
+                const response = await fetch(`${API_URL}/trips/${tripId}/events`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                currentTripEvents = data.events || [];
+                
+                document.getElementById('mapLoading').style.display = 'none';
+                document.getElementById('map').style.display = 'block';
+            } catch (error) {
+                console.error('Error loading trip events:', error);
+                document.getElementById('mapLoading').innerHTML = '❌ Failed to load route data';
+            }
+        }
+
+        function initializeMap() {
+            if (!currentTripEvents || currentTripEvents.length === 0) {
+                document.getElementById('mapLoading').innerHTML = '⚠️ No route data available';
+                return;
+            }
+
+            // Destroy previous map if exists
+            if (map) {
+                map.remove();
+                map = null;
+            }
+
+            // Create new map
+            map = L.map('map').setView([51.505, -0.09], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(map);
+
+            // Create layers
+            routeLayer = L.featureGroup().addTo(map);
+            markersLayer = L.featureGroup().addTo(map);
+
+            // Plot route
+            const routePoints = currentTripEvents
+                .filter(e => e.latitude && e.longitude)
+                .map(e => [e.latitude, e.longitude]);
+
+            if (routePoints.length === 0) {
+                document.getElementById('mapLoading').innerHTML = '⚠️ No GPS data available';
+                return;
+            }
+
+            // Draw polyline
+            L.polyline(routePoints, {
+                color: '#3b82f6',
+                weight: 3,
+                opacity: 0.8,
+                smoothFactor: 1.0
+            }).addTo(routeLayer);
+
+            // Add start marker
+            if (routePoints.length > 0) {
+                L.circleMarker(routePoints[0], {
+                    radius: 8,
+                    fillColor: '#22c55e',
+                    color: '#fff',
+                    weight: 2,
+                    opacity: 0.8,
+                    fillOpacity: 0.8
+                }).bindPopup('🚗 Trip Start').addTo(markersLayer);
+            }
+
+            // Add end marker
+            if (routePoints.length > 1) {
+                L.circleMarker(routePoints[routePoints.length - 1], {
+                    radius: 8,
+                    fillColor: '#ef4444',
+                    color: '#fff',
+                    weight: 2,
+                    opacity: 0.8,
+                    fillOpacity: 0.8
+                }).bindPopup('🏁 Trip End').addTo(markersLayer);
+            }
+
+            // Fit bounds
+            const bounds = L.latLngBounds(routePoints);
+            map.fitBounds(bounds, { padding: [50, 50] });
+        }
+
+        function updateTripInfo() {
+            if (!currentTrip) return;
+
+            const distance = (currentTrip.distance || 0) / 1000;
+            const duration = currentTrip.duration || 0;
+            const startTime = new Date(currentTrip.startUtcTimestamp);
+            const endTime = new Date(currentTrip.endUtcTimestamp);
+            const startTimeFormatted = startTime.toLocaleString('en-US', { 
+                weekday: 'short', 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+            });
+            const endTimeFormatted = endTime.toLocaleString('en-US', { 
+                weekday: 'short', 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+            });
+
+            document.getElementById('tripId').textContent = currentTrip.id;
+            document.getElementById('tripDuration').textContent = formatDuration(duration);
+            document.getElementById('tripDistanceDetail').textContent = `${distance.toFixed(2)} km`;
+            document.getElementById('vehicleDesc').textContent = currentTrip.vehicle_Description || 'N/A';
+            document.getElementById('driverDesc').textContent = currentTrip.driver_Description || 'Not specified';
+            document.getElementById('keyCode').textContent = currentTrip.driverKeyCode || 'N/A';
+            document.getElementById('startLocation').textContent = currentTrip.startLocationDescription || 'N/A';
+            document.getElementById('endLocation').textContent = currentTrip.endLocationDescription || 'N/A';
+            document.getElementById('startTime').textContent = startTimeFormatted;
+            document.getElementById('endTime').textContent = endTimeFormatted;
+
+            // Calculate stats from events
+            if (currentTripEvents && currentTripEvents.length > 0) {
+                const speeds = currentTripEvents
+                    .map(e => e.speed || 0)
+                    .filter(s => s > 0);
+                
+                const maxSpeed = Math.max(...speeds, 0);
+                const avgSpeed = speeds.length > 0 ? speeds.reduce((a, b) => a + b, 0) / speeds.length : 0;
+                
+                document.getElementById('maxSpeed').textContent = `${maxSpeed.toFixed(1)} km/h`;
+                document.getElementById('avgSpeed').textContent = `${avgSpeed.toFixed(1)} km/h`;
+            }
+        }
+
+        function backToList() {
+            // Smooth transition
+            document.getElementById('tripDetails').classList.remove('active');
+            document.getElementById('tripsView').classList.remove('hidden');
+            
+            // Clean up map
+            if (map) {
+                map.remove();
+                map = null;
+            }
+            
+            // Reset scroll position
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function resetFilters() {
+            document.getElementById('vehicleSelect').value = '';
+            document.getElementById('minDistance').value = '0';
+            document.getElementById('tripsList').innerHTML = '';
+            document.getElementById('filterStats').style.display = 'none';
+            currentTrips = [];
+        }
+
+        function formatDuration(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            
+            if (hours > 0) {
+                return `${hours}h ${minutes}m`;
+            } else if (minutes > 0) {
+                return `${minutes}m ${secs}s`;
+            } else {
+                return `${secs}s`;
+            }
+        }
+
+        function getAverageSpeed(trip) {
+            const distance = (trip.distance || 0) / 1000; // meters to km
+            const duration = (trip.duration || 1) / 3600; // seconds to hours
+            return distance / duration;
+        }
+
+        function showError(message) {
+            alert(message);
+        }
+    </script>
+</body>
+</html>

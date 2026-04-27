@@ -1,0 +1,67 @@
+# Environment variables — NEVER commit real .env files
+# These patterns cover all subdirectories (backend/.env, etc.)
+.env
+.env.local
+.env.production
+.env.staging
+.env.development
+**/.env
+**/.env.local
+**/.env.production
+**/.env.staging
+**/.env.development
+# Allow only example/template files
+!**/.env.example
+!**/.env.local.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.next/
+out/
+dist/
+
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.iml
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Docker
+*.log
+
+# Database
+*.db
+*.sqlite
+postgres_data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log

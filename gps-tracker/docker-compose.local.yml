@@ -1,0 +1,102 @@
+version: '3.8'
+
+# Local Development Docker Compose
+# Use this for local testing before pushing to production
+# Run with: docker-compose -f docker-compose.local.yml up
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: beacon_telematics_db_local
+    environment:
+      POSTGRES_USER: beacon_user
+      POSTGRES_PASSWORD: local_dev_password
+      POSTGRES_DB: beacon_telematics
+    volumes:
+      - beacon_telematics_postgres_data_local:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - beacon_telematics_network_local
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U beacon_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: beacon_telematics_backend_local
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - beacon_telematics_network_local
+    environment:
+      - DEBUG=True
+      - ENVIRONMENT=development
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  admin:
+    build:
+      context: ./admin-dashboard
+      dockerfile: Dockerfile
+    container_name: beacon_telematics_admin_local
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./admin-dashboard:/app
+      - /app/node_modules
+    environment:
+      - BACKEND_URL=http://localhost:8000/api/v1
+      - NODE_ENV=development
+    depends_on:
+      - backend
+    networks:
+      - beacon_telematics_network_local
+
+  customer:
+    build:
+      context: ./customer-dashboard
+      dockerfile: Dockerfile
+    container_name: beacon_telematics_customer_local
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./customer-dashboard:/app
+      - /app/node_modules
+    environment:
+      - BACKEND_URL=http://localhost:8000/api/v1
+      - NODE_ENV=development
+    depends_on:
+      - backend
+    networks:
+      - beacon_telematics_network_local
+
+  flutter-web:
+    build:
+      context: ./mobile-app
+      dockerfile: Dockerfile
+    container_name: beacon_telematics_flutter_web_local
+    ports:
+      - "3002:80"
+    depends_on:
+      - backend
+    networks:
+      - beacon_telematics_network_local
+
+volumes:
+  beacon_telematics_postgres_data_local:
+    driver: local
+
+networks:
+  beacon_telematics_network_local:
+    driver: bridge

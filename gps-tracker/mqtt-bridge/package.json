@@ -1,0 +1,11 @@
+{
+  "name": "mqtt-bridge",
+  "version": "1.0.0",
+  "description": "Pareto Anywhere → Mosquitto MQTT bridge",
+  "main": "index.js",
+  "scripts": { "start": "node index.js" },
+  "dependencies": {
+    "mqtt": "^5.0.0",
+    "socket.io-client": "^4.7.0"
+  }
+}

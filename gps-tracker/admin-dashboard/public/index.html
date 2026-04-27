@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BLE Tracker - Admin Portal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f7fa;
+        }
+        .header {
+            background: #3b82f6;
+            color: white;
+            padding: 1.5rem 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .card h2 {
+            margin-bottom: 1rem;
+            color: #1e293b;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #475569;
+        }
+        .status {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        .status.active {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .status.inactive {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #3b82f6;
+        }
+        .stat-label {
+            color: #64748b;
+            margin-top: 0.5rem;
+        }
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #64748b;
+        }
+        .nav {
+            background: white;
+            padding: 0.5rem 2rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 1rem;
+        }
+        .nav a {
+            padding: 0.75rem 1.25rem;
+            text-decoration: none;
+            color: #64748b;
+            font-weight: 500;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .nav a:hover {
+            color: #3b82f6;
+        }
+        .nav a.active {
+            color: #3b82f6;
+            border-bottom-color: #3b82f6;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🛡️ BLE Tracker - Admin Portal</h1>
+        <p>User Management & System Administration</p>
+    </div>
+
+    <div class="nav">
+        <a href="index.html" class="active">Users</a>
+        <a href="billing.html">Billing & Tags</a>
+        <a href="trips.html">📍 Journeys & Trips</a>
+    </div>
+
+    <div class="container">
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="totalUsers">-</div>
+                <div class="stat-label">Total Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="activeUsers">-</div>
+                <div class="stat-label">Active Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="adminUsers">-</div>
+                <div class="stat-label">Admin Users</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>User Management</h2>
+            <p style="color: #64748b; margin-bottom: 1rem;">Manage user accounts and permissions</p>
+            
+            <div id="userTableContainer">
+                <div class="loading">Loading users...</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Registered BLE Tags / IMEIs</h2>
+            <p style="color: #64748b; margin-bottom: 1rem;">All registered vehicle IMEIs and their owners</p>
+            
+            <div id="tagsTableContainer">
+                <div class="loading">Loading tags...</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>System Status</h2>
+            <p style="color: #22c55e; font-weight: 600;">✓ Backend API: Connected</p>
+            <p style="color: #22c55e; font-weight: 600;">✓ Database: Connected</p>
+        </div>
+    </div>
+
+    <script>
+        // Use relative URL for production compatibility
+        const API_URL = '/api/v1';
+
+        async function loadUsers() {
+            try {
+                const userTableContainer = document.getElementById('userTableContainer');
+                userTableContainer.innerHTML = '<div class="loading">Loading users...</div>';
+                
+                // Fetch users from backend
+                // Note: In production, this would require an admin token
+                const response = await fetch(`${API_URL}/admin/users`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        // In production: 'Authorization': `Bearer ${adminToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const users = await response.json();
+                
+                // Update stats
+                document.getElementById('totalUsers').textContent = users.length;
+                document.getElementById('activeUsers').textContent = users.filter(u => u.is_active).length;
+                document.getElementById('adminUsers').textContent = users.filter(u => u.is_admin).length;
+
+                // Create users table
+                if (users.length === 0) {
+                    userTableContainer.innerHTML = `
+                        <p style="text-align: center; padding: 2rem; color: #64748b;">
+                            No registered users yet.
+                        </p>
+                    `;
+                } else {
+                    userTableContainer.innerHTML = `
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Email</th>
+                                    <th>Full Name</th>
+                                    <th>Verified</th>
+                                    <th>Active</th>
+                                    <th>Role</th>
+                                    <th>Member Since</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${users.map(user => `
+                                    <tr>
+                                        <td><strong>${user.email}</strong></td>
+                                        <td>${user.first_name || ''} ${user.last_name || ''}</td>
+                                        <td>${user.email_verified ? '<span style="color: #22c55e;">✓</span>' : '<span style="color: #ef4444;">✗</span>'}</td>
+                                        <td>${user.is_active ? '<span style="color: #22c55e;">✓</span>' : '<span style="color: #ef4444;">✗</span>'}</td>
+                                        <td>${user.is_admin ? '<span style="color: #3b82f6;">Admin</span>' : 'User'}</td>
+                                        <td>${new Date(user.created_at).toLocaleDateString()}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                }
+
+            } catch (error) {
+                console.error('Error loading users:', error);
+                const userTableContainer = document.getElementById('userTableContainer');
+                userTableContainer.innerHTML = `
+                    <div style="padding: 2rem; text-align: center;">
+                        <p style="color: #ef4444; margin-bottom: 1rem;">
+                            <strong>⚠️ Unable to load users</strong>
+                        </p>
+                        <p style="color: #64748b; margin-bottom: 1rem;">
+                            ${error.message}
+                        </p>
+                        <p style="color: #64748b; font-size: 0.875rem;">
+                            Note: This endpoint requires admin authentication.<br>
+                            For testing, you can temporarily disable auth in the backend.
+                        </p>
+                        <button style="margin-top: 1rem; padding: 0.5rem 1rem; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;" onclick="loadUsers()">
+                            Retry
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        async function loadTags() {
+            try {
+                const tagsTableContainer = document.getElementById('tagsTableContainer');
+                tagsTableContainer.innerHTML = '<div class="loading">Loading tags...</div>';
+                
+                // Fetch BLE tags from backend
+                const response = await fetch(`${API_URL}/admin/billing/tags`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        // In production: 'Authorization': `Bearer ${adminToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const tags = await response.json();
+
+                // Create tags table
+                if (tags.length === 0) {
+                    tagsTableContainer.innerHTML = `
+                        <p style="text-align: center; padding: 2rem; color: #64748b;">
+                            No registered IMEIs yet.
+                        </p>
+                    `;
+                } else {
+                    tagsTableContainer.innerHTML = `
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>IMEI</th>
+                                    <th>Device Name</th>
+                                    <th>Owner Email</th>
+                                    <th>Owner Name</th>
+                                    <th>Status</th>
+                                    <th>Added</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${tags.map(tag => `
+                                    <tr>
+                                        <td><strong>${tag.imei}</strong></td>
+                                        <td>${tag.device_name || '<span style="color: #94a3b8;">Not set</span>'}</td>
+                                        <td>${tag.user_email || '<span style="color: #94a3b8;">Unknown</span>'}</td>
+                                        <td>${tag.user_name || '<span style="color: #94a3b8;">-</span>'}</td>
+                                        <td>${tag.is_active ? '<span style="color: #22c55e;">● Active</span>' : '<span style="color: #ef4444;">● Inactive</span>'}</td>
+                                        <td>${new Date(tag.added_at).toLocaleDateString()}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                }
+
+            } catch (error) {
+                console.error('Error loading tags:', error);
+                const tagsTableContainer = document.getElementById('tagsTableContainer');
+                tagsTableContainer.innerHTML = `
+                    <div style="padding: 2rem; text-align: center;">
+                        <p style="color: #ef4444; margin-bottom: 1rem;">
+                            <strong>⚠️ Unable to load BLE tags</strong>
+                        </p>
+                        <p style="color: #64748b; margin-bottom: 1rem;">
+                            ${error.message}
+                        </p>
+                        <button style="margin-top: 1rem; padding: 0.5rem 1rem; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;" onclick="loadTags()">
+                            Retry
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        // Load data on page load
+        loadUsers();
+        loadTags();
+        
+        // Refresh every 10 seconds
+        setInterval(() => {
+            loadUsers();
+            loadTags();
+        }, 10000);
+    </script>
+</body>
+</html>

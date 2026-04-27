@@ -1,0 +1,7 @@
+# Test dependencies (local development only, NOT deployed)
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+httpx==0.26.0
+sqlalchemy==2.0.25
+# Note: uvloop is Linux/macOS only, excluded for Windows compatibility

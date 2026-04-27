@@ -1,0 +1,38 @@
+Generic single-database configuration for Alembic migrations.
+
+## Running Migrations
+
+### In Development (Local)
+```bash
+cd gps-tracker/backend
+alembic upgrade head
+```
+
+### In Production (Docker)
+```bash
+cd ~/gps-tracker
+docker-compose exec backend bash -c "cd /app && alembic upgrade head"
+```
+
+### Check Current Version
+```bash
+# Local
+alembic current
+
+# Docker
+docker-compose exec backend bash -c "cd /app && alembic current"
+```
+
+### Create New Migration
+```bash
+# Local
+alembic revision -m "description of changes"
+
+# Autogenerate from models
+alembic revision --autogenerate -m "description"
+```
+
+## Migration Files
+- `env.py` - Alembic environment configuration
+- `script.py.mako` - Template for new migrations
+- `versions/` - Directory containing all migration scripts
