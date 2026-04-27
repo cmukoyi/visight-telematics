@@ -1,0 +1,508 @@
+{
+  "@odata.context": "https://live.mzoneweb.net/mzone62.api/$metadata#Trips(vehicle_Description,duration,distance,startLocationDescription,startUtcTimestamp,endLocationDescription,endUtcTimestamp,driver_Description,id,vehicle_Id,driverKeyCode)",
+  "@odata.count": 536,
+  "value": [
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 660,
+      "distance": 2.441,
+      "startLocationDescription": "Crown Lane, London Borough of Merton",
+      "startUtcTimestamp": "2026-03-10T18:32:32Z",
+      "endLocationDescription": "7 Cranleigh Gardens, London Borough of Sutton, SM1 3EJ",
+      "endUtcTimestamp": "2026-03-10T18:43:32Z",
+      "id": 2400298867,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 168,
+      "distance": 0.319,
+      "startLocationDescription": "20d Bordesley Road, London Borough of Merton, SM4 5LN",
+      "startUtcTimestamp": "2026-03-10T18:29:30Z",
+      "endLocationDescription": "Crown Road, London Borough of Merton",
+      "endUtcTimestamp": "2026-03-10T18:32:18Z",
+      "id": 2400320648,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 38,
+      "distance": 0.0,
+      "startUtcTimestamp": "2026-03-10T18:23:13Z",
+      "endLocationDescription": "20d Bordesley Road, London Borough of Merton, SM4 5LN",
+      "endUtcTimestamp": "2026-03-10T18:23:51Z",
+      "id": 2400320649,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 427,
+      "distance": 0.0,
+      "startUtcTimestamp": "2026-03-10T18:09:04Z",
+      "endUtcTimestamp": "2026-03-10T18:16:11Z",
+      "id": 2400320650,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 200,
+      "distance": 0.221,
+      "startUtcTimestamp": "2026-03-10T17:12:31Z",
+      "endLocationDescription": "54 Malmesbury Road, London Borough of Merton",
+      "endUtcTimestamp": "2026-03-10T17:15:51Z",
+      "id": 2400293575,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 173,
+      "distance": 0.0,
+      "startUtcTimestamp": "2026-03-10T17:09:24Z",
+      "endUtcTimestamp": "2026-03-10T17:12:17Z",
+      "id": 2400296975,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 236,
+      "distance": 0.688,
+      "startLocationDescription": "24-57 Rose Hill Roundabout, London Borough of Sutton",
+      "startUtcTimestamp": "2026-03-10T15:18:40Z",
+      "endLocationDescription": "28 Cranleigh Gardens, London Borough of Sutton, SM1 3EJ",
+      "endUtcTimestamp": "2026-03-10T15:22:36Z",
+      "id": 2400280526,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 173,
+      "distance": 0.617,
+      "startLocationDescription": "40 Neath Gardens, London Borough of Merton, SM4 6HG",
+      "startUtcTimestamp": "2026-03-10T15:15:33Z",
+      "endLocationDescription": "Rose Hill Roundabout, London Borough of Sutton",
+      "endUtcTimestamp": "2026-03-10T15:18:26Z",
+      "id": 2400278742,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 32,
+      "distance": 0.0,
+      "startUtcTimestamp": "2026-03-10T11:08:28Z",
+      "endUtcTimestamp": "2026-03-10T11:09:00Z",
+      "id": 2400242981,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 32,
+      "distance": 0.0,
+      "startUtcTimestamp": "2026-03-10T10:09:05Z",
+      "endUtcTimestamp": "2026-03-10T10:09:37Z",
+      "id": 2400240652,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 151,
+      "distance": 0.641,
+      "startLocationDescription": "12-22 Rose Hill, London Borough of Sutton",
+      "startUtcTimestamp": "2026-03-10T08:50:50Z",
+      "endLocationDescription": "3 Cranleigh Gardens, London Borough of Sutton, SM1 3EJ",
+      "endUtcTimestamp": "2026-03-10T08:53:21Z",
+      "id": 2400222683,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 36,
+      "distance": 0.044,
+      "startLocationDescription": "Rose Hill Roundabout, London Borough of Sutton",
+      "startUtcTimestamp": "2026-03-10T08:49:50Z",
+      "endLocationDescription": "Rose Hill Roundabout, London Borough of Sutton",
+      "endUtcTimestamp": "2026-03-10T08:50:26Z",
+      "id": 2400222866,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 170,
+      "distance": 0.371,
+      "startLocationDescription": "80 Middleton Road, London Borough of Merton",
+      "startUtcTimestamp": "2026-03-10T08:46:49Z",
+      "endLocationDescription": "13-24 St. Helier Avenue, London Borough of Sutton",
+      "endUtcTimestamp": "2026-03-10T08:49:39Z",
+      "id": 2400240653,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 71,
+      "distance": 0.014,
+      "startLocationDescription": "117 Middleton Road, London Borough of Merton, SM4 6HG",
+      "startUtcTimestamp": "2026-03-10T08:45:04Z",
+      "endLocationDescription": "80 Middleton Road, London Borough of Merton",
+      "endUtcTimestamp": "2026-03-10T08:46:15Z",
+      "id": 2400240980,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 198,
+      "distance": 0.241,
+      "startUtcTimestamp": "2026-03-10T08:41:35Z",
+      "endLocationDescription": "117 Middleton Road, London Borough of Merton, SM4 6HG",
+      "endUtcTimestamp": "2026-03-10T08:44:53Z",
+      "id": 2400241265,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 78,
+      "distance": 0.0,
+      "startUtcTimestamp": "2026-03-10T08:39:54Z",
+      "endUtcTimestamp": "2026-03-10T08:41:12Z",
+      "id": 2400241266,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 218,
+      "distance": 0.0,
+      "startUtcTimestamp": "2026-03-10T08:36:00Z",
+      "endUtcTimestamp": "2026-03-10T08:39:38Z",
+      "id": 2400241267,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 208,
+      "distance": 0.0,
+      "startUtcTimestamp": "2026-03-10T08:32:20Z",
+      "endUtcTimestamp": "2026-03-10T08:35:48Z",
+      "id": 2400220708,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 60,
+      "distance": 0.0,
+      "startUtcTimestamp": "2026-03-09T19:07:56Z",
+      "endUtcTimestamp": "2026-03-09T19:08:56Z",
+      "id": 2400220212,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 32,
+      "distance": 0.0,
+      "startUtcTimestamp": "2026-03-09T19:06:35Z",
+      "endUtcTimestamp": "2026-03-09T19:07:07Z",
+      "id": 2400220709,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 32,
+      "distance": 0.0,
+      "startUtcTimestamp": "2026-03-09T18:31:32Z",
+      "endUtcTimestamp": "2026-03-09T18:32:04Z",
+      "id": 2400190453,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 234,
+      "distance": 0.001,
+      "startUtcTimestamp": "2026-03-09T18:27:17Z",
+      "endUtcTimestamp": "2026-03-09T18:31:11Z",
+      "id": 2400190454,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 316,
+      "distance": 0.0,
+      "startUtcTimestamp": "2026-03-09T18:21:44Z",
+      "endUtcTimestamp": "2026-03-09T18:27:00Z",
+      "id": 2400190563,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 36,
+      "distance": 0.0,
+      "startUtcTimestamp": "2026-03-09T18:20:45Z",
+      "endUtcTimestamp": "2026-03-09T18:21:21Z",
+      "id": 2400190564,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 125,
+      "distance": 0.0,
+      "startUtcTimestamp": "2026-03-09T18:18:19Z",
+      "endUtcTimestamp": "2026-03-09T18:20:24Z",
+      "id": 2400190565,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 32,
+      "distance": 0.001,
+      "startLocationDescription": "54 Madeira Road, London Borough of Merton, CR4 4HB",
+      "startUtcTimestamp": "2026-03-09T17:00:35Z",
+      "endLocationDescription": "54 Madeira Road, London Borough of Merton, CR4 4HB",
+      "endUtcTimestamp": "2026-03-09T17:01:07Z",
+      "id": 2400185559,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 32,
+      "distance": 0.001,
+      "startLocationDescription": "54 Madeira Road, London Borough of Merton, CR4 4HB",
+      "startUtcTimestamp": "2026-03-09T16:58:36Z",
+      "endLocationDescription": "54 Madeira Road, London Borough of Merton, CR4 4HB",
+      "endUtcTimestamp": "2026-03-09T16:59:08Z",
+      "id": 2400185560,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 32,
+      "distance": 0.001,
+      "startLocationDescription": "54 Madeira Road, London Borough of Merton, CR4 4HB",
+      "startUtcTimestamp": "2026-03-09T16:57:33Z",
+      "endLocationDescription": "54 Madeira Road, London Borough of Merton, CR4 4HB",
+      "endUtcTimestamp": "2026-03-09T16:58:05Z",
+      "id": 2400185561,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 32,
+      "distance": 0.001,
+      "startLocationDescription": "54 Madeira Road, London Borough of Merton, CR4 4HB",
+      "startUtcTimestamp": "2026-03-09T16:55:50Z",
+      "endLocationDescription": "54 Madeira Road, London Borough of Merton, CR4 4HB",
+      "endUtcTimestamp": "2026-03-09T16:56:22Z",
+      "id": 2400185562,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 32,
+      "distance": 0.001,
+      "startLocationDescription": "54 Madeira Road, London Borough of Merton, CR4 4HB",
+      "startUtcTimestamp": "2026-03-09T16:53:53Z",
+      "endLocationDescription": "54 Madeira Road, London Borough of Merton, CR4 4HB",
+      "endUtcTimestamp": "2026-03-09T16:54:25Z",
+      "id": 2400185563,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 268,
+      "distance": 0.101,
+      "startUtcTimestamp": "2026-03-09T16:44:16Z",
+      "endLocationDescription": "54 Madeira Road, London Borough of Merton, CR4 4HB",
+      "endUtcTimestamp": "2026-03-09T16:48:44Z",
+      "id": 2400183337,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 87,
+      "distance": 0.0,
+      "startUtcTimestamp": "2026-03-09T16:42:27Z",
+      "endUtcTimestamp": "2026-03-09T16:43:54Z",
+      "id": 2400183338,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 151,
+      "distance": 0.0,
+      "startUtcTimestamp": "2026-03-09T16:39:44Z",
+      "endUtcTimestamp": "2026-03-09T16:42:15Z",
+      "id": 2400183339,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 173,
+      "distance": 0.0,
+      "startUtcTimestamp": "2026-03-09T16:36:38Z",
+      "endUtcTimestamp": "2026-03-09T16:39:31Z",
+      "id": 2400183340,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 178,
+      "distance": 0.0,
+      "startUtcTimestamp": "2026-03-09T16:33:14Z",
+      "endUtcTimestamp": "2026-03-09T16:36:12Z",
+      "id": 2400191754,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 213,
+      "distance": 0.769,
+      "startLocationDescription": "328 Rosehill Roundabout, London Borough of Sutton, SM5 1AG",
+      "startUtcTimestamp": "2026-03-09T15:36:27Z",
+      "endLocationDescription": "5 Cranleigh Gardens, London Borough of Sutton, SM1 3EJ",
+      "endUtcTimestamp": "2026-03-09T15:40:00Z",
+      "id": 2400177513,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 162,
+      "distance": 0.471,
+      "startLocationDescription": "271 St. Helier Avenue, London Borough of Merton, SM4 6RT",
+      "startUtcTimestamp": "2026-03-09T15:19:07Z",
+      "endLocationDescription": "347 Rose Hill Roundabout, London Borough of Sutton, SM5 1AG",
+      "endUtcTimestamp": "2026-03-09T15:21:49Z",
+      "id": 2400177514,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 108,
+      "distance": 0.143,
+      "startLocationDescription": "47 Neath Gardens, London Borough of Merton, SM4 6HG",
+      "startUtcTimestamp": "2026-03-09T15:16:34Z",
+      "endLocationDescription": "80 Middleton Road, London Borough of Merton, SM4 6RT",
+      "endUtcTimestamp": "2026-03-09T15:18:22Z",
+      "id": 2400177515,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 32,
+      "distance": 0.001,
+      "startLocationDescription": "47 Neath Gardens, London Borough of Merton, SM4 6HG",
+      "startUtcTimestamp": "2026-03-09T15:11:26Z",
+      "endLocationDescription": "47 Neath Gardens, London Borough of Merton, SM4 6HG",
+      "endUtcTimestamp": "2026-03-09T15:11:58Z",
+      "id": 2400171456,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 190,
+      "distance": 0.186,
+      "startUtcTimestamp": "2026-03-09T14:54:00Z",
+      "endUtcTimestamp": "2026-03-09T14:57:10Z",
+      "id": 2400169905,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 249,
+      "distance": 0.95,
+      "startUtcTimestamp": "2026-03-09T10:22:02Z",
+      "endLocationDescription": "3 Cranleigh Gardens, London Borough of Sutton, SM1 3EJ",
+      "endUtcTimestamp": "2026-03-09T10:26:11Z",
+      "id": 2400169906,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 62,
+      "distance": 0.0,
+      "startUtcTimestamp": "2026-03-09T10:17:30Z",
+      "endUtcTimestamp": "2026-03-09T10:18:32Z",
+      "id": 2400169907,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 163,
+      "distance": 0.0,
+      "startUtcTimestamp": "2026-03-09T10:14:07Z",
+      "endUtcTimestamp": "2026-03-09T10:16:50Z",
+      "id": 2400124176,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 156,
+      "distance": 0.674,
+      "startLocationDescription": "24-57 Rose Hill, London Borough of Sutton, SM5 1AG",
+      "startUtcTimestamp": "2026-03-09T08:39:35Z",
+      "endLocationDescription": "5 Cranleigh Gardens, London Borough of Sutton, SM1 3EJ",
+      "endUtcTimestamp": "2026-03-09T08:42:11Z",
+      "id": 2400112654,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 36,
+      "distance": 0.047,
+      "startLocationDescription": "347 Bishopsford Road, London Borough of Sutton",
+      "startUtcTimestamp": "2026-03-09T08:38:48Z",
+      "endLocationDescription": "Rose Hill Roundabout, London Borough of Sutton",
+      "endUtcTimestamp": "2026-03-09T08:39:24Z",
+      "id": 2400112655,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 415,
+      "distance": 0.495,
+      "startUtcTimestamp": "2026-03-09T08:31:36Z",
+      "endLocationDescription": "St. Helier Avenue, London Borough of Sutton",
+      "endUtcTimestamp": "2026-03-09T08:38:31Z",
+      "id": 2400111799,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 32,
+      "distance": 0.01,
+      "startLocationDescription": "28 Conifer Gardens, London Borough of Sutton, SM1 3JT",
+      "startUtcTimestamp": "2026-03-08T15:48:04Z",
+      "endLocationDescription": "7 Conifer Gardens, London Borough of Sutton, SM1 3EJ",
+      "endUtcTimestamp": "2026-03-08T15:48:36Z",
+      "id": 2400084045,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 248,
+      "distance": 0.774,
+      "startLocationDescription": "347 Rose Hill Roundabout, London Borough of Sutton",
+      "startUtcTimestamp": "2026-03-08T15:41:30Z",
+      "endLocationDescription": "7 Cranleigh Gardens, London Borough of Sutton, SM1 3EJ",
+      "endUtcTimestamp": "2026-03-08T15:45:38Z",
+      "id": 2400084105,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 67,
+      "distance": 0.345,
+      "startLocationDescription": "302 Bishopsford Road, London Borough of Sutton",
+      "startUtcTimestamp": "2026-03-08T15:40:01Z",
+      "endLocationDescription": "347 Bishopsford Road, London Borough of Sutton",
+      "endUtcTimestamp": "2026-03-08T15:41:08Z",
+      "id": 2400084106,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    },
+    {
+      "vehicle_Description": "BMW 320i",
+      "duration": 412,
+      "distance": 2.315,
+      "startLocationDescription": "75 Acre Lane, London Borough of Sutton",
+      "startUtcTimestamp": "2026-03-08T15:32:20Z",
+      "endLocationDescription": "169 Middleton Road, London Borough of Sutton",
+      "endUtcTimestamp": "2026-03-08T15:39:12Z",
+      "id": 2400084704,
+      "vehicle_Id": "88c45ad7-4054-40d8-b530-ed844e1c261a"
+    }
+  ]
+}
