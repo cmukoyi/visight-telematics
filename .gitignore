@@ -23,5 +23,8 @@
 .github/scripts/tracksolidBeaconTel.py
 .github/scripts/trips_api_response 2.json
 .github/scripts/trips_api_response.json
-
+PinPlot-HPS/Floorplan
+PinPlot-HPS/QR
+PinPlot-HPS/code_sandbox_light
+PinPlot-HPS/sketch
 
