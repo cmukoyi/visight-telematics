@@ -1,0 +1,91 @@
+name: Rollback Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Git tag or commit to roll back to (leave blank for previous tag)'
+        required: false
+        default: ''
+
+jobs:
+  rollback:
+    name: Rollback Production
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+
+      - name: Add server to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -t rsa,ecdsa,ed25519 -H ${{ secrets.DO_SERVER_IP }} >> ~/.ssh/known_hosts 2>/dev/null
+          printf 'Host %s\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n' "${{ secrets.DO_SERVER_IP }}" >> ~/.ssh/config
+          chmod 600 ~/.ssh/config
+
+      - name: Checkout rollback target
+        env:
+          TARGET_VERSION: ${{ inputs.version }}
+        run: |
+          if [ -n "$TARGET_VERSION" ]; then
+            git checkout "$TARGET_VERSION"
+            echo "Rolling back to: $TARGET_VERSION"
+          else
+            PREV=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-parse --short HEAD~1)
+            git checkout "$PREV"
+            echo "Rolling back to: $PREV"
+          fi
+
+      - name: Sync code to server (no .env write — secrets preserved)
+        env:
+          DO_SERVER_IP: ${{ secrets.DO_SERVER_IP }}
+          DO_USER: ${{ secrets.DO_USER }}
+        run: |
+          rsync -avz --delete \
+            --exclude '.git' \
+            --exclude '.gitignore' \
+            --exclude 'node_modules' \
+            --exclude '__pycache__' \
+            --exclude '*.pyc' \
+            --exclude '.dart_tool' \
+            --exclude 'pinplot_postgres_data' \
+            --exclude 'backend/.env' \
+            --exclude '.env' \
+            ./gps-tracker/ $DO_USER@$DO_SERVER_IP:~/pinplot/gps-tracker/
+          echo "✅ Code synced (secrets on server untouched)"
+
+      - name: Rebuild and restart containers
+        env:
+          DO_SERVER_IP: ${{ secrets.DO_SERVER_IP }}
+          DO_USER: ${{ secrets.DO_USER }}
+        run: |
+          ssh $DO_USER@$DO_SERVER_IP 'bash -s' << 'SSHEOF'
+            set -e
+            cd ~/pinplot/gps-tracker
+            docker compose down --remove-orphans || true
+            docker compose build --no-cache flutter-web admin-portal
+            docker compose build backend customer
+            docker compose up -d
+            sleep 20
+            docker compose ps
+            echo "✅ Rollback complete"
+          SSHEOF
+
+      - name: Rollback summary
+        if: always()
+        run: |
+          echo "========================================"
+          echo "⏪ Pinplot — Rollback Complete"
+          echo "Target  : ${{ inputs.version || 'previous tag' }}"
+          echo "Commit  : $(git rev-parse --short HEAD)"
+          echo "========================================"
+          echo "Verify  : http://${{ secrets.DO_SERVER_IP }}:8001/api/health"
+          echo "========================================"
