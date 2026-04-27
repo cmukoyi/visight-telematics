@@ -7,7 +7,6 @@ Feel free to explore, contribute, and help improve the project.
 
 ## Getting Started
 - Clone the repository
-- Review the `.github/scripts` folder for setup and utility scripts
 - Follow instructions in the documentation to run or test components
 
 ## Contributing

@@ -1,0 +1,27 @@
+.github/scripts/
+.github/scripts/DEPLOYMENT_GUIDE.md
+.github/scripts/GITHUB_ACTIONS_SETUP.md
+.github/scripts/README.md
+.github/scripts/SECURITY.md
+.github/scripts/backup-server.sh
+.github/scripts/check-github-secrets.ps1
+.github/scripts/check-github-secrets.sh
+.github/scripts/dev.sh
+.github/scripts/entrypoint.sh.original
+.github/scripts/github-actions-pinplot
+.github/scripts/github-actions-pinplot.pub
+.github/scripts/pip
+.github/scripts/run_tests.bat
+.github/scripts/run_tests.sh
+.github/scripts/setup-env-files.sh
+.github/scripts/setup.sh
+.github/scripts/tempCodeRunnerFile.py
+.github/scripts/test-environment.sh
+.github/scripts/test_validate_tag 2.py
+.github/scripts/test_validate_tag.py
+.github/scripts/tracksolidBeaconTel 2.py
+.github/scripts/tracksolidBeaconTel.py
+.github/scripts/trips_api_response 2.json
+.github/scripts/trips_api_response.json
+
+
