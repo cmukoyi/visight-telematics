@@ -11,7 +11,8 @@ variables so they are never hard-coded in source.
     SCOPE_API_BASE_URL  — base URL of the Scope REST API
                           default: https://live.scopemp.net/Scope.MProfilerIa.WPI/api/v1
     SCOPE_AUTH_HEADER   — value of the Authorization header (Basic …)
-                          default: the pre-configured Pinplot integration token
+                          Required. Set this in the server .env file — never commit a real
+                          token to source control.
 """
 import os
 import re
@@ -24,10 +25,9 @@ _SCOPE_API_BASE = os.getenv(
     "SCOPE_API_BASE_URL",
     "https://live.scopemp.net/Scope.MProfilerIa.WPI/api/v1",
 )
-_SCOPE_AUTH = os.getenv(
-    "SCOPE_AUTH_HEADER",
-    "Basic aWNvbW9uTVBBUEk6aWNvbW9uTVBBUEkwMSE=",
-)
+# No default — must be set in .env on the server.
+# See gps-tracker/backend/.env.example for the variable name.
+_SCOPE_AUTH = os.getenv("SCOPE_AUTH_HEADER", "")
 
 
 class ScopeTagProvider(DeviceTagProvider):
@@ -66,7 +66,14 @@ class ScopeTagProvider(DeviceTagProvider):
                 message="Invalid identifier. Please enter a 15-digit IMEI or a valid GUID.",
             )
 
-        # ── 2. Scope API — confirm the tag exists ───────────────────────────
+        # ── 2. Guard: require auth header configured ────────────────────────
+        if not _SCOPE_AUTH:
+            return TagValidationResult(
+                is_valid=False,
+                message="Scope validation is not configured on this server. Contact your administrator.",
+            )
+
+        # ── 3. Scope API — confirm the tag exists ───────────────────────────
         url = f"{_SCOPE_API_BASE}/units/unitconnections/{imei_strip}"
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:

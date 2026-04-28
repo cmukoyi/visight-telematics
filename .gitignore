@@ -28,3 +28,9 @@ QR/
 code_sandbox_light/
 sketch/
 
+# Secret environment files — never commit real credentials
+.env
+gps-tracker/backend/.env
+gps-tracker/**/.env
+*.env.local
+
