@@ -355,9 +355,6 @@
                         <i class="fa-solid fa-magnifying-glass"></i>
                         <input id="al-search" class="search-input" type="text" placeholder="Search name, IMEI…" oninput="alRenderTable()">
                     </div>
-                    <button class="btn btn-primary btn-sm" onclick="openAddTagModal()">
-                        <i class="fa-solid fa-plus"></i> Add Tag
-                    </button>
                 </div>
 
                 <div id="al-category-chips" style="padding:10px 20px;background:var(--bg-2);border-bottom:1px solid var(--border);flex-shrink:0;display:flex;flex-wrap:wrap;gap:8px;align-items:center"></div>
@@ -377,11 +374,10 @@
                                     <th>Last Location</th>
                                     <th>Last Update</th>
                                     <th>Expires</th>
-                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="al-tbody">
-                                <tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text-3)">Loading…</td></tr>
+                                <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-3)">Loading…</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1431,6 +1427,27 @@
                             </thead>
                             <tbody id="usersTableBody">
                                 <tr><td colspan="6" style="text-align:center;padding:40px;color:var(--gray)">Loading…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- End User App Users -->
+                <div class="card" style="margin-top:20px">
+                    <div class="card-header">
+                        <span class="card-title">End User App Users</span>
+                        <span style="font-size:.78rem;color:var(--text-3)">Registered via the PinPlot mobile app &amp; matched to your domain</span>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                </tr>
+                            </thead>
+                            <tbody id="endUsersTableBody">
+                                <tr><td colspan="2" style="text-align:center;padding:30px;color:var(--text-3)">Loading…</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -3103,11 +3120,16 @@ async function openTagMgmtModal(mode, imei) {
     if (tag.package_id) {
         document.getElementById('tagMgmtPackage').value = tag.package_id;
     }
-    // Pre-select existing category from tag attributes
-    const existingCat = tag.attributes?.category?.value || '';
-    if (existingCat) {
-        const catOpt = _categoriesCache.find(c => c.name === existingCat);
-        if (catOpt) document.getElementById('tagMgmtCategory').value = catOpt.id;
+    // Pre-select existing category
+    if (tag.category_id) {
+        document.getElementById('tagMgmtCategory').value = tag.category_id;
+    } else {
+        // fallback: match by name from attributes
+        const existingCat = tag.attributes?.category?.value || '';
+        if (existingCat) {
+            const catOpt = _categoriesCache.find(c => c.name === existingCat);
+            if (catOpt) document.getElementById('tagMgmtCategory').value = catOpt.id;
+        }
     }
 }
 
@@ -6028,50 +6050,75 @@ async function loadUsers() {
         const me = getSession().user;
         if (!users.length) {
             tb.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--gray)">No users yet.</td></tr>';
+        } else {
+            const roleBadge = r => {
+                const map = {
+                    admin:    ['badge-info',    'Admin'],
+                    manager:  ['badge-primary', 'Manager'],
+                    reporter: ['badge-success', 'Reporter'],
+                    custom:   ['badge-warning', 'Custom'],
+                };
+                const [cls, label] = map[r] || ['badge-secondary', r || 'User'];
+                return `<span class="badge ${cls}">${label}</span>`;
+            };
+            tb.innerHTML = users.map(u => {
+                const name   = [u.first_name, u.last_name].filter(Boolean).join(' ') || '—';
+                const role   = roleBadge(u.role || (u.is_group_admin ? 'admin' : 'reporter'));
+                const status = u.is_active ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-danger">Inactive</span>';
+                const expiry = u.expires_at ? new Date(u.expires_at).toLocaleDateString() : '—';
+                const isSelf = me && me.id === u.id;
+                const targetIsAdmin = u.is_group_admin || u.role === 'admin';
+                const meIsAdmin = me?.is_group_admin;
+                const canModifyAdmin = meIsAdmin || !targetIsAdmin;
+                const actions = isSelf ? '<span style="color:var(--text-3);font-size:12px">You</span>' : `
+                    <button class="btn btn-ghost btn-sm" onclick="openEditRoleModal('${esc(u.id)}','${esc(name)}','${esc(u.role||'admin')}',${JSON.stringify(u.custom_features||[])})" title="Change role">
+                        <i class="fa-solid fa-shield-halved"></i> Role
+                    </button>
+                    ${canModifyAdmin ? `<button class="btn btn-ghost btn-sm" onclick="toggleUserActive('${esc(u.id)}',${u.is_active},'${esc(name)}')" title="${u.is_active ? 'Deactivate' : 'Activate'} user">
+                        <i class="fa-solid fa-${u.is_active ? 'user-slash' : 'user-check'}"></i> ${u.is_active ? 'Deactivate' : 'Activate'}
+                    </button>` : ''}
+                    ${canModifyAdmin ? `<button class="btn btn-ghost btn-sm" onclick="openUserExpiryModal('${esc(u.id)}','${esc(name)}','${esc(u.expires_at||'')}')">
+                        <i class="fa-solid fa-clock"></i> Expiry
+                    </button>` : ''}
+                `;
+                return `<tr>
+                    <td>${esc(name)}</td>
+                    <td>${esc(u.email)}</td>
+                    <td>${role}</td>
+                    <td>${status}</td>
+                    <td>${expiry}</td>
+                    <td style="white-space:nowrap">${actions}</td>
+                </tr>`;
+            }).join('');
+        }
+    } catch (err) {
+        tb.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--gray)">${esc(err.message)}</td></tr>`;
+    }
+    // Also refresh the end-user app users section
+    loadEndUsers();
+}
+
+async function loadEndUsers() {
+    const tb = document.getElementById('endUsersTableBody');
+    if (!tb) return;
+    try {
+        const res = await apiFetch('/api/portal/mobile-users');
+        if (res.status === 401) { handleLogout(); return; }
+        if (!res.ok) throw new Error('Failed to load app users');
+        const users = await res.json();
+        if (!users.length) {
+            tb.innerHTML = '<tr><td colspan="2" style="text-align:center;padding:30px;color:var(--text-3)">No end users registered yet. Users register at pinplot.me and are matched by email domain.</td></tr>';
             return;
         }
-        const roleBadge = r => {
-            const map = {
-                admin:    ['badge-info',    'Admin'],
-                manager:  ['badge-primary', 'Manager'],
-                reporter: ['badge-success', 'Reporter'],
-                custom:   ['badge-warning', 'Custom'],
-            };
-            const [cls, label] = map[r] || ['badge-secondary', r || 'User'];
-            return `<span class="badge ${cls}">${label}</span>`;
-        };
         tb.innerHTML = users.map(u => {
-            const name   = [u.first_name, u.last_name].filter(Boolean).join(' ') || '—';
-            const role   = roleBadge(u.role || (u.is_group_admin ? 'admin' : 'reporter'));
-            const status = u.is_active ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-danger">Inactive</span>';
-            const expiry = u.expires_at ? new Date(u.expires_at).toLocaleDateString() : '—';
-            const isSelf = me && me.id === u.id;
-            // Non-admin users cannot deactivate or set expiry on admin-role users
-            const targetIsAdmin = u.is_group_admin || u.role === 'admin';
-            const meIsAdmin = me?.is_group_admin;
-            const canModifyAdmin = meIsAdmin || !targetIsAdmin;
-            const actions = isSelf ? '<span style="color:var(--text-3);font-size:12px">You</span>' : `
-                <button class="btn btn-ghost btn-sm" onclick="openEditRoleModal('${esc(u.id)}','${esc(name)}','${esc(u.role||'admin')}',${JSON.stringify(u.custom_features||[])})" title="Change role">
-                    <i class="fa-solid fa-shield-halved"></i> Role
-                </button>
-                ${canModifyAdmin ? `<button class="btn btn-ghost btn-sm" onclick="toggleUserActive('${esc(u.id)}',${u.is_active},'${esc(name)}')" title="${u.is_active ? 'Deactivate' : 'Activate'} user">
-                    <i class="fa-solid fa-${u.is_active ? 'user-slash' : 'user-check'}"></i> ${u.is_active ? 'Deactivate' : 'Activate'}
-                </button>` : ''}
-                ${canModifyAdmin ? `<button class="btn btn-ghost btn-sm" onclick="openUserExpiryModal('${esc(u.id)}','${esc(name)}','${esc(u.expires_at||'')}')">
-                    <i class="fa-solid fa-clock"></i> Expiry
-                </button>` : ''}
-            `;
+            const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || '—';
             return `<tr>
                 <td>${esc(name)}</td>
                 <td>${esc(u.email)}</td>
-                <td>${role}</td>
-                <td>${status}</td>
-                <td>${expiry}</td>
-                <td style="white-space:nowrap">${actions}</td>
             </tr>`;
         }).join('');
     } catch (err) {
-        tb.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--gray)">${esc(err.message)}</td></tr>`;
+        tb.innerHTML = `<tr><td colspan="2" style="text-align:center;padding:30px;color:var(--text-3)">${esc(err.message)}</td></tr>`;
     }
 }
 
@@ -6627,7 +6674,7 @@ function alRenderTable() {
     const tbody = document.getElementById('al-tbody');
     if (!tbody) return;
     if (!list.length) {
-        tbody.innerHTML = '<tr><td colspan="11" class="table-empty" style="text-align:center;padding:40px;color:var(--text-3)">No assets match the search.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="table-empty" style="text-align:center;padding:40px;color:var(--text-3)">No assets match the search.</td></tr>';
         return;
     }
     const statusColors = { active: 'var(--success)', inactive: 'var(--danger)', stock: 'var(--text-3)' };
@@ -6693,9 +6740,6 @@ function alRenderTable() {
                     </button>` : ''}
                     <button class="btn-icon-sm" title="Movement History" onclick="switchTab('history');setTimeout(()=>histPreselect('${esc(t.imei)}'),300)">
                         <i class="fa-solid fa-route"></i>
-                    </button>
-                    <button class="btn-icon-sm" title="Edit" onclick="openTagMgmtModal('edit','${esc(t.imei)}')">
-                        <i class="fa-solid fa-pen"></i>
                     </button>
                 </div>
             </td>
