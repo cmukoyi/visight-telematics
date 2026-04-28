@@ -19,7 +19,8 @@ def upgrade():
     op.execute("ALTER TABLE pois ALTER COLUMN user_id DROP NOT NULL")
 
     # Add usergroup_id — IF NOT EXISTS guards against partial re-runs
-    op.execute("ALTER TABLE pois ADD COLUMN IF NOT EXISTS usergroup_id VARCHAR(36)")
+    # Must be UUID to match user_groups.id primary key type
+    op.execute("ALTER TABLE pois ADD COLUMN IF NOT EXISTS usergroup_id UUID")
     op.execute("""
         DO $$ BEGIN
             IF NOT EXISTS (

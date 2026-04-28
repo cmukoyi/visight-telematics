@@ -17,9 +17,9 @@ def upgrade():
     # IF NOT EXISTS guards against partial re-runs
     op.execute("""
         CREATE TABLE IF NOT EXISTS portal_alerts (
-            id VARCHAR(36) PRIMARY KEY,
-            usergroup_id VARCHAR(36) NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
-            tag_id VARCHAR(36) REFERENCES ble_tags(id) ON DELETE CASCADE,
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            usergroup_id UUID NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
+            tag_id UUID REFERENCES ble_tags(id) ON DELETE CASCADE,
             alert_type VARCHAR(50) NOT NULL,
             title VARCHAR(200) NOT NULL,
             message TEXT,

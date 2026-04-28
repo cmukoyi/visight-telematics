@@ -137,7 +137,7 @@ class POI(Base):
     
     id = get_uuid_column()
     user_id = Column(String(36), ForeignKey("users.id"), nullable=True)   # nullable for portal-created POIs
-    usergroup_id = Column(String(36), ForeignKey("user_groups.id", ondelete="CASCADE"), nullable=True)
+    usergroup_id = get_uuid_fk_nullable("user_groups.id")
     name = Column(String(200), nullable=False)
     description = Column(Text)
     poi_type = Column(String(20), default='single', nullable=False)  # Store as string, not enum
@@ -215,7 +215,7 @@ class PortalAlert(Base):
 
     id           = get_uuid_column()
     usergroup_id = get_uuid_fk("user_groups.id")
-    tag_id       = Column(String(36), ForeignKey("ble_tags.id", ondelete="CASCADE"), nullable=True)
+    tag_id       = get_uuid_fk_nullable("ble_tags.id")
     alert_type   = Column(String(50), nullable=False)   # 'geofence_exit','geofence_entry','battery_low','tag_offline'
     title        = Column(String(200), nullable=False)
     message      = Column(Text, nullable=True)
