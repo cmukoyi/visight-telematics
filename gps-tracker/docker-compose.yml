@@ -61,8 +61,10 @@ services:
       - DEBUG=False
       - ENVIRONMENT=production
       - FROM_EMAIL=noreply@pinplot.me
-    # No --reload in production
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+    # One worker — the background location poller must not run in multiple processes
+    # (multiple workers each start their own poller → duplicate alerts).
+    # The poller is async/I-O-bound; a single worker event loop handles it well.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
 
   admin-portal:
     build:

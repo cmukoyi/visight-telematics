@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.models import PortalAlert, BLETag, PortalUser
+from app.database import SessionLocal
 from app.services.email_service import EmailService
 
 logger = logging.getLogger(__name__)
@@ -119,18 +120,34 @@ def _notify_group_by_email(db: Session, usergroup_id: str, alert_type: str,
                             meta_data: dict | None = None) -> None:
     """Send a one-shot email for a new alert to all opted-in portal users in the group.
 
-    Respects per-user flags:  alerts_enabled, notify_via_email, and the
+    Uses its own DB session so it is completely isolated from the caller's
+    in-flight transaction (prevents PendingRollbackError / InFailedSqlTransaction
+    from silently killing every email send).
+
+    Respects per-user flags: alerts_enabled, notify_via_email, and the
     specific notify_battery_low / notify_offline / notify_geofence_exit flag.
     Also sends to any extra addresses in PortalUser.notification_emails.
     """
     flag = _NOTIFY_FLAG.get(alert_type, "alerts_enabled")
+    notify_db = SessionLocal()
     try:
-        users = db.query(PortalUser).filter(
-            PortalUser.usergroup_id == usergroup_id,
+        import uuid as _uuid
+        try:
+            gid = _uuid.UUID(usergroup_id)
+        except ValueError:
+            logger.error("_notify_group_by_email: invalid usergroup_id %r", usergroup_id)
+            return
+
+        users = notify_db.query(PortalUser).filter(
+            PortalUser.usergroup_id == gid,
             PortalUser.is_active == True,
             PortalUser.alerts_enabled == True,
             PortalUser.notify_via_email == True,
         ).all()
+
+        if not users:
+            logger.debug("No opted-in portal users for group %s — email skipped", usergroup_id)
+            return
 
         sent_to: set[str] = set()
 
@@ -148,19 +165,21 @@ def _notify_group_by_email(db: Session, usergroup_id: str, alert_type: str,
                     sent_to.add(pu.email)
                     logger.info("📧 Alert email sent to %s (%s)", pu.email, alert_type)
                 else:
-                    logger.warning("📧 Failed to send alert email to %s", pu.email)
+                    logger.warning("📧 Failed to send alert email to %s (%s)", pu.email, alert_type)
 
             # Extra notification addresses
-            extras = pu.notification_emails or []
-            for extra in extras:
+            for extra in (pu.notification_emails or []):
                 if isinstance(extra, str) and extra.strip() and extra not in sent_to:
                     ok = _email_svc.send_portal_alert_email(
                         extra.strip(), alert_type, title, message, meta_data
                     )
                     if ok:
                         sent_to.add(extra.strip())
+
     except Exception as exc:
-        logger.error("Failed to send alert notification emails: %s", exc)
+        logger.error("Failed to send alert notification emails for group %s: %s", usergroup_id, exc)
+    finally:
+        notify_db.close()
 
 
 def check_battery_alert(db: Session, tag: BLETag) -> bool:
