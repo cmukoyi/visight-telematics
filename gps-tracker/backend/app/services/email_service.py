@@ -109,7 +109,88 @@ class EmailService:
         except Exception as e:
             print(f"Error sending email: {e}")
             return False
-    
+
+    def send_portal_reset_pin(self, to_email: str, pin: str, first_name: Optional[str] = None) -> bool:
+        """Send a 6-digit password reset PIN to a portal user."""
+        try:
+            name = first_name if first_name else "there"
+
+            if self.debug:
+                print(f"\n{'='*60}")
+                print(f"🔑 PORTAL PASSWORD RESET PIN for {to_email}")
+                print(f"     PIN: {pin}")
+                print(f"{'='*60}\n")
+
+            text = f"""
+Hi {name},
+
+You requested a password reset for your Pinplot portal account.
+
+Your reset PIN is:  {pin}
+
+Enter this PIN on the portal password reset screen along with your new password.
+This PIN expires in 15 minutes.
+
+If you did not request a password reset, you can safely ignore this email.
+
+Best regards,
+Pinplot Team
+"""
+
+            html = f"""
+<html>
+  <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0;">
+    <div style="max-width: 560px; margin: 40px auto; padding: 0 20px;">
+      <div style="background: #173C64; border-radius: 10px 10px 0 0; padding: 28px 32px; text-align: center;">
+        <h1 style="color: #fff; margin: 0; font-size: 22px; letter-spacing: .5px;">🔑 Password Reset</h1>
+      </div>
+      <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px; padding: 32px;">
+        <p style="font-size: 15px; margin-top: 0;">Hi {name},</p>
+        <p style="font-size: 15px;">We received a request to reset your Pinplot portal password.
+           Use the PIN below on the reset screen:</p>
+        <div style="background: #fff; border: 2px dashed #173C64; border-radius: 10px;
+                    text-align: center; padding: 24px; margin: 24px 0;">
+          <p style="margin: 0 0 4px; font-size: 12px; color: #6b7280; letter-spacing: 1px; text-transform: uppercase;">Your reset PIN</p>
+          <p style="margin: 0; font-size: 42px; font-weight: 700; letter-spacing: 12px;
+                    color: #173C64; font-family: 'Courier New', monospace;">{pin}</p>
+          <p style="margin: 8px 0 0; font-size: 12px; color: #ef4444;">⏱ Expires in 15 minutes</p>
+        </div>
+        <p style="font-size: 13px; color: #6b7280;">
+          If you did not request a password reset, simply ignore this email — your account is safe.
+        </p>
+      </div>
+      <p style="font-size: 11px; color: #9ca3af; text-align: center; margin-top: 20px;">
+        Pinplot &middot; <a href="https://pinplot.me" style="color:#9ca3af">pinplot.me</a>
+      </p>
+    </div>
+  </body>
+</html>
+"""
+
+            if self.use_sendgrid:
+                return self._send_via_sendgrid(
+                    to_email=to_email,
+                    subject='Your Pinplot Portal Password Reset PIN',
+                    text_content=text,
+                    html_content=html,
+                )
+            else:
+                msg = MIMEMultipart('alternative')
+                msg['Subject'] = 'Your Pinplot Portal Password Reset PIN'
+                msg['From'] = self.from_email
+                msg['To'] = to_email
+                msg.attach(MIMEText(text, 'plain'))
+                msg.attach(MIMEText(html, 'html'))
+                with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+                    if self.smtp_user and self.smtp_password:
+                        server.starttls()
+                        server.login(self.smtp_user, self.smtp_password)
+                    server.sendmail(self.from_email, to_email, msg.as_string())
+                return True
+        except Exception as e:
+            print(f"Error sending portal reset PIN email: {e}")
+            return False
+
     def send_welcome_email(self, to_email: str, first_name: Optional[str] = None) -> bool:
         """Send welcome email after successful registration"""
         try:

@@ -2181,11 +2181,11 @@ def forgot_password(data: ForgotPasswordRequest, db: Session = Depends(get_db)):
             "pin": pin,
             "expires": datetime.utcnow() + timedelta(minutes=15),
         }
-        # Reuse the existing send_password_reset_email — pass the PIN as the token
+        # Send PIN email
         try:
-            _email_svc_portal.send_password_reset_email(
+            _email_svc_portal.send_portal_reset_pin(
                 to_email=user.email,
-                reset_token=pin,
+                pin=pin,
                 first_name=user.name.split()[0] if user.name else None,
             )
         except Exception:
