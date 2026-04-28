@@ -22,7 +22,34 @@ depends_on = None
 def upgrade():
     conn = op.get_bind()
 
-    # Check if the index already exists (idempotent)
+    # ── Step 1: delete duplicate rows, keeping the oldest per day ────────────
+    # The 2-worker bug may have created multiple rows for the same
+    # (usergroup_id, tag_id, alert_type, day). Keep the one with the lowest id
+    # (earliest insert) and delete the rest.
+    conn.execute(
+        text(
+            """
+            DELETE FROM portal_alerts
+            WHERE id IN (
+                SELECT id FROM (
+                    SELECT id,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY usergroup_id,
+                                            tag_id,
+                                            alert_type,
+                                            DATE(created_at AT TIME ZONE 'UTC')
+                               ORDER BY created_at ASC
+                           ) AS rn
+                    FROM portal_alerts
+                    WHERE tag_id IS NOT NULL
+                ) ranked
+                WHERE rn > 1
+            )
+            """
+        )
+    )
+
+    # ── Step 2: create the unique index (safe now) ────────────────────────────
     existing = conn.execute(
         text(
             "SELECT EXISTS (SELECT 1 FROM pg_indexes "
@@ -31,7 +58,6 @@ def upgrade():
     ).scalar()
 
     if not existing:
-        # One alert per (group, tag, type) per calendar day (UTC)
         op.execute(
             """
             CREATE UNIQUE INDEX uq_portal_alert_per_day
