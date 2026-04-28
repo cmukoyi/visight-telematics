@@ -19,6 +19,7 @@ from app.models_admin import TagPackage
 from app.services.mzone_service import MZoneService
 from app.services.geofence_service import GeofenceService
 from app.services.device_providers.tracksolid_provider import fetch_all_tracksolid_locations
+from app.services import portal_alert_service
 
 logger = logging.getLogger(__name__)
 
@@ -240,7 +241,29 @@ class LocationPollerService:
             db.commit()
             logger.info(f"✅ Updated {updated_count} tracker positions and checked geofences "
                         f"({len(series2_trackers)} Series 2 / TrackSolid, {len(series1_trackers)} Series 1 / MZone)")
-            
+
+            # ── Generate battery-low and offline portal alerts ─────────────
+            alert_count = 0
+            for tracker in live_trackers:
+                try:
+                    if portal_alert_service.check_battery_alert(db, tracker):
+                        alert_count += 1
+                    if portal_alert_service.check_offline_alert(db, tracker):
+                        alert_count += 1
+                except Exception as exc:
+                    logger.error("Alert check error for tracker %s: %s", tracker.imei, exc)
+            if alert_count:
+                db.commit()
+                logger.info("🔔 Generated %d portal alert(s) this cycle", alert_count)
+
+            # ── Purge portal alerts older than 7 days ─────────────────────
+            try:
+                purged = portal_alert_service.purge_old_alerts(db)
+                if purged:
+                    db.commit()
+            except Exception as exc:
+                logger.error("Alert purge error: %s", exc)
+
         except Exception as e:
             logger.error(f"❌ Error in _poll_locations: {str(e)}")
             db.rollback()

@@ -16,7 +16,7 @@ import os
 import logging
 
 from app.database import get_db
-from app.models import UserGroup, UserGroupPackage, PortalUser, Building, Floor, IndoorGateway, BLETag, User, TagCategory, GeofenceAlert, POI
+from app.models import UserGroup, UserGroupPackage, PortalUser, Building, Floor, IndoorGateway, BLETag, User, TagCategory, GeofenceAlert, POI, PortalAlert
 from app.models_admin import TagPackage
 from app.admin_auth import hash_password, verify_password
 from app.services.device_providers.provider_factory import DeviceProviderFactory
@@ -1652,3 +1652,123 @@ def report_geofence_events(
             "longitude":   a.longitude,
         })
     return result
+
+
+# ---------------------------------------------------------------------------
+# Portal Alerts — unified inbox (geofence, battery_low, tag_offline)
+# ---------------------------------------------------------------------------
+
+@router.get("/alerts")
+def list_portal_alerts(
+    request: Request,
+    days: int = 7,
+    db: Session = Depends(get_db),
+):
+    """Return alerts for this user's group from the last N days (max 7)."""
+    me = get_portal_user_from_request(request, db)
+    since = datetime.utcnow() - timedelta(days=max(1, min(days, 7)))
+    alerts = (
+        db.query(PortalAlert)
+        .filter(
+            PortalAlert.usergroup_id == str(me.usergroup_id),
+            PortalAlert.created_at >= since,
+        )
+        .order_by(PortalAlert.created_at.desc())
+        .limit(500)
+        .all()
+    )
+    return [_portal_alert_dict(a) for a in alerts]
+
+
+@router.get("/alerts/unread-count")
+def portal_alerts_unread_count(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Return count of unread alerts in the last 7 days."""
+    me = get_portal_user_from_request(request, db)
+    since = datetime.utcnow() - timedelta(days=7)
+    count = (
+        db.query(PortalAlert)
+        .filter(
+            PortalAlert.usergroup_id == str(me.usergroup_id),
+            PortalAlert.created_at >= since,
+            PortalAlert.is_read == False,
+        )
+        .count()
+    )
+    return {"unread": count}
+
+
+@router.put("/alerts/{alert_id}/read")
+def mark_portal_alert_read(
+    alert_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Mark a single alert as read."""
+    me = get_portal_user_from_request(request, db)
+    alert = db.query(PortalAlert).filter(
+        PortalAlert.id == alert_id,
+        PortalAlert.usergroup_id == str(me.usergroup_id),
+    ).first()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    alert.is_read = True
+    db.commit()
+    return _portal_alert_dict(alert)
+
+
+@router.put("/alerts/read-all")
+def mark_all_portal_alerts_read(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Mark all unread alerts as read for this group."""
+    me = get_portal_user_from_request(request, db)
+    since = datetime.utcnow() - timedelta(days=7)
+    db.query(PortalAlert).filter(
+        PortalAlert.usergroup_id == str(me.usergroup_id),
+        PortalAlert.created_at >= since,
+        PortalAlert.is_read == False,
+    ).update({"is_read": True})
+    db.commit()
+    return {"detail": "All alerts marked as read"}
+
+
+@router.delete("/alerts/{alert_id}")
+def delete_portal_alert(
+    alert_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Delete (dismiss) a single alert."""
+    me = get_portal_user_from_request(request, db)
+    alert = db.query(PortalAlert).filter(
+        PortalAlert.id == alert_id,
+        PortalAlert.usergroup_id == str(me.usergroup_id),
+    ).first()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    db.delete(alert)
+    db.commit()
+    return {"detail": "Alert deleted"}
+
+
+def _portal_alert_dict(a: PortalAlert) -> dict:
+    tag = a.tag
+    tag_label = None
+    if tag:
+        tag_label = tag.description or tag.device_name or tag.imei
+    return {
+        "id":          str(a.id),
+        "alert_type":  a.alert_type,
+        "title":       a.title,
+        "message":     a.message,
+        "is_read":     a.is_read,
+        "created_at":  a.created_at.isoformat() if a.created_at else None,
+        "tag_id":      str(a.tag_id) if a.tag_id else None,
+        "tag_label":   tag_label,
+        "tag_imei":    tag.imei if tag else None,
+        "meta_data":   a.meta_data or {},
+    }

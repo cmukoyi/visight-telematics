@@ -2048,3 +2048,19 @@ select option { background: var(--bg-3); }
   transition: color .15s;
 }
 .notif-email-chip-remove:hover { color: var(--danger); }
+
+/* ─── Inline danger icon button (alert dismiss) ──────────────────────────── */
+.btn-icon-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  color: var(--text-3);
+  font-size: 13px;
+  transition: color .15s, background .15s;
+}
+.btn-icon-danger:hover { color: var(--danger); background: rgba(239,68,68,.1); }

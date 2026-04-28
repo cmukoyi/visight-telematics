@@ -203,6 +203,27 @@ class GeofenceAlert(Base):
     user = relationship("User")
 
 
+class PortalAlert(Base):
+    """Unified alert inbox for portal users — covers geofence, battery, and offline events.
+
+    One row per alert event, scoped to a usergroup_id so all users in a group
+    share the same alert feed.  Alerts older than 7 days are purged by the poller.
+    """
+    __tablename__ = "portal_alerts"
+
+    id           = get_uuid_column()
+    usergroup_id = get_uuid_fk("user_groups.id")
+    tag_id       = Column(String(36), ForeignKey("ble_tags.id", ondelete="CASCADE"), nullable=True)
+    alert_type   = Column(String(50), nullable=False)   # 'geofence_exit','geofence_entry','battery_low','tag_offline'
+    title        = Column(String(200), nullable=False)
+    message      = Column(Text, nullable=True)
+    is_read      = Column(Boolean, nullable=False, default=False)
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
+    meta_data    = Column(JSON, nullable=True)           # e.g. {'poi_name': 'Depot', 'battery': 2}
+
+    tag       = relationship("BLETag", foreign_keys=[tag_id])
+
+
 class AppFeatures(Base):
     """Global feature flags that control which tabs/features are visible
     in the mobile app. There is exactly one row (id='global').

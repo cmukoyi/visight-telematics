@@ -3,6 +3,7 @@ Geofence monitoring service for POI entry/exit detection
 """
 from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
+from app.services import portal_alert_service as _pas
 from sqlalchemy import and_
 from app.models import POI, BLETag, POITrackerLink, GeofenceAlert, GeofenceEventType, GeofenceState, User, POIType
 from app.services.email_service import EmailService
@@ -271,6 +272,17 @@ class GeofenceService:
             )
             db.add(alert)
             alerts.append(alert)
+
+            # Mirror into the unified portal alerts inbox
+            try:
+                tag = db.query(type(alert).tracker.property.mapper.class_).filter_by(id=tracker_id).first()
+                if tag:
+                    _pas.create_geofence_alert(
+                        db, tag, poi.name, str(poi.id),
+                        event_type.value if hasattr(event_type, 'value') else str(event_type)
+                    )
+            except Exception as _exc:
+                logger.warning("Portal alert mirror failed (single poi): %s", _exc)
             
             logger.info(
                 f"✅ ALERT GENERATED: tracker {event_type.value} {poi.name} (strict pairing)"
@@ -373,6 +385,19 @@ class GeofenceService:
             )
             db.add(alert)
             alerts.append(alert)
+
+            # Mirror into the unified portal alerts inbox
+            try:
+                from app.models import BLETag as _BLETag
+                tag = db.query(_BLETag).filter(_BLETag.id == tracker_id).first()
+                if tag:
+                    _pas.create_geofence_alert(
+                        db, tag, poi.name, str(poi.id),
+                        pending_event_type.value if hasattr(pending_event_type, 'value') else str(pending_event_type)
+                    )
+            except Exception as _exc:
+                logger.warning("Portal alert mirror failed (route poi): %s", _exc)
+
             logger.info(
                 f"Route alert: Package {'LEFT' if pending_event_type == GeofenceEventType.EXIT else 'ARRIVED AT'} "
                 f"{pending_location_name} for {poi.name}"

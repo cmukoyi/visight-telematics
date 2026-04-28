@@ -1760,14 +1760,6 @@
             <!-- ═══ REPORTS — Alerts Inbox ═══ -->
             <div id="tab-reports-alerts" class="tab-content">
                 <div class="rpt-toolbar">
-                    <div style="display:flex;align-items:center;gap:8px">
-                        <label style="font-size:12px;color:var(--text-3);white-space:nowrap">Last</label>
-                        <select id="rpt-alerts-days">
-                            <option value="7">7 days</option>
-                            <option value="30" selected>30 days</option>
-                            <option value="90">90 days</option>
-                        </select>
-                    </div>
                     <button class="btn btn-secondary btn-small" onclick="rptAlertsLoad()">
                         <i class="fa-solid fa-rotate-right"></i> Refresh
                     </button>
@@ -1779,6 +1771,8 @@
                     <span id="rpt-alerts-count"><strong>—</strong> alerts</span>
                     <span class="rpt-sep">·</span>
                     <span id="rpt-alerts-unread" style="color:var(--primary)"><strong>—</strong> unread</span>
+                    <span class="rpt-sep">·</span>
+                    <span style="font-size:11px;color:var(--text-3)">last 7 days</span>
                 </div>
                 <div id="rpt-alerts-err" class="alert" style="display:none"><span id="rpt-alerts-err-text"></span></div>
                 <div class="rpt-table-wrap">
@@ -1786,14 +1780,15 @@
                         <thead>
                             <tr>
                                 <th style="width:16px"></th>
-                                <th>Event</th>
+                                <th>Type</th>
                                 <th>Asset / Tag</th>
-                                <th>Zone / Geofence</th>
+                                <th>Detail</th>
                                 <th>Time</th>
+                                <th style="width:40px"></th>
                             </tr>
                         </thead>
                         <tbody id="rpt-alerts-tbody">
-                            <tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-3)"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</td></tr>
+                            <tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-3)"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -4028,9 +4023,20 @@ function _saveAlertsRead() {
     localStorage.setItem('_alertsRead', JSON.stringify(arr));
 }
 
+// ─── Alert type config ────────────────────────────────────────────────────────
+function _alertMeta(type) {
+    switch (type) {
+        case 'geofence_exit':  return { icon: 'fa-right-from-bracket', color: 'var(--danger)',  label: 'Geofence Exit'  };
+        case 'geofence_entry': return { icon: 'fa-right-to-bracket',   color: 'var(--success)', label: 'Geofence Entry' };
+        case 'battery_low':    return { icon: 'fa-battery-low',        color: 'var(--warning)', label: 'Low Battery'    };
+        case 'tag_offline':    return { icon: 'fa-wifi-slash',         color: 'var(--text-3)',  label: 'Tag Offline'    };
+        default:               return { icon: 'fa-bell',               color: 'var(--primary)', label: type             };
+    }
+}
+
 async function _fetchBellAlerts() {
     try {
-        const res = await apiFetch('/api/portal/reports/geofence-events?days=7');
+        const res = await apiFetch('/api/portal/alerts?days=7');
         if (!res.ok) return;
         _bellAlerts = await res.json();
         _updateBellBadge();
@@ -4040,7 +4046,8 @@ async function _fetchBellAlerts() {
 function _updateBellBadge() {
     const badge = document.getElementById('notif-badge');
     if (!badge) return;
-    const unread = _bellAlerts.filter(a => !_alertsRead.has(a.id)).length;
+    // Use server is_read flag; fall back to local set for optimistic updates
+    const unread = _bellAlerts.filter(a => !a.is_read && !_alertsRead.has(a.id)).length;
     if (unread > 0) {
         badge.textContent = unread > 99 ? '99+' : unread;
         badge.style.display = 'flex';
@@ -4072,40 +4079,53 @@ function _renderNotifPanel() {
     if (!list) return;
     const recent = _bellAlerts.slice(0, 10);
     if (!recent.length) {
-        list.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-3);font-size:.83rem">No recent alerts</div>';
+        list.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-3);font-size:.83rem">No alerts in the last 7 days</div>';
         return;
     }
     list.innerHTML = recent.map(a => {
-        const isUnread = !_alertsRead.has(a.id);
-        const isEntry  = /enter|entry/i.test(a.event_type || '');
-        const evtIcon  = isEntry ? 'fa-right-to-bracket' : 'fa-right-from-bracket';
-        const evtColor = isEntry ? 'var(--success)' : 'var(--danger)';
-        const ago      = a.created_at ? _timeAgo(new Date(a.created_at)) : '\u2014';
+        const isUnread = !a.is_read && !_alertsRead.has(a.id);
+        const m    = _alertMeta(a.alert_type);
+        const ago  = a.created_at ? _timeAgo(new Date(a.created_at)) : '\u2014';
+        const detail = a.meta_data?.poi_name
+            ? (a.alert_type === 'geofence_exit' ? `Exited ${a.meta_data.poi_name}` : `Entered ${a.meta_data.poi_name}`)
+            : a.message || '';
         return `<div class="notif-item${isUnread ? ' notif-unread' : ''}" onclick="notifItemClick('${esc(a.id)}',this)">
-            <span class="notif-icon" style="color:${evtColor}"><i class="fa-solid ${evtIcon}"></i></span>
+            <span class="notif-icon" style="color:${m.color}"><i class="fa-solid ${m.icon}"></i></span>
             <div style="flex:1;min-width:0">
-                <div style="font-weight:${isUnread?600:400};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.tag_label||a.tag_imei||a.tag_id)}</div>
-                <div style="font-size:.78rem;color:var(--text-3)">${isEntry ? 'Entered' : 'Exited'} ${esc(a.poi_name||'')}</div>
+                <div style="font-weight:${isUnread?600:400};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.tag_label||a.tag_imei||'—')}</div>
+                <div style="font-size:.78rem;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(detail)}</div>
             </div>
             <span class="notif-time">${ago}</span>
         </div>`;
     }).join('');
 }
 
-function notifItemClick(id, el) {
+async function notifItemClick(id, el) {
+    // Optimistic mark-read
     _alertsRead.add(id);
     _saveAlertsRead();
     if (el) el.classList.remove('notif-unread');
     _updateBellBadge();
     closeNotifPanel();
     switchTab('reports-alerts');
+    // Persist to server
+    try { await apiFetch(`/api/portal/alerts/${id}/read`, { method: 'PUT' }); } catch (_) {}
+    // Update local cache
+    const a = _bellAlerts.find(x => x.id === id);
+    if (a) a.is_read = true;
 }
 
-function markAllAlertsRead() {
-    _bellAlerts.forEach(a => _alertsRead.add(a.id));
+async function markAllAlertsRead() {
+    try { await apiFetch('/api/portal/alerts/read-all', { method: 'PUT' }); } catch (_) {}
+    _bellAlerts.forEach(a => { a.is_read = true; _alertsRead.add(a.id); });
     _saveAlertsRead();
     _renderNotifPanel();
     _updateBellBadge();
+    // Refresh inbox if open
+    if (_alertsData.length) {
+        _alertsData.forEach(a => { a.is_read = true; });
+        _rptAlertsRender();
+    }
 }
 
 function _timeAgo(date) {
@@ -4116,22 +4136,23 @@ function _timeAgo(date) {
     return Math.floor(secs / 86400) + 'd ago';
 }
 
+// ─── Alerts Inbox tab ─────────────────────────────────────────────────────────
+
 async function rptAlertsLoad() {
-    const days  = document.getElementById('rpt-alerts-days')?.value || 30;
     const tbody = document.getElementById('rpt-alerts-tbody');
-    if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-3)"><i class="fa-solid fa-spinner fa-spin"></i> Loading\u2026</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-3)"><i class="fa-solid fa-spinner fa-spin"></i> Loading\u2026</td></tr>';
     const errEl = document.getElementById('rpt-alerts-err');
     if (errEl) errEl.style.display = 'none';
     try {
-        const res = await apiFetch(`/api/portal/reports/geofence-events?days=${days}`);
+        const res = await apiFetch('/api/portal/alerts?days=7');
         if (!res.ok) throw new Error(await safeJsonDetail(res, 'Failed to load alerts'));
         _alertsData = await res.json();
-        if (parseInt(days) >= 7) _bellAlerts = _alertsData;
+        _bellAlerts = _alertsData;   // keep bell in sync
         _updateBellBadge();
         _rptAlertsRender();
     } catch (err) {
         if (errEl) { document.getElementById('rpt-alerts-err-text').textContent = err.message; errEl.style.display = 'flex'; }
-        if (tbody) tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-3)">${esc(err.message)}</td></tr>`;
+        if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-3)">${esc(err.message)}</td></tr>`;
     }
 }
 
@@ -4141,59 +4162,89 @@ function _rptAlertsRender() {
     const markBtn = document.getElementById('rpt-alerts-mark-all-btn');
     if (!tbody) return;
     if (!_alertsData.length) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-3)">No alerts in the selected date range.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-3)">No alerts in the last 7 days.</td></tr>';
         if (summary) summary.style.display = 'none';
         if (markBtn) markBtn.style.display = 'none';
         return;
     }
-    const unreadCount = _alertsData.filter(a => !_alertsRead.has(a.id)).length;
+    const unreadCount = _alertsData.filter(a => !a.is_read && !_alertsRead.has(a.id)).length;
     document.getElementById('rpt-alerts-count').innerHTML  = `<strong>${_alertsData.length}</strong> alerts`;
     document.getElementById('rpt-alerts-unread').innerHTML = `<strong>${unreadCount}</strong> unread`;
     if (summary) summary.style.display = 'flex';
     if (markBtn) markBtn.style.display  = unreadCount > 0 ? '' : 'none';
     tbody.innerHTML = _alertsData.map(a => {
-        const isUnread = !_alertsRead.has(a.id);
-        const isEntry  = /enter|entry/i.test(a.event_type || '');
-        const evtColor = isEntry ? 'var(--success)' : 'var(--danger)';
-        const evtIcon  = isEntry ? 'fa-right-to-bracket' : 'fa-right-from-bracket';
-        const evtLabel = isEntry ? 'Entry' : 'Exit';
+        const isUnread = !a.is_read && !_alertsRead.has(a.id);
+        const m        = _alertMeta(a.alert_type);
         const time     = a.created_at ? new Date(a.created_at).toLocaleString() : '\u2014';
-        const dot      = isUnread
-            ? `<span style="width:8px;height:8px;border-radius:50%;background:var(--primary);display:inline-block"></span>`
+        const detail   = a.meta_data?.poi_name
+            ? a.meta_data.poi_name
+            : (a.meta_data?.battery != null ? `${a.meta_data.battery}%` : (a.meta_data?.days_offline ? `${a.meta_data.days_offline} days offline` : ''));
+        const dot = isUnread
+            ? `<span style="width:8px;height:8px;border-radius:50%;background:var(--primary);display:inline-block;flex-shrink:0"></span>`
             : `<span style="width:8px;height:8px;display:inline-block"></span>`;
-        return `<tr class="${isUnread ? 'rpt-row-unread' : ''}" style="cursor:pointer" onclick="rptAlertMarkRead('${esc(a.id)}',this)">
+        return `<tr class="${isUnread ? 'rpt-row-unread' : ''}" data-alert-id="${esc(a.id)}">
             <td style="padding-left:16px">${dot}</td>
-            <td><span style="color:${evtColor}"><i class="fa-solid ${evtIcon}"></i> ${evtLabel}</span></td>
-            <td>${esc(a.tag_label||a.tag_imei||a.tag_id||'\u2014')}</td>
-            <td>${esc(a.poi_name||a.poi_id||'\u2014')}</td>
-            <td style="white-space:nowrap;color:var(--text-3);font-size:.82rem">${esc(time)}</td>
+            <td style="cursor:pointer" onclick="rptAlertMarkRead('${esc(a.id)}',this.closest('tr'))">
+                <span style="color:${m.color};white-space:nowrap"><i class="fa-solid ${m.icon}"></i> ${esc(m.label)}</span>
+            </td>
+            <td style="cursor:pointer" onclick="rptAlertMarkRead('${esc(a.id)}',this.closest('tr'))">${esc(a.tag_label||a.tag_imei||'\u2014')}</td>
+            <td style="cursor:pointer;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="rptAlertMarkRead('${esc(a.id)}',this.closest('tr'))" title="${esc(a.message||'')}">${esc(detail||'\u2014')}</td>
+            <td style="white-space:nowrap;color:var(--text-3);font-size:.82rem;cursor:pointer" onclick="rptAlertMarkRead('${esc(a.id)}',this.closest('tr'))">${esc(time)}</td>
+            <td><button class="btn-icon-danger" title="Dismiss alert" onclick="rptAlertDelete('${esc(a.id)}',this.closest('tr'))"><i class="fa-solid fa-xmark"></i></button></td>
         </tr>`;
     }).join('');
 }
 
-function rptAlertMarkRead(id, rowEl) {
-    if (_alertsRead.has(id)) return;
+async function rptAlertMarkRead(id, rowEl) {
+    const a = _alertsData.find(x => x.id === id);
+    if (a?.is_read && _alertsRead.has(id)) return;
     _alertsRead.add(id);
     _saveAlertsRead();
+    if (a) a.is_read = true;
     if (rowEl) {
         rowEl.classList.remove('rpt-row-unread');
         const dot = rowEl.querySelector('td:first-child span');
         if (dot) dot.style.background = 'transparent';
     }
     _updateBellBadge();
-    const unreadCount = _alertsData.filter(a => !_alertsRead.has(a.id)).length;
+    const unreadCount = _alertsData.filter(x => !x.is_read && !_alertsRead.has(x.id)).length;
     const unreadEl = document.getElementById('rpt-alerts-unread');
     if (unreadEl) unreadEl.innerHTML = `<strong>${unreadCount}</strong> unread`;
     const markBtn = document.getElementById('rpt-alerts-mark-all-btn');
     if (markBtn) markBtn.style.display = unreadCount > 0 ? '' : 'none';
+    // Persist to server (fire-and-forget)
+    try { await apiFetch(`/api/portal/alerts/${id}/read`, { method: 'PUT' }); } catch (_) {}
 }
 
-function rptAlertsMarkAllRead() {
-    _alertsData.forEach(a => _alertsRead.add(a.id));
+async function rptAlertDelete(id, rowEl) {
+    try {
+        const res = await apiFetch(`/api/portal/alerts/${id}`, { method: 'DELETE' });
+        if (!res.ok) return;
+        _alertsData = _alertsData.filter(a => a.id !== id);
+        _bellAlerts = _bellAlerts.filter(a => a.id !== id);
+        _updateBellBadge();
+        if (rowEl) rowEl.remove();
+        // Update counts
+        const unreadCount = _alertsData.filter(x => !x.is_read && !_alertsRead.has(x.id)).length;
+        const countEl  = document.getElementById('rpt-alerts-count');
+        const unreadEl = document.getElementById('rpt-alerts-unread');
+        if (countEl)  countEl.innerHTML  = `<strong>${_alertsData.length}</strong> alerts`;
+        if (unreadEl) unreadEl.innerHTML = `<strong>${unreadCount}</strong> unread`;
+        if (!_alertsData.length) _rptAlertsRender();
+    } catch (_) {}
+}
+
+async function rptAlertsMarkAllRead() {
+    try { await apiFetch('/api/portal/alerts/read-all', { method: 'PUT' }); } catch (_) {}
+    _alertsData.forEach(a => { a.is_read = true; _alertsRead.add(a.id); });
+    _bellAlerts.forEach(a => { a.is_read = true; });
     _saveAlertsRead();
     _rptAlertsRender();
     _updateBellBadge();
 }
+
+// Poll for new alerts every 2 minutes while the page is open
+setInterval(_fetchBellAlerts, 120_000);
 
 // ══════════════════════════════════════════
 // REPORTS — Tag Subscriptions
