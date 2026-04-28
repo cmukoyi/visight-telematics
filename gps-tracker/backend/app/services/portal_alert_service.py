@@ -6,7 +6,6 @@ Called by:
   - geofence_service         (geofence_entry, geofence_exit)
 """
 import logging
-import uuid
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
@@ -90,7 +89,6 @@ def create_alert(db: Session, usergroup_id: str, tag_id: str | None,
                  meta_data: dict | None = None) -> PortalAlert:
     """Insert a new PortalAlert row."""
     alert = PortalAlert(
-        id=str(uuid.uuid4()),
         usergroup_id=usergroup_id,
         tag_id=tag_id,
         alert_type=alert_type,
