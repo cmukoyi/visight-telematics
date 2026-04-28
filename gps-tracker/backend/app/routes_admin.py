@@ -1741,3 +1741,188 @@ def delete_room(room_id: str, request: Request, db: Session = Depends(get_db)):
     db.delete(room)
     db.commit()
     return {"detail": "Room deleted"}
+
+
+# ---------------------------------------------------------------------------
+# Health / Diagnostics
+# ---------------------------------------------------------------------------
+
+import subprocess
+import shutil
+import platform
+
+
+# Containers we care about, in display order
+_KNOWN_CONTAINERS = [
+    "pinplot_nginx",
+    "pinplot_backend",
+    "pinplot_customer",
+    "pinplot_admin",
+    "pinplot_db",
+    "pinplot_mosquitto",
+    "pinplot_mqtt_bridge",
+    "pinplot_flutter_web",
+]
+
+_FRIENDLY = {
+    "pinplot_nginx":        "Nginx",
+    "pinplot_backend":      "Backend API",
+    "pinplot_customer":     "Customer Portal",
+    "pinplot_admin":        "Admin Portal",
+    "pinplot_db":           "PostgreSQL",
+    "pinplot_mosquitto":    "MQTT Broker",
+    "pinplot_mqtt_bridge":  "MQTT Bridge",
+    "pinplot_flutter_web":  "Flutter Web",
+}
+
+
+def _docker_available() -> bool:
+    return shutil.which("docker") is not None
+
+
+def _run_docker(*args, timeout: int = 10) -> str:
+    result = subprocess.run(
+        ["docker", *args],
+        capture_output=True, text=True, timeout=timeout
+    )
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or "docker command failed")
+    return result.stdout.strip()
+
+
+def _container_status(name: str) -> dict:
+    try:
+        fmt = "{{.State.Status}}|{{.State.Health.Status}}|{{.Config.Image}}|{{.State.StartedAt}}|{{.RestartCount}}"
+        raw = _run_docker("inspect", "--format", fmt, name)
+        parts = raw.split("|")
+        state, health, image, started_at, restarts = (parts + [""] * 5)[:5]
+        try:
+            stats_raw = _run_docker("stats", "--no-stream", "--format",
+                                     "{{.CPUPerc}}|{{.MemUsage}}", name, timeout=8)
+            cpu, mem = (stats_raw.split("|") + ["", ""])[:2]
+        except Exception:
+            cpu, mem = "—", "—"
+        return {
+            "name": name,
+            "friendly": _FRIENDLY.get(name, name),
+            "status": state,
+            "health": health or "—",
+            "image": image,
+            "started_at": started_at,
+            "restarts": int(restarts) if str(restarts).isdigit() else 0,
+            "cpu": cpu.strip(),
+            "mem": mem.strip(),
+            "present": True,
+        }
+    except Exception as exc:
+        return {
+            "name": name,
+            "friendly": _FRIENDLY.get(name, name),
+            "status": "absent",
+            "health": "—",
+            "image": "—",
+            "started_at": None,
+            "restarts": 0,
+            "cpu": "—",
+            "mem": "—",
+            "present": False,
+        }
+
+
+@router.get("/health/containers")
+def health_containers(request: Request, db: Session = Depends(get_db)):
+    """Return status of all known containers. Requires manager role."""
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=403, detail="Requires manager role")
+    if not _docker_available():
+        raise HTTPException(status_code=503, detail="docker CLI not available inside container")
+    return [_container_status(n) for n in _KNOWN_CONTAINERS]
+
+
+class ContainerAction(BaseModel):
+    action: str   # start | stop | restart
+
+
+@router.post("/health/containers/{container_name}/action")
+def container_action(
+    container_name: str,
+    body: ContainerAction,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Start, stop, or restart a named container. Requires admin role."""
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "admin"):
+        raise HTTPException(status_code=403, detail="Requires admin role")
+    if container_name not in _KNOWN_CONTAINERS:
+        raise HTTPException(status_code=400, detail="Unknown container")
+    if body.action not in ("start", "stop", "restart"):
+        raise HTTPException(status_code=400, detail="action must be start | stop | restart")
+    if not _docker_available():
+        raise HTTPException(status_code=503, detail="docker CLI not available")
+    if body.action == "stop" and container_name == "pinplot_backend":
+        raise HTTPException(status_code=400, detail="Cannot stop the backend from itself — use the server directly")
+    try:
+        _run_docker(body.action, container_name, timeout=20)
+        return {"ok": True, "container": container_name, "action": body.action}
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/health/system")
+def health_system(request: Request, db: Session = Depends(get_db)):
+    """Return disk usage, DB size, uptime, and key table row counts."""
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=403, detail="Requires manager role")
+
+    result: dict = {}
+
+    # Disk usage for /
+    try:
+        total, used, free = shutil.disk_usage("/")
+        result["disk"] = {
+            "total_gb": round(total / 1e9, 1),
+            "used_gb":  round(used  / 1e9, 1),
+            "free_gb":  round(free  / 1e9, 1),
+            "pct":      round(used / total * 100, 1),
+        }
+    except Exception:
+        result["disk"] = None
+
+    # System uptime (/proc/uptime — Linux)
+    try:
+        with open("/proc/uptime") as f:
+            uptime_secs = float(f.read().split()[0])
+        days, rem = divmod(int(uptime_secs), 86400)
+        hours, rem = divmod(rem, 3600)
+        minutes = rem // 60
+        result["uptime"] = f"{days}d {hours}h {minutes}m"
+    except Exception:
+        result["uptime"] = "—"
+
+    # PostgreSQL DB size
+    try:
+        from sqlalchemy import text
+        row = db.execute(text("SELECT pg_size_pretty(pg_database_size(current_database())) AS sz")).fetchone()
+        result["db_size"] = row[0] if row else "—"
+    except Exception:
+        result["db_size"] = "—"
+
+    # Key table row counts
+    try:
+        from sqlalchemy import text
+        tables = ["users", "ble_tags", "app_logs", "audit_logs", "pois"]
+        counts = {}
+        for t in tables:
+            try:
+                r = db.execute(text(f"SELECT COUNT(*) FROM {t}")).fetchone()
+                counts[t] = r[0] if r else 0
+            except Exception:
+                counts[t] = "—"
+        result["table_counts"] = counts
+    except Exception:
+        result["table_counts"] = {}
+
+    return result

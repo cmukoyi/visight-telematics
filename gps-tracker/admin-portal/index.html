@@ -863,6 +863,12 @@
                             <span>Buildings</span>
                         </button>
                     </li>
+                    <li class="sidebar-item">
+                        <button class="sidebar-link" onclick="switchTab('health')">
+                            <span>🩺</span>
+                            <span>Health</span>
+                        </button>
+                    </li>
                 </ul>
 
                 <div style="position: absolute; bottom: 24px; left: 24px; right: 24px;">
@@ -1614,6 +1620,84 @@
                     </div>
                     <!-- END BUILDINGS TAB -->
 
+                    <!-- HEALTH TAB -->
+                    <div id="health" class="tab-content">
+                        <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
+                            <div>
+                                <h2 class="page-title">System Health</h2>
+                                <p class="page-subtitle">Container status, resource usage, database diagnostics</p>
+                            </div>
+                            <div style="display:flex;gap:8px;align-items:center">
+                                <span id="healthLastRefresh" style="font-size:12px;color:var(--gray)"></span>
+                                <button class="btn btn-primary btn-small" onclick="healthRefresh()" id="healthRefreshBtn">
+                                    🔄 Refresh
+                                </button>
+                                <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--gray);cursor:pointer;margin:0">
+                                    <input type="checkbox" id="healthAutoRefresh" onchange="healthToggleAuto(this.checked)">
+                                    Auto (30s)
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- System info bar -->
+                        <div id="healthSysBar" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px">
+                            <div class="stat-card">
+                                <div class="stat-value" id="hsDisk">—</div>
+                                <div class="stat-label">Disk Used</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="hsDiskFree">—</div>
+                                <div class="stat-label">Disk Free</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="hsUptime">—</div>
+                                <div class="stat-label">Server Uptime</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="hsDbSize">—</div>
+                                <div class="stat-label">Database Size</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="hsUsers">—</div>
+                                <div class="stat-label">Users</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="hsTags">—</div>
+                                <div class="stat-label">BLE Tags</div>
+                            </div>
+                        </div>
+
+                        <!-- Container grid -->
+                        <div class="card" style="padding:0">
+                            <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+                                <h3 style="font-size:15px;font-weight:600;margin:0">Containers</h3>
+                                <span id="healthContainerError" style="display:none;color:var(--danger);font-size:13px"></span>
+                            </div>
+                            <div id="healthContainerGrid" style="padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px">
+                                <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--gray)">Loading containers…</div>
+                            </div>
+                        </div>
+
+                        <!-- DB table counts -->
+                        <div class="card" style="margin-top:16px">
+                            <h3 style="font-size:15px;font-weight:600;margin:0 0 14px">Database Tables</h3>
+                            <div style="overflow-x:auto">
+                                <table id="healthDbTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Table</th>
+                                            <th style="text-align:right">Rows</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="healthDbTableBody">
+                                        <tr><td colspan="2" style="text-align:center;color:var(--gray);padding:20px">Loading…</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END HEALTH TAB -->
+
                     <div id="audit" class="tab-content">
                         <div class="page-header">
                             <h2 class="page-title">Audit Logs</h2>
@@ -1850,7 +1934,8 @@
                 'features': 'App Features',
                 'usergroups': 'User Groups',
                 'packages': 'Tag Packages',
-                'buildings': 'Buildings & Floor Plans'
+                'buildings': 'Buildings & Floor Plans',
+                'health': 'System Health'
             };
             document.getElementById('pageTitle').textContent = titles[tabName];
 
@@ -1863,6 +1948,7 @@
             if (tabName === 'usergroups') loadUsergroups();
             if (tabName === 'packages') loadPackages();
             if (tabName === 'buildings') { loadBuildings(); }
+            if (tabName === 'health') { healthRefresh(); }
         }
 
         // DASHBOARD
@@ -3223,6 +3309,133 @@
             reader.readAsDataURL(file);
         }
 
+    </script>
+
+    <script>
+    // ══════════════════════════════════════════════════════════════════
+    // HEALTH TAB
+    // ══════════════════════════════════════════════════════════════════
+    let _healthAutoTimer = null;
+
+    function healthToggleAuto(on) {
+        if (_healthAutoTimer) { clearInterval(_healthAutoTimer); _healthAutoTimer = null; }
+        if (on) _healthAutoTimer = setInterval(healthRefresh, 30000);
+    }
+
+    async function healthRefresh() {
+        const btn = document.getElementById('healthRefreshBtn');
+        if (btn) { btn.disabled = true; btn.textContent = '⏳ Loading…'; }
+        try {
+            const [cRes, sRes] = await Promise.all([
+                fetch(API_URL + '/api/admin/health/containers', { headers: { 'Authorization': 'Bearer ' + authToken } }),
+                fetch(API_URL + '/api/admin/health/system',     { headers: { 'Authorization': 'Bearer ' + authToken } }),
+            ]);
+            if (cRes.ok) {
+                const containers = await cRes.json();
+                renderContainers(containers);
+                document.getElementById('healthContainerError').style.display = 'none';
+            } else {
+                const err = await cRes.json().catch(() => ({ detail: 'Unknown error' }));
+                document.getElementById('healthContainerError').textContent = err.detail || 'Failed to load containers';
+                document.getElementById('healthContainerError').style.display = '';
+            }
+            if (sRes.ok) {
+                const sys = await sRes.json();
+                renderSystem(sys);
+            }
+        } catch (e) {
+            document.getElementById('healthContainerError').textContent = e.message;
+            document.getElementById('healthContainerError').style.display = '';
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = '🔄 Refresh'; }
+            const ts = document.getElementById('healthLastRefresh');
+            if (ts) ts.textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+        }
+    }
+
+    function renderSystem(sys) {
+        if (sys.disk) {
+            document.getElementById('hsDisk').textContent    = sys.disk.used_gb + ' GB (' + sys.disk.pct + '%)';
+            document.getElementById('hsDiskFree').textContent = sys.disk.free_gb + ' GB';
+        }
+        document.getElementById('hsUptime').textContent = sys.uptime || '—';
+        document.getElementById('hsDbSize').textContent = sys.db_size || '—';
+        const tc = sys.table_counts || {};
+        document.getElementById('hsUsers').textContent = tc.users !== undefined ? tc.users.toLocaleString() : '—';
+        document.getElementById('hsTags').textContent  = tc.ble_tags !== undefined ? tc.ble_tags.toLocaleString() : '—';
+
+        // DB table counts table
+        const tb = document.getElementById('healthDbTableBody');
+        if (tb && tc) {
+            const labels = { users: 'Users', ble_tags: 'BLE Tags', app_logs: 'App Logs', audit_logs: 'Audit Logs', pois: 'Locations (POIs)' };
+            tb.innerHTML = Object.entries(tc).map(([k, v]) =>
+                `<tr><td>${labels[k] || k}</td><td style="text-align:right;font-variant-numeric:tabular-nums">${typeof v === 'number' ? v.toLocaleString() : v}</td></tr>`
+            ).join('') || '<tr><td colspan="2" style="color:var(--gray)">No data</td></tr>';
+        }
+    }
+
+    function renderContainers(containers) {
+        const grid = document.getElementById('healthContainerGrid');
+        if (!grid) return;
+        grid.innerHTML = containers.map(c => {
+            const isRunning = c.status === 'running';
+            const isAbsent  = c.status === 'absent';
+            const statusColor = isRunning ? '#10b981' : (isAbsent ? '#9ca3af' : '#ef4444');
+            const statusDot   = `<span style="width:10px;height:10px;border-radius:50%;background:${statusColor};display:inline-block;flex-shrink:0"></span>`;
+            const statusLabel = c.status.charAt(0).toUpperCase() + c.status.slice(1);
+            const healthBadge = (c.health && c.health !== '—')
+                ? `<span style="font-size:11px;padding:1px 7px;border-radius:8px;background:${c.health==='healthy'?'rgba(16,185,129,.15)':'rgba(239,68,68,.12)'};color:${c.health==='healthy'?'#10b981':'#ef4444'}">${c.health}</span>`
+                : '';
+            const upImage = c.image && c.image !== '—' ? `<div style="font-size:11px;color:var(--gray);margin-top:4px;word-break:break-all">${escH(c.image)}</div>` : '';
+            const statsCpu = isRunning ? `<span style="font-size:12px;color:var(--gray)">CPU: ${escH(c.cpu)}</span>` : '';
+            const statsMem = isRunning ? `<span style="font-size:12px;color:var(--gray)">RAM: ${escH(c.mem)}</span>` : '';
+            const restartBadge = c.restarts > 0
+                ? `<span style="font-size:11px;padding:1px 7px;border-radius:8px;background:rgba(245,158,11,.15);color:#f59e0b">↺ ${c.restarts}</span>`
+                : '';
+            // Action buttons — stop is disabled for backend container
+            const isBackend = c.name === 'pinplot_backend';
+            const actionBtns = isAbsent
+                ? `<button class="btn btn-small btn-primary" onclick="healthAction('${c.name}','start')">▶ Start</button>`
+                : isRunning
+                    ? `<button class="btn btn-small btn-secondary" onclick="healthAction('${c.name}','restart')" style="font-size:12px">↺ Restart</button>
+                       ${!isBackend ? `<button class="btn btn-small" onclick="healthAction('${c.name}','stop')" style="background:#ef4444;color:#fff;font-size:12px;border:none">■ Stop</button>` : ''}`
+                    : `<button class="btn btn-small btn-primary" onclick="healthAction('${c.name}','start')">▶ Start</button>`;
+            return `<div style="border:1px solid var(--border);border-radius:8px;padding:14px;background:var(--surface);display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    ${statusDot}
+                    <span style="font-weight:600;font-size:14px">${escH(c.friendly)}</span>
+                    <span style="font-size:12px;color:${statusColor}">${statusLabel}</span>
+                    ${healthBadge}
+                    ${restartBadge}
+                </div>
+                ${upImage}
+                <div style="display:flex;gap:12px;flex-wrap:wrap">${statsCpu}${statsMem}</div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">${actionBtns}</div>
+            </div>`;
+        }).join('');
+    }
+
+    async function healthAction(containerName, action) {
+        const friendly = containerName.replace('pinplot_', '');
+        if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} container "${friendly}"?`)) return;
+        try {
+            const res = await fetch(`${API_URL}/api/admin/health/containers/${containerName}/action`, {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + authToken, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Action failed');
+            // Brief pause then refresh so Docker state has settled
+            setTimeout(healthRefresh, 1200);
+        } catch (e) {
+            alert('Error: ' + e.message);
+        }
+    }
+
+    function escH(s) {
+        return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
     </script>
 </body>
 </html>
