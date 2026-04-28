@@ -154,6 +154,11 @@ class POI(Base):
     destination_radius = Column(Float, nullable=True)
     destination_address = Column(String(500), nullable=True)
     
+    # Shape info for drawn geofences (migration 028)
+    shape_type = Column(String(20), default='circle')   # circle | polygon | rectangle
+    coordinates = Column(Text, nullable=True)           # JSON [[lat,lng], ...] for polygon/rectangle
+    notes = Column(Text, nullable=True)                 # free-text notes
+
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

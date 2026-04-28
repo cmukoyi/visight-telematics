@@ -1837,6 +1837,9 @@ def _poi_dict(poi: POI, db: Session, usergroup_id: str) -> dict:
         "latitude":    poi.latitude,
         "longitude":   poi.longitude,
         "radius":      poi.radius or 150.0,
+        "shape_type":  getattr(poi, 'shape_type', None) or 'circle',
+        "coordinates": getattr(poi, 'coordinates', None),
+        "notes":       getattr(poi, 'notes', None),
         "is_active":   poi.is_active,
         "created_at":  poi.created_at.isoformat() if poi.created_at else None,
         "armed_count": len(armed_tag_ids),
@@ -1891,13 +1894,22 @@ def list_locations(request: Request, db: Session = Depends(get_db)):
     return [_poi_dict(p, db, str(me.usergroup_id)) for p in pois]
 
 
-# ── Create a single location by postcode ─────────────────────────────────────
+# ── Create a single location by postcode OR drawn coordinates ────────────────
 
 class LocationCreate(BaseModel):
-    postcode: str
     name: str
     description: Optional[str] = None
     radius: float = 150.0
+    # Option A: postcode geocoding (legacy / bulk)
+    postcode: Optional[str] = None
+    # Option B: direct coordinates from drawn shape
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    address: Optional[str] = None
+    shape_type: str = 'circle'       # circle | polygon | rectangle
+    coordinates: Optional[str] = None  # JSON string [[lat,lng], ...] for polygon/rectangle
+    notes: Optional[str] = None
+    status: Optional[str] = None     # 'active' | 'draft' | 'inactive'
 
 
 @router.post("/locations", status_code=201)
@@ -1905,19 +1917,39 @@ async def create_location(data: LocationCreate, request: Request, db: Session = 
     me = get_portal_user_from_request(request, db)
     if not me.is_group_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
-    geo = await _geocode_postcode(data.postcode)
+
+    # Resolve coordinates: either from direct input or by geocoding a postcode
+    if data.latitude is not None and data.longitude is not None:
+        lat = float(data.latitude)
+        lon = float(data.longitude)
+        display = data.address or ""
+    elif data.postcode:
+        geo = await _geocode_postcode(data.postcode)
+        lat = geo["lat"]
+        lon = geo["lon"]
+        display = geo["display"]
+    else:
+        raise HTTPException(status_code=422, detail="Either postcode or latitude/longitude is required")
+
     poi = POI(
         usergroup_id=str(me.usergroup_id),
         user_id=None,
         name=data.name.strip(),
         description=data.description,
         poi_type="single",
-        latitude=geo["lat"],
-        longitude=geo["lon"],
+        latitude=lat,
+        longitude=lon,
         radius=max(50.0, min(data.radius, 50000.0)),
-        address=geo["display"],
+        address=display,
         is_active=True,
     )
+    # Set shape fields if the columns exist (migration 028)
+    if hasattr(poi, 'shape_type'):
+        poi.shape_type = data.shape_type or 'circle'
+    if hasattr(poi, 'coordinates'):
+        poi.coordinates = data.coordinates
+    if hasattr(poi, 'notes'):
+        poi.notes = data.notes
     db.add(poi)
     db.commit()
     db.refresh(poi)
@@ -1931,6 +1963,12 @@ class LocationUpdate(BaseModel):
     description: Optional[str] = None
     radius: Optional[float] = None
     is_active: Optional[bool] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    address: Optional[str] = None
+    shape_type: Optional[str] = None
+    coordinates: Optional[str] = None
+    notes: Optional[str] = None
 
 
 @router.put("/locations/{location_id}")
@@ -1950,6 +1988,18 @@ def update_location(
         poi.radius = max(50.0, min(data.radius, 50000.0))
     if data.is_active is not None:
         poi.is_active = data.is_active
+    if data.latitude is not None:
+        poi.latitude = float(data.latitude)
+    if data.longitude is not None:
+        poi.longitude = float(data.longitude)
+    if data.address is not None:
+        poi.address = data.address
+    if data.shape_type is not None and hasattr(poi, 'shape_type'):
+        poi.shape_type = data.shape_type
+    if data.coordinates is not None and hasattr(poi, 'coordinates'):
+        poi.coordinates = data.coordinates
+    if data.notes is not None and hasattr(poi, 'notes'):
+        poi.notes = data.notes
     db.commit()
     db.refresh(poi)
     return _poi_dict(poi, db, str(me.usergroup_id))

@@ -16,6 +16,9 @@
     <!-- Leaflet -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Leaflet Draw (for geofence drawing in Locations tab) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 
     <!-- MQTT -->
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
@@ -478,90 +481,284 @@
             </div>
 
             <!-- ═══ LOCATIONS TAB ═══ -->
-            <div id="tab-locations" class="tab-content">
-                <div class="view-header">
-                    <h2><i class="fa-solid fa-location-dot" style="color:var(--primary);margin-right:8px"></i>Locations</h2>
-                    <div class="search-input-wrap" style="flex:1;max-width:280px">
-                        <i class="fa-solid fa-magnifying-glass"></i>
-                        <input id="loc-search" class="search-input" type="text" placeholder="Search name, address…" oninput="locationsRender()">
+            <style>
+            /* ── Location Manager scoped styles ────────────────── */
+            #tab-locations { padding:0 !important; overflow:hidden; }
+            .loc-main { display:grid; grid-template-columns:340px 1fr; height:100%; overflow:hidden; }
+            /* Sidebar */
+            .loc-sidebar { background:var(--bg-2); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
+            .loc-sidebar-hd { padding:14px 14px 10px; border-bottom:1px solid var(--border); flex-shrink:0; }
+            .loc-sidebar-title { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:600; color:var(--text-1); margin-bottom:10px; }
+            .loc-pulse { width:8px; height:8px; border-radius:50%; background:var(--primary); animation:locPulse 2s infinite; flex-shrink:0; }
+            @keyframes locPulse { 0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--primary) 60%,transparent)} 70%{box-shadow:0 0 0 8px transparent} 100%{box-shadow:0 0 0 0 transparent} }
+            /* Search */
+            .loc-search-wrap { position:relative; }
+            .loc-search-input { width:100%; padding:9px 10px 9px 34px; background:var(--bg-3); border:1px solid var(--border); border-radius:8px; color:var(--text-1); font-size:12px; outline:none; box-sizing:border-box; transition:border-color .15s; }
+            .loc-search-input:focus { border-color:var(--primary); }
+            .loc-search-input::placeholder { color:var(--text-3); }
+            .loc-search-ico { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-3); pointer-events:none; }
+            .loc-search-spinner { position:absolute; right:10px; top:50%; transform:translateY(-50%); width:13px; height:13px; border-radius:50%; border:2px solid var(--border); border-top-color:var(--primary); animation:locSpin .7s linear infinite; display:none; }
+            .loc-search-wrap.loading .loc-search-spinner { display:block; }
+            @keyframes locSpin { to { transform:translateY(-50%) rotate(360deg); } }
+            .loc-search-results { position:absolute; top:calc(100% + 4px); left:0; right:0; background:var(--bg-2); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.18); max-height:260px; overflow-y:auto; z-index:1200; display:none; }
+            .loc-search-results.open { display:block; }
+            .loc-sr { padding:9px 12px; border-bottom:1px solid var(--border); cursor:pointer; transition:background .1s; }
+            .loc-sr:last-child { border-bottom:none; }
+            .loc-sr:hover { background:var(--bg-3); }
+            .loc-sr-name { font-size:12px; color:var(--text-1); margin-bottom:2px; font-weight:500; }
+            .loc-sr-detail { font-size:11px; color:var(--text-3); }
+            /* Stats */
+            .loc-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; padding:10px 12px; border-bottom:1px solid var(--border); flex-shrink:0; }
+            .loc-stat { background:var(--bg-3); border:1px solid var(--border); border-radius:8px; padding:8px 6px; text-align:center; cursor:pointer; transition:all .15s; }
+            .loc-stat:hover { border-color:var(--primary); transform:translateY(-1px); }
+            .loc-stat.lsf-active { border-color:var(--primary); background:color-mix(in srgb,var(--primary) 12%,transparent); }
+            .loc-stat-num { font-size:18px; font-weight:700; color:var(--text-1); line-height:1; margin-bottom:3px; }
+            .loc-stat-lbl { font-size:10px; color:var(--text-3); text-transform:uppercase; letter-spacing:.05em; }
+            .loc-stat-active .loc-stat-num { color:var(--primary); }
+            .loc-stat-draft .loc-stat-num { color:#f59e0b; }
+            .loc-stat-armed .loc-stat-num { color:#22c55e; }
+            /* Action bar */
+            .loc-action-bar { display:flex; gap:6px; padding:10px 12px; border-bottom:1px solid var(--border); flex-shrink:0; }
+            .loc-btn { padding:8px 10px; border-radius:7px; font-size:12px; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:5px; border:1px solid transparent; cursor:pointer; transition:all .15s; white-space:nowrap; }
+            .loc-btn-primary { flex:1; background:var(--primary); color:#fff; }
+            .loc-btn-primary:hover { filter:brightness(1.1); }
+            .loc-btn-secondary { flex:1; background:var(--bg-3); color:var(--text-1); border-color:var(--border); }
+            .loc-btn-secondary:hover { border-color:var(--primary); }
+            .loc-btn-ghost { background:transparent; color:var(--text-2); border-color:var(--border); }
+            .loc-btn-ghost:hover { color:var(--text-1); border-color:var(--primary); }
+            .loc-btn-danger { background:transparent; color:var(--danger); border-color:color-mix(in srgb,var(--danger) 40%,transparent); }
+            .loc-btn-danger:hover { background:color-mix(in srgb,var(--danger) 10%,transparent); }
+            /* Shape filter tabs */
+            .loc-shape-tabs { display:flex; gap:5px; padding:8px 12px; border-bottom:1px solid var(--border); flex-shrink:0; flex-wrap:wrap; }
+            .loc-stab { padding:4px 10px; background:transparent; border:1px solid var(--border); border-radius:999px; color:var(--text-2); font-size:11px; cursor:pointer; transition:all .15s; }
+            .loc-stab:hover { color:var(--text-1); border-color:var(--primary); }
+            .loc-stab-active { background:color-mix(in srgb,var(--primary) 12%,transparent); border-color:var(--primary); color:var(--primary); font-weight:600; }
+            /* Geofence list */
+            .loc-list { flex:1; overflow-y:auto; padding:6px 10px 10px; }
+            .loc-list::-webkit-scrollbar { width:6px; }
+            .loc-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+            .loc-gf-item { display:flex; align-items:center; gap:10px; padding:10px; margin-bottom:4px; background:var(--bg-3); border:1px solid var(--border); border-radius:8px; cursor:pointer; transition:all .15s; }
+            .loc-gf-item:hover { border-color:var(--primary); transform:translateY(-1px); }
+            .loc-gf-item.loc-gf-sel { background:color-mix(in srgb,var(--primary) 10%,var(--bg-2)); border-color:var(--primary); }
+            .loc-gf-pin { width:30px; height:30px; flex-shrink:0; border-radius:7px; display:grid; place-items:center; }
+            .loc-gf-pin-circle { background:color-mix(in srgb,var(--primary) 15%,transparent); color:var(--primary); }
+            .loc-gf-pin-polygon { background:rgba(59,130,246,.15); color:#3b82f6; }
+            .loc-gf-pin-rectangle { background:rgba(245,158,11,.15); color:#f59e0b; }
+            .loc-gf-meta { flex:1; min-width:0; }
+            .loc-gf-name { font-size:12px; font-weight:600; color:var(--text-1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+            .loc-gf-detail { font-size:11px; color:var(--text-3); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+            .loc-gf-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+            .loc-gf-dot-active { background:var(--primary); box-shadow:0 0 5px var(--primary); }
+            .loc-gf-dot-draft { background:#f59e0b; }
+            .loc-gf-dot-inactive { background:var(--text-3); }
+            .loc-gf-empty { text-align:center; padding:32px 16px; color:var(--text-3); font-size:13px; }
+            /* Detail panel */
+            .loc-detail { border-top:1px solid var(--border); padding:12px 14px; background:var(--bg-2); display:none; flex-shrink:0; }
+            .loc-detail.open { display:block; }
+            .loc-detail-hd { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:10px; }
+            .loc-detail-title-wrap { display:flex; align-items:center; gap:8px; min-width:0; }
+            .loc-detail-name { font-size:13px; font-weight:600; color:var(--text-1); }
+            .loc-detail-id { font-size:11px; color:var(--text-3); }
+            .loc-detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px 14px; margin-bottom:10px; }
+            .loc-detail-lbl { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-3); margin-bottom:2px; }
+            .loc-detail-val { font-size:12px; color:var(--text-1); }
+            .loc-detail-val-accent { color:var(--primary); font-weight:600; }
+            .loc-detail-actions { display:flex; gap:5px; flex-wrap:wrap; }
+            /* Map area */
+            .loc-map-area { position:relative; overflow:hidden; min-height:0; }
+            #locMap { width:100%; height:100%; min-height:400px; background:var(--bg); }
+            /* Map toolbar */
+            .loc-map-toolbar { position:absolute; top:12px; left:50%; transform:translateX(-50%); z-index:500; display:flex; gap:3px; background:var(--bg-2); border:1px solid var(--border); border-radius:9px; padding:3px; box-shadow:0 2px 12px rgba(0,0,0,.2); }
+            .loc-tool-btn { padding:7px 11px; background:transparent; border:none; border-radius:6px; color:var(--text-2); font-size:12px; font-weight:500; display:inline-flex; align-items:center; gap:5px; cursor:pointer; transition:all .15s; }
+            .loc-tool-btn:hover { background:var(--bg-3); color:var(--text-1); }
+            .loc-tool-btn.loc-tool-active { background:color-mix(in srgb,var(--primary) 12%,transparent); color:var(--primary); }
+            .loc-tool-div { width:1px; background:var(--border); margin:3px 2px; }
+            /* Slide-in editor panel */
+            .loc-editor-panel { position:absolute; top:0; right:0; bottom:0; width:360px; background:var(--bg-2); border-left:1px solid var(--border); box-shadow:-6px 0 20px rgba(0,0,0,.2); display:flex; flex-direction:column; transform:translateX(100%); transition:transform .28s cubic-bezier(.4,0,.2,1); z-index:600; }
+            .loc-editor-panel.open { transform:translateX(0); }
+            .loc-editor-hd { padding:14px 16px; border-bottom:1px solid var(--border); display:flex; align-items:flex-start; justify-content:space-between; gap:10px; flex-shrink:0; }
+            .loc-editor-badge { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; padding:3px 7px; border-radius:4px; background:color-mix(in srgb,var(--primary) 15%,transparent); color:var(--primary); border:1px solid color-mix(in srgb,var(--primary) 40%,transparent); flex-shrink:0; }
+            .loc-editor-badge.editing { background:rgba(245,158,11,.12); color:#f59e0b; border-color:rgba(245,158,11,.4); }
+            .loc-editor-title { font-size:14px; font-weight:600; color:var(--text-1); }
+            .loc-editor-sub { font-size:11px; color:var(--text-3); margin-top:2px; }
+            .loc-editor-body { flex:1; overflow-y:auto; padding:16px; }
+            .loc-editor-footer { padding:12px 16px; border-top:1px solid var(--border); display:flex; gap:7px; background:var(--bg-2); flex-shrink:0; }
+            .loc-editor-footer .btn { flex:1; }
+            /* Leaflet popup theming for location map */
+            #tab-locations .leaflet-popup-content-wrapper { background:var(--bg-2) !important; color:var(--text-1) !important; border:1px solid var(--border); border-radius:8px !important; box-shadow:0 4px 16px rgba(0,0,0,.2) !important; }
+            #tab-locations .leaflet-popup-tip { background:var(--bg-2) !important; }
+            #tab-locations .leaflet-control-zoom a { background:var(--bg-2) !important; color:var(--text-1) !important; border:1px solid var(--border) !important; }
+            /* Toast stack */
+            #locToastStack { position:fixed; bottom:20px; right:20px; z-index:3500; display:flex; flex-direction:column; gap:7px; }
+            .loc-toast { background:var(--bg-2); border:1px solid var(--border); border-left:3px solid var(--primary); border-radius:7px; padding:10px 14px; box-shadow:0 4px 16px rgba(0,0,0,.2); font-size:13px; min-width:220px; max-width:320px; animation:locToastIn .2s ease-out; }
+            .loc-toast.err { border-left-color:var(--danger); }
+            .loc-toast.warn { border-left-color:#f59e0b; }
+            @keyframes locToastIn { from{transform:translateX(16px);opacity:0} to{transform:translateX(0);opacity:1} }
+            /* Responsive */
+            @media (max-width:900px) { .loc-main { grid-template-columns:300px 1fr; } .loc-editor-panel { width:300px; } }
+            </style>
+
+            <div id="tab-locations" class="tab-content" style="padding:0;overflow:hidden">
+              <div class="loc-main">
+
+                <!-- ── Sidebar ── -->
+                <aside class="loc-sidebar">
+                  <div class="loc-sidebar-hd">
+                    <div class="loc-sidebar-title">
+                      <span class="loc-pulse"></span> Locations
                     </div>
-                    <button class="btn btn-primary btn-sm" id="loc-add-btn" onclick="locOpenAdd()">
-                        <i class="fa-solid fa-plus"></i> Add Location
+                    <div class="loc-search-wrap" id="locAddrWrap">
+                      <svg class="loc-search-ico" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                      <input id="locAddrInput" class="loc-search-input" placeholder="Search address or postcode…" autocomplete="off"/>
+                      <div class="loc-search-spinner"></div>
+                      <div class="loc-search-results" id="locSearchResults"></div>
+                    </div>
+                  </div>
+
+                  <div class="loc-stats" id="locStats">
+                    <div class="loc-stat loc-stat-total lsf-active" data-lsf="all"><div class="loc-stat-num" id="locStatTotal">0</div><div class="loc-stat-lbl">Total</div></div>
+                    <div class="loc-stat loc-stat-active" data-lsf="active"><div class="loc-stat-num" id="locStatActive">0</div><div class="loc-stat-lbl">Active</div></div>
+                    <div class="loc-stat loc-stat-draft" data-lsf="draft"><div class="loc-stat-num" id="locStatDraft">0</div><div class="loc-stat-lbl">Draft</div></div>
+                    <div class="loc-stat loc-stat-armed" data-lsf="armed"><div class="loc-stat-num" id="locStatArmed">0</div><div class="loc-stat-lbl">Armed</div></div>
+                  </div>
+
+                  <div id="loc-alert" class="alert" style="display:none;margin:6px 10px 0"><span id="loc-alert-text"></span></div>
+
+                  <div class="loc-action-bar">
+                    <button class="loc-btn loc-btn-primary" id="locBtnNew">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                      New Location
                     </button>
-                    <button class="btn btn-ghost btn-sm" id="loc-bulk-btn" onclick="locOpenBulk()">
-                        <i class="fa-solid fa-file-arrow-up"></i> Bulk Upload
+                    <button class="loc-btn loc-btn-secondary" id="locBtnBulk">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                      Bulk
                     </button>
-                    <a class="btn btn-ghost btn-sm" id="loc-template-btn" href="/api/portal/locations/template" download="locations_template.xlsx">
-                        <i class="fa-solid fa-file-excel"></i> Template
-                    </a>
-                </div>
+                  </div>
 
-                <div id="loc-alert" class="alert" style="display:none;margin:0 24px 0">
-                    <span id="loc-alert-text"></span>
-                </div>
+                  <div class="loc-shape-tabs" id="locShapeTabs">
+                    <button class="loc-stab loc-stab-active" data-lshape="all">All shapes</button>
+                    <button class="loc-stab" data-lshape="circle">Circles</button>
+                    <button class="loc-stab" data-lshape="polygon">Polygons</button>
+                    <button class="loc-stab" data-lshape="rectangle">Rectangles</button>
+                  </div>
 
-                <div class="view-body" style="padding:0 24px 24px">
-                    <!-- Empty state -->
-                    <div id="loc-empty" style="display:none;flex-direction:column;align-items:center;justify-content:center;padding:80px 24px;color:var(--text-3);text-align:center">
-                        <i class="fa-solid fa-location-dot" style="font-size:3rem;margin-bottom:16px;opacity:.3"></i>
-                        <div style="font-size:1rem;font-weight:600;margin-bottom:8px">No locations yet</div>
-                        <div style="font-size:.85rem">Add a location by postcode or bulk-upload from an Excel file.</div>
-                    </div>
+                  <div class="loc-list" id="locGfList"></div>
 
-                    <!-- Locations table -->
-                    <table class="data-table" id="loc-table" style="display:none">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Address / Postcode</th>
-                                <th style="text-align:center">Radius</th>
-                                <th style="text-align:center">Armed Tags</th>
-                                <th style="width:120px"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="loc-tbody"></tbody>
-                    </table>
-
-                    <div id="loc-loading" style="display:none;padding:60px;text-align:center;color:var(--text-3)">
-                        <i class="fa-solid fa-spinner fa-spin" style="font-size:1.5rem"></i>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ─── Locations: Add modal ─────────────────────────────────── -->
-            <div id="loc-add-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)locCloseAdd()">
-                <div class="modal-box" style="max-width:480px">
-                    <div class="modal-header">
-                        <span class="modal-title" id="loc-add-modal-title">Add Location</span>
-                        <button class="modal-close" onclick="locCloseAdd()"><i class="fa-solid fa-xmark"></i></button>
-                    </div>
-                    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
-                        <div id="loc-add-alert" class="alert alert-error" style="display:none"><span id="loc-add-alert-text"></span></div>
-                        <div class="form-row">
-                            <label class="form-label">Postcode *</label>
-                            <input id="loc-add-postcode" class="form-input" type="text" placeholder="e.g. SW1A 1AA" maxlength="10">
+                  <!-- Detail panel at bottom of sidebar -->
+                  <div class="loc-detail" id="locDetailPanel">
+                    <div class="loc-detail-hd">
+                      <div class="loc-detail-title-wrap">
+                        <div class="loc-gf-pin loc-gf-pin-circle" id="locDetailPin">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>
                         </div>
-                        <div class="form-row">
-                            <label class="form-label">Name *</label>
-                            <input id="loc-add-name" class="form-input" type="text" placeholder="e.g. Head Office" maxlength="200">
+                        <div>
+                          <div class="loc-detail-name" id="locDetailName">—</div>
+                          <div class="loc-detail-id" id="locDetailId">—</div>
                         </div>
-                        <div class="form-row">
-                            <label class="form-label">Description</label>
-                            <input id="loc-add-desc" class="form-input" type="text" placeholder="Optional note" maxlength="500">
-                        </div>
-                        <div class="form-row">
-                            <label class="form-label">Geofence radius (metres)</label>
-                            <input id="loc-add-radius" class="form-input" type="number" value="150" min="50" max="50000" step="10">
-                        </div>
+                      </div>
+                      <button class="btn-icon-sm" id="locDetailClose" title="Close"><i class="fa-solid fa-xmark"></i></button>
                     </div>
-                    <div class="modal-footer">
-                        <button class="btn btn-ghost" onclick="locCloseAdd()">Cancel</button>
-                        <button class="btn btn-primary" id="loc-add-save-btn" onclick="locSaveAdd()">
-                            <i class="fa-solid fa-floppy-disk"></i> Save
-                        </button>
+                    <div class="loc-detail-grid">
+                      <div><div class="loc-detail-lbl">Status</div><div class="loc-detail-val loc-detail-val-accent" id="locDetailStatus">—</div></div>
+                      <div><div class="loc-detail-lbl">Shape</div><div class="loc-detail-val" id="locDetailShape">—</div></div>
+                      <div><div class="loc-detail-lbl">Size</div><div class="loc-detail-val" id="locDetailArea">—</div></div>
+                      <div><div class="loc-detail-lbl">Tags Armed</div><div class="loc-detail-val" id="locDetailArmed">0</div></div>
+                      <div style="grid-column:1/-1"><div class="loc-detail-lbl">Address</div><div class="loc-detail-val" id="locDetailAddr">—</div></div>
                     </div>
-                </div>
-            </div>
+                    <div class="loc-detail-actions">
+                      <button class="loc-btn loc-btn-secondary" id="locBtnEdit">Edit</button>
+                      <button class="loc-btn loc-btn-ghost" id="locBtnManageTags">Tags</button>
+                      <button class="loc-btn loc-btn-ghost" id="locBtnCentre">Centre</button>
+                      <button class="loc-btn loc-btn-danger" id="locBtnDelete">Delete</button>
+                    </div>
+                  </div>
+                </aside>
+
+                <!-- ── Map area ── -->
+                <div class="loc-map-area">
+                  <div id="locMap"></div>
+
+                  <!-- Draw toolbar -->
+                  <div class="loc-map-toolbar">
+                    <button class="loc-tool-btn" data-loctool="circle" title="Draw circle">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>
+                      Circle
+                    </button>
+                    <button class="loc-tool-btn" data-loctool="polygon" title="Draw polygon">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2 22 8.5 18 20H6L2 8.5z"/></svg>
+                      Polygon
+                    </button>
+                    <button class="loc-tool-btn" data-loctool="rectangle" title="Draw rectangle">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="1"/></svg>
+                      Rectangle
+                    </button>
+                    <div class="loc-tool-div"></div>
+                    <button class="loc-tool-btn" id="locToolCancel" style="display:none">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                      Cancel
+                    </button>
+                  </div>
+
+                  <!-- Slide-in editor panel -->
+                  <aside class="loc-editor-panel" id="locEditorPanel">
+                    <div class="loc-editor-hd">
+                      <div style="display:flex;align-items:center;gap:10px;min-width:0">
+                        <span class="loc-editor-badge" id="locEditorBadge">New</span>
+                        <div>
+                          <div class="loc-editor-title" id="locEditorTitle">New location</div>
+                          <div class="loc-editor-sub" id="locEditorSub">Adjust shape on the map</div>
+                        </div>
+                      </div>
+                      <button class="btn-icon-sm" id="locEditorClose"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <div class="loc-editor-body">
+                      <div class="form-row">
+                        <label class="form-label">Name *</label>
+                        <input class="form-input" id="locGfName" placeholder="e.g. Worsley Depot" maxlength="200"/>
+                      </div>
+                      <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                        <div>
+                          <label class="form-label">Shape</label>
+                          <select class="form-input" id="locGfType">
+                            <option value="circle">Circle</option>
+                            <option value="polygon">Polygon</option>
+                            <option value="rectangle">Rectangle</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label class="form-label">Status</label>
+                          <select class="form-input" id="locGfStatus">
+                            <option value="active">Active</option>
+                            <option value="draft">Draft</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="form-row" id="locRadiusRow">
+                        <label class="form-label">Radius</label>
+                        <div style="display:flex;align-items:center;gap:10px">
+                          <input type="range" id="locGfRadius" min="50" max="2000" step="25" value="300" style="flex:1;accent-color:var(--primary)"/>
+                          <span id="locRadiusDisp" style="min-width:58px;text-align:right;font-weight:600;color:var(--primary);font-size:13px">300 m</span>
+                        </div>
+                        <div style="font-size:11px;color:var(--text-3);margin-top:4px">Drag the marker on the map to reposition.</div>
+                      </div>
+                      <div class="form-row">
+                        <label class="form-label">Address / Notes</label>
+                        <input class="form-input" id="locGfAddress" placeholder="Optional address or note" maxlength="500"/>
+                      </div>
+                      <div class="form-row">
+                        <label class="form-label">Coordinates</label>
+                        <div id="locCoordDisp" style="padding:8px 12px;background:var(--bg-3,var(--bg));border:1px solid var(--border);border-radius:8px;font-family:monospace;font-size:11px;color:var(--text-2)">—</div>
+                      </div>
+                    </div>
+                    <div class="loc-editor-footer">
+                      <button class="btn btn-ghost btn-sm" id="locBtnCancelEditor">Cancel</button>
+                      <button class="btn btn-primary btn-sm" id="locBtnSave">Save location</button>
+                    </div>
+                  </aside>
+                </div><!-- /map-area -->
+
+              </div><!-- /loc-main -->
+            </div><!-- /#tab-locations -->
 
             <!-- ─── Locations: Bulk upload modal ────────────────────────── -->
             <div id="loc-bulk-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)locCloseBulk()">
@@ -573,7 +770,7 @@
                     <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
                         <p style="margin:0;font-size:.87rem;color:var(--text-2)">
                             Download the <a href="/api/portal/locations/template" download="locations_template.xlsx" style="color:var(--primary)">Excel template</a>,
-                            fill in your postcodes and names, then upload it here.
+                            fill in your postcodes/addresses and names, then upload it here.
                             Each row is geocoded automatically — please allow a few seconds per row.
                         </p>
                         <div id="loc-bulk-alert" class="alert" style="display:none"><span id="loc-bulk-alert-text"></span></div>
@@ -613,6 +810,11 @@
                         <button class="btn btn-ghost" onclick="locCloseTagsModal()">Done</button>
                     </div>
                 </div>
+            </div>
+
+            <!-- Toast stack for location manager -->
+            <div id="locToastStack"></div>
+
             </div>
 
             <!-- ═══ FLOORPLAN SKETCH TAB (native — no iframe) ═══ -->
@@ -4598,358 +4800,793 @@ async function rptAlertsMarkAllRead() {
 setInterval(_fetchBellAlerts, 120_000);
 
 // ══════════════════════════════════════════
-// LOCATIONS (portal-managed geofences)
+// LOCATIONS  — map-based geofence manager
 // ══════════════════════════════════════════
-let _locsData       = [];   // [{id, name, address, radius, armed_count, tags_armed:[]}]
-let _locEditingId   = null; // id of POI being edited (null = new)
-let _locTagsLocId   = null; // id of POI open in arm/disarm modal
-let _allTagsCache   = null; // cached tag list for arm modal
 
-async function locationsLoad() {
-    _locSetLoading(true);
-    _locHideAlert();
-    try {
-        const res = await apiFetch('/api/portal/locations');
-        if (!res.ok) throw new Error(await safeJsonDetail(res, 'Failed to load locations'));
-        _locsData = await res.json();
-        locationsRender();
-    } catch (err) {
-        _locShowAlert(err.message, 'error');
-    } finally {
-        _locSetLoading(false);
+/* ── State ─────────────────────────────── */
+let _locsData        = [];        // POIs from backend
+let _locMap          = null;      // Leaflet map instance
+let _locGeoLayer     = null;      // L.featureGroup: all committed shapes
+let _locPendingShape = null;      // shape being drawn / edited (not yet saved)
+let _locDrawer       = null;      // active L.Draw.* drawer
+let _locDrawingTool  = null;      // 'circle'|'polygon'|'rectangle'
+let _locSelectedId   = null;      // id of selected POI
+let _locEditingId    = null;      // id being edited (null = new)
+let _locEditSnap     = null;      // snapshot for cancel-revert on edit
+let _locStatusFilter = 'all';     // 'all'|'active'|'draft'|'armed'
+let _locShapeFilter  = 'all';     // 'all'|'circle'|'polygon'|'rectangle'
+let _locAddrTimer    = null;
+let _locSearchMarker = null;      // temporary pin from address search
+let _locMapInit      = false;     // has map been initialized yet
+let _locTagsLocId    = null;      // POI id open in arm/disarm modal
+let _allTagsCache    = null;      // cached tag list
+
+/* ── Helpers ───────────────────────────── */
+function _locHtml(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function _locCap(s){ return (s||'').charAt(0).toUpperCase()+(s||'').slice(1); }
+function _locCss(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim()||'#22c55e'; }
+function _locSleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+function locToast(msg, kind=''){
+    const el = document.createElement('div');
+    el.className = `loc-toast${kind?' '+kind:''}`;
+    el.textContent = msg;
+    const stack = document.getElementById('locToastStack');
+    if(stack){ stack.appendChild(el); }
+    setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .2s'; }, 2600);
+    setTimeout(()=>el.remove(), 2900);
+}
+function _locShowAlert(msg, type='error'){
+    const el=document.getElementById('loc-alert'), tx=document.getElementById('loc-alert-text');
+    if(!el) return;
+    el.className='alert alert-'+type; el.style.display='flex'; tx.textContent=msg;
+}
+function _locHideAlert(){ const el=document.getElementById('loc-alert'); if(el) el.style.display='none'; }
+
+function _locShapeIcon(type){
+    if(type==='polygon')   return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2 22 8.5 18 20H6L2 8.5z"/></svg>`;
+    if(type==='rectangle') return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="1"/></svg>`;
+    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>`;
+}
+function _locDescribeShape(gf){
+    if(gf.shape_type==='circle'||!gf.shape_type){
+        const r=gf.radius||150;
+        return r>=1000?`Circle · ${(r/1000).toFixed(1)} km radius`:`Circle · ${r}m radius`;
     }
+    return _locCap(gf.shape_type);
+}
+function _locApproxArea(layer){
+    let ll = layer.getLatLngs();
+    if(Array.isArray(ll[0])) ll=ll[0];
+    if(!ll||!ll.length) return 0;
+    const R=6371000, latRad=ll[0].lat*Math.PI/180;
+    const pts=ll.map(p=>[ R*(p.lng*Math.PI/180)*Math.cos(latRad), R*(p.lat*Math.PI/180) ]);
+    let a=0;
+    for(let i=0;i<pts.length;i++){const[x1,y1]=pts[i],[x2,y2]=pts[(i+1)%pts.length];a+=x1*y2-x2*y1;}
+    return Math.abs(a/2);
+}
+function _locFmtArea(m2){
+    if(m2>1_000_000) return `${(m2/1_000_000).toFixed(2)} km²`;
+    if(m2>10_000)    return `${(m2/10_000).toFixed(2)} ha`;
+    return `${Math.round(m2)} m²`;
+}
+function _locPopupHtml(gf){
+    return `<div style="font-weight:600;margin-bottom:3px">${_locHtml(gf.name)}</div>
+<div style="font-size:11px;color:var(--text-3);margin-bottom:6px">${_locHtml(gf.address||'')}</div>
+<div style="font-size:11px;color:var(--text-2)">
+  ${_locCap(gf.shape_type||'circle')} · ${gf.shape_type==='circle'||!gf.shape_type?gf.radius+'m radius':''}<br>
+  Status: ${_locCap(gf.is_active?'active':'inactive')}${gf.armed_count?' · '+gf.armed_count+' armed':''}
+</div>`;
 }
 
-function locationsRender() {
-    const q      = (document.getElementById('loc-search')?.value || '').toLowerCase();
-    const tbody  = document.getElementById('loc-tbody');
-    const table  = document.getElementById('loc-table');
-    const empty  = document.getElementById('loc-empty');
-    if (!tbody) return;
-
-    const isAdmin = getSession().user?.is_group_admin;
-    const filtered = _locsData.filter(l =>
-        l.name.toLowerCase().includes(q) ||
-        (l.address || '').toLowerCase().includes(q)
-    );
-
-    if (!filtered.length) {
-        table.style.display = 'none';
-        empty.style.display = 'flex';
-        return;
-    }
-    empty.style.display = 'none';
-    table.style.display = '';
-
-    tbody.innerHTML = filtered.map(l => {
-        const armedBadge = l.armed_count > 0
-            ? `<span style="background:var(--success-bg,rgba(34,197,94,.15));color:var(--success);padding:2px 8px;border-radius:12px;font-size:.78rem;font-weight:600">${l.armed_count} armed</span>`
-            : `<span style="color:var(--text-3);font-size:.78rem">none</span>`;
-        const adminBtns = isAdmin ? `
-            <button class="btn-icon-sm" title="Edit" onclick="locOpenEdit('${esc(l.id)}')"><i class="fa-solid fa-pen"></i></button>
-            <button class="btn-icon-sm" title="Manage Tags" onclick="locOpenTagsModal('${esc(l.id)}')"><i class="fa-solid fa-sliders"></i></button>
-            <button class="btn-icon-danger" title="Delete" onclick="locDelete('${esc(l.id)}', this)"><i class="fa-solid fa-trash"></i></button>
-        ` : `
-            <button class="btn-icon-sm" title="Manage Tags" onclick="locOpenTagsModal('${esc(l.id)}')"><i class="fa-solid fa-sliders"></i></button>
-        `;
-        return `<tr>
-            <td style="font-weight:500">${esc(l.name)}</td>
-            <td style="color:var(--text-3);font-size:.84rem;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(l.address||'')}">${esc(l.address||'—')}</td>
-            <td style="text-align:center;color:var(--text-2)">${l.radius}m</td>
-            <td style="text-align:center">${armedBadge}</td>
-            <td style="text-align:right;white-space:nowrap">${adminBtns}</td>
-        </tr>`;
-    }).join('');
-}
-
-function _locSetLoading(on) {
-    const loadEl = document.getElementById('loc-loading');
-    const table  = document.getElementById('loc-table');
-    const empty  = document.getElementById('loc-empty');
-    if (on) {
-        if (loadEl) loadEl.style.display = '';
-        if (table)  table.style.display  = 'none';
-        if (empty)  empty.style.display  = 'none';
-    } else {
-        if (loadEl) loadEl.style.display = 'none';
-    }
-}
-function _locShowAlert(msg, type='error') {
-    const el = document.getElementById('loc-alert');
-    const tx = document.getElementById('loc-alert-text');
-    if (!el) return;
-    el.className = 'alert alert-' + type;
-    el.style.display = 'flex';
-    tx.textContent = msg;
-}
-function _locHideAlert() {
-    const el = document.getElementById('loc-alert');
-    if (el) el.style.display = 'none';
-}
-
-// ── Add / Edit modal ─────────────────────────────────────────────────────────
-
-function locOpenAdd() {
-    _locEditingId = null;
-    document.getElementById('loc-add-modal-title').textContent = 'Add Location';
-    document.getElementById('loc-add-postcode').value  = '';
-    document.getElementById('loc-add-name').value      = '';
-    document.getElementById('loc-add-desc').value      = '';
-    document.getElementById('loc-add-radius').value    = '150';
-    document.getElementById('loc-add-alert').style.display = 'none';
-    document.getElementById('loc-add-postcode').style.display = '';
-    document.getElementById('loc-add-postcode').previousElementSibling.style.display = '';
-    document.getElementById('loc-add-modal').style.display = 'flex';
-    document.getElementById('loc-add-postcode').focus();
-}
-
-function locOpenEdit(id) {
-    const l = _locsData.find(x => x.id === id);
-    if (!l) return;
-    _locEditingId = id;
-    document.getElementById('loc-add-modal-title').textContent = 'Edit Location';
-    // Hide postcode field when editing (can't re-geocode without explicit action)
-    document.getElementById('loc-add-postcode').style.display = 'none';
-    document.getElementById('loc-add-postcode').previousElementSibling.style.display = 'none';
-    document.getElementById('loc-add-name').value      = l.name;
-    document.getElementById('loc-add-desc').value      = l.description || '';
-    document.getElementById('loc-add-radius').value    = l.radius;
-    document.getElementById('loc-add-alert').style.display = 'none';
-    document.getElementById('loc-add-modal').style.display = 'flex';
-    document.getElementById('loc-add-name').focus();
-}
-
-function locCloseAdd() {
-    document.getElementById('loc-add-modal').style.display = 'none';
-}
-
-async function locSaveAdd() {
-    const btn     = document.getElementById('loc-add-save-btn');
-    const alertEl = document.getElementById('loc-add-alert');
-    const alertTx = document.getElementById('loc-add-alert-text');
-    alertEl.style.display = 'none';
-
-    const name   = document.getElementById('loc-add-name').value.trim();
-    const desc   = document.getElementById('loc-add-desc').value.trim();
-    const radius = parseFloat(document.getElementById('loc-add-radius').value) || 150;
-
-    if (!name) {
-        alertEl.className = 'alert alert-error';
-        alertTx.textContent = 'Name is required.';
-        alertEl.style.display = 'flex';
-        return;
-    }
-
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
-
-    try {
-        let res, data;
-        if (_locEditingId) {
-            res = await apiFetch(`/api/portal/locations/${_locEditingId}`, {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ name, description: desc || null, radius }),
-            });
-        } else {
-            const postcode = document.getElementById('loc-add-postcode').value.trim();
-            if (!postcode) {
-                alertEl.className = 'alert alert-error';
-                alertTx.textContent = 'Postcode is required.';
-                alertEl.style.display = 'flex';
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save';
-                return;
-            }
-            res = await apiFetch('/api/portal/locations', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ postcode, name, description: desc || null, radius }),
-            });
-        }
-        if (!res.ok) throw new Error(await safeJsonDetail(res, 'Save failed'));
-        data = await res.json();
-
-        if (_locEditingId) {
-            const idx = _locsData.findIndex(x => x.id === _locEditingId);
-            if (idx >= 0) _locsData[idx] = data;
-        } else {
-            _locsData.unshift(data);
-        }
-        locationsRender();
-        locCloseAdd();
-    } catch (err) {
-        alertEl.className = 'alert alert-error';
-        alertTx.textContent = err.message;
-        alertEl.style.display = 'flex';
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save';
-    }
-}
-
-// ── Delete ───────────────────────────────────────────────────────────────────
-
-async function locDelete(id, btn) {
-    const loc = _locsData.find(x => x.id === id);
-    if (!loc) return;
-    if (!confirm(`Delete location "${loc.name}"? This will disarm all tags and cannot be undone.`)) return;
-    try {
-        const res = await apiFetch(`/api/portal/locations/${id}`, { method: 'DELETE' });
-        if (!res.ok) throw new Error(await safeJsonDetail(res, 'Delete failed'));
-        _locsData = _locsData.filter(x => x.id !== id);
-        locationsRender();
-    } catch (err) {
-        _locShowAlert(err.message, 'error');
-    }
-}
-
-// ── Bulk upload ──────────────────────────────────────────────────────────────
-
-function locOpenBulk() {
-    document.getElementById('loc-bulk-file').value      = '';
-    document.getElementById('loc-bulk-alert').style.display  = 'none';
-    document.getElementById('loc-bulk-progress').style.display = 'none';
-    document.getElementById('loc-bulk-result').style.display  = 'none';
-    document.getElementById('loc-bulk-upload-btn').disabled   = false;
-    document.getElementById('loc-bulk-modal').style.display   = 'flex';
-}
-function locCloseBulk() {
-    document.getElementById('loc-bulk-modal').style.display = 'none';
-}
-
-async function locDoBulkUpload() {
-    const fileInput = document.getElementById('loc-bulk-file');
-    const alertEl   = document.getElementById('loc-bulk-alert');
-    const alertTx   = document.getElementById('loc-bulk-alert-text');
-    const progress  = document.getElementById('loc-bulk-progress');
-    const resultEl  = document.getElementById('loc-bulk-result');
-    const uploadBtn = document.getElementById('loc-bulk-upload-btn');
-
-    alertEl.style.display   = 'none';
-    resultEl.style.display  = 'none';
-
-    if (!fileInput.files.length) {
-        alertEl.className = 'alert alert-error'; alertTx.textContent = 'Please select a file.';
-        alertEl.style.display = 'flex'; return;
-    }
-
-    uploadBtn.disabled = true;
-    progress.style.display = '';
-
-    try {
-        const fd = new FormData();
-        fd.append('file', fileInput.files[0]);
-        const res = await apiFetch('/api/portal/locations/bulk-upload', { method: 'POST', body: fd });
-        progress.style.display = 'none';
-        if (!res.ok) throw new Error(await safeJsonDetail(res, 'Upload failed'));
-        const data = await res.json();
-
-        const failHtml = data.details.failed.length
-            ? `<details style="margin-top:8px;font-size:.82rem"><summary style="cursor:pointer;color:var(--warning)">${data.details.failed.length} failed rows</summary><ul style="margin:6px 0 0 16px;padding:0">` +
-              data.details.failed.map(f => `<li>Row ${f.row}: ${esc(f.postcode || '')} — ${esc(f.reason)}</li>`).join('') + '</ul></details>'
-            : '';
-
-        resultEl.innerHTML = `<div class="alert alert-${data.failed === 0 ? 'success' : 'warning'}" style="display:flex;flex-direction:column">
-            <strong>${data.created} location${data.created!==1?'s':''} created</strong>
-            ${data.failed > 0 ? `<span>${data.failed} row${data.failed!==1?'s':''} could not be geocoded</span>` : ''}
-            ${failHtml}
-        </div>`;
-        resultEl.style.display = '';
-        // Reload the list
-        await locationsLoad();
-    } catch (err) {
-        progress.style.display = 'none';
-        alertEl.className = 'alert alert-error'; alertTx.textContent = err.message;
-        alertEl.style.display = 'flex';
-    } finally {
-        uploadBtn.disabled = false;
-    }
-}
-
-// ── Arm / disarm tags modal ───────────────────────────────────────────────────
-
-async function locOpenTagsModal(locationId) {
-    _locTagsLocId = locationId;
-    const loc = _locsData.find(x => x.id === locationId);
-    document.getElementById('loc-tags-modal-title').textContent = `Manage Tags — ${loc?.name || ''}`;
-    document.getElementById('loc-tags-list').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-3)"><i class="fa-solid fa-spinner fa-spin"></i></div>';
-    document.getElementById('loc-tags-modal').style.display = 'flex';
-
-    // Load all group tags if not cached
-    if (!_allTagsCache) {
+/* ── Map layer helpers ─────────────────── */
+function _locBuildLayer(gf){
+    const opts = { color:_locCss('--primary'), weight:2, fillColor:_locCss('--primary'), fillOpacity:0.18 };
+    const type = gf.shape_type||'circle';
+    let layer;
+    if(type==='circle'){
+        layer = L.circle([gf.latitude, gf.longitude], { ...opts, radius: gf.radius||150 });
+    } else if(type==='polygon'||type==='rectangle'){
         try {
-            const res = await apiFetch('/api/portal/tags');
-            _allTagsCache = res.ok ? await res.json() : [];
-        } catch (_) { _allTagsCache = []; }
+            const coords = typeof gf.coordinates==='string'?JSON.parse(gf.coordinates):gf.coordinates;
+            layer = type==='rectangle'?L.rectangle(coords, opts):L.polygon(coords, opts);
+        } catch(e){
+            layer = L.circle([gf.latitude, gf.longitude], { ...opts, radius: gf.radius||150 });
+        }
+    } else {
+        layer = L.circle([gf.latitude, gf.longitude], { ...opts, radius: gf.radius||150 });
+    }
+    layer.bindPopup(_locPopupHtml(gf));
+    layer._locId = gf.id;
+    layer.on('click', ()=>locSelectGf(gf.id));
+    return layer;
+}
+
+/* ── Map initialization (lazy) ─────────── */
+function locInitMap(){
+    if(_locMapInit) return;
+    _locMapInit = true;
+
+    _locMap = L.map('locMap', { zoomControl:true, attributionControl:true })
+        .setView([53.5, -2.38], 12);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom:19,
+        attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(_locMap);
+
+    _locGeoLayer = L.featureGroup().addTo(_locMap);
+
+    // Draw shape created
+    _locMap.on(L.Draw.Event.CREATED, (e)=>{
+        const layer = e.layer;
+        _locGeoLayer.addLayer(layer);
+        _locPendingShape = layer;
+
+        let lat, lng, radius, type;
+        if(e.layerType==='circle'){
+            const ll = layer.getLatLng();
+            lat=ll.lat; lng=ll.lng; radius=Math.round(layer.getRadius()); type='circle';
+        } else {
+            const c = layer.getBounds().getCenter();
+            lat=c.lat; lng=c.lng; radius=150; type=e.layerType;
+        }
+        _locCancelDrawMode();
+        _locEnableDrag(_locPendingShape, type);
+        locOpenEditor({ mode:'new', type, lat, lng, radius, address:'' });
+    });
+
+    // Wire toolbar draw buttons
+    document.querySelectorAll('[data-loctool]').forEach(btn=>{
+        btn.addEventListener('click', ()=>_locStartDraw(btn.dataset.loctool));
+    });
+    document.getElementById('locToolCancel')?.addEventListener('click', _locCancelDraw);
+
+    // Wire sidebar buttons
+    document.getElementById('locBtnNew')?.addEventListener('click', ()=>{
+        const c = _locMap.getCenter();
+        const layer = L.circle(c, {
+            radius:300, color:_locCss('--primary'), weight:2,
+            fillColor:_locCss('--primary'), fillOpacity:0.18
+        }).addTo(_locGeoLayer);
+        _locPendingShape = layer;
+        _locEnableDrag(layer, 'circle');
+        locOpenEditor({ mode:'new', type:'circle', lat:c.lat, lng:c.lng, radius:300, address:'' });
+    });
+    document.getElementById('locBtnBulk')?.addEventListener('click', locOpenBulk);
+
+    // Shape filter tabs
+    document.getElementById('locShapeTabs')?.addEventListener('click', e=>{
+        const btn = e.target.closest('[data-lshape]');
+        if(!btn) return;
+        document.querySelectorAll('#locShapeTabs .loc-stab').forEach(b=>b.classList.remove('loc-stab-active'));
+        btn.classList.add('loc-stab-active');
+        _locShapeFilter = btn.dataset.lshape;
+        locRenderAll();
+    });
+
+    // Stats filter tiles
+    document.getElementById('locStats')?.addEventListener('click', e=>{
+        const tile = e.target.closest('[data-lsf]');
+        if(!tile) return;
+        const val = tile.dataset.lsf;
+        _locStatusFilter = (_locStatusFilter===val && val!=='all') ? 'all' : val;
+        document.querySelectorAll('#locStats .loc-stat').forEach(t=>
+            t.classList.toggle('lsf-active', t.dataset.lsf===_locStatusFilter)
+        );
+        locRenderAll();
+    });
+
+    // Detail panel buttons
+    document.getElementById('locDetailClose')?.addEventListener('click', ()=>{
+        document.getElementById('locDetailPanel').classList.remove('open');
+        _locSelectedId=null; locRenderList();
+    });
+    document.getElementById('locBtnEdit')?.addEventListener('click', ()=>{
+        const gf = _locsData.find(x=>x.id===_locSelectedId);
+        if(!gf) return;
+        // Remove stale drag layer; _locBuildLayer already added permanent layer
+        // Find layer in geoLayer
+        let existingLayer = null;
+        _locGeoLayer.eachLayer(l=>{ if(l._locId===gf.id) existingLayer=l; });
+        if(existingLayer){
+            _locPendingShape = existingLayer;
+            _locEditSnap = _locSnapshot(existingLayer, gf.shape_type||'circle');
+            _locEnableDrag(existingLayer, gf.shape_type||'circle');
+        }
+        locOpenEditor({
+            mode:'edit', id:gf.id, name:gf.name, type:gf.shape_type||'circle',
+            status:gf.is_active?'active':'draft',
+            lat:gf.latitude, lng:gf.longitude, radius:gf.radius||150,
+            address:gf.address||'', notes:gf.notes||''
+        });
+    });
+    document.getElementById('locBtnManageTags')?.addEventListener('click', ()=>locOpenTagsModal(_locSelectedId));
+    document.getElementById('locBtnCentre')?.addEventListener('click', ()=>{
+        const gf=_locsData.find(x=>x.id===_locSelectedId);
+        if(!gf) return;
+        let existingLayer=null;
+        _locGeoLayer.eachLayer(l=>{ if(l._locId===gf.id) existingLayer=l; });
+        if(existingLayer){
+            if(existingLayer.getLatLng) _locMap.setView(existingLayer.getLatLng(),17);
+            else _locMap.fitBounds(existingLayer.getBounds(),{padding:[60,60]});
+        }
+    });
+    document.getElementById('locBtnDelete')?.addEventListener('click', ()=>locDeleteSelected());
+
+    // Editor panel buttons
+    document.getElementById('locEditorClose')?.addEventListener('click', ()=>locCloseEditor());
+    document.getElementById('locBtnCancelEditor')?.addEventListener('click', ()=>locCloseEditor());
+    document.getElementById('locBtnSave')?.addEventListener('click', ()=>locSaveEditor());
+
+    // Radius slider
+    document.getElementById('locGfRadius')?.addEventListener('input', e=>{
+        const v=parseInt(e.target.value);
+        document.getElementById('locRadiusDisp').textContent=v+' m';
+        if(_locPendingShape&&_locPendingShape.setRadius) _locPendingShape.setRadius(v);
+    });
+
+    // Shape type selector in editor
+    document.getElementById('locGfType')?.addEventListener('change', e=>{
+        const newType=e.target.value;
+        document.getElementById('locRadiusRow').style.display=newType==='circle'?'':'none';
+        if(_locPendingShape) _locSwapShape(newType);
+    });
+
+    // Address search
+    const addrInput = document.getElementById('locAddrInput');
+    const addrWrap  = document.getElementById('locAddrWrap');
+    const resultsEl = document.getElementById('locSearchResults');
+    if(addrInput){
+        addrInput.addEventListener('input', ()=>{
+            const q=addrInput.value.trim();
+            clearTimeout(_locAddrTimer);
+            if(q.length<3){ resultsEl.classList.remove('open'); return; }
+            addrWrap.classList.add('loading');
+            _locAddrTimer=setTimeout(()=>_locDoSearch(q), 350);
+        });
+        addrInput.addEventListener('focus', ()=>{
+            if(resultsEl.children.length) resultsEl.classList.add('open');
+        });
+        document.addEventListener('click', e=>{
+            if(!addrWrap.contains(e.target)) resultsEl.classList.remove('open');
+        });
+    }
+}
+
+/* ── Draw mode ──────────────────────────── */
+function _locStartDraw(tool){
+    _locCancelDraw();
+    _locDrawingTool = tool;
+    document.querySelectorAll('[data-loctool]').forEach(b=>b.classList.toggle('loc-tool-active', b.dataset.loctool===tool));
+    document.getElementById('locToolCancel').style.display='';
+
+    const opts={ shapeOptions:{ color:_locCss('--primary'), weight:2, fillColor:_locCss('--primary'), fillOpacity:0.18 } };
+    if(tool==='circle') _locDrawer=new L.Draw.Circle(_locMap, opts);
+    else if(tool==='polygon') _locDrawer=new L.Draw.Polygon(_locMap, {...opts, allowIntersection:false});
+    else if(tool==='rectangle') _locDrawer=new L.Draw.Rectangle(_locMap, opts);
+    _locDrawer.enable();
+}
+function _locCancelDraw(){
+    if(_locDrawer){ _locDrawer.disable(); _locDrawer=null; }
+    _locDrawingTool=null;
+    document.querySelectorAll('[data-loctool]').forEach(b=>b.classList.remove('loc-tool-active'));
+    document.getElementById('locToolCancel').style.display='none';
+}
+function _locCancelDrawMode(){ _locCancelDraw(); }
+
+/* ── Drag handles ───────────────────────── */
+function _locEnableDrag(layer, type){
+    if(!layer) return;
+    if(type==='circle'){
+        if(layer._dragMarker) return;
+        const dm=L.marker(layer.getLatLng(),{
+            draggable:true,
+            icon:L.divIcon({
+                className:'',
+                html:`<div style="width:16px;height:16px;border-radius:50%;background:white;border:3px solid ${_locCss('--primary')};box-shadow:0 2px 6px rgba(0,0,0,.35);transform:translate(-50%,-50%)"></div>`,
+                iconSize:[16,16], iconAnchor:[0,0]
+            })
+        }).addTo(_locMap);
+        dm.on('drag',()=>{
+            layer.setLatLng(dm.getLatLng());
+            _locUpdateCoordDisp(dm.getLatLng());
+        });
+        layer._dragMarker=dm;
+    } else if(layer.editing){
+        layer.editing.enable();
+        layer.on('edit',()=>{
+            const c=layer.getBounds().getCenter();
+            _locUpdateCoordDisp(c);
+        });
+    }
+}
+function _locDisableDrag(layer){
+    if(!layer) return;
+    if(layer._dragMarker){ _locMap.removeLayer(layer._dragMarker); layer._dragMarker=null; }
+    if(layer.editing&&layer.editing.disable) layer.editing.disable();
+}
+function _locSnapshot(layer, type){
+    return {
+        latlng: type==='circle'&&layer.getLatLng ? {...layer.getLatLng()} : null,
+        radius: type==='circle'&&layer.getRadius ? layer.getRadius() : null,
+        latlngs: type!=='circle'&&layer.getLatLngs ? JSON.parse(JSON.stringify(layer.getLatLngs())) : null
+    };
+}
+function _locRevertSnap(layer, snap){
+    if(!layer||!snap) return;
+    if(snap.latlng&&layer.setLatLng) layer.setLatLng(snap.latlng);
+    if(snap.radius&&layer.setRadius) layer.setRadius(snap.radius);
+    if(snap.latlngs&&layer.setLatLngs) layer.setLatLngs(snap.latlngs);
+}
+
+/* ── Swap shape type in editor ─────────── */
+function _locSwapShape(newType){
+    if(!_locPendingShape) return;
+    const old=_locPendingShape;
+    let center;
+    if(old.getLatLng) center=old.getLatLng();
+    else if(old.getBounds) center=old.getBounds().getCenter();
+    _locDisableDrag(old);
+    _locGeoLayer.removeLayer(old);
+    _locPendingShape=null;
+
+    const opts={ color:_locCss('--primary'), weight:2, fillColor:_locCss('--primary'), fillOpacity:0.18 };
+    let newLayer;
+    if(newType==='circle'){
+        const r=parseInt(document.getElementById('locGfRadius').value)||300;
+        newLayer=L.circle(center,{...opts, radius:r});
+    } else if(newType==='rectangle'){
+        const off=300, dLat=off/111320, dLng=off/(111320*Math.cos(center.lat*Math.PI/180));
+        newLayer=L.rectangle([[center.lat-dLat,center.lng-dLng],[center.lat+dLat,center.lng+dLng]], opts);
+    } else {
+        const rM=300, pts=[];
+        for(let i=0;i<6;i++){
+            const ang=(Math.PI/3)*i-Math.PI/2;
+            pts.push([center.lat+(rM*Math.sin(ang))/111320, center.lng+(rM*Math.cos(ang))/(111320*Math.cos(center.lat*Math.PI/180))]);
+        }
+        newLayer=L.polygon(pts, opts);
+    }
+    _locGeoLayer.addLayer(newLayer);
+    _locPendingShape=newLayer;
+    _locEnableDrag(newLayer, newType);
+    document.getElementById('locRadiusRow').style.display=newType==='circle'?'':'none';
+    _locUpdateCoordDisp(center);
+}
+
+function _locUpdateCoordDisp(ll){
+    const el=document.getElementById('locCoordDisp');
+    if(!el) return;
+    if(!ll||ll.lat==null){ el.textContent='—'; return; }
+    el.textContent=`${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`;
+}
+
+/* ── Editor open / close ────────────────── */
+function locOpenEditor({ mode='new', id=null, name='', type='circle', status='active',
+                          lat=0, lng=0, radius=300, address='', notes='' }={}){
+    _locEditingId = mode==='edit' ? id : null;
+
+    const badge = document.getElementById('locEditorBadge');
+    const title = document.getElementById('locEditorTitle');
+    const sub   = document.getElementById('locEditorSub');
+    if(badge){ badge.textContent=mode==='edit'?'Editing':'New'; badge.classList.toggle('editing', mode==='edit'); }
+    if(title) title.textContent=mode==='edit'?(name||'Location'):'New location';
+    if(sub)   sub.textContent=mode==='edit'?'Drag the shape on the map to reposition':'Adjust the shape on the map as you go';
+
+    const nameEl=document.getElementById('locGfName');
+    const typeEl=document.getElementById('locGfType');
+    const statEl=document.getElementById('locGfStatus');
+    const radEl =document.getElementById('locGfRadius');
+    const radDsp=document.getElementById('locRadiusDisp');
+    const addrEl=document.getElementById('locGfAddress');
+    if(nameEl) nameEl.value=name;
+    if(typeEl) typeEl.value=type;
+    if(statEl) statEl.value=status;
+    if(radEl)  radEl.value=radius;
+    if(radDsp) radDsp.textContent=radius+' m';
+    if(addrEl) addrEl.value=address;
+    document.getElementById('locRadiusRow').style.display=type==='circle'?'':'none';
+    _locUpdateCoordDisp({ lat, lng });
+
+    document.getElementById('locEditorPanel').classList.add('open');
+    setTimeout(()=>{ if(nameEl) nameEl.focus(); if(_locMap) _locMap.invalidateSize(); }, 280);
+}
+
+function locCloseEditor(){
+    document.getElementById('locEditorPanel').classList.remove('open');
+    if(_locEditingId){
+        // Revert shape to snapshot and disable drag
+        if(_locPendingShape && _locEditSnap) _locRevertSnap(_locPendingShape, _locEditSnap);
+        if(_locPendingShape) _locDisableDrag(_locPendingShape);
+        _locPendingShape=null; _locEditSnap=null;
+    } else if(_locPendingShape){
+        // New shape — remove it
+        _locGeoLayer.removeLayer(_locPendingShape);
+        if(_locPendingShape._dragMarker) _locMap.removeLayer(_locPendingShape._dragMarker);
+        _locPendingShape=null;
+    }
+    _locEditingId=null;
+    document.querySelectorAll('[data-loctool]').forEach(b=>b.classList.remove('loc-tool-active'));
+    setTimeout(()=>{ if(_locMap) _locMap.invalidateSize(); }, 300);
+}
+
+/* ── Save (POST / PUT) ──────────────────── */
+async function locSaveEditor(){
+    const nameEl = document.getElementById('locGfName');
+    const name   = nameEl?.value.trim();
+    if(!name){ locToast('Name is required','err'); nameEl?.focus(); return; }
+
+    const type   = document.getElementById('locGfType')?.value || 'circle';
+    const status = document.getElementById('locGfStatus')?.value || 'active';
+    const radius = parseInt(document.getElementById('locGfRadius')?.value)||300;
+    const address= document.getElementById('locGfAddress')?.value.trim()||'';
+
+    const saveBtn = document.getElementById('locBtnSave');
+    if(saveBtn){ saveBtn.disabled=true; saveBtn.textContent='Saving…'; }
+
+    try {
+        let lat, lng, coordinates=null;
+        if(!_locPendingShape && !_locEditingId){ locToast('Draw or select a shape first','err'); return; }
+
+        if(_locPendingShape){
+            if(type==='circle'){
+                const ll=_locPendingShape.getLatLng(); lat=ll.lat; lng=ll.lng;
+            } else {
+                const c=_locPendingShape.getBounds().getCenter();
+                lat=c.lat; lng=c.lng;
+                let raw=_locPendingShape.getLatLngs();
+                if(Array.isArray(raw[0])) raw=raw[0];
+                coordinates=JSON.stringify(raw.map(p=>[p.lat, p.lng]));
+            }
+            _locDisableDrag(_locPendingShape);
+        } else {
+            // editing without shape change
+            const gf=_locsData.find(x=>x.id===_locEditingId);
+            lat=gf?.latitude||0; lng=gf?.longitude||0;
+            coordinates=gf?.coordinates||null;
+        }
+
+        const payload = {
+            name, description:null,
+            latitude:lat, longitude:lng,
+            radius:type==='circle'?radius:150,
+            address:address||null,
+            shape_type:type, coordinates, notes:'',
+            status
+        };
+
+        let res, saved;
+        if(_locEditingId){
+            res=await apiFetch(`/api/portal/locations/${_locEditingId}`, {
+                method:'PUT', headers:{'Content-Type':'application/json'},
+                body:JSON.stringify(payload)
+            });
+        } else {
+            res=await apiFetch('/api/portal/locations', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body:JSON.stringify(payload)
+            });
+        }
+        if(!res.ok) throw new Error(await safeJsonDetail(res,'Save failed'));
+        saved=await res.json();
+
+        // Remove old map layer & rebuild from saved data
+        _locGeoLayer.eachLayer(l=>{ if(l._locId===saved.id) _locGeoLayer.removeLayer(l); });
+        if(_locPendingShape) _locGeoLayer.removeLayer(_locPendingShape);
+        _locPendingShape=null;
+        const newLayer=_locBuildLayer(saved);
+        _locGeoLayer.addLayer(newLayer);
+
+        // Update local cache
+        const wasEditing = !!_locEditingId;
+        if(_locEditingId){
+            const idx=_locsData.findIndex(x=>x.id===_locEditingId);
+            if(idx>=0) _locsData[idx]=saved; else _locsData.unshift(saved);
+        } else {
+            _locsData.unshift(saved);
+        }
+
+        _locEditingId=null; _locEditSnap=null;
+        document.getElementById('locEditorPanel').classList.remove('open');
+        setTimeout(()=>{ if(_locMap) _locMap.invalidateSize(); },300);
+
+        locRenderAll();
+        _locSelectedId=saved.id;
+        locSelectGf(saved.id);
+        locToast(wasEditing?'Location updated':'Location saved');
+    } catch(err){
+        locToast(err.message,'err');
+    } finally {
+        if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent='Save location'; }
+    }
+}
+
+/* ── Delete ─────────────────────────────── */
+async function locDeleteSelected(){
+    const gf=_locsData.find(x=>x.id===_locSelectedId);
+    if(!gf) return;
+    if(!confirm(`Delete "${gf.name}"? This will disarm all tags and cannot be undone.`)) return;
+    try {
+        const res=await apiFetch(`/api/portal/locations/${gf.id}`,{method:'DELETE'});
+        if(!res.ok) throw new Error(await safeJsonDetail(res,'Delete failed'));
+        _locGeoLayer.eachLayer(l=>{ if(l._locId===gf.id) _locGeoLayer.removeLayer(l); });
+        _locsData=_locsData.filter(x=>x.id!==gf.id);
+        _locSelectedId=null;
+        document.getElementById('locDetailPanel').classList.remove('open');
+        locRenderAll();
+        locToast('Location deleted');
+    } catch(err){ _locShowAlert(err.message,'error'); }
+}
+
+/* ── Render list ─────────────────────────── */
+function locRenderAll(){
+    locRenderList();
+    locRenderStats();
+    _locSyncMapLayers();
+}
+function _locSyncMapLayers(){
+    if(!_locMap||!_locGeoLayer) return;
+    // Remove layers for IDs no longer in data
+    const ids=new Set(_locsData.map(g=>g.id));
+    const toRemove=[];
+    _locGeoLayer.eachLayer(l=>{ if(l._locId&&!ids.has(l._locId)) toRemove.push(l); });
+    toRemove.forEach(l=>_locGeoLayer.removeLayer(l));
+    // Add layers for IDs not yet on the map
+    const onMap=new Set();
+    _locGeoLayer.eachLayer(l=>{ if(l._locId) onMap.add(l._locId); });
+    _locsData.forEach(gf=>{ if(!onMap.has(gf.id)){ const l=_locBuildLayer(gf); _locGeoLayer.addLayer(l); }});
+}
+
+function locRenderList(){
+    const el=document.getElementById('locGfList');
+    if(!el) return;
+
+    let items=[..._locsData];
+    if(_locStatusFilter==='active') items=items.filter(g=>g.is_active);
+    else if(_locStatusFilter==='draft') items=items.filter(g=>!g.is_active);
+    else if(_locStatusFilter==='armed') items=items.filter(g=>(g.armed_count||0)>0);
+    if(_locShapeFilter!=='all') items=items.filter(g=>(g.shape_type||'circle')===_locShapeFilter);
+
+    if(!items.length){
+        const filt=_locStatusFilter!=='all'||_locShapeFilter!=='all';
+        el.innerHTML=`<div class="loc-gf-empty">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".3"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <div>${filt?'No locations match this filter':'No locations yet'}</div>
+            <div style="font-size:11px;margin-top:4px">${filt?'Clear the filter to see all':'Use + New Location or draw on the map'}</div>
+        </div>`;
+        return;
+    }
+
+    el.innerHTML=items.map(gf=>{
+        const type=gf.shape_type||'circle';
+        const sel=_locSelectedId===gf.id;
+        const dotCls=gf.is_active?(gf.armed_count>0?'loc-gf-dot-active':'loc-gf-dot-active'):'loc-gf-dot-inactive';
+        return `<div class="loc-gf-item${sel?' loc-gf-sel':''}" data-locid="${_locHtml(gf.id)}">
+            <div class="loc-gf-pin loc-gf-pin-${type}">${_locShapeIcon(type)}</div>
+            <div class="loc-gf-meta">
+                <div class="loc-gf-name">${_locHtml(gf.name)}</div>
+                <div class="loc-gf-detail">${_locDescribeShape(gf)}${gf.address?` · ${_locHtml(gf.address)}`:''}${gf.armed_count>0?` · <strong style="color:var(--primary)">${gf.armed_count} armed</strong>`:''}</div>
+            </div>
+            <div class="loc-gf-dot ${dotCls}"></div>
+        </div>`;
+    }).join('');
+
+    el.querySelectorAll('[data-locid]').forEach(row=>{
+        row.addEventListener('click', ()=>locSelectGf(row.dataset.locid));
+    });
+}
+
+function locRenderStats(){
+    const total=_locsData.length;
+    const active=_locsData.filter(g=>g.is_active).length;
+    const draft=_locsData.filter(g=>!g.is_active).length;
+    const armed=_locsData.filter(g=>(g.armed_count||0)>0).length;
+    const t=document.getElementById('locStatTotal'), a=document.getElementById('locStatActive'),
+          d=document.getElementById('locStatDraft'), m=document.getElementById('locStatArmed');
+    if(t) t.textContent=total;
+    if(a) a.textContent=active;
+    if(d) d.textContent=draft;
+    if(m) m.textContent=armed;
+}
+
+/* ── Select a geofence ──────────────────── */
+function locSelectGf(id){
+    _locSelectedId=id;
+    const gf=_locsData.find(x=>x.id===id);
+    if(!gf){ document.getElementById('locDetailPanel').classList.remove('open'); locRenderList(); return; }
+
+    // Fly to shape
+    if(_locMap){
+        let existingLayer=null;
+        _locGeoLayer.eachLayer(l=>{ if(l._locId===id) existingLayer=l; });
+        if(existingLayer){
+            if(existingLayer.getLatLng) _locMap.setView(existingLayer.getLatLng(), Math.max(_locMap.getZoom(),15));
+            else _locMap.fitBounds(existingLayer.getBounds(),{padding:[60,60]});
+            existingLayer.openPopup();
+        }
+    }
+
+    // Detail panel
+    document.getElementById('locDetailName').textContent=gf.name;
+    document.getElementById('locDetailId').textContent='POI #'+gf.id.toString().slice(-6);
+    document.getElementById('locDetailStatus').textContent=gf.is_active?'Active':'Inactive';
+    document.getElementById('locDetailShape').textContent=_locCap(gf.shape_type||'circle');
+    document.getElementById('locDetailArea').textContent=_locDescribeShape(gf);
+    document.getElementById('locDetailArmed').textContent=(gf.armed_count||0)+' tags';
+    document.getElementById('locDetailAddr').textContent=gf.address||'—';
+
+    // Update pin icon
+    const pin=document.getElementById('locDetailPin');
+    if(pin){ pin.className='loc-gf-pin loc-gf-pin-'+(gf.shape_type||'circle'); pin.innerHTML=_locShapeIcon(gf.shape_type||'circle'); }
+
+    document.getElementById('locDetailPanel').classList.add('open');
+    locRenderList();
+}
+
+/* ── Load from API ──────────────────────── */
+async function locationsLoad(){
+    _locHideAlert();
+    if(!_locMapInit) locInitMap();
+    try {
+        const res=await apiFetch('/api/portal/locations');
+        if(!res.ok) throw new Error(await safeJsonDetail(res,'Failed to load locations'));
+        _locsData=await res.json();
+        locRenderAll();
+        // Fit map to all shapes if any exist
+        if(_locMap && _locsData.length && _locGeoLayer.getLayers().length){
+            try { _locMap.fitBounds(_locGeoLayer.getBounds().pad(0.15)); } catch(e){}
+        }
+        setTimeout(()=>{ if(_locMap) _locMap.invalidateSize(); }, 200);
+    } catch(err){
+        _locShowAlert(err.message,'error');
+    }
+}
+
+/* ── Address search ─────────────────────── */
+const _LOC_UK_PC=/^([A-Z]{1,2}\d{1,2}[A-Z]?)\s*(\d[A-Z]{2})$/i;
+
+async function _locDoSearch(q){
+    const addrWrap=document.getElementById('locAddrWrap');
+    const resultsEl=document.getElementById('locSearchResults');
+    try {
+        let results=[];
+        // 1. UK postcode
+        const pcMatch=q.toUpperCase().match(_LOC_UK_PC);
+        if(pcMatch){
+            try {
+                const pc=pcMatch[1]+' '+pcMatch[2];
+                const r=await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(pc)}`);
+                if(r.ok){ const j=await r.json(); if(j.result) results.push({ label:j.result.postcode, detail:[j.result.admin_ward,j.result.admin_district,j.result.country].filter(Boolean).join(', '), lat:j.result.latitude, lng:j.result.longitude }); }
+            } catch(e){}
+        }
+        // 2. Nominatim
+        if(!results.length){
+            try {
+                const url=`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=gb,ie&q=${encodeURIComponent(q)}`;
+                const r2=await fetch(url,{headers:{'Accept-Language':'en-GB'}});
+                if(r2.ok){ const arr=await r2.json(); arr.forEach(it=>results.push({ label:it.display_name.split(',').slice(0,2).join(',').trim(), detail:it.display_name, lat:parseFloat(it.lat), lng:parseFloat(it.lon) })); }
+            } catch(e){}
+        }
+        _locRenderSearchResults(results.slice(0,8), q);
+    } catch(e){
+        locToast('Search failed','err');
+    } finally {
+        addrWrap&&addrWrap.classList.remove('loading');
+    }
+}
+
+function _locRenderSearchResults(results, q){
+    const el=document.getElementById('locSearchResults');
+    if(!el) return;
+    if(!results.length){
+        el.innerHTML=`<div class="loc-sr"><div class="loc-sr-name">No results</div><div class="loc-sr-detail">Try a different address or postcode</div></div>`;
+    } else {
+        el.innerHTML=results.map((r,i)=>`<div class="loc-sr" data-locridx="${i}"><div class="loc-sr-name">${_locHtml(r.label)}</div><div class="loc-sr-detail">${_locHtml(r.detail)}</div></div>`).join('');
+        el.querySelectorAll('.loc-sr[data-locridx]').forEach(row=>{
+            row.addEventListener('click',()=>{
+                _locPickAddress(results[parseInt(row.dataset.locridx)]);
+                el.classList.remove('open');
+                document.getElementById('locAddrInput').value='';
+            });
+        });
+    }
+    el.classList.add('open');
+}
+
+function _locPickAddress(r){
+    if(!_locMap) return;
+    if(_locSearchMarker){ _locMap.removeLayer(_locSearchMarker); _locSearchMarker=null; }
+    _locMap.flyTo([r.lat,r.lng], 16, {duration:0.6});
+    // Drop temporary circle + open editor
+    const layer=L.circle([r.lat,r.lng],{
+        radius:300, color:_locCss('--primary'), weight:2,
+        fillColor:_locCss('--primary'), fillOpacity:0.18
+    }).addTo(_locGeoLayer);
+    layer._isSearchPin=true;
+    _locPendingShape=layer;
+    _locEnableDrag(layer,'circle');
+    locOpenEditor({ mode:'new', type:'circle', lat:r.lat, lng:r.lng, radius:300, address:r.detail });
+}
+
+/* ── Bulk upload ─────────────────────────── */
+function locOpenBulk(){
+    document.getElementById('loc-bulk-file').value='';
+    document.getElementById('loc-bulk-alert').style.display='none';
+    document.getElementById('loc-bulk-progress').style.display='none';
+    document.getElementById('loc-bulk-result').style.display='none';
+    document.getElementById('loc-bulk-upload-btn').disabled=false;
+    document.getElementById('loc-bulk-modal').style.display='flex';
+}
+function locCloseBulk(){ document.getElementById('loc-bulk-modal').style.display='none'; }
+async function locDoBulkUpload(){
+    const fileInput=document.getElementById('loc-bulk-file');
+    const alertEl=document.getElementById('loc-bulk-alert'), alertTx=document.getElementById('loc-bulk-alert-text');
+    const progress=document.getElementById('loc-bulk-progress'), resultEl=document.getElementById('loc-bulk-result');
+    const uploadBtn=document.getElementById('loc-bulk-upload-btn');
+    alertEl.style.display='none'; resultEl.style.display='none';
+    if(!fileInput.files.length){ alertEl.className='alert alert-error'; alertTx.textContent='Please select a file.'; alertEl.style.display='flex'; return; }
+    uploadBtn.disabled=true; progress.style.display='';
+    try {
+        const fd=new FormData(); fd.append('file', fileInput.files[0]);
+        const res=await apiFetch('/api/portal/locations/bulk-upload',{method:'POST',body:fd});
+        progress.style.display='none';
+        if(!res.ok) throw new Error(await safeJsonDetail(res,'Upload failed'));
+        const data=await res.json();
+        const failHtml=data.details?.failed?.length
+            ?`<details style="margin-top:8px;font-size:.82rem"><summary style="cursor:pointer;color:var(--warning)">${data.details.failed.length} failed rows</summary><ul style="margin:6px 0 0 16px;padding:0">${data.details.failed.map(f=>`<li>Row ${f.row}: ${esc(f.postcode||'')} — ${esc(f.reason)}</li>`).join('')}</ul></details>`:'';
+        resultEl.innerHTML=`<div class="alert alert-${data.failed===0?'success':'warning'}" style="display:flex;flex-direction:column"><strong>${data.created} location${data.created!==1?'s':''} created</strong>${data.failed>0?`<span>${data.failed} row${data.failed!==1?'s':''} could not be geocoded</span>`:''}${failHtml}</div>`;
+        resultEl.style.display='';
+        await locationsLoad();
+    } catch(err){
+        progress.style.display='none';
+        alertEl.className='alert alert-error'; alertTx.textContent=err.message; alertEl.style.display='flex';
+    } finally { uploadBtn.disabled=false; }
+}
+
+/* ── Arm / disarm tags ──────────────────── */
+async function locOpenTagsModal(locationId){
+    _locTagsLocId=locationId;
+    const loc=_locsData.find(x=>x.id===locationId);
+    document.getElementById('loc-tags-modal-title').textContent=`Manage Tags — ${loc?.name||''}`;
+    document.getElementById('loc-tags-list').innerHTML='<div style="padding:20px;text-align:center;color:var(--text-3)"><i class="fa-solid fa-spinner fa-spin"></i></div>';
+    document.getElementById('loc-tags-modal').style.display='flex';
+    if(!_allTagsCache){
+        try { const r=await apiFetch('/api/portal/tags'); _allTagsCache=r.ok?await r.json():[]; } catch(_){ _allTagsCache=[]; }
     }
     _locRenderTagsList(loc);
 }
-
-function locCloseTagsModal() {
-    document.getElementById('loc-tags-modal').style.display = 'none';
-    _locTagsLocId = null;
-}
-
-function _locRenderTagsList(loc) {
-    const listEl = document.getElementById('loc-tags-list');
-    if (!_allTagsCache?.length) {
-        listEl.innerHTML = '<div style="padding:20px;color:var(--text-3);font-size:.85rem">No tags found for your group.</div>';
-        return;
-    }
-    const armedIds = new Set((loc?.tags_armed || []).map(t => t.id));
-    listEl.innerHTML = _allTagsCache.map(t => {
-        const isArmed   = armedIds.has(t.id);
-        const label     = esc(t.description || t.device_name || t.imei);
-        const subLabel  = esc(t.imei);
-        const switchId  = `loc-arm-${t.id}`;
+function locCloseTagsModal(){ document.getElementById('loc-tags-modal').style.display='none'; _locTagsLocId=null; }
+function _locRenderTagsList(loc){
+    const listEl=document.getElementById('loc-tags-list');
+    if(!_allTagsCache?.length){ listEl.innerHTML='<div style="padding:20px;color:var(--text-3);font-size:.85rem">No tags found for your group.</div>'; return; }
+    const armedIds=new Set((loc?.tags_armed||[]).map(t=>t.id));
+    listEl.innerHTML=_allTagsCache.map(t=>{
+        const isArmed=armedIds.has(t.id);
+        const label=_locHtml(t.description||t.device_name||t.imei);
         return `<div style="display:flex;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
-            <div style="flex:1;min-width:0">
-                <div style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${label}</div>
-                <div style="font-size:.78rem;color:var(--text-3)">${subLabel}</div>
-            </div>
-            <label class="toggle-switch" title="${isArmed ? 'Disarm' : 'Arm'}" style="margin-left:12px;flex-shrink:0">
-                <input type="checkbox" id="${switchId}" ${isArmed ? 'checked' : ''} onchange="locToggleArm('${esc(t.id)}','${esc(loc?.id||_locTagsLocId)}',this)">
+            <div style="flex:1;min-width:0"><div style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${label}</div>
+            <div style="font-size:.78rem;color:var(--text-3)">${_locHtml(t.imei)}</div></div>
+            <label class="toggle-switch" title="${isArmed?'Disarm':'Arm'}" style="margin-left:12px;flex-shrink:0">
+                <input type="checkbox" id="loc-arm-${t.id}" ${isArmed?'checked':''} onchange="locToggleArm('${_locHtml(t.id)}','${_locHtml(loc?.id||_locTagsLocId)}',this)">
                 <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            </label>
-        </div>`;
+            </label></div>`;
     }).join('');
 }
-
-async function locToggleArm(tagId, locationId, checkbox) {
-    const armed = checkbox.checked;
-    checkbox.disabled = true;
+async function locToggleArm(tagId, locationId, checkbox){
+    const armed=checkbox.checked; checkbox.disabled=true;
     try {
-        const method = armed ? 'POST' : 'DELETE';
-        const res = await apiFetch(`/api/portal/locations/${locationId}/arm/${tagId}`, { method });
-        if (!res.ok) {
-            checkbox.checked = !armed; // revert
-            const msg = await safeJsonDetail(res, armed ? 'Arm failed' : 'Disarm failed');
-            _locShowAlert(msg, 'error');
-            return;
+        const res=await apiFetch(`/api/portal/locations/${locationId}/arm/${tagId}`,{method:armed?'POST':'DELETE'});
+        if(!res.ok){ checkbox.checked=!armed; _locShowAlert(await safeJsonDetail(res,armed?'Arm failed':'Disarm failed'),'error'); return; }
+        const data=await res.json();
+        const locIdx=_locsData.findIndex(x=>x.id===locationId);
+        if(locIdx>=0&&data.location) _locsData[locIdx]=data.location;
+        else if(locIdx>=0){
+            if(armed){ _locsData[locIdx].armed_count=(_locsData[locIdx].armed_count||0)+1; const tag=(_allTagsCache||[]).find(t=>t.id===tagId); if(tag) _locsData[locIdx].tags_armed.push({id:tag.id,imei:tag.imei,label:tag.description||tag.device_name||tag.imei}); }
+            else { _locsData[locIdx].armed_count=Math.max(0,(_locsData[locIdx].armed_count||0)-1); _locsData[locIdx].tags_armed=(_locsData[locIdx].tags_armed||[]).filter(t=>t.id!==tagId); }
         }
-        const data = await res.json();
-        // Update local cache
-        const locIdx = _locsData.findIndex(x => x.id === locationId);
-        if (locIdx >= 0 && data.location) _locsData[locIdx] = data.location;
-        else if (locIdx >= 0) {
-            // Manually update armed_count
-            if (armed) {
-                _locsData[locIdx].armed_count = (_locsData[locIdx].armed_count || 0) + 1;
-                const tag = (_allTagsCache || []).find(t => t.id === tagId);
-                if (tag) _locsData[locIdx].tags_armed.push({ id: tag.id, imei: tag.imei, label: tag.description || tag.device_name || tag.imei });
-            } else {
-                _locsData[locIdx].armed_count = Math.max(0, (_locsData[locIdx].armed_count || 0) - 1);
-                _locsData[locIdx].tags_armed = (_locsData[locIdx].tags_armed || []).filter(t => t.id !== tagId);
-            }
-        }
-        locationsRender();
-    } catch (err) {
-        checkbox.checked = !armed;
-        _locShowAlert(err.message, 'error');
-    } finally {
-        checkbox.disabled = false;
-    }
+        locRenderAll();
+    } catch(err){ checkbox.checked=!armed; _locShowAlert(err.message,'error'); }
+    finally { checkbox.disabled=false; }
 }
 
 // ══════════════════════════════════════════
