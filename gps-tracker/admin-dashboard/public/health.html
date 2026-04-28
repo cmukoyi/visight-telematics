@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Health — Pinplot Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background: #f5f7fa; }
+
+        /* ── Header / Nav (match other admin pages) ── */
+        .header { background: #3b82f6; color: white; padding: 1.5rem 2rem; box-shadow: 0 2px 4px rgba(0,0,0,.1); }
+        .header h1 { font-size: 1.5rem; margin-bottom: .25rem; }
+        .header p  { opacity: .8; font-size: .9rem; }
+        .nav { background: white; padding: .5rem 2rem; box-shadow: 0 1px 3px rgba(0,0,0,.1); display: flex; gap: 1rem; flex-wrap: wrap; }
+        .nav a { padding: .75rem 1.25rem; text-decoration: none; color: #64748b; font-weight: 500; border-bottom: 2px solid transparent; transition: all .2s; white-space: nowrap; }
+        .nav a:hover  { color: #3b82f6; }
+        .nav a.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+
+        /* ── Layout ── */
+        .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem 2rem 3rem; }
+
+        /* ── Top bar ── */
+        .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px; }
+        .top-bar h2 { font-size: 1.1rem; color: #1e293b; }
+        .top-bar-meta { font-size: 12px; color: #94a3b8; margin-top: 3px; }
+        .top-bar-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+        /* ── Toggle switch ── */
+        .toggle-wrap { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #64748b; cursor: pointer; user-select: none; }
+        .toggle { position: relative; width: 40px; height: 22px; }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; inset: 0; background: #cbd5e1; border-radius: 22px; transition: .3s; cursor: pointer; }
+        .slider:before { content: ''; position: absolute; width: 16px; height: 16px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .3s; }
+        input:checked + .slider { background: #3b82f6; }
+        input:checked + .slider:before { transform: translateX(18px); }
+
+        /* ── Buttons ── */
+        .btn { padding: .5rem 1rem; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; transition: background .15s, opacity .15s; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover:not(:disabled) { background: #2563eb; }
+        .btn-danger  { background: #ef4444; color: white; }
+        .btn-danger:hover:not(:disabled)  { background: #dc2626; }
+        .btn-ghost   { background: white; color: #475569; border: 1px solid #e2e8f0; }
+        .btn-ghost:hover:not(:disabled)   { background: #f8fafc; }
+        .btn-sm { padding: .35rem .7rem; font-size: 12px; }
+        .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+        /* ── Quick actions panel ── */
+        .panel { background: white; border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .panel-title { font-size: 13px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; }
+        .quick-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+
+        /* ── Container cards ── */
+        .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
+        .c-card { background: white; border-radius: 10px; padding: 1.2rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); border-left: 4px solid #e2e8f0; transition: box-shadow .2s, opacity .2s; }
+        .c-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.11); }
+        .c-card.running    { border-left-color: #22c55e; }
+        .c-card.exited     { border-left-color: #ef4444; }
+        .c-card.restarting { border-left-color: #f59e0b; }
+        .c-card.created    { border-left-color: #94a3b8; }
+        .c-card.pending    { opacity: .55; pointer-events: none; }
+
+        .c-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: .8rem; gap: 8px; }
+        .c-icon-name { display: flex; align-items: center; gap: 10px; }
+        .c-icon { font-size: 26px; width: 34px; text-align: center; line-height: 1; }
+        .c-name { font-weight: 600; color: #1e293b; font-size: 14px; }
+        .c-id   { font-size: 11px; color: #94a3b8; font-family: monospace; margin-top: 2px; }
+        .c-pills { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+
+        /* ── Pills ── */
+        .pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; }
+        .pill-running   { background: #dcfce7; color: #166534; }
+        .pill-exited    { background: #fee2e2; color: #991b1b; }
+        .pill-restarting{ background: #fef3c7; color: #92400e; }
+        .pill-created   { background: #f1f5f9; color: #64748b; }
+        .pill-healthy   { background: #d1fae5; color: #065f46; }
+        .pill-unhealthy { background: #fee2e2; color: #991b1b; }
+        .pill-starting  { background: #e0f2fe; color: #0369a1; }
+        .pill-none      { background: #f1f5f9; color: #94a3b8; }
+
+        /* ── Card meta ── */
+        .c-meta { display: grid; grid-template-columns: 90px 1fr; gap: 4px 8px; font-size: 12px; margin-bottom: .9rem; }
+        .c-meta .k { color: #94a3b8; }
+        .c-meta .v { color: #334155; font-family: monospace; font-size: 11px; word-break: break-all; }
+
+        .c-actions { display: flex; gap: 8px; }
+
+        /* ── Skeleton loader ── */
+        .skeleton { background: linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%); background-size: 200% 100%; animation: shimmer 1.2s infinite; border-radius: 5px; }
+        @keyframes shimmer { to { background-position: -200% 0; } }
+
+        /* ── Console ── */
+        .console-wrap { background: #0f172a; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,.25); }
+        .console-topbar { background: #1e293b; padding: .7rem 1.2rem; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .traffic-lights { display: flex; gap: 6px; }
+        .tl { width: 12px; height: 12px; border-radius: 50%; }
+        .console-label { color: #64748b; font-size: 12px; font-weight: 600; letter-spacing: .5px; margin-left: 10px; }
+        .console-btns { display: flex; gap: 8px; }
+        .console-btn { padding: 4px 12px; background: #334155; color: #94a3b8; border: none; border-radius: 5px; font-size: 11px; cursor: pointer; transition: background .15s; }
+        .console-btn:hover { background: #475569; color: #e2e8f0; }
+
+        .console-body {
+            padding: .9rem 1.25rem;
+            min-height: 240px;
+            max-height: 460px;
+            overflow-y: auto;
+            font-family: 'Cascadia Code', 'JetBrains Mono', 'Fira Code', Menlo, 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.65;
+        }
+        .console-body::-webkit-scrollbar { width: 6px; }
+        .console-body::-webkit-scrollbar-track { background: transparent; }
+        .console-body::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+        .cl { white-space: pre-wrap; word-break: break-all; }
+        .cl-cmd  { color: #60a5fa; font-weight: 600; }
+        .cl-ok   { color: #4ade80; }
+        .cl-warn { color: #fbbf24; }
+        .cl-err  { color: #f87171; }
+        .cl-sep  { color: #334155; }
+        .cl-ts   { color: #475569; }
+        .cl-log  { color: #94a3b8; }
+        .cl-logerr { color: #f87171; }
+        .cl-logwarn { color: #fbbf24; }
+
+        /* ── Spinner in button ── */
+        .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(255,255,255,.35); border-top-color: white; border-radius: 50%; animation: doSpin .65s linear infinite; }
+        @keyframes doSpin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🛡️ BLE Tracker - Admin Portal</h1>
+    <p>User Management & System Administration</p>
+</div>
+
+<div class="nav">
+    <a href="index.html">Users</a>
+    <a href="billing.html">Billing &amp; Tags</a>
+    <a href="trips.html">📍 Journeys &amp; Trips</a>
+    <a href="health.html" class="active">🔬 Health</a>
+</div>
+
+<div class="container">
+
+    <!-- ── Top bar ── -->
+    <div class="top-bar">
+        <div>
+            <h2>Platform Health</h2>
+            <div class="top-bar-meta" id="lastUpdated">Fetching containers…</div>
+        </div>
+        <div class="top-bar-actions">
+            <label class="toggle-wrap">
+                <span>Auto-refresh (10 s)</span>
+                <span class="toggle">
+                    <input type="checkbox" id="autoRefreshToggle" checked>
+                    <span class="slider"></span>
+                </span>
+            </label>
+            <button class="btn btn-ghost" onclick="refreshAll()">↻ Refresh Now</button>
+        </div>
+    </div>
+
+    <!-- ── Quick actions ── -->
+    <div class="panel">
+        <div class="panel-title">⚡ Quick Actions</div>
+        <div class="quick-grid">
+            <button class="btn btn-primary" onclick="doRestart('pinplot_backend')">🔄 Restart API</button>
+            <button class="btn btn-ghost"   onclick="doLogs('pinplot_backend',200)">📋 API Logs</button>
+            <button class="btn btn-ghost"   onclick="doLogs('pinplot_db',150)">🗄️ DB Logs</button>
+            <button class="btn btn-ghost"   onclick="doLogs('pinplot_nginx',100)">🌐 Nginx Logs</button>
+            <button class="btn btn-ghost"   onclick="doLogs('pinplot_mqtt_bridge',100)">📡 MQTT Bridge Logs</button>
+            <button class="btn btn-ghost"   onclick="doLogs('pinplot_mosquitto',100)">🔌 Mosquitto Logs</button>
+            <button class="btn btn-ghost"   onclick="doLogs('pinplot_customer',100)">👤 Customer Logs</button>
+            <button class="btn btn-danger"  onclick="restartAll()">⚠️ Restart All Services</button>
+        </div>
+    </div>
+
+    <!-- ── Container cards ── -->
+    <div class="cards-grid" id="cardsGrid">
+        <!-- skeleton placeholders injected by JS on load -->
+    </div>
+
+    <!-- ── Console ── -->
+    <div class="console-wrap">
+        <div class="console-topbar">
+            <div style="display:flex;align-items:center">
+                <div class="traffic-lights">
+                    <div class="tl" style="background:#ef4444"></div>
+                    <div class="tl" style="background:#f59e0b"></div>
+                    <div class="tl" style="background:#22c55e"></div>
+                </div>
+                <span class="console-label">OUTPUT CONSOLE</span>
+            </div>
+            <div class="console-btns">
+                <button class="console-btn" onclick="copyConsole()">Copy</button>
+                <button class="console-btn" onclick="clearConsole()">Clear</button>
+            </div>
+        </div>
+        <div class="console-body" id="consoleBody">
+            <div class="cl cl-ok">Pinplot Health Console ready.</div>
+            <div class="cl cl-log">Use the Quick Actions or per-container buttons above to inspect services.</div>
+        </div>
+    </div>
+
+</div><!-- /container -->
+
+<script>
+const API = '/api/admin/ops';
+let containers = [];
+let autoTimer  = null;
+
+// ── Container display config ─────────────────────────────────────────────────
+const ICON = {
+    pinplot_backend:     '⚡',
+    pinplot_db:          '🗄️',
+    pinplot_nginx:       '🌐',
+    pinplot_admin:       '🛡️',
+    pinplot_customer:    '👤',
+    pinplot_flutter_web: '📱',
+    pinplot_mosquitto:   '📡',
+    pinplot_mqtt_bridge: '🔌',
+};
+const LABEL = {
+    pinplot_backend:     'API Backend',
+    pinplot_db:          'PostgreSQL DB',
+    pinplot_nginx:       'Nginx (Proxy)',
+    pinplot_admin:       'Admin Portal',
+    pinplot_customer:    'Customer Portal',
+    pinplot_flutter_web: 'Flutter Web App',
+    pinplot_mosquitto:   'Mosquitto MQTT',
+    pinplot_mqtt_bridge: 'MQTT Bridge',
+};
+
+// ── Console helpers ──────────────────────────────────────────────────────────
+function ts() { return new Date().toLocaleTimeString(); }
+
+function clog(text, cls = 'cl-log') {
+    const el = document.getElementById('consoleBody');
+    const d  = document.createElement('div');
+    d.className = `cl ${cls}`;
+    d.textContent = `[${ts()}] ${text}`;
+    el.appendChild(d);
+    el.scrollTop = el.scrollHeight;
+}
+
+function csep(label) {
+    const el = document.getElementById('consoleBody');
+    const d  = document.createElement('div');
+    d.className = 'cl cl-sep';
+    d.textContent = `── ${label} ${'─'.repeat(Math.max(0, 56 - label.length))}`;
+    el.appendChild(d);
+    el.scrollTop = el.scrollHeight;
+}
+
+function clogRaw(text) {
+    const el = document.getElementById('consoleBody');
+    text.split('\n').forEach(line => {
+        if (!line.trim()) return;
+        const d = document.createElement('div');
+        d.className = 'cl ' + (
+            /\b(error|exception|critical|fatal)\b/i.test(line) ? 'cl-logerr'  :
+            /\b(warn|warning)\b/i.test(line)                   ? 'cl-logwarn' : 'cl-log'
+        );
+        d.textContent = line;
+        el.appendChild(d);
+    });
+    el.scrollTop = el.scrollHeight;
+}
+
+function clearConsole() { document.getElementById('consoleBody').innerHTML = ''; }
+
+function copyConsole() {
+    const text = document.getElementById('consoleBody').innerText;
+    navigator.clipboard.writeText(text)
+        .then(() => clog('Console copied to clipboard.', 'cl-ok'))
+        .catch(() => clog('Copy failed — use Ctrl+A / Cmd+A inside the console.', 'cl-warn'));
+}
+
+// ── Uptime ───────────────────────────────────────────────────────────────────
+function uptime(startedAt) {
+    if (!startedAt || startedAt.startsWith('0001')) return '—';
+    const ms = Date.now() - new Date(startedAt).getTime();
+    if (ms < 0) return '—';
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    const h = Math.floor(m / 60);
+    const d = Math.floor(h / 24);
+    if (d > 0)  return `${d}d ${h % 24}h`;
+    if (h > 0)  return `${h}h ${m % 60}m`;
+    if (m > 0)  return `${m}m ${s % 60}s`;
+    return `${s}s`;
+}
+
+// ── Render skeleton cards ────────────────────────────────────────────────────
+function renderSkeletons() {
+    document.getElementById('cardsGrid').innerHTML = Array(8).fill(0).map(() => `
+        <div class="c-card" style="border-left-color:#e2e8f0">
+            <div style="display:flex;gap:10px;margin-bottom:12px">
+                <div class="skeleton" style="width:34px;height:34px;border-radius:8px;flex-shrink:0"></div>
+                <div style="flex:1">
+                    <div class="skeleton" style="height:14px;width:60%;margin-bottom:7px"></div>
+                    <div class="skeleton" style="height:10px;width:35%"></div>
+                </div>
+            </div>
+            <div class="skeleton" style="height:12px;width:80%;margin-bottom:8px"></div>
+            <div class="skeleton" style="height:12px;width:50%;margin-bottom:14px"></div>
+            <div style="display:flex;gap:8px">
+                <div class="skeleton" style="height:28px;width:80px;border-radius:6px"></div>
+                <div class="skeleton" style="height:28px;width:80px;border-radius:6px"></div>
+            </div>
+        </div>`).join('');
+}
+
+// ── Render container cards ───────────────────────────────────────────────────
+function renderCards(list) {
+    const grid = document.getElementById('cardsGrid');
+    if (!list.length) {
+        grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:3rem;color:#64748b">
+            <div style="font-size:2rem;margin-bottom:1rem">🐳</div>
+            <strong>No pinplot_* containers found</strong><br>
+            <span style="font-size:13px">Is <code>/var/run/docker.sock</code> mounted into the backend container?</span>
+        </div>`;
+        return;
+    }
+
+    grid.innerHTML = list.map(c => {
+        const icon   = ICON[c.name]  || '🐳';
+        const label  = LABEL[c.name] || c.name.replace('pinplot_', '');
+        const stCls  = ['running','exited','restarting','created'].includes(c.status) ? c.status : 'created';
+        const img    = (c.image || '').split('/').pop().replace(':latest', '');
+
+        const statusPill = `<span class="pill pill-${stCls}">${c.status}</span>`;
+        const healthPill = (c.health && c.health !== 'none')
+            ? `<span class="pill pill-${c.health}">${c.health}</span>` : '';
+
+        return `
+        <div class="c-card ${stCls}" id="card-${c.name}">
+            <div class="c-header">
+                <div class="c-icon-name">
+                    <div class="c-icon">${icon}</div>
+                    <div>
+                        <div class="c-name">${label}</div>
+                        <div class="c-id">${c.name} · ${c.id}</div>
+                    </div>
+                </div>
+                <div class="c-pills">
+                    ${statusPill}
+                    ${healthPill}
+                </div>
+            </div>
+            <div class="c-meta">
+                <span class="k">Uptime</span>  <span class="v">${uptime(c.started_at)}</span>
+                <span class="k">Image</span>   <span class="v">${img || '—'}</span>
+            </div>
+            <div class="c-actions">
+                <button class="btn btn-ghost btn-sm" onclick="doLogs('${c.name}',150)">📋 Logs</button>
+                <button class="btn btn-primary btn-sm" onclick="doRestart('${c.name}')">🔄 Restart</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ── API: fetch container list ────────────────────────────────────────────────
+async function refreshAll(silent = false) {
+    if (!silent) clog('Fetching container status…', 'cl-cmd');
+    try {
+        const r = await fetch(`${API}/containers`);
+        if (!r.ok) throw new Error(`HTTP ${r.status} — ${r.statusText}`);
+        containers = await r.json();
+        renderCards(containers);
+        const now = new Date().toLocaleTimeString();
+        document.getElementById('lastUpdated').textContent =
+            `Last refreshed at ${now} — ${containers.length} containers`;
+        if (!silent) clog(`Found ${containers.length} pinplot_* containers.`, 'cl-ok');
+    } catch (e) {
+        if (!silent) clog(`Failed to fetch containers: ${e.message}`, 'cl-err');
+        document.getElementById('lastUpdated').textContent = 'Error fetching containers — see console';
+    }
+}
+
+// ── API: fetch logs ──────────────────────────────────────────────────────────
+async function doLogs(name, lines = 150) {
+    csep(`LOGS › ${name}`);
+    clog(`Fetching last ${lines} lines from ${name}…`, 'cl-cmd');
+    try {
+        const r = await fetch(`${API}/containers/${encodeURIComponent(name)}/logs?lines=${lines}`);
+        if (!r.ok) {
+            const err = await r.json().catch(() => ({ detail: r.statusText }));
+            throw new Error(err.detail || `HTTP ${r.status}`);
+        }
+        const d = await r.json();
+        clogRaw(d.logs || '(no output)');
+        clog(`── end of ${name} logs ──`, 'cl-sep');
+    } catch (e) {
+        clog(`Error: ${e.message}`, 'cl-err');
+    }
+}
+
+// ── API: restart container ───────────────────────────────────────────────────
+async function doRestart(name) {
+    const label = LABEL[name] || name.replace('pinplot_', '');
+    if (!confirm(`Restart "${label}"?\n\nThe service will be briefly unavailable.`)) return;
+
+    clog(`Sending restart → ${name}…`, 'cl-cmd');
+    const card = document.getElementById(`card-${name}`);
+    if (card) card.classList.add('pending');
+
+    try {
+        const r = await fetch(`${API}/containers/${encodeURIComponent(name)}/restart`, { method: 'POST' });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`);
+        clog(`✓ ${d.message}`, 'cl-ok');
+        clog(`Container "${name}" is restarting — refreshing status in 4 s…`, 'cl-log');
+        setTimeout(() => refreshAll(true), 4000);
+    } catch (e) {
+        clog(`✗ Restart failed: ${e.message}`, 'cl-err');
+    } finally {
+        if (card) card.classList.remove('pending');
+    }
+}
+
+// ── Restart ALL containers ───────────────────────────────────────────────────
+async function restartAll() {
+    if (!confirm(
+        'Restart ALL pinplot services?\n\n' +
+        'This will cause a brief outage for every user on the platform.\n\n' +
+        'Click OK to proceed.'
+    )) return;
+
+    csep('RESTART ALL');
+    clog('Restarting all pinplot containers…', 'cl-cmd');
+
+    for (const c of containers) {
+        clog(`  → restarting ${c.name}`, 'cl-warn');
+        try {
+            await fetch(`${API}/containers/${encodeURIComponent(c.name)}/restart`, { method: 'POST' });
+        } catch (e) {
+            clog(`  ✗ ${c.name}: ${e.message}`, 'cl-err');
+        }
+    }
+
+    clog('All restart commands sent. Refreshing status in 6 s…', 'cl-ok');
+    setTimeout(() => refreshAll(), 6000);
+}
+
+// ── Auto-refresh ─────────────────────────────────────────────────────────────
+function setAutoRefresh(on) {
+    clearInterval(autoTimer);
+    if (on) autoTimer = setInterval(() => refreshAll(true), 10000);
+}
+
+document.getElementById('autoRefreshToggle').addEventListener('change', e => setAutoRefresh(e.target.checked));
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+renderSkeletons();
+refreshAll();
+setAutoRefresh(true);
+</script>
+
+</body>
+</html>

@@ -182,6 +182,10 @@ app.include_router(portal_router)
 from app.routes_beacons import router as beacons_router  # noqa: E402
 app.include_router(beacons_router)
 
+# Include admin ops router (Docker container management)
+from app.routes_ops import router as ops_router  # noqa: E402
+app.include_router(ops_router)
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
