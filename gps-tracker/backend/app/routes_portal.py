@@ -19,6 +19,10 @@ from app.database import get_db
 from app.models import UserGroup, UserGroupPackage, PortalUser, Building, Floor, IndoorGateway, BLETag, User, TagCategory, GeofenceAlert, POI
 from app.models_admin import TagPackage
 from app.admin_auth import hash_password, verify_password
+from app.services.device_providers.provider_factory import DeviceProviderFactory
+
+# Alias map shared by create_tag and validate_tag_portal
+_TAG_TYPE_ALIAS = {"series1": "scope", "series2": "tracksolid"}
 
 router = APIRouter(prefix="/api/portal", tags=["portal"])
 logger = logging.getLogger(__name__)
@@ -1010,8 +1014,35 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
     return _build_tag_out(tag, owner.email if owner else "", db)
 
 
+class PortalTagValidateRequest(BaseModel):
+    imei: str
+    tag_type: str  # 'series1' | 'series2' (or canonical 'scope' | 'tracksolid')
+
+
+@router.post("/tags/validate")
+async def validate_tag_portal(
+    data: PortalTagValidateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Validate a tag IMEI against its vendor platform (portal auth required).
+    Returns {is_valid, message} without persisting anything."""
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Only group admins can validate tags")
+
+    tag_type = _TAG_TYPE_ALIAS.get(data.tag_type.lower(), data.tag_type.lower())
+    try:
+        provider = DeviceProviderFactory.get_provider(tag_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    result = await provider.validate_tag(data.imei)
+    return {"is_valid": result.is_valid, "message": result.message}
+
+
 @router.post("/tags", response_model=PortalTagOut, status_code=201)
-def create_tag(data: PortalTagCreate, request: Request, db: Session = Depends(get_db)):
+async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depends(get_db)):
     """Create a new BLE tag and assign it directly to a mobile-app user (group admin only)."""
     me = get_portal_user_from_request(request, db)
     if not me.is_group_admin:
@@ -1029,12 +1060,22 @@ def create_tag(data: PortalTagCreate, request: Request, db: Session = Depends(ge
     if db.query(BLETag).filter(BLETag.imei == imei).first():
         raise HTTPException(status_code=409, detail=f"Tag with IMEI '{imei}' already exists")
 
+    # Validate IMEI against the vendor platform before persisting
+    canonical_type = _TAG_TYPE_ALIAS.get((data.tag_type or "scope").lower(), (data.tag_type or "scope").lower())
+    try:
+        provider = DeviceProviderFactory.get_provider(canonical_type)
+        validation = await provider.validate_tag(imei)
+        if not validation.is_valid:
+            raise HTTPException(status_code=422, detail=validation.message)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
     now = datetime.utcnow()
     tag = BLETag(
         user_id=str(data.user_id),
         imei=imei,
         description=data.description,
-        tag_type=data.tag_type or "scope",
+        tag_type=canonical_type,
         is_active=True,
         package_id=str(data.package_id),
         expiry_date=now + timedelta(days=pkg.validity_days),

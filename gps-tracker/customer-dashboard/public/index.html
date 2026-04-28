@@ -1907,7 +1907,10 @@
         <form id="tagMgmtForm" onsubmit="submitTagForm(event)">
             <div id="tagMgmtImeiGroup" class="form-group">
                 <label>IMEI / Tag ID *</label>
-                <input type="text" id="tagMgmtImei" placeholder="e.g. 867747079036032" required>
+                <input type="text" id="tagMgmtImei" placeholder="e.g. 867747079036032" required
+                       oninput="_tagImeiResetValidation()"
+                       onblur="_tagImeiValidateOnBlur()">
+                <div id="tagMgmtImeiStatus" style="display:none;margin-top:4px;font-size:12px"></div>
             </div>
             <div id="tagMgmtDescGroup" class="form-group">
                 <label>Description</label>
@@ -2687,6 +2690,7 @@ async function openAddTagModal() {
     document.getElementById('tagMgmtTagId').value = '';
     document.getElementById('tagMgmtMode').value = '';
     document.getElementById('tagMgmtImei').value = '';
+    _tagImeiResetValidation();
     const imeiInput = document.getElementById('tagMgmtImei');
     imeiInput.readOnly = false;
     imeiInput.style.background = '';
@@ -2804,6 +2808,57 @@ async function openTagMgmtModal(mode, imei) {
     }
 }
 
+// ── Series 1 IMEI validation helpers ──────────────────────────────────────
+// Calls POST /api/portal/tags/validate and shows inline status below the IMEI field.
+
+function _tagImeiResetValidation() {
+    const el = document.getElementById('tagImeiStatus');
+    if (el) el.style.display = 'none';
+    const statusEl = document.getElementById('tagMgmtImeiStatus');
+    if (statusEl) statusEl.style.display = 'none';
+}
+
+async function _tagImeiValidate(imei, tagType) {
+    const statusEl = document.getElementById('tagMgmtImeiStatus');
+    statusEl.style.display = 'block';
+    statusEl.style.color = 'var(--text-3, #6b7280)';
+    statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking tag on Scope platform…';
+    try {
+        const res = await apiFetch('/api/portal/tags/validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imei, tag_type: tagType }),
+        });
+        const data = await res.json();
+        if (res.ok && data.is_valid) {
+            statusEl.style.color = 'var(--success, #22c55e)';
+            statusEl.innerHTML = '<i class="fa-solid fa-circle-check"></i> ' + data.message;
+            return true;
+        } else {
+            const msg = data.detail || data.message || 'Validation failed';
+            statusEl.style.color = 'var(--danger, #ef4444)';
+            statusEl.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> ' + msg;
+            return false;
+        }
+    } catch (err) {
+        statusEl.style.color = 'var(--warning, #f59e0b)';
+        statusEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Could not reach validation service';
+        return false;
+    }
+}
+
+async function _tagImeiValidateOnBlur() {
+    const tagId  = document.getElementById('tagMgmtTagId').value;
+    const mode   = document.getElementById('tagMgmtMode').value;
+    // Only validate for new tags (not edit / reassign)
+    if (tagId || mode === 'edit') return;
+    const tagType = document.getElementById('tagMgmtType').value;
+    if (tagType !== 'series1' && tagType !== 'scope') return;
+    const imei = document.getElementById('tagMgmtImei').value.trim();
+    if (!imei) return;
+    await _tagImeiValidate(imei, tagType);
+}
+
 async function submitTagForm(e) {
     e.preventDefault();
     const tagId  = document.getElementById('tagMgmtTagId').value;
@@ -2814,7 +2869,19 @@ async function submitTagForm(e) {
     btn.disabled = true;
     const alertEl = document.getElementById('tagMgmtAlert');
     alertEl.style.display = 'none';
-    // Resolve selected category name
+
+    // For new Series 1 tags: validate against the Scope platform first
+    if (!tagId && !mode) {
+        const tagType = document.getElementById('tagMgmtType').value;
+        if (tagType === 'series1' || tagType === 'scope') {
+            const imei = document.getElementById('tagMgmtImei').value.trim();
+            const valid = await _tagImeiValidate(imei, tagType);
+            if (!valid) {
+                btn.disabled = false;
+                return;
+            }
+        }
+    }
     const catId = document.getElementById('tagMgmtCategory')?.value || '';
     const catObj = catId ? _categoriesCache.find(c => c.id === catId) : null;
     const categoryName = catObj ? catObj.name : null;
