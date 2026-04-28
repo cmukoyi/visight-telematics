@@ -10,8 +10,12 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.models import PortalAlert, BLETag, PortalUser
+from app.services.email_service import EmailService
 
 logger = logging.getLogger(__name__)
+
+# Shared email service instance (re-uses SendGrid key from env)
+_email_svc = EmailService()
 
 BATTERY_LOW_THRESHOLD = 20          # %
 OFFLINE_THRESHOLD_DAYS = 7          # days with no last_seen
@@ -101,6 +105,64 @@ def create_alert(db: Session, usergroup_id: str, tag_id: str | None,
     return alert
 
 
+# ── Notify flag per alert type ────────────────────────────────────────────────
+_NOTIFY_FLAG = {
+    "battery_low":    "notify_battery_low",
+    "tag_offline":    "notify_offline",
+    "geofence_entry": "notify_geofence_exit",   # same preference covers both directions
+    "geofence_exit":  "notify_geofence_exit",
+}
+
+
+def _notify_group_by_email(db: Session, usergroup_id: str, alert_type: str,
+                            title: str, message: str,
+                            meta_data: dict | None = None) -> None:
+    """Send a one-shot email for a new alert to all opted-in portal users in the group.
+
+    Respects per-user flags:  alerts_enabled, notify_via_email, and the
+    specific notify_battery_low / notify_offline / notify_geofence_exit flag.
+    Also sends to any extra addresses in PortalUser.notification_emails.
+    """
+    flag = _NOTIFY_FLAG.get(alert_type, "alerts_enabled")
+    try:
+        users = db.query(PortalUser).filter(
+            PortalUser.usergroup_id == usergroup_id,
+            PortalUser.is_active == True,
+            PortalUser.alerts_enabled == True,
+            PortalUser.notify_via_email == True,
+        ).all()
+
+        sent_to: set[str] = set()
+
+        for pu in users:
+            # Check the specific per-type flag
+            if not getattr(pu, flag, True):
+                continue
+
+            # Primary address
+            if pu.email and pu.email not in sent_to:
+                ok = _email_svc.send_portal_alert_email(
+                    pu.email, alert_type, title, message, meta_data
+                )
+                if ok:
+                    sent_to.add(pu.email)
+                    logger.info("📧 Alert email sent to %s (%s)", pu.email, alert_type)
+                else:
+                    logger.warning("📧 Failed to send alert email to %s", pu.email)
+
+            # Extra notification addresses
+            extras = pu.notification_emails or []
+            for extra in extras:
+                if isinstance(extra, str) and extra.strip() and extra not in sent_to:
+                    ok = _email_svc.send_portal_alert_email(
+                        extra.strip(), alert_type, title, message, meta_data
+                    )
+                    if ok:
+                        sent_to.add(extra.strip())
+    except Exception as exc:
+        logger.error("Failed to send alert notification emails: %s", exc)
+
+
 def check_battery_alert(db: Session, tag: BLETag) -> bool:
     """Generate a battery_low alert if battery < threshold and not raised recently."""
     if tag.battery_level is None or tag.battery_level > BATTERY_LOW_THRESHOLD:
@@ -115,13 +177,12 @@ def check_battery_alert(db: Session, tag: BLETag) -> bool:
     for usergroup_id in group_ids:
         if _recent_alert_exists(db, usergroup_id, tag_id, "battery_low", BATTERY_DEDUPE_HOURS):
             continue
-        create_alert(
-            db, usergroup_id, tag_id,
-            alert_type="battery_low",
-            title=f"Low battery — {label}",
-            message=f"{label} has a battery level of {tag.battery_level}%. Please recharge or replace the battery soon.",
-            meta_data={"battery": tag.battery_level, "imei": tag.imei},
-        )
+        _title = f"Low battery — {label}"
+        _msg   = f"{label} has a battery level of {tag.battery_level}%. Please recharge or replace the battery soon."
+        _meta  = {"battery": tag.battery_level, "imei": tag.imei}
+        create_alert(db, usergroup_id, tag_id, alert_type="battery_low",
+                     title=_title, message=_msg, meta_data=_meta)
+        _notify_group_by_email(db, usergroup_id, "battery_low", _title, _msg, _meta)
         logger.info("🔋 Battery-low alert created for tag %s (%d%%) → group %s", tag.imei, tag.battery_level, usergroup_id)
         created = True
     return created
@@ -146,13 +207,12 @@ def check_offline_alert(db: Session, tag: BLETag) -> bool:
     for usergroup_id in group_ids:
         if _recent_alert_exists(db, usergroup_id, tag_id, "tag_offline", OFFLINE_DEDUPE_HOURS):
             continue
-        create_alert(
-            db, usergroup_id, tag_id,
-            alert_type="tag_offline",
-            title=f"Tag offline — {label}",
-            message=f"{label} hasn't been detected for {age_days} days. Check the device or its location.",
-            meta_data={"days_offline": age_days, "last_seen": last_seen_str, "imei": tag.imei},
-        )
+        _title = f"Tag offline — {label}"
+        _msg   = f"{label} hasn't been detected for {age_days} days. Check the device or its location."
+        _meta  = {"days_offline": age_days, "last_seen": last_seen_str, "imei": tag.imei}
+        create_alert(db, usergroup_id, tag_id, alert_type="tag_offline",
+                     title=_title, message=_msg, meta_data=_meta)
+        _notify_group_by_email(db, usergroup_id, "tag_offline", _title, _msg, _meta)
         logger.info("📡 Offline alert created for tag %s (%d days) → group %s", tag.imei, age_days, usergroup_id)
         created = True
     return created
@@ -175,15 +235,13 @@ def create_geofence_alert(db: Session, tag: BLETag, poi_name: str, poi_id: str,
     label = _tag_label(tag)
     verb = "entered" if is_entry else "exited"
     tag_id = str(tag.id)
+    _meta = {"poi_name": poi_name, "poi_id": poi_id, "imei": tag.imei, "event_type": event_type}
     for usergroup_id in group_ids:
-        create_alert(
-            db, usergroup_id, tag_id,
-            alert_type=atype,
-            title=f"Geofence {verb} — {label}",
-            message=f"{label} has {verb} the zone '{poi_name}'.",
-            meta_data={"poi_name": poi_name, "poi_id": poi_id, "imei": tag.imei,
-                       "event_type": event_type},
-        )
+        _title = f"Geofence {verb} — {label}"
+        _msg   = f"{label} has {verb} the zone '{poi_name}'."
+        create_alert(db, usergroup_id, tag_id, alert_type=atype,
+                     title=_title, message=_msg, meta_data=_meta)
+        _notify_group_by_email(db, usergroup_id, atype, _title, _msg, _meta)
     return True
 
 

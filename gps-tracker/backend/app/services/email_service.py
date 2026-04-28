@@ -399,6 +399,87 @@ class EmailService:
             print(f"Error sending password reset email: {e}")
             return False
     
+    def send_portal_alert_email(self, to_email: str, alert_type: str,
+                                 title: str, message: str,
+                                 meta_data: dict | None = None) -> bool:
+        """Send a portal alert notification email (battery_low, tag_offline,
+        geofence_entry, geofence_exit).  Called at most once per alert row."""
+        try:
+            meta_data = meta_data or {}
+            # ── Per-type styling ──────────────────────────────────────────
+            styles = {
+                "battery_low":    {"emoji": "🔋", "color": "#F59E0B", "bg": "#FEF3C7", "label": "Battery Low"},
+                "tag_offline":    {"emoji": "📴", "color": "#6B7280", "bg": "#F3F4F6", "label": "Tag Offline"},
+                "geofence_entry": {"emoji": "🟢", "color": "#10B981", "bg": "#D1FAE5", "label": "Geofence Entry"},
+                "geofence_exit":  {"emoji": "🔴", "color": "#EF4444", "bg": "#FEE2E2", "label": "Geofence Exit"},
+            }
+            s = styles.get(alert_type, {"emoji": "🔔", "color": "#173C64", "bg": "#EFF6FF", "label": "Alert"})
+
+            # ── Extra detail rows from meta_data ─────────────────────────
+            detail_rows = ""
+            if "battery" in meta_data:
+                detail_rows += f"<tr><td style='padding:6px 12px;color:#666'>Battery level</td><td style='padding:6px 12px'><strong>{meta_data['battery']}%</strong></td></tr>"
+            if "days_offline" in meta_data:
+                detail_rows += f"<tr><td style='padding:6px 12px;color:#666'>Days offline</td><td style='padding:6px 12px'><strong>{meta_data['days_offline']} days</strong></td></tr>"
+            if "poi_name" in meta_data:
+                detail_rows += f"<tr><td style='padding:6px 12px;color:#666'>Zone</td><td style='padding:6px 12px'><strong>{meta_data['poi_name']}</strong></td></tr>"
+            if "last_seen" in meta_data:
+                detail_rows += f"<tr><td style='padding:6px 12px;color:#666'>Last seen</td><td style='padding:6px 12px'>{meta_data['last_seen'][:19].replace('T',' ')}</td></tr>"
+            if "imei" in meta_data:
+                detail_rows += f"<tr><td style='padding:6px 12px;color:#666'>IMEI</td><td style='padding:6px 12px'>{meta_data['imei']}</td></tr>"
+
+            subject = f"{s['emoji']} {title}"
+            text_content = f"{title}\n\n{message}\n\nPinplot Alerts"
+            html_content = f"""
+            <html>
+              <body style="margin:0;padding:0;background:#f9fafb;font-family:Arial,sans-serif;">
+                <div style="max-width:560px;margin:32px auto;background:#fff;border-radius:10px;
+                            box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden;">
+                  <!-- header bar -->
+                  <div style="background:{s['color']};padding:20px 28px;display:flex;align-items:center;">
+                    <span style="font-size:28px;margin-right:12px">{s['emoji']}</span>
+                    <span style="color:#fff;font-size:18px;font-weight:700">{s['label']}</span>
+                  </div>
+                  <!-- body -->
+                  <div style="padding:28px;">
+                    <h2 style="margin:0 0 12px;color:#111;font-size:17px">{title}</h2>
+                    <p style="margin:0 0 20px;color:#444;font-size:14px;line-height:1.6">{message}</p>
+                    {f'<table style="width:100%;border-collapse:collapse;background:{s["bg"]};border-radius:8px;margin-bottom:20px">{detail_rows}</table>' if detail_rows else ''}
+                    <a href="https://pinplot.me/#/map"
+                       style="display:inline-block;background:#173C64;color:#fff;text-decoration:none;
+                              padding:11px 24px;border-radius:6px;font-size:14px;font-weight:600">
+                      Open Pinplot →
+                    </a>
+                  </div>
+                  <div style="padding:16px 28px;border-top:1px solid #f0f0f0;background:#fafafa">
+                    <p style="margin:0;color:#999;font-size:11px">
+                      You are receiving this because you have alert notifications enabled in Pinplot.
+                      To change your preferences, visit Settings inside the portal.
+                    </p>
+                  </div>
+                </div>
+              </body>
+            </html>
+            """
+            if self.use_sendgrid:
+                return self._send_via_sendgrid(to_email, subject, text_content, html_content)
+            else:
+                msg = MIMEMultipart('alternative')
+                msg['Subject'] = subject
+                msg['From'] = self.from_email
+                msg['To'] = to_email
+                msg.attach(MIMEText(text_content, 'plain'))
+                msg.attach(MIMEText(html_content, 'html'))
+                with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+                    if self.smtp_user and self.smtp_password:
+                        server.starttls()
+                        server.login(self.smtp_user, self.smtp_password)
+                    server.sendmail(self.from_email, to_email, msg.as_string())
+                return True
+        except Exception as e:
+            print(f"Error sending portal alert email: {e}")
+            return False
+
     def _send_via_sendgrid(self, to_email: str, subject: str, text_content: str, html_content: str) -> bool:
         """Send email using SendGrid API"""
         try:
