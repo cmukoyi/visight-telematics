@@ -113,6 +113,10 @@
                 <label>New password</label>
                 <input type="password" id="fpNewPassword" placeholder="••••••••" autocomplete="new-password" style="width:100%">
             </div>
+            <div class="form-group">
+                <label>Confirm new password</label>
+                <input type="password" id="fpConfirmPassword" placeholder="••••••••" autocomplete="new-password" style="width:100%">
+            </div>
             <div id="fpStep2Error" style="display:none;color:#ef4444;font-size:.82rem;margin-bottom:8px"></div>
             <button class="btn btn-primary btn-full" onclick="fpResetPassword()">
                 <i class="fa-solid fa-lock"></i> Set new password
@@ -2535,6 +2539,7 @@ async function fpRequestPin() {
         document.getElementById('fpStep2').style.display = '';
         document.getElementById('fpPin').value = '';
         document.getElementById('fpNewPassword').value = '';
+        document.getElementById('fpConfirmPassword').value = '';
         document.getElementById('fpStep2Error').style.display = 'none';
     } catch (err) {
         errEl.textContent = 'Network error. Please try again.';
@@ -2542,12 +2547,15 @@ async function fpRequestPin() {
     }
 }
 async function fpResetPassword() {
-    const email    = document.getElementById('fpEmail')?.value?.trim();
-    const pin      = document.getElementById('fpPin')?.value?.trim();
-    const newPass  = document.getElementById('fpNewPassword')?.value;
-    const errEl    = document.getElementById('fpStep2Error');
+    const email      = document.getElementById('fpEmail')?.value?.trim();
+    const pin        = document.getElementById('fpPin')?.value?.trim();
+    const newPass    = document.getElementById('fpNewPassword')?.value;
+    const confirmPass= document.getElementById('fpConfirmPassword')?.value;
+    const errEl      = document.getElementById('fpStep2Error');
     errEl.style.display = 'none';
-    if (!pin || !newPass) { errEl.textContent = 'Please fill in all fields.'; errEl.style.display = ''; return; }
+    if (!pin || !newPass || !confirmPass) { errEl.textContent = 'Please fill in all fields.'; errEl.style.display = ''; return; }
+    if (newPass !== confirmPass) { errEl.textContent = 'Passwords do not match.'; errEl.style.display = ''; return; }
+    if (newPass.length < 8) { errEl.textContent = 'Password must be at least 8 characters.'; errEl.style.display = ''; return; }
     try {
         const res = await fetch('/api/portal/auth/reset-password', {
             method: 'POST',
