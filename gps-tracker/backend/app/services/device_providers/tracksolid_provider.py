@@ -249,7 +249,7 @@ class TrackSolidTagProvider(DeviceTagProvider):
             )
         return TagValidationResult(
             is_valid=False,
-            message="Tag not supported — IMEI not found on TrackSolid account.",
+            message="Unknown Tag or Incorrect Series",
         )
 
 
