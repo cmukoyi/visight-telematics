@@ -2186,7 +2186,7 @@ def forgot_password(data: ForgotPasswordRequest, db: Session = Depends(get_db)):
             _email_svc_portal.send_portal_reset_pin(
                 to_email=user.email,
                 pin=pin,
-                first_name=user.name.split()[0] if user.name else None,
+                first_name=user.first_name or None,
             )
         except Exception:
             logger.exception("Failed to send portal password reset PIN to %s", email)
