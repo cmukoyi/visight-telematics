@@ -15,17 +15,22 @@ depends_on = None
 
 def upgrade():
     # Make user_id nullable on pois (portal-created POIs have no mobile user)
-    op.alter_column('pois', 'user_id', nullable=True)
+    # ALTER COLUMN is idempotent when already nullable
+    op.execute("ALTER TABLE pois ALTER COLUMN user_id DROP NOT NULL")
 
-    # Add usergroup_id column (nullable FK to user_groups)
-    op.add_column('pois', sa.Column('usergroup_id', sa.String(36), nullable=True))
-    op.create_foreign_key(
-        'fk_pois_usergroup_id',
-        'pois', 'user_groups',
-        ['usergroup_id'], ['id'],
-        ondelete='CASCADE',
-    )
-    op.create_index('ix_pois_usergroup_id', 'pois', ['usergroup_id'])
+    # Add usergroup_id — IF NOT EXISTS guards against partial re-runs
+    op.execute("ALTER TABLE pois ADD COLUMN IF NOT EXISTS usergroup_id VARCHAR(36)")
+    op.execute("""
+        DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint WHERE conname = 'fk_pois_usergroup_id'
+            ) THEN
+                ALTER TABLE pois ADD CONSTRAINT fk_pois_usergroup_id
+                    FOREIGN KEY (usergroup_id) REFERENCES user_groups(id) ON DELETE CASCADE;
+            END IF;
+        END $$
+    """)
+    op.execute("CREATE INDEX IF NOT EXISTS ix_pois_usergroup_id ON pois (usergroup_id)")
 
 
 def downgrade():

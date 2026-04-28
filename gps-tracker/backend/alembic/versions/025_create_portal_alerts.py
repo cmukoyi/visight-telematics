@@ -14,21 +14,28 @@ depends_on = None
 
 
 def upgrade():
-    op.create_table(
-        'portal_alerts',
-        sa.Column('id', sa.String(36), primary_key=True),
-        sa.Column('usergroup_id', sa.String(36), sa.ForeignKey('user_groups.id', ondelete='CASCADE'), nullable=False),
-        sa.Column('tag_id', sa.String(36), sa.ForeignKey('ble_tags.id', ondelete='CASCADE'), nullable=True),
-        sa.Column('alert_type', sa.String(50), nullable=False),
-        sa.Column('title', sa.String(200), nullable=False),
-        sa.Column('message', sa.Text(), nullable=True),
-        sa.Column('is_read', sa.Boolean(), nullable=False, server_default='false'),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.Column('meta_data', sa.JSON(), nullable=True),
-    )
-    op.create_index('ix_portal_alerts_usergroup_created', 'portal_alerts',
-                    ['usergroup_id', 'created_at'])
-    op.create_index('ix_portal_alerts_tag_id', 'portal_alerts', ['tag_id'])
+    # IF NOT EXISTS guards against partial re-runs
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS portal_alerts (
+            id VARCHAR(36) PRIMARY KEY,
+            usergroup_id VARCHAR(36) NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
+            tag_id VARCHAR(36) REFERENCES ble_tags(id) ON DELETE CASCADE,
+            alert_type VARCHAR(50) NOT NULL,
+            title VARCHAR(200) NOT NULL,
+            message TEXT,
+            is_read BOOLEAN NOT NULL DEFAULT false,
+            created_at TIMESTAMPTZ DEFAULT now(),
+            meta_data JSON
+        )
+    """)
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_portal_alerts_usergroup_created
+        ON portal_alerts (usergroup_id, created_at)
+    """)
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_portal_alerts_tag_id
+        ON portal_alerts (tag_id)
+    """)
 
 
 def downgrade():

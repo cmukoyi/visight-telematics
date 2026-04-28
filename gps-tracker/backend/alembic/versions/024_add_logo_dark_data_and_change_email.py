@@ -14,10 +14,9 @@ depends_on = None
 
 
 def upgrade():
-    # Add dark-mode logo column to user_groups
-    op.add_column('user_groups', sa.Column('logo_dark_data', sa.Text(), nullable=True))
-    # Add extra notification email list to portal_users
-    op.add_column('portal_users', sa.Column('notification_emails', sa.JSON(), nullable=True))
+    # Use raw SQL with IF NOT EXISTS so re-runs on a partially-applied DB are safe
+    op.execute("ALTER TABLE user_groups ADD COLUMN IF NOT EXISTS logo_dark_data TEXT")
+    op.execute("ALTER TABLE portal_users ADD COLUMN IF NOT EXISTS notification_emails JSON")
 
 
 def downgrade():
