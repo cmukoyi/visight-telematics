@@ -312,6 +312,7 @@
                                 <tr>
                                     <th>Asset / Tag</th>
                                     <th>Description</th>
+                                    <th>Type</th>
                                     <th>Category</th>
                                     <th>Status</th>
                                     <th>Package</th>
@@ -323,7 +324,7 @@
                                 </tr>
                             </thead>
                             <tbody id="al-tbody">
-                                <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-3)">Loading…</td></tr>
+                                <tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text-3)">Loading…</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -2753,8 +2754,9 @@ async function openTagMgmtModal(mode, imei) {
     document.getElementById('tagMgmtDesc').value = tag.description || tag.device_name || '';
     document.getElementById('tagMgmtDescGroup').style.display = '';
 
-    // Tag type
-    document.getElementById('tagMgmtType').value = tag.tag_type || 'series1';
+    // Tag type — normalise canonical DB values (scope/tracksolid) to select option values (series1/series2)
+    const _typeAliasToSelect = { scope: 'series1', tracksolid: 'series2', series1: 'series1', series2: 'series2' };
+    document.getElementById('tagMgmtType').value = _typeAliasToSelect[(tag.tag_type || 'scope').toLowerCase()] || 'series1';
     document.getElementById('tagMgmtTypeGroup').style.display = '';
 
     // Category
@@ -5767,15 +5769,18 @@ function alRenderTable() {
     const tbody = document.getElementById('al-tbody');
     if (!tbody) return;
     if (!list.length) {
-        tbody.innerHTML = '<tr><td colspan="10" class="table-empty" style="text-align:center;padding:40px;color:var(--text-3)">No assets match the search.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" class="table-empty" style="text-align:center;padding:40px;color:var(--text-3)">No assets match the search.</td></tr>';
         return;
     }
     const statusColors = { active: 'var(--success)', inactive: 'var(--danger)', stock: 'var(--text-3)' };
     const statusLabel  = { active: 'Active', inactive: 'Inactive', stock: 'Stock' };
+    const _tagTypeLabel = tt => ({ scope: 'Series 1', series1: 'Series 1', tracksolid: 'Series 2', series2: 'Series 2' })[(tt||'').toLowerCase()] || (tt || '—');
     tbody.innerHTML = list.map(t => {
         const status = _lmStatusClass(t);
         const label  = esc(t.description || t.device_name || t.imei);
         const owner  = esc((t.owner_email || '').split('@')[0] || '—');
+        const typeLabel = _tagTypeLabel(t.tag_type);
+        const typeColor = typeLabel === 'Series 1' ? 'var(--primary)' : typeLabel === 'Series 2' ? 'var(--warning,#f59e0b)' : 'var(--text-3)';
         const batPct = t.battery_level != null ? t.battery_level : null;
         const batCls = batPct == null ? '' : batPct <= 20 ? 'battery-critical' : batPct <= 50 ? 'battery-low' : 'battery-ok';
         const batHtml= batPct != null
@@ -5810,6 +5815,7 @@ function alRenderTable() {
                 </div>
             </td>
             <td style="font-size:.82rem;color:var(--text-2)">${esc(t.description || t.imei)}</td>
+            <td><span style="font-size:.75rem;font-weight:600;color:${typeColor};background:${typeColor}18;padding:2px 7px;border-radius:20px;white-space:nowrap">${typeLabel}</span></td>
             <td style="font-size:.78rem;color:var(--text-2)">${alCatLabel(t).label}</td>
             <td>
                 <div style="display:flex;align-items:center;gap:5px">
@@ -6183,6 +6189,7 @@ function amRenderCards() {
     }
     const statusColors = { active: 'var(--success)', inactive: 'var(--danger)', stock: 'var(--text-3)' };
     const statusLabel  = { active: 'Active', inactive: 'Inactive', stock: 'Stock' };
+    const _tagTypeLabel = tt => ({ scope: 'Series 1', series1: 'Series 1', tracksolid: 'Series 2', series2: 'Series 2' })[(tt||'').toLowerCase()] || (tt || '—');
     grid.innerHTML = `<div class="asset-card-grid">${list.map(t => {
         const status   = _lmStatusClass(t);
         const color    = statusColors[status];
@@ -6192,7 +6199,8 @@ function amRenderCards() {
         const pkgHtml  = hasPkg
             ? `<span>${esc(t.package_name || 'Unknown')}</span>`
             : `<span style="color:var(--danger);font-weight:600"><i class="fa-solid fa-circle-exclamation" style="margin-right:3px"></i>No Package</span>`;
-        const tagType  = esc(t.tag_type || '—');
+        const tagType  = _tagTypeLabel(t.tag_type);
+        const tagTypeColor = tagType === 'Series 1' ? 'var(--primary)' : tagType === 'Series 2' ? 'var(--warning,#f59e0b)' : 'var(--text-3)';
         const lastSeen = t.last_seen ? new Date(t.last_seen).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
         const expiryDate = t.expiry_date ? new Date(t.expiry_date).toLocaleDateString([], {day:'2-digit',month:'short',year:'numeric'}) : null;
         const daysLeft = hasPkg
@@ -6213,7 +6221,7 @@ function amRenderCards() {
                 </div>
                 <div class="asset-card-title">
                     <strong>${label}</strong>
-                    <small>${tagType}</small>
+                    <small style="color:${tagTypeColor};font-weight:600">${tagType}</small>
                 </div>
                 <span class="status-dot status-${status}" style="margin-left:auto" title="${statusLabel[status]}"></span>
             </div>
