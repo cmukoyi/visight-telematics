@@ -76,6 +76,10 @@ input, select, textarea { font-family: var(--font); }
     "sidebar main";
   height: 100vh;
   overflow: hidden;
+  transition: grid-template-columns var(--transition);
+}
+#app.sidebar-collapsed {
+  grid-template-columns: 56px 1fr;
 }
 
 /* ── Header ────────────────────────────────────────────────── */

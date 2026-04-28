@@ -85,7 +85,7 @@
 
     <!-- ── HEADER ── -->
     <header id="app-header">
-        <button id="sidebar-toggle" title="Toggle sidebar" onclick="document.getElementById('sidebar').classList.toggle('collapsed')">
+        <button id="sidebar-toggle" title="Toggle sidebar" onclick="(function(){var s=document.getElementById('sidebar'),a=document.getElementById('app');s.classList.toggle('collapsed');a.classList.toggle('sidebar-collapsed');})()">
             <i class="fa-solid fa-bars"></i>
         </button>
 
