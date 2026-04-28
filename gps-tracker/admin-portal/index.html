@@ -2220,13 +2220,15 @@
                 if (response.status === 401) { handle401(); return; }
                 if (!response.ok) throw new Error(`Server returned HTTP ${response.status}`);
                 const data = await response.json();
-                _featuresLoaded = true; // set BEFORE assigning checked so onchange won't fire a bad save
+                // Populate checkboxes BEFORE enabling the guard so that any
+                // programmatic assignment that somehow triggers onchange is still blocked.
                 document.getElementById('feat_show_map').checked       = data.show_map;
                 document.getElementById('feat_show_journey').checked   = data.show_journey;
                 document.getElementById('feat_show_assets').checked    = data.show_assets;
                 document.getElementById('feat_show_scan').checked      = data.show_scan;
                 document.getElementById('feat_show_settings').checked  = data.show_settings;
                 document.getElementById('feat_show_solutions').checked = data.show_solutions;
+                _featuresLoaded = true; // only allow saves AFTER all checkboxes are populated
             } catch (error) {
                 const el = document.getElementById('featuresLoadError');
                 el.textContent = 'Could not load features: ' + error.message;
@@ -2246,6 +2248,17 @@
                 show_settings:  document.getElementById('feat_show_settings').checked,
                 show_solutions: document.getElementById('feat_show_solutions').checked,
             };
+            // Guard: never allow saving with every nav tab disabled — the app
+            // would show a completely empty bottom bar with no way to recover.
+            const anyEnabled = Object.values(payload).some(v => v === true);
+            if (!anyEnabled) {
+                msgEl.textContent = '⚠️ At least one tab must remain enabled — change not saved.';
+                msgEl.style.cssText = 'display:block;color:orange;font-weight:500';
+                // Re-check the Map tab as the safe fallback
+                document.getElementById('feat_show_map').checked = true;
+                setTimeout(() => { msgEl.style.display = 'none'; }, 3500);
+                return;
+            }
             try {
                 const response = await fetch(`${API_URL}/api/admin/app-features`, {
                     method: 'PUT',

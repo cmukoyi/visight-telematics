@@ -799,8 +799,13 @@ async def add_ble_tag(
     This prevents a TrackSolid IMEI being silently saved as Scope (or vice versa)
     if the client sends the wrong type.
     """
-    # Normalise and validate tag_type
-    tag_type = (tag_data.tag_type or 'scope').lower()
+    # Normalise and validate tag_type.
+    # Accept both vendor names ('scope'/'tracksolid') and the Flutter app's
+    # user-facing series names ('series1'/'series2') as aliases.
+    # Always store the canonical vendor name so the DB is consistent.
+    _ALIAS_MAP = {"series1": "scope", "series2": "tracksolid"}
+    raw_type = (tag_data.tag_type or 'scope').lower()
+    tag_type = _ALIAS_MAP.get(raw_type, raw_type)
     try:
         provider = DeviceProviderFactory.get_provider(tag_type)
     except ValueError:

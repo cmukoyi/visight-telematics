@@ -11,10 +11,16 @@ from .base_provider import DeviceTagProvider
 from .tracksolid_provider import TrackSolidTagProvider
 from .scope_provider import ScopeTagProvider
 
-# Registry: tag_type key → provider class
+# Registry: tag_type key → provider class.
+# Both the canonical vendor names ('scope', 'tracksolid') and the
+# user-facing series names ('series1', 'series2') are accepted so that
+# the Flutter app (which sends 'series1'/'series2') and any older DB rows
+# (which store 'scope'/'tracksolid') both resolve correctly.
 _PROVIDERS: dict[str, type[DeviceTagProvider]] = {
-    "tracksolid": TrackSolidTagProvider,
-    "scope": ScopeTagProvider,
+    "scope":      ScopeTagProvider,       # Series 1
+    "series1":    ScopeTagProvider,       # alias used by the Flutter app
+    "tracksolid": TrackSolidTagProvider,  # Series 2
+    "series2":    TrackSolidTagProvider,  # alias used by the Flutter app
 }
 
 

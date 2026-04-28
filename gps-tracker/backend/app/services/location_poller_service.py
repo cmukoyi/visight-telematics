@@ -88,11 +88,20 @@ class LocationPollerService:
                 logger.debug("No active trackers to poll")
                 return
 
-            # Split by provider type — only known types are routed; unknowns are logged and skipped
-            series2_trackers = [t for t in live_trackers if (t.tag_type or "").lower() == "series2"]
-            series1_trackers = [t for t in live_trackers if (t.tag_type or "series1").lower() == "series1"]
+            # Split by provider type.
+            # Accept both the canonical DB names ('scope', 'tracksolid') and
+            # the Flutter app's series aliases ('series1', 'series2') so that
+            # tags added by any client version are polled correctly.
+            _SERIES2_KEYS = {"series2", "tracksolid"}
+            _SERIES1_KEYS = {"series1", "scope"}
+
+            def _tag_key(t) -> str:
+                return (t.tag_type or "series1").lower()
+
+            series2_trackers = [t for t in live_trackers if _tag_key(t) in _SERIES2_KEYS]
+            series1_trackers = [t for t in live_trackers if _tag_key(t) in _SERIES1_KEYS]
             unknown_trackers = [t for t in live_trackers
-                                   if (t.tag_type or "series1").lower() not in ("series2", "series1")]
+                                   if _tag_key(t) not in _SERIES2_KEYS | _SERIES1_KEYS]
             for t in unknown_trackers:
                 logger.warning("⚠️  Tracker IMEI %s has unrecognised tag_type '%s' — skipping", t.imei, t.tag_type)
 

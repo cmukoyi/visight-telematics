@@ -63,6 +63,18 @@ class AppFeaturesService {
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
         final features = AppFeatures.fromJson(data);
+        // Sanity-check: if every nav tab is disabled the server row is corrupt
+        // (e.g. accidental bulk-disable via admin portal).  Fall back to cache
+        // or defaults so the app is never left with an empty bottom bar.
+        final anyEnabled = features.showMap ||
+            features.showJourney ||
+            features.showAssets ||
+            features.showScan ||
+            features.showSettings ||
+            features.showSolutions;
+        if (!anyEnabled) {
+          return await _fromCache() ?? AppFeatures.defaults();
+        }
         await _cache(features);
         return features;
       }
