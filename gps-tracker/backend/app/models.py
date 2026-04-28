@@ -136,7 +136,8 @@ class POI(Base):
     __tablename__ = "pois"
     
     id = get_uuid_column()
-    user_id = get_uuid_fk("users.id")
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=True)   # nullable for portal-created POIs
+    usergroup_id = Column(String(36), ForeignKey("user_groups.id", ondelete="CASCADE"), nullable=True)
     name = Column(String(200), nullable=False)
     description = Column(Text)
     poi_type = Column(String(20), default='single', nullable=False)  # Store as string, not enum
@@ -159,6 +160,7 @@ class POI(Base):
     
     # Relationships
     user = relationship("User", back_populates="pois")
+    usergroup = relationship("UserGroup", foreign_keys=[usergroup_id])
     tracker_links = relationship("POITrackerLink", back_populates="poi")
     alerts = relationship("GeofenceAlert", back_populates="poi")
 

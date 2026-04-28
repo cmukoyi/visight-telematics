@@ -16,7 +16,7 @@ import os
 import logging
 
 from app.database import get_db
-from app.models import UserGroup, UserGroupPackage, PortalUser, Building, Floor, IndoorGateway, BLETag, User, TagCategory, GeofenceAlert, POI, PortalAlert
+from app.models import UserGroup, UserGroupPackage, PortalUser, Building, Floor, IndoorGateway, BLETag, User, TagCategory, GeofenceAlert, POI, POITrackerLink, GeofenceState, PortalAlert
 from app.models_admin import TagPackage
 from app.admin_auth import hash_password, verify_password
 from app.services.device_providers.provider_factory import DeviceProviderFactory
@@ -38,7 +38,7 @@ PORTAL_TOKEN_EXPIRE_HOURS = 12
 
 SECTION_FEATURES: dict = {
     "tracking":   ["livemap", "floorplan", "assets", "history"],
-    "management": ["asset-mgmt", "users", "qr", "building", "settings"],
+    "management": ["asset-mgmt", "users", "qr", "building", "locations", "settings"],
     "reports":    [
         "reports-subscriptions", "reports-activity", "reports-trips",
         "reports-geofence", "reports-battery", "reports-alerts",
@@ -1772,3 +1772,357 @@ def _portal_alert_dict(a: PortalAlert) -> dict:
         "tag_imei":    tag.imei if tag else None,
         "meta_data":   a.meta_data or {},
     }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Locations (Portal-managed POIs / Geofences)
+# ──────────────────────────────────────────────────────────────────────────────
+import httpx as _httpx
+import io as _io
+
+try:
+    import openpyxl as _openpyxl
+    _HAS_OPENPYXL = True
+except ImportError:  # pragma: no cover
+    _HAS_OPENPYXL = False
+
+from fastapi import UploadFile, File
+
+
+def _poi_dict(poi: POI, db: Session, usergroup_id: str) -> dict:
+    """Serialise a POI with armed-tag info for the portal."""
+    armed_links = (
+        db.query(POITrackerLink)
+        .filter(POITrackerLink.poi_id == poi.id, POITrackerLink.is_armed == True)
+        .all()
+    )
+    armed_tag_ids = [str(lk.tracker_id) for lk in armed_links]
+    # Resolve labels for armed tags that belong to this group
+    tags_armed = []
+    for lk in armed_links:
+        tag = lk.tracker
+        if tag:
+            tags_armed.append({
+                "id":    str(tag.id),
+                "imei":  tag.imei,
+                "label": tag.description or tag.device_name or tag.imei,
+            })
+    return {
+        "id":          str(poi.id),
+        "name":        poi.name,
+        "description": poi.description,
+        "address":     poi.address,
+        "latitude":    poi.latitude,
+        "longitude":   poi.longitude,
+        "radius":      poi.radius or 150.0,
+        "is_active":   poi.is_active,
+        "created_at":  poi.created_at.isoformat() if poi.created_at else None,
+        "armed_count": len(armed_tag_ids),
+        "tags_armed":  tags_armed,
+    }
+
+
+async def _geocode_postcode(postcode: str) -> dict:
+    """
+    Geocode a UK postcode (or any address) via Nominatim.
+    Returns {"lat": float, "lon": float, "display": str} or raises HTTPException.
+    Nominatim fair-use: 1 req/s max — bulk upload loops add a tiny sleep.
+    """
+    q = postcode.strip()
+    url = f"https://nominatim.openstreetmap.org/search?q={_httpx.QueryParams({'q': q})}&format=json&limit=1&countrycodes=gb"
+    async with _httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={"q": q, "format": "json", "limit": 1, "countrycodes": "gb"},
+            headers={"User-Agent": "PinPlot-HPS/1.0 (portal)"},
+        )
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"Geocoding service error for '{q}'")
+    results = resp.json()
+    if not results:
+        raise HTTPException(status_code=422, detail=f"Postcode not found: '{q}'")
+    r = results[0]
+    return {"lat": float(r["lat"]), "lon": float(r["lon"]), "display": r.get("display_name", q)}
+
+
+def _get_group_poi(poi_id: str, usergroup_id: str, db: Session) -> POI:
+    poi = db.query(POI).filter(
+        POI.id == poi_id,
+        POI.usergroup_id == usergroup_id,
+    ).first()
+    if not poi:
+        raise HTTPException(status_code=404, detail="Location not found")
+    return poi
+
+
+# ── List all locations for this group ────────────────────────────────────────
+
+@router.get("/locations")
+def list_locations(request: Request, db: Session = Depends(get_db)):
+    me = get_portal_user_from_request(request, db)
+    pois = (
+        db.query(POI)
+        .filter(POI.usergroup_id == str(me.usergroup_id), POI.is_active == True)
+        .order_by(POI.created_at.desc())
+        .all()
+    )
+    return [_poi_dict(p, db, str(me.usergroup_id)) for p in pois]
+
+
+# ── Create a single location by postcode ─────────────────────────────────────
+
+class LocationCreate(BaseModel):
+    postcode: str
+    name: str
+    description: Optional[str] = None
+    radius: float = 150.0
+
+
+@router.post("/locations", status_code=201)
+async def create_location(data: LocationCreate, request: Request, db: Session = Depends(get_db)):
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    geo = await _geocode_postcode(data.postcode)
+    poi = POI(
+        usergroup_id=str(me.usergroup_id),
+        user_id=None,
+        name=data.name.strip(),
+        description=data.description,
+        poi_type="single",
+        latitude=geo["lat"],
+        longitude=geo["lon"],
+        radius=max(50.0, min(data.radius, 50000.0)),
+        address=geo["display"],
+        is_active=True,
+    )
+    db.add(poi)
+    db.commit()
+    db.refresh(poi)
+    return _poi_dict(poi, db, str(me.usergroup_id))
+
+
+# ── Update a location ────────────────────────────────────────────────────────
+
+class LocationUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    radius: Optional[float] = None
+    is_active: Optional[bool] = None
+
+
+@router.put("/locations/{location_id}")
+def update_location(
+    location_id: str, data: LocationUpdate,
+    request: Request, db: Session = Depends(get_db),
+):
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    poi = _get_group_poi(location_id, str(me.usergroup_id), db)
+    if data.name is not None:
+        poi.name = data.name.strip()
+    if data.description is not None:
+        poi.description = data.description
+    if data.radius is not None:
+        poi.radius = max(50.0, min(data.radius, 50000.0))
+    if data.is_active is not None:
+        poi.is_active = data.is_active
+    db.commit()
+    db.refresh(poi)
+    return _poi_dict(poi, db, str(me.usergroup_id))
+
+
+# ── Delete a location ────────────────────────────────────────────────────────
+
+@router.delete("/locations/{location_id}")
+def delete_location(
+    location_id: str, request: Request, db: Session = Depends(get_db),
+):
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    poi = _get_group_poi(location_id, str(me.usergroup_id), db)
+    # Remove arm links (so geofence checks stop)
+    db.query(POITrackerLink).filter(POITrackerLink.poi_id == location_id).delete()
+    db.delete(poi)
+    db.commit()
+    return {"detail": "Location deleted"}
+
+
+# ── Arm / disarm a tag to a location ─────────────────────────────────────────
+
+@router.post("/locations/{location_id}/arm/{tag_id}", status_code=200)
+def arm_location(
+    location_id: str, tag_id: str,
+    request: Request, db: Session = Depends(get_db),
+):
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    poi = _get_group_poi(location_id, str(me.usergroup_id), db)
+    # Verify tag belongs to this group
+    tag = _resolve_group_tag(tag_id, str(me.usergroup_id), db)
+    link = db.query(POITrackerLink).filter(
+        POITrackerLink.poi_id == location_id,
+        POITrackerLink.tracker_id == tag_id,
+    ).first()
+    if link:
+        if link.is_armed:
+            return {"detail": "Already armed"}
+        link.is_armed = True
+        link.armed_at = datetime.utcnow()
+        link.disarmed_at = None
+        link.last_known_state = GeofenceState.UNKNOWN
+    else:
+        link = POITrackerLink(
+            poi_id=location_id,
+            tracker_id=tag_id,
+            is_armed=True,
+            last_known_state=GeofenceState.UNKNOWN,
+        )
+        db.add(link)
+    db.commit()
+    return {"detail": "Armed", "location": _poi_dict(poi, db, str(me.usergroup_id))}
+
+
+@router.delete("/locations/{location_id}/arm/{tag_id}")
+def disarm_location(
+    location_id: str, tag_id: str,
+    request: Request, db: Session = Depends(get_db),
+):
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    _get_group_poi(location_id, str(me.usergroup_id), db)
+    link = db.query(POITrackerLink).filter(
+        POITrackerLink.poi_id == location_id,
+        POITrackerLink.tracker_id == tag_id,
+    ).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Tag not armed to this location")
+    link.is_armed = False
+    link.disarmed_at = datetime.utcnow()
+    db.commit()
+    return {"detail": "Disarmed"}
+
+
+# ── Bulk upload via Excel ─────────────────────────────────────────────────────
+
+@router.get("/locations/template")
+def download_locations_template():
+    """Return an Excel (.xlsx) template for bulk location upload."""
+    if not _HAS_OPENPYXL:
+        raise HTTPException(status_code=501, detail="openpyxl not installed")
+    from fastapi.responses import StreamingResponse
+    wb = _openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Locations"
+    ws.append(["Postcode", "Name", "Description", "Radius (metres)"])
+    ws.append(["SW1A 1AA", "Buckingham Palace", "Example geofence", 200])
+    ws.column_dimensions["A"].width = 16
+    ws.column_dimensions["B"].width = 30
+    ws.column_dimensions["C"].width = 40
+    ws.column_dimensions["D"].width = 18
+    buf = _io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="locations_template.xlsx"'},
+    )
+
+
+@router.post("/locations/bulk-upload")
+async def bulk_upload_locations(
+    file: UploadFile = File(...),
+    request: Request = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Upload an Excel file with columns: Postcode, Name, Description, Radius.
+    Geocodes each row and creates a POI. Returns a summary of successes/failures.
+    """
+    if not _HAS_OPENPYXL:
+        raise HTTPException(status_code=501, detail="openpyxl not installed")
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    import asyncio as _asyncio
+
+    contents = await file.read()
+    try:
+        wb = _openpyxl.load_workbook(filename=_io.BytesIO(contents), read_only=True, data_only=True)
+        ws = wb.active
+    except Exception:
+        raise HTTPException(status_code=422, detail="Could not read Excel file. Please use the provided template.")
+
+    rows = list(ws.iter_rows(min_row=2, values_only=True))
+    if not rows:
+        raise HTTPException(status_code=422, detail="No data rows found (row 1 is the header)")
+
+    results = {"created": [], "failed": []}
+
+    for i, row in enumerate(rows, start=2):
+        postcode = str(row[0]).strip() if row[0] else ""
+        name     = str(row[1]).strip() if row[1] else ""
+        desc     = str(row[2]).strip() if len(row) > 2 and row[2] else None
+        try:
+            radius = float(row[3]) if len(row) > 3 and row[3] else 150.0
+            radius = max(50.0, min(radius, 50000.0))
+        except (TypeError, ValueError):
+            radius = 150.0
+
+        if not postcode or not name:
+            results["failed"].append({"row": i, "reason": "Postcode and Name are required"})
+            continue
+
+        try:
+            geo = await _geocode_postcode(postcode)
+            poi = POI(
+                usergroup_id=str(me.usergroup_id),
+                user_id=None,
+                name=name,
+                description=desc,
+                poi_type="single",
+                latitude=geo["lat"],
+                longitude=geo["lon"],
+                radius=radius,
+                address=geo["display"],
+                is_active=True,
+            )
+            db.add(poi)
+            db.flush()
+            results["created"].append({"row": i, "name": name, "postcode": postcode, "id": str(poi.id)})
+        except HTTPException as exc:
+            results["failed"].append({"row": i, "name": name, "postcode": postcode, "reason": exc.detail})
+        # Nominatim rate-limit: 1 req/s
+        await _asyncio.sleep(1.1)
+
+    db.commit()
+    return {
+        "total":   len(rows),
+        "created": len(results["created"]),
+        "failed":  len(results["failed"]),
+        "details": results,
+    }
+
+
+def _resolve_group_tag(tag_id: str, usergroup_id: str, db: Session) -> BLETag:
+    """Return a BLETag that belongs to the given group, or raise 404."""
+    group = db.query(UserGroup).filter(UserGroup.id == usergroup_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+    tag = db.query(BLETag).filter(BLETag.id == tag_id).first()
+    if not tag:
+        raise HTTPException(status_code=404, detail="Tag not found")
+    # Verify the tag's owning user belongs to this group (by email domain)
+    owner = db.query(User).filter(User.id == tag.user_id).first()
+    if not owner:
+        raise HTTPException(status_code=404, detail="Tag owner not found")
+    if group.email_domain and not owner.email.lower().endswith("@" + group.email_domain.lstrip("@").lower()):
+        raise HTTPException(status_code=403, detail="Tag does not belong to your group")
+    return tag
+
