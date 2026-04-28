@@ -167,10 +167,10 @@ class LocationPollerService:
 
                     updated_count += 1
 
-            # ── Poll MZone tags ───────────────────────────────────────────
-            if mzone_trackers:
-                imeis = [tracker.imei for tracker in mzone_trackers]
-                logger.info(f"📡 Polling {len(imeis)} MZone trackers")
+            # ── Poll Series 1 / MZone tags ────────────────────────────────────
+            if series1_trackers:
+                imeis = [tracker.imei for tracker in series1_trackers]
+                logger.info(f"📡 Polling {len(imeis)} Series 1 / MZone trackers")
                 vehicles = self.mzone_service.get_vehicles_with_locations(imeis)
 
                 vehicle_map = {}
@@ -182,9 +182,9 @@ class LocationPollerService:
                             vehicle_map[imei] = v
                             break
 
-                logger.info(f"🗺️  Built vehicle map with {len(vehicle_map)} entries for {len(imeis)} MZone trackers")
+                logger.info(f"🗺️  Built vehicle map with {len(vehicle_map)} entries for {len(imeis)} Series 1 trackers")
 
-                for tracker in mzone_trackers:
+                for tracker in series1_trackers:
                     vehicle = vehicle_map.get(tracker.imei)
                     if not vehicle:
                         logger.warning(f"⚠️  No vehicle data found for tracker IMEI: {tracker.imei}")
@@ -239,7 +239,7 @@ class LocationPollerService:
             # Commit all updates
             db.commit()
             logger.info(f"✅ Updated {updated_count} tracker positions and checked geofences "
-                        f"({len(tracksolid_trackers)} TrackSolid, {len(mzone_trackers)} MZone)")
+                        f"({len(series2_trackers)} Series 2 / TrackSolid, {len(series1_trackers)} Series 1 / MZone)")
             
         except Exception as e:
             logger.error(f"❌ Error in _poll_locations: {str(e)}")
