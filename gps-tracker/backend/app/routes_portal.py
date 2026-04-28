@@ -13,6 +13,7 @@ from uuid import UUID
 from pydantic import BaseModel, EmailStr
 import jwt
 import os
+import secrets
 import logging
 
 from app.database import get_db
@@ -20,6 +21,9 @@ from app.models import UserGroup, UserGroupPackage, PortalUser, Building, Floor,
 from app.models_admin import TagPackage
 from app.admin_auth import hash_password, verify_password
 from app.services.device_providers.provider_factory import DeviceProviderFactory
+from app.services.email_service import EmailService as _EmailService
+
+_email_svc_portal = _EmailService()
 
 # Alias map shared by create_tag and validate_tag_portal
 _TAG_TYPE_ALIAS = {"series1": "scope", "series2": "tracksolid"}
@@ -2142,4 +2146,66 @@ def _resolve_group_tag(tag_id: str, usergroup_id: str, db: Session) -> BLETag:
     if group.email_domain and not owner.email.lower().endswith("@" + group.email_domain.lstrip("@").lower()):
         raise HTTPException(status_code=403, detail="Tag does not belong to your group")
     return tag
+
+
+# ---------------------------------------------------------------------------
+# Portal password reset — PIN-based (no database table required)
+# ---------------------------------------------------------------------------
+
+# In-memory store:  { email.lower(): {"pin": str, "expires": datetime} }
+_portal_reset_pins: dict = {}
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+    pin: str
+    new_password: str
+
+
+@router.post("/auth/forgot-password", status_code=200)
+def forgot_password(data: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Generate a 6-digit PIN and email it to the portal user.
+    Always returns 200 to avoid leaking account existence.
+    """
+    email = data.email.strip().lower()
+    user = db.query(PortalUser).filter(PortalUser.email == email).first()
+    if user:
+        pin = str(secrets.randbelow(900000) + 100000)  # 100000–999999
+        _portal_reset_pins[email] = {
+            "pin": pin,
+            "expires": datetime.utcnow() + timedelta(minutes=15),
+        }
+        # Reuse the existing send_password_reset_email — pass the PIN as the token
+        try:
+            _email_svc_portal.send_password_reset_email(
+                to_email=user.email,
+                reset_token=pin,
+                first_name=user.name.split()[0] if user.name else None,
+            )
+        except Exception:
+            logger.exception("Failed to send portal password reset PIN to %s", email)
+    return {"detail": "If that email is registered you will receive a reset PIN shortly."}
+
+
+@router.post("/auth/reset-password", status_code=200)
+def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """Validate the PIN and update the portal user's password."""
+    email = data.email.strip().lower()
+    entry = _portal_reset_pins.get(email)
+    if not entry or datetime.utcnow() > entry["expires"] or entry["pin"] != data.pin.strip():
+        raise HTTPException(status_code=400, detail="Invalid or expired PIN")
+    if len(data.new_password) < 8:
+        raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
+    user = db.query(PortalUser).filter(PortalUser.email == email).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired PIN")
+    user.hashed_password = hash_password(data.new_password)
+    db.commit()
+    del _portal_reset_pins[email]
+    return {"detail": "Password reset successfully"}
 

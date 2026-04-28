@@ -75,7 +75,59 @@
             <button type="submit" class="btn btn-primary btn-full" id="loginBtn">
                 <i class="fa-solid fa-right-to-bracket"></i> Sign In
             </button>
+            <div style="text-align:center;margin-top:10px">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="showForgotPassword()" style="font-size:.82rem;color:var(--text-3)">
+                    Forgot password?
+                </button>
+            </div>
         </form>
+    </div>
+</div>
+
+<!-- ══════════════════ FORGOT PASSWORD OVERLAY ══════════════════ -->
+<div id="forgotPasswordOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:none;align-items:center;justify-content:center">
+    <div style="background:var(--bg,#fff);border-radius:12px;padding:32px;width:100%;max-width:380px;box-shadow:0 8px 40px rgba(0,0,0,.25);position:relative">
+        <button onclick="hideForgotPassword()" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--text-3)">&times;</button>
+        <!-- Step 1: enter email -->
+        <div id="fpStep1">
+            <h3 style="margin:0 0 6px;font-size:1.1rem">Reset your password</h3>
+            <p style="margin:0 0 16px;font-size:.85rem;color:var(--text-3)">Enter your account email and we'll send you a 6-digit PIN.</p>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="fpEmail" placeholder="you@company.com" autocomplete="email" style="width:100%">
+            </div>
+            <div id="fpStep1Error" style="display:none;color:#ef4444;font-size:.82rem;margin-bottom:8px"></div>
+            <button class="btn btn-primary btn-full" onclick="fpRequestPin()">
+                <i class="fa-solid fa-paper-plane"></i> Send PIN
+            </button>
+        </div>
+        <!-- Step 2: enter PIN + new password -->
+        <div id="fpStep2" style="display:none">
+            <h3 style="margin:0 0 6px;font-size:1.1rem">Enter your PIN</h3>
+            <p style="margin:0 0 16px;font-size:.85rem;color:var(--text-3)">Check your email for a 6-digit PIN (valid 15 minutes).</p>
+            <div class="form-group">
+                <label>PIN</label>
+                <input type="text" id="fpPin" placeholder="123456" maxlength="6" autocomplete="one-time-code" style="width:100%;letter-spacing:.2em;font-size:1.1rem">
+            </div>
+            <div class="form-group">
+                <label>New password</label>
+                <input type="password" id="fpNewPassword" placeholder="••••••••" autocomplete="new-password" style="width:100%">
+            </div>
+            <div id="fpStep2Error" style="display:none;color:#ef4444;font-size:.82rem;margin-bottom:8px"></div>
+            <button class="btn btn-primary btn-full" onclick="fpResetPassword()">
+                <i class="fa-solid fa-lock"></i> Set new password
+            </button>
+            <button class="btn btn-ghost btn-sm btn-full" onclick="fpGoBack()" style="margin-top:8px">
+                <i class="fa-solid fa-arrow-left"></i> Back
+            </button>
+        </div>
+        <!-- Step 3: success -->
+        <div id="fpStep3" style="display:none;text-align:center">
+            <i class="fa-solid fa-circle-check" style="font-size:2.5rem;color:#10b981;margin-bottom:12px"></i>
+            <h3 style="margin:0 0 6px;font-size:1.1rem">Password updated!</h3>
+            <p style="margin:0 0 20px;font-size:.85rem;color:var(--text-3)">You can now sign in with your new password.</p>
+            <button class="btn btn-primary btn-full" onclick="hideForgotPassword()">Back to Sign In</button>
+        </div>
     </div>
 </div>
 
@@ -100,13 +152,6 @@
         <span id="pageTitle" style="font-size:1rem;font-weight:600;color:var(--text);flex:1;padding-left:16px"></span>
 
         <div class="header-right">
-            <button id="theme-toggle" title="Toggle light / dark mode" onclick="toggleTheme()">
-                <i id="themeIcon" class="fa-solid fa-sun"></i>
-            </button>
-            <div style="font-size:13px;color:var(--text-3);text-align:right">
-                <strong id="sidebarUserName" style="display:block;color:var(--text-2)">—</strong>
-                <small id="sidebarCompany">—</small>
-            </div>
             <div class="notif-wrap" id="notifWrap">
                 <button id="notif-btn" title="Alerts inbox" onclick="toggleNotifPanel(event)">
                     <i class="fa-solid fa-bell"></i>
@@ -124,6 +169,13 @@
                         </button>
                     </div>
                 </div>
+            </div>
+            <button id="theme-toggle" title="Toggle light / dark mode" onclick="toggleTheme()">
+                <i id="themeIcon" class="fa-solid fa-sun"></i>
+            </button>
+            <div style="font-size:13px;color:var(--text-3);text-align:right">
+                <strong id="sidebarUserName" style="display:block;color:var(--text-2)">—</strong>
+                <small id="sidebarCompany">—</small>
             </div>
             <div class="avatar-menu-wrap" id="avatarMenuWrap">
                 <div class="header-avatar" id="headerAvatar" title="Account menu" onclick="toggleAvatarMenu(event)" style="cursor:pointer">—</div>
@@ -219,7 +271,7 @@
                 <span class="nav-label">Journey Log</span>
             </button>
 
-            <button class="nav-item" data-tab="reports-geofence" onclick="switchTab('reports-geofence')">
+            <button class="nav-item" data-tab="reports-geofence" onclick="switchTab('reports-geofence')" style="display:none">
                 <span class="nav-icon"><i class="fa-solid fa-draw-polygon"></i></span>
                 <span class="nav-label">Geofence Events</span>
             </button>
@@ -1631,7 +1683,7 @@
                 <div class="rpt-toolbar">
                     <div class="search-input-wrap" style="flex:1;max-width:280px">
                         <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                        <input type="text" id="rpt-sub-search" placeholder="Search tag, user or package…"
+                        <input type="text" class="search-input" id="rpt-sub-search" placeholder="Search tag, user or package…"
                                oninput="rptSubFilter()">
                     </div>
                     <select id="rpt-sub-pkg-filter" onchange="rptSubFilter()" style="min-width:160px">
@@ -1693,7 +1745,7 @@
                 <div class="rpt-toolbar">
                     <div class="search-input-wrap" style="flex:1;max-width:280px">
                         <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                        <input type="text" id="rpt-act-search" placeholder="Search tag, user, category…" oninput="rptActFilter()">
+                        <input type="text" class="search-input" id="rpt-act-search" placeholder="Search tag, user, category…" oninput="rptActFilter()">
                     </div>
                     <select id="rpt-act-cat-filter" onchange="rptActFilter()" style="min-width:160px">
                         <option value="">All categories</option>
@@ -1792,7 +1844,7 @@
             </div>
 
             <!-- ═══ REPORTS — Geofence Events ═══ -->
-            <div id="tab-reports-geofence" class="tab-content">
+            <div id="tab-reports-geofence" class="tab-content" style="display:none">
                 <div class="rpt-toolbar">
                     <select id="rpt-geo-days" onchange="rptGeoLoad()" style="min-width:130px">
                         <option value="7">Last 7 days</option>
@@ -2427,6 +2479,78 @@ function _generateCaptcha() {
     if (inp) inp.value = '';
 }
 
+// ══════════════════════════════════════════
+// Forgot / Reset password
+// ══════════════════════════════════════════
+function showForgotPassword() {
+    const overlay = document.getElementById('forgotPasswordOverlay');
+    document.getElementById('fpStep1').style.display = '';
+    document.getElementById('fpStep2').style.display = 'none';
+    document.getElementById('fpStep3').style.display = 'none';
+    document.getElementById('fpStep1Error').style.display = 'none';
+    document.getElementById('fpEmail').value = '';
+    if (overlay) { overlay.style.display = 'flex'; }
+}
+function hideForgotPassword() {
+    const overlay = document.getElementById('forgotPasswordOverlay');
+    if (overlay) overlay.style.display = 'none';
+}
+function fpGoBack() {
+    document.getElementById('fpStep1').style.display = '';
+    document.getElementById('fpStep2').style.display = 'none';
+    document.getElementById('fpStep1Error').style.display = 'none';
+    document.getElementById('fpStep2Error').style.display = 'none';
+}
+async function fpRequestPin() {
+    const emailEl = document.getElementById('fpEmail');
+    const errEl   = document.getElementById('fpStep1Error');
+    errEl.style.display = 'none';
+    const email = emailEl?.value?.trim();
+    if (!email) { errEl.textContent = 'Please enter your email.'; errEl.style.display = ''; return; }
+    try {
+        const res = await fetch('/api/portal/auth/forgot-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+        });
+        // Always 200; proceed regardless
+        document.getElementById('fpStep1').style.display = 'none';
+        document.getElementById('fpStep2').style.display = '';
+        document.getElementById('fpPin').value = '';
+        document.getElementById('fpNewPassword').value = '';
+        document.getElementById('fpStep2Error').style.display = 'none';
+    } catch (err) {
+        errEl.textContent = 'Network error. Please try again.';
+        errEl.style.display = '';
+    }
+}
+async function fpResetPassword() {
+    const email    = document.getElementById('fpEmail')?.value?.trim();
+    const pin      = document.getElementById('fpPin')?.value?.trim();
+    const newPass  = document.getElementById('fpNewPassword')?.value;
+    const errEl    = document.getElementById('fpStep2Error');
+    errEl.style.display = 'none';
+    if (!pin || !newPass) { errEl.textContent = 'Please fill in all fields.'; errEl.style.display = ''; return; }
+    try {
+        const res = await fetch('/api/portal/auth/reset-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, pin, new_password: newPass }),
+        });
+        if (!res.ok) {
+            const detail = await res.json().then(j => j.detail || 'Invalid or expired PIN').catch(() => 'Invalid or expired PIN');
+            errEl.textContent = detail;
+            errEl.style.display = '';
+            return;
+        }
+        document.getElementById('fpStep2').style.display = 'none';
+        document.getElementById('fpStep3').style.display = '';
+    } catch (err) {
+        errEl.textContent = 'Network error. Please try again.';
+        errEl.style.display = '';
+    }
+}
+
 async function handleLogin(e) {
     e.preventDefault();
     const errEl = document.getElementById('loginError');
@@ -2502,6 +2626,7 @@ document.addEventListener('click', function(e) {
 });
 
 function handleLogout() {
+    if (!confirm('Are you sure you want to sign out?')) return;
     closeAvatarMenu();
     clearSession();
     document.getElementById('dashboardPage').style.display = 'none';
@@ -2530,7 +2655,7 @@ function applyNavFeatures(features) {
         'Tracking':   ['livemap', 'floorplan', 'assets', 'history'],
         'Management': ['asset-mgmt', 'users', 'qr', 'building', 'locations', 'settings'],
         'Reports':    ['reports-subscriptions', 'reports-activity', 'reports-trips',
-                       'reports-geofence', 'reports-battery', 'reports-alerts'],
+                       'reports-battery', 'reports-alerts'],
     };
     document.querySelectorAll('.nav-section').forEach(sec => {
         const labelEl = sec.querySelector('.nav-section-label');
@@ -2603,7 +2728,7 @@ applyTheme(localStorage.getItem('pp-theme') || 'dark');
 // ══════════════════════════════════════════
 // Tab switching
 // ══════════════════════════════════════════
-const TAB_TITLES = { livemap: 'Live Map', assets: 'Asset List', history: 'Movement History', 'asset-mgmt': 'Asset Management', locations: 'Locations', users: 'User Accounts', building: 'Floor Plan Sketch', floorplan: 'Floor Plan', settings: 'Settings', qr: 'QR / NFC Tags', 'reports-subscriptions': 'Tag Subscriptions Report', 'reports-activity': 'Asset Activity Summary', 'reports-trips': 'Movement / Journey Log', 'reports-geofence': 'Geofence Events', 'reports-battery': 'Battery & Offline Report', 'reports-alerts': 'Alerts Inbox' };
+const TAB_TITLES = { livemap: 'Live Map', assets: 'Asset List', history: 'Movement History', 'asset-mgmt': 'Asset Management', locations: 'Locations', users: 'User Accounts', building: 'Floor Plan Sketch', floorplan: 'Floor Plan', settings: 'Settings', qr: 'QR / NFC Tags', 'reports-subscriptions': 'Tag Subscriptions Report', 'reports-activity': 'Asset Activity Summary', 'reports-trips': 'Movement / Journey Log', 'reports-battery': 'Battery & Offline Report', 'reports-alerts': 'Alerts Inbox' };
 let _mapInitialized = false;
 
 function switchTab(name) {
@@ -3138,7 +3263,8 @@ async function submitTagForm(e) {
 let _settingsCache   = null;   // /api/portal/settings (email_domain etc.)
 let _themeCache      = null;   // /api/portal/theme
 let _notifCache      = null;   // /api/portal/notifications
-let _logoDataPending = undefined; // undefined = unchanged; null = remove; string = new data-URL
+let _logoDataPending     = undefined; // undefined = unchanged; null = remove; string = new data-URL
+let _logoDarkDataPending = undefined; // same semantics for dark-mode logo
 
 async function loadSettings() {
     const isAdmin = getSession().user?.is_group_admin;
@@ -3159,7 +3285,8 @@ async function _loadSettingsTheme(isAdmin) {
         const res = await apiFetch('/api/portal/theme');
         if (!res.ok) throw new Error(await safeJsonDetail(res, 'Failed'));
         _themeCache = await res.json();
-        _logoDataPending = undefined;
+        _logoDataPending     = undefined;
+        _logoDarkDataPending = undefined;
     } catch (_) {
         _themeCache = {};
     }
@@ -3168,7 +3295,7 @@ async function _loadSettingsTheme(isAdmin) {
     if (loading) loading.style.display = 'none';
     if (body)    body.style.display    = '';
 
-    // Logo preview
+    // Logo preview (light)
     const img      = document.getElementById('logo-preview-img');
     const none     = document.getElementById('logo-preview-none');
     const removeBtn= document.getElementById('logo-remove-btn');
@@ -3184,6 +3311,22 @@ async function _loadSettingsTheme(isAdmin) {
             if (removeBtn) removeBtn.style.display = 'none';
         }
     }
+    // Logo preview (dark)
+    const imgDark      = document.getElementById('logo-dark-preview-img');
+    const noneDark     = document.getElementById('logo-dark-preview-none');
+    const removeBtnDark= document.getElementById('logo-dark-remove-btn');
+    if (imgDark && noneDark) {
+        if (_themeCache?.logo_dark_data) {
+            imgDark.src = _themeCache.logo_dark_data;
+            imgDark.style.display = '';
+            noneDark.style.display = 'none';
+            if (removeBtnDark) removeBtnDark.style.display = '';
+        } else {
+            imgDark.style.display = 'none';
+            noneDark.style.display = '';
+            if (removeBtnDark) removeBtnDark.style.display = 'none';
+        }
+    }
 
     // Color swatches
     const primary = _themeCache?.theme_primary || '';
@@ -3192,7 +3335,7 @@ async function _loadSettingsTheme(isAdmin) {
     _setColorDisplayRow('accent',  accent);
 
     // Admin-only controls
-    const controls   = document.querySelectorAll('#appearance-logo-controls, #color-primary-control, #color-accent-control, #appearance-save-row');
+    const controls   = document.querySelectorAll('#appearance-logo-controls, #appearance-logo-dark-controls, #color-primary-control, #color-accent-control, #appearance-save-row');
     const viewPrimary = document.getElementById('color-primary-view');
     const viewAccent  = document.getElementById('color-accent-view');
     controls.forEach(el => { if (el) el.style.display = isAdmin ? 'flex' : 'none'; });
@@ -3259,6 +3402,36 @@ function settingsLogoRemove() {
     if (removeBtn) removeBtn.style.display = 'none';
 }
 
+function settingsLogoDarkFileChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 512 * 1024) {
+        alert('Logo must be under 512 KB.');
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = ev => {
+        _logoDarkDataPending = ev.target.result;
+        const img  = document.getElementById('logo-dark-preview-img');
+        const none = document.getElementById('logo-dark-preview-none');
+        const removeBtn = document.getElementById('logo-dark-remove-btn');
+        if (img)  { img.src = _logoDarkDataPending; img.style.display = ''; }
+        if (none) none.style.display = 'none';
+        if (removeBtn) removeBtn.style.display = '';
+    };
+    reader.readAsDataURL(file);
+}
+
+function settingsLogoDarkRemove() {
+    _logoDarkDataPending = null;
+    const img  = document.getElementById('logo-dark-preview-img');
+    const none = document.getElementById('logo-dark-preview-none');
+    const removeBtn = document.getElementById('logo-dark-remove-btn');
+    if (img)  { img.src = ''; img.style.display = 'none'; }
+    if (none) none.style.display = '';
+    if (removeBtn) removeBtn.style.display = 'none';
+}
+
 async function settingsSaveAppearance() {
     const btn     = document.getElementById('appearance-save-btn');
     const alertEl = document.getElementById('appearance-alert');
@@ -3273,6 +3446,9 @@ async function settingsSaveAppearance() {
     if (_logoDataPending !== undefined) {
         payload.logo_data = _logoDataPending;  // null = clear, string = new logo
     }
+    if (_logoDarkDataPending !== undefined) {
+        payload.logo_dark_data = _logoDarkDataPending;
+    }
 
     try {
         const res = await apiFetch('/api/portal/theme', {
@@ -3282,7 +3458,8 @@ async function settingsSaveAppearance() {
         });
         if (!res.ok) throw new Error(await safeJsonDetail(res, 'Save failed'));
         _themeCache = await res.json();
-        _logoDataPending = undefined;
+        _logoDataPending     = undefined;
+        _logoDarkDataPending = undefined;
         applyBranding(_themeCache);
         alertTx.textContent   = 'Appearance saved.';
         alertEl.className     = 'alert alert-success';
@@ -3927,7 +4104,7 @@ function rptTripsExportCSV() {
         Number(trip.distance || 0).toFixed(2),
         trip.startLocationDescription || '', trip.endLocationDescription || '',
     ]);
-    _rptDownloadCSV([cols, ...rows], 'trip-log');
+    _rptDownloadCSV([cols, ...rows], 'journey-log');
 }
 
 // ══════════════════════════════════════════
