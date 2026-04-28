@@ -906,11 +906,26 @@ def list_active_packages(request: Request, db: Session = Depends(get_db)):
 # Mobile users — list mobile-app Users in the group's email domain
 # ---------------------------------------------------------------------------
 
+class MobileUserTagOut(BaseModel):
+    id: UUID
+    imei: str
+    description: Optional[str] = None
+    activation_date: Optional[datetime] = None
+    expiry_date: Optional[datetime] = None
+    days_remaining: Optional[int] = None
+    package_name: Optional[str] = None
+    is_active: bool = True
+
+    class Config:
+        from_attributes = True
+
+
 class MobileUserOut(BaseModel):
     id: UUID
     email: str
     first_name: Optional[str]
     last_name: Optional[str]
+    tags: List[MobileUserTagOut] = []
 
     class Config:
         from_attributes = True
@@ -919,7 +934,7 @@ class MobileUserOut(BaseModel):
 @router.get("/mobile-users", response_model=List[MobileUserOut])
 def list_mobile_users(request: Request, db: Session = Depends(get_db)):
     """Return all active mobile-app Users whose email domain matches the group's
-    configured email_domain. Used to populate the assign-tag dropdown."""
+    configured email_domain, with their assigned tags."""
     me = get_portal_user_from_request(request, db)
     group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
     if not group or not group.email_domain:
@@ -931,8 +946,45 @@ def list_mobile_users(request: Request, db: Session = Depends(get_db)):
         .order_by(User.email)
         .all()
     )
-    return [MobileUserOut(id=u.id, email=u.email, first_name=u.first_name, last_name=u.last_name)
-            for u in users]
+    # Fetch all tags for these users in one query
+    user_ids = [u.id for u in users]
+    tags_rows = (
+        db.query(BLETag)
+        .filter(BLETag.user_id.in_(user_ids))
+        .order_by(BLETag.added_at.desc())
+        .all()
+    ) if user_ids else []
+    # Build package lookup
+    pkg_ids = {t.package_id for t in tags_rows if t.package_id}
+    pkg_map: dict = {}
+    if pkg_ids:
+        for p in db.query(TagPackage).filter(TagPackage.id.in_(pkg_ids)).all():
+            pkg_map[str(p.id)] = p.name
+    # Group tags by user_id
+    from collections import defaultdict
+    tags_by_user: dict = defaultdict(list)
+    for tag in tags_rows:
+        days_remaining = None
+        if tag.expiry_date:
+            days_remaining = (tag.expiry_date.replace(tzinfo=None) - datetime.utcnow()).days
+        tags_by_user[str(tag.user_id)].append(MobileUserTagOut(
+            id=tag.id,
+            imei=tag.imei,
+            description=tag.description,
+            activation_date=tag.activation_date,
+            expiry_date=tag.expiry_date,
+            days_remaining=days_remaining,
+            package_name=pkg_map.get(str(tag.package_id)) if tag.package_id else None,
+            is_active=tag.is_active,
+        ))
+    return [
+        MobileUserOut(
+            id=u.id, email=u.email,
+            first_name=u.first_name, last_name=u.last_name,
+            tags=tags_by_user.get(str(u.id), [])
+        )
+        for u in users
+    ]
 
 
 # ---------------------------------------------------------------------------

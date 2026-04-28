@@ -2076,3 +2076,15 @@ html[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator,
 html[data-theme="dark"] input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   filter: invert(1);
 }
+
+/* ── End-user accordion expand rows ─────────────────────────── */
+.eu-user-row:hover td { background: var(--bg-3, var(--bg-2)); }
+.eu-chevron {
+    display: inline-block;
+    font-size: 1.2rem; line-height: 1;
+    color: var(--text-3);
+    transition: transform .2s ease, color .2s;
+    user-select: none;
+}
+.eu-user-row:hover .eu-chevron { color: var(--primary); }
+.eu-imei-row td { padding: 0 !important; }
