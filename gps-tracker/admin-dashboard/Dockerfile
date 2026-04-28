@@ -1,12 +1,16 @@
-FROM nginx:alpine
+FROM node:18-alpine
 
-# Copy nginx config
-COPY nginx-admin.conf /etc/nginx/conf.d/default.conf
+WORKDIR /app
 
-# Copy ALL admin portal HTML files and assets
-COPY public/ /usr/share/nginx/html/
+# Copy package files
+COPY package*.json ./
 
-# Expose port
-EXPOSE 80
+# Install dependencies
+RUN npm install
 
-CMD ["nginx", "-g", "daemon off;"]
+# Copy application code
+COPY . .
+
+EXPOSE 3000
+
+CMD ["npm", "run", "dev"]

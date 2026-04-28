@@ -68,7 +68,7 @@ services:
 
   admin-portal:
     build:
-      context: ./admin-dashboard
+      context: ./admin-portal
       dockerfile: Dockerfile
     container_name: pinplot_admin
     ports:
