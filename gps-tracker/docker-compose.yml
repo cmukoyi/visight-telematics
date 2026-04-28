@@ -56,7 +56,7 @@ services:
       start_period: 20s
     volumes:
       - nginx_logs:/var/log/nginx:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - DEBUG=False
       - ENVIRONMENT=production

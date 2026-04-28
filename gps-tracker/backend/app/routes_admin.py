@@ -1745,14 +1745,19 @@ def delete_room(room_id: str, request: Request, db: Session = Depends(get_db)):
 
 # ---------------------------------------------------------------------------
 # Health / Diagnostics
+# Uses the Docker daemon Unix socket directly — no docker CLI needed.
+# The socket is already mounted: /var/run/docker.sock:/var/run/docker.sock:ro
 # ---------------------------------------------------------------------------
 
-import subprocess
 import shutil
 import platform
+import socket as _socket
+import json as _json
+import urllib.parse
 
 
-# Containers we care about, in display order
+DOCKER_SOCK = "/var/run/docker.sock"
+
 _KNOWN_CONTAINERS = [
     "pinplot_nginx",
     "pinplot_backend",
@@ -1776,67 +1781,159 @@ _FRIENDLY = {
 }
 
 
-def _docker_available() -> bool:
-    return shutil.which("docker") is not None
+def _docker_sock_available() -> bool:
+    return os.path.exists(DOCKER_SOCK)
 
 
-def _run_docker(*args, timeout: int = 10) -> str:
-    result = subprocess.run(
-        ["docker", *args],
-        capture_output=True, text=True, timeout=timeout
-    )
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or "docker command failed")
-    return result.stdout.strip()
+def _docker_request(method: str, path: str, body: dict | None = None, timeout: int = 10) -> tuple[int, any]:
+    """
+    Send an HTTP request to the Docker daemon over the Unix socket.
+    Returns (status_code, parsed_json_body).
+    """
+    sock = _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM)
+    sock.settimeout(timeout)
+    try:
+        sock.connect(DOCKER_SOCK)
+        payload_bytes = _json.dumps(body).encode() if body else b""
+        headers = (
+            f"{method} {path} HTTP/1.1\r\n"
+            f"Host: localhost\r\n"
+            f"Content-Type: application/json\r\n"
+            f"Content-Length: {len(payload_bytes)}\r\n"
+            f"Connection: close\r\n"
+            f"\r\n"
+        )
+        sock.sendall(headers.encode() + payload_bytes)
+
+        # Read the full response
+        chunks = []
+        while True:
+            chunk = sock.recv(65536)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        raw = b"".join(chunks).decode("utf-8", errors="replace")
+
+        # Split HTTP response
+        header_end = raw.find("\r\n\r\n")
+        if header_end == -1:
+            return 500, {}
+        header_part = raw[:header_end]
+        body_part   = raw[header_end + 4:]
+
+        # Parse status code from first line
+        first_line = header_part.split("\r\n")[0]
+        status_code = int(first_line.split(" ")[1]) if len(first_line.split(" ")) > 1 else 500
+
+        # Handle chunked transfer encoding
+        transfer = ""
+        for line in header_part.split("\r\n"):
+            if line.lower().startswith("transfer-encoding:"):
+                transfer = line.split(":", 1)[1].strip().lower()
+        if transfer == "chunked":
+            body_part = _decode_chunked(body_part)
+
+        try:
+            parsed = _json.loads(body_part) if body_part.strip() else {}
+        except Exception:
+            parsed = {}
+        return status_code, parsed
+    finally:
+        sock.close()
+
+
+def _decode_chunked(data: str) -> str:
+    """Decode HTTP chunked transfer encoding."""
+    result = []
+    while data:
+        nl = data.find("\r\n")
+        if nl == -1:
+            break
+        size = int(data[:nl], 16)
+        if size == 0:
+            break
+        chunk = data[nl + 2: nl + 2 + size]
+        result.append(chunk)
+        data = data[nl + 2 + size + 2:]
+    return "".join(result)
 
 
 def _container_status(name: str) -> dict:
+    base = {
+        "name": name,
+        "friendly": _FRIENDLY.get(name, name),
+        "status": "absent",
+        "health": "—",
+        "image": "—",
+        "started_at": None,
+        "restarts": 0,
+        "cpu": "—",
+        "mem": "—",
+        "present": False,
+    }
     try:
-        fmt = "{{.State.Status}}|{{.State.Health.Status}}|{{.Config.Image}}|{{.State.StartedAt}}|{{.RestartCount}}"
-        raw = _run_docker("inspect", "--format", fmt, name)
-        parts = raw.split("|")
-        state, health, image, started_at, restarts = (parts + [""] * 5)[:5]
-        try:
-            stats_raw = _run_docker("stats", "--no-stream", "--format",
-                                     "{{.CPUPerc}}|{{.MemUsage}}", name, timeout=8)
-            cpu, mem = (stats_raw.split("|") + ["", ""])[:2]
-        except Exception:
-            cpu, mem = "—", "—"
+        code, data = _docker_request("GET", f"/containers/{name}/json")
+        if code == 404:
+            return base
+        if code != 200:
+            base["status"] = "error"
+            return base
+
+        state   = data.get("State", {})
+        config  = data.get("Config", {})
+        restart = data.get("RestartCount", 0)
+        health  = state.get("Health", {})
+
+        status_str = state.get("Status", "unknown")
+        health_str = health.get("Status", "—") if health else "—"
+        image_str  = config.get("Image", "—")
+        started_at = state.get("StartedAt", None)
+
+        cpu_pct = "—"
+        mem_str = "—"
+        if status_str == "running":
+            try:
+                scode, stats = _docker_request("GET", f"/containers/{name}/stats?stream=false", timeout=8)
+                if scode == 200 and stats:
+                    cpu_delta  = stats["cpu_stats"]["cpu_usage"]["total_usage"] - stats["precpu_stats"]["cpu_usage"]["total_usage"]
+                    sys_delta  = stats["cpu_stats"]["system_cpu_usage"] - stats["precpu_stats"]["system_cpu_usage"]
+                    num_cpus   = stats["cpu_stats"].get("online_cpus") or len(stats["cpu_stats"]["cpu_usage"].get("percpu_usage", [1]))
+                    if sys_delta > 0:
+                        cpu_pct = f"{round(cpu_delta / sys_delta * num_cpus * 100, 1)}%"
+                    mem_usage = stats["memory_stats"].get("usage", 0)
+                    mem_limit = stats["memory_stats"].get("limit", 0)
+                    if mem_usage:
+                        mem_mb = mem_usage / 1024 / 1024
+                        lim_mb = mem_limit / 1024 / 1024
+                        mem_str = f"{mem_mb:.0f} MB / {lim_mb:.0f} MB"
+            except Exception:
+                pass
+
         return {
             "name": name,
             "friendly": _FRIENDLY.get(name, name),
-            "status": state,
-            "health": health or "—",
-            "image": image,
+            "status": status_str,
+            "health": health_str,
+            "image": image_str,
             "started_at": started_at,
-            "restarts": int(restarts) if str(restarts).isdigit() else 0,
-            "cpu": cpu.strip(),
-            "mem": mem.strip(),
+            "restarts": int(restart),
+            "cpu": cpu_pct,
+            "mem": mem_str,
             "present": True,
         }
     except Exception as exc:
-        return {
-            "name": name,
-            "friendly": _FRIENDLY.get(name, name),
-            "status": "absent",
-            "health": "—",
-            "image": "—",
-            "started_at": None,
-            "restarts": 0,
-            "cpu": "—",
-            "mem": "—",
-            "present": False,
-        }
+        base["health"] = str(exc)[:80]
+        return base
 
 
 @router.get("/health/containers")
 def health_containers(request: Request, db: Session = Depends(get_db)):
-    """Return status of all known containers. Requires manager role."""
+    """Return status of all known containers via Docker socket. Requires manager role."""
     admin = get_admin_from_request(request, db)
     if not check_role_permission(admin.role, "manager"):
         raise HTTPException(status_code=403, detail="Requires manager role")
-    if not _docker_available():
-        raise HTTPException(status_code=503, detail="docker CLI not available inside container")
+    if not _docker_sock_available():
+        raise HTTPException(status_code=503, detail="Docker socket not available — ensure /var/run/docker.sock is mounted")
     return [_container_status(n) for n in _KNOWN_CONTAINERS]
 
 
@@ -1851,7 +1948,7 @@ def container_action(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Start, stop, or restart a named container. Requires admin role."""
+    """Start, stop, or restart a named container via Docker socket. Requires admin role."""
     admin = get_admin_from_request(request, db)
     if not check_role_permission(admin.role, "admin"):
         raise HTTPException(status_code=403, detail="Requires admin role")
@@ -1859,14 +1956,20 @@ def container_action(
         raise HTTPException(status_code=400, detail="Unknown container")
     if body.action not in ("start", "stop", "restart"):
         raise HTTPException(status_code=400, detail="action must be start | stop | restart")
-    if not _docker_available():
-        raise HTTPException(status_code=503, detail="docker CLI not available")
+    if not _docker_sock_available():
+        raise HTTPException(status_code=503, detail="Docker socket not available")
     if body.action == "stop" and container_name == "pinplot_backend":
         raise HTTPException(status_code=400, detail="Cannot stop the backend from itself — use the server directly")
     try:
-        _run_docker(body.action, container_name, timeout=20)
+        code, resp = _docker_request("POST", f"/containers/{container_name}/{body.action}", timeout=25)
+        # Docker returns 204 (no content) on success, 304 if already in that state
+        if code not in (200, 204, 304):
+            msg = resp.get("message") if isinstance(resp, dict) else str(resp)
+            raise HTTPException(status_code=502, detail=f"Docker daemon error {code}: {msg}")
         return {"ok": True, "container": container_name, "action": body.action}
-    except RuntimeError as exc:
+    except HTTPException:
+        raise
+    except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
 
@@ -1879,7 +1982,6 @@ def health_system(request: Request, db: Session = Depends(get_db)):
 
     result: dict = {}
 
-    # Disk usage for /
     try:
         total, used, free = shutil.disk_usage("/")
         result["disk"] = {
@@ -1891,7 +1993,6 @@ def health_system(request: Request, db: Session = Depends(get_db)):
     except Exception:
         result["disk"] = None
 
-    # System uptime (/proc/uptime — Linux)
     try:
         with open("/proc/uptime") as f:
             uptime_secs = float(f.read().split()[0])
@@ -1902,7 +2003,6 @@ def health_system(request: Request, db: Session = Depends(get_db)):
     except Exception:
         result["uptime"] = "—"
 
-    # PostgreSQL DB size
     try:
         from sqlalchemy import text
         row = db.execute(text("SELECT pg_size_pretty(pg_database_size(current_database())) AS sz")).fetchone()
@@ -1910,7 +2010,6 @@ def health_system(request: Request, db: Session = Depends(get_db)):
     except Exception:
         result["db_size"] = "—"
 
-    # Key table row counts
     try:
         from sqlalchemy import text
         tables = ["users", "ble_tags", "app_logs", "audit_logs", "pois"]
