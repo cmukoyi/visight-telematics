@@ -2945,7 +2945,7 @@ async function submitTagForm(e) {
             _lmTags = [];
         }
         amRenderCards();   // immediately refresh asset management grid
-        loadGroupTags();   // keep tags tab table in sync
+        alRenderTable();   // keep asset list table in sync
     } catch (err) {
         const span = document.getElementById('tagMgmtAlertText');
         span.textContent = err.message;
@@ -6258,6 +6258,7 @@ async function deleteTag(tagId, imei) {
         if (res.status === 204 || res.ok) {
             _lmTags = _lmTags.filter(t => t.id !== tagId);
             amRenderCards();
+            alRenderTable();
         } else {
             const d = await res.json().catch(() => ({}));
             alert(d.detail || 'Failed to delete tag');

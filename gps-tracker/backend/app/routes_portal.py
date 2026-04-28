@@ -970,7 +970,8 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
     if data.description is not None:
         tag.description = data.description or None
     if data.tag_type is not None:
-        tag.tag_type = data.tag_type
+        # Normalise UI aliases ('series1'/'series2') to canonical DB values ('scope'/'tracksolid')
+        tag.tag_type = _TAG_TYPE_ALIAS.get(data.tag_type.lower(), data.tag_type.lower())
     if data.user_id is not None:
         target_user = db.query(User).filter(User.id == str(data.user_id)).first()
         _assert_user_in_domain(target_user, _domains(group))
