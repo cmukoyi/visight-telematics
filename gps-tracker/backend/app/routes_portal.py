@@ -538,6 +538,7 @@ def update_settings(
 
 class ThemeOut(BaseModel):
     logo_data: Optional[str] = None
+    logo_dark_data: Optional[str] = None
     theme_primary: Optional[str] = None
     theme_accent: Optional[str] = None
     history_retention_days: Optional[int] = 365
@@ -548,6 +549,7 @@ class ThemeOut(BaseModel):
 
 class ThemeUpdate(BaseModel):
     logo_data: Optional[str] = None          # base64 data-URL or None to clear
+    logo_dark_data: Optional[str] = None     # base64 data-URL (dark mode) or None to clear
     theme_primary: Optional[str] = None      # hex e.g. '#3b82f6' or None to reset
     theme_accent: Optional[str] = None
     history_retention_days: Optional[int] = None
@@ -583,6 +585,11 @@ def update_theme(
             raise HTTPException(status_code=400, detail="logo_data must be a data: URL")
         group.logo_data = data.logo_data or None
 
+    if data.logo_dark_data is not None:
+        if data.logo_dark_data and not data.logo_dark_data.startswith("data:image/"):
+            raise HTTPException(status_code=400, detail="logo_dark_data must be a data: URL")
+        group.logo_dark_data = data.logo_dark_data or None
+
     if data.theme_primary is not None:
         val = data.theme_primary.strip()
         if val and not val.startswith("#"):
@@ -616,6 +623,7 @@ class NotificationPrefsOut(BaseModel):
     notify_battery_low: bool
     notify_offline: bool
     notify_via_email: bool
+    notification_emails: Optional[List[str]] = None   # extra notification addresses
 
     class Config:
         from_attributes = True
@@ -627,6 +635,7 @@ class NotificationPrefsUpdate(BaseModel):
     notify_battery_low: Optional[bool] = None
     notify_offline: Optional[bool] = None
     notify_via_email: Optional[bool] = None
+    notification_emails: Optional[List[str]] = None   # None = do not change; [] = clear all extra
 
 
 @router.get("/notifications", response_model=NotificationPrefsOut)
@@ -654,6 +663,13 @@ def update_notification_prefs(
         me.notify_offline = data.notify_offline
     if data.notify_via_email is not None:
         me.notify_via_email = data.notify_via_email
+    if data.notification_emails is not None:
+        # Validate each entry is a plausible email
+        cleaned = [e.strip().lower() for e in data.notification_emails if e.strip()]
+        for addr in cleaned:
+            if '@' not in addr or '.' not in addr.split('@')[-1]:
+                raise HTTPException(status_code=400, detail=f"Invalid email address: {addr}")
+        me.notification_emails = cleaned if cleaned else None
     db.commit()
     db.refresh(me)
     return NotificationPrefsOut.model_validate(me)
@@ -683,6 +699,36 @@ def change_password(
     me.hashed_password = hash_password(data.new_password)
     db.commit()
     return {"detail": "Password updated successfully"}
+
+
+class ChangeEmailRequest(BaseModel):
+    new_email: str
+    current_password: str
+
+
+@router.post("/account/change-email", status_code=200)
+def change_email(
+    data: ChangeEmailRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Let the logged-in portal user change their own email address."""
+    me = get_portal_user_from_request(request, db)
+    if not verify_password(me.hashed_password, data.current_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    new_email = data.new_email.strip().lower()
+    if not new_email or '@' not in new_email:
+        raise HTTPException(status_code=400, detail="Invalid email address")
+    # Ensure no other portal user has this email
+    conflict = db.query(PortalUser).filter(
+        PortalUser.email == new_email,
+        PortalUser.id != str(me.id),
+    ).first()
+    if conflict:
+        raise HTTPException(status_code=409, detail="That email address is already in use")
+    me.email = new_email
+    db.commit()
+    return {"detail": "Email updated successfully", "new_email": new_email}
 
 
 # ---------------------------------------------------------------------------

@@ -255,7 +255,8 @@ class UserGroup(Base):
     created_at   = Column(DateTime(timezone=True), server_default=func.now())
     updated_at   = Column(DateTime(timezone=True), onupdate=func.now())
     # Branding / appearance (group admin configurable)
-    logo_data             = Column(Text, nullable=True)          # base64 data-URL
+    logo_data             = Column(Text, nullable=True)          # base64 data-URL (light mode)
+    logo_dark_data        = Column(Text, nullable=True)          # base64 data-URL (dark mode)
     theme_primary         = Column(String(20), nullable=True)    # hex e.g. '#3b82f6'
     theme_accent          = Column(String(20), nullable=True)    # secondary hex
     # Data retention
@@ -333,6 +334,7 @@ class PortalUser(Base):
     notify_battery_low   = Column(Boolean, nullable=False, default=True)
     notify_offline       = Column(Boolean, nullable=False, default=True)
     notify_via_email     = Column(Boolean, nullable=False, default=True)
+    notification_emails  = Column(JSON, nullable=True)               # extra notification addresses (list of strings)
 
     usergroup = relationship("UserGroup", back_populates="portal_users")
 

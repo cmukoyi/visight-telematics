@@ -959,11 +959,11 @@
                             <i class="fa-solid fa-spinner fa-spin"></i> Loading…
                         </div>
                         <div id="appearance-body" style="display:none">
-                            <!-- Logo -->
+                            <!-- Logo (Light Mode) -->
                             <div class="settings-row" style="align-items:flex-start;gap:20px;flex-wrap:wrap">
                                 <div>
-                                    <div class="settings-row-label">Company Logo</div>
-                                    <div class="settings-row-hint">Shown in the header and on the login page.</div>
+                                    <div class="settings-row-label">Company Logo <span style="font-size:11px;color:var(--text-3);font-weight:400">(Light Mode)</span></div>
+                                    <div class="settings-row-hint">Shown in the header and on the login page in light mode.</div>
                                 </div>
                                 <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
                                     <div class="logo-preview-box" id="logo-preview-box">
@@ -976,6 +976,28 @@
                                             <input type="file" id="logo-file-input" accept="image/*" style="display:none" onchange="settingsLogoFileChange(event)">
                                         </label>
                                         <button class="btn btn-secondary btn-small" id="logo-remove-btn" style="display:none" onclick="settingsLogoRemove()">
+                                            <i class="fa-solid fa-trash"></i> Remove
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Logo (Dark Mode) -->
+                            <div class="settings-row" style="align-items:flex-start;gap:20px;flex-wrap:wrap">
+                                <div>
+                                    <div class="settings-row-label">Company Logo <span style="font-size:11px;color:var(--text-3);font-weight:400">(Dark Mode)</span></div>
+                                    <div class="settings-row-hint">Optional alternative logo for dark mode. Falls back to the light logo if not set.</div>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+                                    <div class="logo-preview-box" id="logo-dark-preview-box" style="background:var(--bg-2,#1e1e2e)">
+                                        <img id="logo-dark-preview-img" src="" alt="" style="display:none;max-height:48px;max-width:140px">
+                                        <span id="logo-dark-preview-none" style="font-size:12px;color:var(--text-3)">No logo</span>
+                                    </div>
+                                    <div id="appearance-logo-dark-controls" style="display:none;flex-direction:column;gap:6px">
+                                        <label class="btn btn-secondary btn-small" style="cursor:pointer">
+                                            <i class="fa-solid fa-upload"></i> Upload
+                                            <input type="file" id="logo-dark-file-input" accept="image/*" style="display:none" onchange="settingsLogoDarkFileChange(event)">
+                                        </label>
+                                        <button class="btn btn-secondary btn-small" id="logo-dark-remove-btn" style="display:none" onclick="settingsLogoDarkRemove()">
                                             <i class="fa-solid fa-trash"></i> Remove
                                         </button>
                                     </div>
@@ -1141,12 +1163,26 @@
                                 <div class="settings-row">
                                     <div>
                                         <div class="settings-row-label"><i class="fa-solid fa-envelope" style="margin-right:6px;color:var(--info)"></i>Email notifications</div>
-                                        <div class="settings-row-hint">Send an email to <span id="notif-email-address" style="color:var(--text-2);font-style:italic"></span>.</div>
+                                        <div class="settings-row-hint">Send alert emails to the addresses listed below.</div>
                                     </div>
                                     <label class="toggle-switch">
                                         <input type="checkbox" id="notif-email" onchange="settingsSaveNotifications()">
                                         <span class="toggle-track"><span class="toggle-thumb"></span></span>
                                     </label>
+                                </div>
+                                <!-- Notification email address list -->
+                                <div id="notif-email-addresses-section" style="padding:8px 0 4px">
+                                    <div style="font-size:12px;color:var(--text-3);margin-bottom:8px">Notification addresses — your login email is always included.</div>
+                                    <div id="notif-email-tags" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
+                                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                                        <input type="email" id="notif-email-add-input" placeholder="Add email address…"
+                                               style="flex:1;min-width:200px;max-width:320px"
+                                               onkeydown="if(event.key==='Enter'){event.preventDefault();notifAddEmail();}">
+                                        <button class="btn btn-secondary btn-small" onclick="notifAddEmail()">
+                                            <i class="fa-solid fa-plus"></i> Add
+                                        </button>
+                                    </div>
+                                    <div class="alert" id="notif-email-alert" style="display:none;margin-top:8px"><span id="notif-email-alert-text"></span></div>
                                 </div>
                             </div>
                             <div class="alert" id="notif-alert" style="display:none"><span id="notif-alert-text"></span></div>
@@ -3252,6 +3288,10 @@ async function settingsSaveRetention() {
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 
+function _escHtml(str) {
+    return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 async function _loadSettingsNotifications() {
     const loading = document.getElementById('notif-loading');
     const body    = document.getElementById('notif-body');
@@ -3265,11 +3305,93 @@ async function _loadSettingsNotifications() {
     if (loading) loading.style.display = 'none';
     if (body)    body.style.display    = '';
 
-    // Populate email hint
-    const emailSpan = document.getElementById('notif-email-address');
-    if (emailSpan) emailSpan.textContent = getSession().user?.email || '';
-
     _renderNotifications(_notifCache);
+    _renderNotifEmailTags(_notifCache.notification_emails || []);
+}
+
+// Render the email address chips
+function _renderNotifEmailTags(extras) {
+    const container = document.getElementById('notif-email-tags');
+    if (!container) return;
+    container.innerHTML = '';
+
+    // Login email — always present, not removable
+    const loginEmail = getSession().user?.email || '';
+    if (loginEmail) {
+        const chip = document.createElement('span');
+        chip.className = 'notif-email-chip notif-email-chip--primary';
+        chip.innerHTML = `<i class="fa-solid fa-user" style="font-size:10px;margin-right:4px;opacity:.7"></i>${_escHtml(loginEmail)}<span style="font-size:10px;color:var(--text-3);margin-left:4px">(login)</span>`;
+        container.appendChild(chip);
+    }
+
+    // Extra addresses — removable
+    (extras || []).forEach(email => {
+        const chip = document.createElement('span');
+        chip.className = 'notif-email-chip';
+        chip.dataset.email = email;
+        chip.innerHTML = `<span class="notif-email-chip-text">${_escHtml(email)}</span><button class="notif-email-chip-remove" title="Remove" onclick="notifRemoveEmail(this)" aria-label="Remove ${_escHtml(email)}"><i class="fa-solid fa-xmark"></i></button>`;
+        container.appendChild(chip);
+    });
+}
+
+function notifAddEmail() {
+    const input    = document.getElementById('notif-email-add-input');
+    const alertEl  = document.getElementById('notif-email-alert');
+    const alertTx  = document.getElementById('notif-email-alert-text');
+    const val      = input?.value?.trim().toLowerCase();
+    alertEl.style.display = 'none';
+
+    if (!val) return;
+    if (!val.includes('@') || !val.includes('.')) {
+        alertTx.textContent = 'Please enter a valid email address.';
+        alertEl.className   = 'alert alert-error';
+        alertEl.style.display = 'flex';
+        return;
+    }
+
+    // Prevent duplicates (including login email)
+    const loginEmail = getSession().user?.email || '';
+    const existingChips = [...document.querySelectorAll('#notif-email-tags .notif-email-chip[data-email]')].map(c => c.dataset.email);
+    if (val === loginEmail || existingChips.includes(val)) {
+        alertTx.textContent = 'That address is already in the list.';
+        alertEl.className   = 'alert alert-error';
+        alertEl.style.display = 'flex';
+        return;
+    }
+
+    const extras = [...existingChips, val];
+    input.value = '';
+    _notifSaveEmailList(extras);
+}
+
+function notifRemoveEmail(btn) {
+    const chip   = btn.closest('.notif-email-chip');
+    const email  = chip?.dataset?.email;
+    if (!email) return;
+    const remaining = [...document.querySelectorAll('#notif-email-tags .notif-email-chip[data-email]')]
+        .map(c => c.dataset.email)
+        .filter(e => e !== email);
+    _notifSaveEmailList(remaining);
+}
+
+async function _notifSaveEmailList(extras) {
+    const alertEl = document.getElementById('notif-email-alert');
+    const alertTx = document.getElementById('notif-email-alert-text');
+    try {
+        const res = await apiFetch('/api/portal/notifications', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notification_emails: extras }),
+        });
+        if (!res.ok) throw new Error(await safeJsonDetail(res, 'Save failed'));
+        _notifCache = await res.json();
+        _renderNotifEmailTags(_notifCache.notification_emails || []);
+        alertEl.style.display = 'none';
+    } catch (err) {
+        alertTx.textContent   = err.message;
+        alertEl.className     = 'alert alert-error';
+        alertEl.style.display = 'flex';
+    }
 }
 
 function _renderNotifications(p) {
