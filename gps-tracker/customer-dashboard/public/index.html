@@ -2673,12 +2673,9 @@ async function apiFetch(path, options = {}) {
 // Show session-expired notice and return to login
 function _sessionExpiredLogout() {
     clearSession();
-    document.getElementById('dashboardPage').style.display = 'none';
-    document.getElementById('loginPage').style.display = 'flex';
-    const errEl = document.getElementById('loginError');
-    errEl.textContent = 'Your session has expired. Please sign in again.';
-    errEl.style.display = 'block';
-    _generateCaptcha();
+    // Store the message in sessionStorage so the login page can show it after reload
+    sessionStorage.setItem('pp_session_msg', 'Your session has expired. Please sign in again.');
+    window.location.reload();
 }
 
 // Safely extract a detail message from a non-2xx response.
@@ -2867,10 +2864,9 @@ function handleLogout() {
     if (!confirm('Are you sure you want to sign out?')) return;
     closeAvatarMenu();
     clearSession();
-    document.getElementById('dashboardPage').style.display = 'none';
-    document.getElementById('loginPage').style.display     = 'flex';
-    _generateCaptcha();
-    document.getElementById('loginError').style.display = 'none';
+    // Full page reload so no stale JS state, cached API data, or old role/feature
+    // permissions persist into the next login session.
+    window.location.reload();
 }
 
 // ══════════════════════════════════════════
@@ -2970,6 +2966,13 @@ const TAB_TITLES = { livemap: 'Live Map', assets: 'Asset List', history: 'Moveme
 let _mapInitialized = false;
 
 function switchTab(name) {
+    // Feature guard — if the user doesn't have access to this tab, silently
+    // redirect to livemap instead of showing forbidden content.
+    const _sf = getSession().features;
+    if (_sf && !_sf.includes(name)) {
+        // Fall back to the first allowed tab, or livemap as default.
+        name = _sf.includes('livemap') ? 'livemap' : (_sf[0] || 'livemap');
+    }
     document.querySelectorAll('.tab-content').forEach(el => {
         el.classList.remove('active');
         el.style.display = 'none';
@@ -7113,13 +7116,30 @@ async function submitEditRole() {
         // Fetch fresh features from /me so nav reflects any admin changes without re-login
         apiFetch('/api/portal/me').then(r => r.ok ? r.json() : null).then(me => {
             if (!me) return;
+            const freshFeatures = me.effective_features || null;
             // Update stored session with fresh data
-            saveSession(token, me.portal_user || user, me.usergroup || group, me.effective_features || null);
+            saveSession(token, me.portal_user || user, me.usergroup || group, freshFeatures);
             // Re-apply nav visibility with fresh features
-            applyNavFeatures(me.effective_features || null);
-        }).catch(() => { /* silently ignore — dashboard already showing */ });
+            applyNavFeatures(freshFeatures);
+            // If the currently-active tab is no longer allowed under the fresh features,
+            // redirect to the first permitted tab immediately (covers mid-session role changes).
+            if (freshFeatures) {
+                const activeTabEl = document.querySelector('.tab-content.active');
+                const activeTabName = activeTabEl ? activeTabEl.id.replace('tab-', '') : null;
+                if (activeTabName && !freshFeatures.includes(activeTabName)) {
+                    switchTab(freshFeatures.includes('livemap') ? 'livemap' : (freshFeatures[0] || 'livemap'));
+                }
+            }
+        }).catch(() => { /* silently ignore network errors — dashboard already showing */ });
     } else {
         document.getElementById('loginPage').style.display = 'flex';
+        // Show any message left by session-expiry / logout redirect
+        const pendingMsg = sessionStorage.getItem('pp_session_msg');
+        if (pendingMsg) {
+            const errEl = document.getElementById('loginError');
+            if (errEl) { errEl.textContent = pendingMsg; errEl.style.display = 'block'; }
+            sessionStorage.removeItem('pp_session_msg');
+        }
         // Pre-fill remembered email
         const remembered = localStorage.getItem('portal_remembered_email');
         if (remembered) {
