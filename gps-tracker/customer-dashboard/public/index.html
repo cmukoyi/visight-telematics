@@ -311,6 +311,7 @@
                             <thead>
                                 <tr>
                                     <th>Asset / Tag</th>
+                                    <th>Description</th>
                                     <th>Category</th>
                                     <th>Status</th>
                                     <th>Package</th>
@@ -322,7 +323,7 @@
                                 </tr>
                             </thead>
                             <tbody id="al-tbody">
-                                <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-3)">Loading…</td></tr>
+                                <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-3)">Loading…</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -5766,7 +5767,7 @@ function alRenderTable() {
     const tbody = document.getElementById('al-tbody');
     if (!tbody) return;
     if (!list.length) {
-        tbody.innerHTML = '<tr><td colspan="9" class="table-empty" style="text-align:center;padding:40px;color:var(--text-3)">No assets match the search.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="table-empty" style="text-align:center;padding:40px;color:var(--text-3)">No assets match the search.</td></tr>';
         return;
     }
     const statusColors = { active: 'var(--success)', inactive: 'var(--danger)', stock: 'var(--text-3)' };
@@ -5808,6 +5809,7 @@ function alRenderTable() {
                     </div>
                 </div>
             </td>
+            <td style="font-size:.82rem;color:var(--text-2)">${esc(t.description || t.imei)}</td>
             <td style="font-size:.78rem;color:var(--text-2)">${alCatLabel(t).label}</td>
             <td>
                 <div style="display:flex;align-items:center;gap:5px">
