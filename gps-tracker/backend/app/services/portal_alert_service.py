@@ -25,28 +25,52 @@ def _tag_label(tag: BLETag) -> str:
     return tag.description or tag.device_name or tag.imei or str(tag.id)
 
 
-def _group_for_tag(db: Session, tag: BLETag) -> str | None:
-    """Return the usergroup_id for the portal group that owns this tag's user."""
-    from app.models import User, UserGroup
-    user = db.query(User).filter(User.id == tag.user_id).first()
-    if not user:
-        return None
-    group = (
-        db.query(UserGroup)
-        .filter(
-            UserGroup.email_domain.isnot(None),
-            UserGroup.is_active == True,
-        )
+def _groups_for_tag(db: Session, tag: BLETag) -> list[str]:
+    """Return all usergroup_ids that should receive alerts for this tag.
+
+    Priority order:
+      1. POI-based: find all active UserGroups that own POIs this tag is armed to
+         (POITrackerLink → POI.usergroup_id).  This is the correct structural link.
+      2. Email-domain fallback: match the tag owner's email domain against
+         UserGroup.email_domain — used for groups that don't use portal-managed POIs.
+
+    Returns a deduplicated list of group ID strings (may be empty).
+    """
+    from app.models import User, UserGroup, POI, POITrackerLink
+    found: dict[str, bool] = {}  # ordered dedup
+
+    # ── 1. Via POI tracker links ───────────────────────────────────────────
+    poi_links = (
+        db.query(POITrackerLink)
+        .filter(POITrackerLink.tracker_id == tag.id)
         .all()
     )
-    domain = user.email.split("@")[-1].lower() if user.email and "@" in user.email else None
-    if not domain:
-        return None
-    for g in group:
-        domains = [d.strip().lower() for d in (g.email_domain or "").split(",")]
-        if domain in domains:
-            return str(g.id)
-    return None
+    poi_ids = [lnk.poi_id for lnk in poi_links]
+    if poi_ids:
+        pois_with_group = (
+            db.query(POI)
+            .filter(POI.id.in_(poi_ids), POI.usergroup_id.isnot(None), POI.is_active == True)
+            .all()
+        )
+        for poi in pois_with_group:
+            found[str(poi.usergroup_id)] = True
+
+    # ── 2. Email-domain fallback ───────────────────────────────────────────
+    if not found:
+        user = db.query(User).filter(User.id == tag.user_id).first()
+        if user and user.email and "@" in user.email:
+            domain = user.email.split("@")[-1].lower()
+            groups = (
+                db.query(UserGroup)
+                .filter(UserGroup.email_domain.isnot(None), UserGroup.is_active == True)
+                .all()
+            )
+            for g in groups:
+                domains = [d.strip().lower() for d in (g.email_domain or "").split(",")]
+                if domain in domains:
+                    found[str(g.id)] = True
+
+    return list(found.keys())
 
 
 def _recent_alert_exists(db: Session, usergroup_id: str, tag_id: str,
@@ -83,66 +107,85 @@ def check_battery_alert(db: Session, tag: BLETag) -> bool:
     """Generate a battery_low alert if battery < threshold and not raised recently."""
     if tag.battery_level is None or tag.battery_level > BATTERY_LOW_THRESHOLD:
         return False
-    usergroup_id = _group_for_tag(db, tag)
-    if not usergroup_id:
-        return False
-    if _recent_alert_exists(db, usergroup_id, str(tag.id), "battery_low", BATTERY_DEDUPE_HOURS):
+    group_ids = _groups_for_tag(db, tag)
+    if not group_ids:
+        logger.debug("No group found for tag %s — battery alert skipped", tag.imei)
         return False
     label = _tag_label(tag)
-    create_alert(
-        db, usergroup_id, str(tag.id),
-        alert_type="battery_low",
-        title=f"Low battery — {label}",
-        message=f"{label} has a battery level of {tag.battery_level}%. Please recharge or replace the battery soon.",
-        meta_data={"battery": tag.battery_level, "imei": tag.imei},
-    )
-    logger.info("🔋 Battery-low alert created for tag %s (%d%%)", tag.imei, tag.battery_level)
-    return True
+    tag_id = str(tag.id)
+    created = False
+    for usergroup_id in group_ids:
+        if _recent_alert_exists(db, usergroup_id, tag_id, "battery_low", BATTERY_DEDUPE_HOURS):
+            continue
+        create_alert(
+            db, usergroup_id, tag_id,
+            alert_type="battery_low",
+            title=f"Low battery — {label}",
+            message=f"{label} has a battery level of {tag.battery_level}%. Please recharge or replace the battery soon.",
+            meta_data={"battery": tag.battery_level, "imei": tag.imei},
+        )
+        logger.info("🔋 Battery-low alert created for tag %s (%d%%) → group %s", tag.imei, tag.battery_level, usergroup_id)
+        created = True
+    return created
 
 
 def check_offline_alert(db: Session, tag: BLETag) -> bool:
-    """Generate a tag_offline alert if tag hasn't been seen for >7 days."""
+    """Generate a tag_offline alert if tag hasn't been seen for >= OFFLINE_THRESHOLD_DAYS."""
     if not tag.last_seen:
         return False
     last_seen = tag.last_seen.replace(tzinfo=None) if tag.last_seen.tzinfo else tag.last_seen
     age_days = (datetime.utcnow() - last_seen).days
     if age_days < OFFLINE_THRESHOLD_DAYS:
         return False
-    usergroup_id = _group_for_tag(db, tag)
-    if not usergroup_id:
-        return False
-    if _recent_alert_exists(db, usergroup_id, str(tag.id), "tag_offline", OFFLINE_DEDUPE_HOURS):
+    group_ids = _groups_for_tag(db, tag)
+    if not group_ids:
+        logger.debug("No group found for tag %s — offline alert skipped", tag.imei)
         return False
     label = _tag_label(tag)
-    create_alert(
-        db, usergroup_id, str(tag.id),
-        alert_type="tag_offline",
-        title=f"Tag offline — {label}",
-        message=f"{label} hasn't been detected for {age_days} days. Check the device or its location.",
-        meta_data={"days_offline": age_days, "last_seen": tag.last_seen.isoformat(), "imei": tag.imei},
-    )
-    logger.info("📡 Offline alert created for tag %s (%d days)", tag.imei, age_days)
-    return True
+    tag_id = str(tag.id)
+    last_seen_str = tag.last_seen.isoformat()
+    created = False
+    for usergroup_id in group_ids:
+        if _recent_alert_exists(db, usergroup_id, tag_id, "tag_offline", OFFLINE_DEDUPE_HOURS):
+            continue
+        create_alert(
+            db, usergroup_id, tag_id,
+            alert_type="tag_offline",
+            title=f"Tag offline — {label}",
+            message=f"{label} hasn't been detected for {age_days} days. Check the device or its location.",
+            meta_data={"days_offline": age_days, "last_seen": last_seen_str, "imei": tag.imei},
+        )
+        logger.info("📡 Offline alert created for tag %s (%d days) → group %s", tag.imei, age_days, usergroup_id)
+        created = True
+    return created
 
 
 def create_geofence_alert(db: Session, tag: BLETag, poi_name: str, poi_id: str,
                            event_type: str) -> bool:
     """Generate a geofence_entry or geofence_exit PortalAlert."""
-    usergroup_id = _group_for_tag(db, tag)
-    if not usergroup_id:
+    from app.models import POI
+    # For geofence alerts prefer the POI's own group first (most specific)
+    poi = db.query(POI).filter(POI.id == poi_id).first()
+    if poi and poi.usergroup_id:
+        group_ids = [str(poi.usergroup_id)]
+    else:
+        group_ids = _groups_for_tag(db, tag)
+    if not group_ids:
         return False
     is_entry = "enter" in event_type.lower()
     atype = "geofence_entry" if is_entry else "geofence_exit"
     label = _tag_label(tag)
     verb = "entered" if is_entry else "exited"
-    create_alert(
-        db, usergroup_id, str(tag.id),
-        alert_type=atype,
-        title=f"Geofence {verb} — {label}",
-        message=f"{label} has {verb} the zone '{poi_name}'.",
-        meta_data={"poi_name": poi_name, "poi_id": poi_id, "imei": tag.imei,
-                   "event_type": event_type},
-    )
+    tag_id = str(tag.id)
+    for usergroup_id in group_ids:
+        create_alert(
+            db, usergroup_id, tag_id,
+            alert_type=atype,
+            title=f"Geofence {verb} — {label}",
+            message=f"{label} has {verb} the zone '{poi_name}'.",
+            meta_data={"poi_name": poi_name, "poi_id": poi_id, "imei": tag.imei,
+                       "event_type": event_type},
+        )
     return True
 
 
