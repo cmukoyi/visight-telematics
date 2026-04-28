@@ -1101,12 +1101,15 @@ tbody tr:hover { background: var(--bg-3); }
 .btn-outline-danger { background:transparent; color:var(--danger); border:1px solid var(--danger); border-radius:6px; padding:4px 9px; font-size:.78rem; cursor:pointer; transition:background .15s; }
 .btn-outline-danger:hover { background:rgba(239,68,68,.1); }
 .btn-icon {
-  width: 32px; height: 32px;
+  min-width: 32px; height: 32px;
+  padding: 0 8px;
   border-radius: var(--radius-sm);
   background: var(--bg-3);
   border: 1px solid var(--border);
   color: var(--text-2);
-  display: flex; align-items: center; justify-content: center;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  white-space: nowrap;
+  font-size: .82rem;
   transition: var(--transition);
 }
 .btn-icon:hover { background: var(--bg-4); color: var(--text); }
