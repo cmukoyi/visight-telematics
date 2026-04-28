@@ -1093,6 +1093,13 @@ tbody tr:hover { background: var(--bg-3); }
 .btn-danger-ghost { background: var(--bg-3); color: var(--danger); border-color: var(--border); }
 .btn-danger-ghost:hover { background: rgba(239,68,68,.1); border-color: var(--danger); }
 .btn-sm { padding: 5px 10px; font-size: .78rem; }
+/* Outline action button variants (used in End User table) */
+.btn-outline-warn   { background:transparent; color:#f59e0b; border:1px solid #f59e0b; border-radius:6px; padding:4px 9px; font-size:.78rem; cursor:pointer; transition:background .15s; }
+.btn-outline-warn:hover   { background:rgba(245,158,11,.12); }
+.btn-outline-ok     { background:transparent; color:var(--primary); border:1px solid var(--primary); border-radius:6px; padding:4px 9px; font-size:.78rem; cursor:pointer; transition:background .15s; }
+.btn-outline-ok:hover     { background:color-mix(in srgb,var(--primary) 10%,transparent); }
+.btn-outline-danger { background:transparent; color:var(--danger); border:1px solid var(--danger); border-radius:6px; padding:4px 9px; font-size:.78rem; cursor:pointer; transition:background .15s; }
+.btn-outline-danger:hover { background:rgba(239,68,68,.1); }
 .btn-icon {
   width: 32px; height: 32px;
   border-radius: var(--radius-sm);

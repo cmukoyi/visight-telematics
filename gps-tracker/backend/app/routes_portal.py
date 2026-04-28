@@ -925,6 +925,8 @@ class MobileUserOut(BaseModel):
     email: str
     first_name: Optional[str]
     last_name: Optional[str]
+    is_active: bool = True
+    created_at: Optional[datetime] = None
     tags: List[MobileUserTagOut] = []
 
     class Config:
@@ -933,8 +935,8 @@ class MobileUserOut(BaseModel):
 
 @router.get("/mobile-users", response_model=List[MobileUserOut])
 def list_mobile_users(request: Request, db: Session = Depends(get_db)):
-    """Return all active mobile-app Users whose email domain matches the group's
-    configured email_domain, with their assigned tags."""
+    """Return all mobile-app Users (active and inactive) whose email domain
+    matches the group's configured email_domain, with their assigned tags."""
     me = get_portal_user_from_request(request, db)
     group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
     if not group or not group.email_domain:
@@ -942,7 +944,7 @@ def list_mobile_users(request: Request, db: Session = Depends(get_db)):
     domains = _domains(group)
     users = (
         db.query(User)
-        .filter(_domain_filter(domains), User.is_active == True)
+        .filter(_domain_filter(domains))          # all users, active or not
         .order_by(User.email)
         .all()
     )
@@ -981,10 +983,54 @@ def list_mobile_users(request: Request, db: Session = Depends(get_db)):
         MobileUserOut(
             id=u.id, email=u.email,
             first_name=u.first_name, last_name=u.last_name,
+            is_active=u.is_active,
+            created_at=u.created_at,
             tags=tags_by_user.get(str(u.id), [])
         )
         for u in users
     ]
+
+
+class MobileUserPatch(BaseModel):
+    is_active: bool
+
+
+@router.patch("/mobile-users/{user_id}", status_code=200)
+def toggle_mobile_user(user_id: UUID, body: MobileUserPatch,
+                       request: Request, db: Session = Depends(get_db)):
+    """Activate or deactivate a mobile-app user within the portal group's domain."""
+    me = get_portal_user_from_request(request, db)
+    group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
+    if not group or not group.email_domain:
+        raise HTTPException(status_code=403, detail="No email domain configured")
+    domains = _domains(group)
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    # Ensure the target user belongs to this group's domain
+    if not any(user.email.lower().endswith(f"@{d}") for d in domains):
+        raise HTTPException(status_code=403, detail="User does not belong to your domain")
+    user.is_active = body.is_active
+    db.commit()
+    return {"id": str(user_id), "is_active": user.is_active}
+
+
+@router.delete("/mobile-users/{user_id}", status_code=204)
+def delete_mobile_user(user_id: UUID, request: Request, db: Session = Depends(get_db)):
+    """Permanently delete a mobile-app user from the system (domain-scoped)."""
+    me = get_portal_user_from_request(request, db)
+    group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
+    if not group or not group.email_domain:
+        raise HTTPException(status_code=403, detail="No email domain configured")
+    domains = _domains(group)
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not any(user.email.lower().endswith(f"@{d}") for d in domains):
+        raise HTTPException(status_code=403, detail="User does not belong to your domain")
+    db.delete(user)
+    db.commit()
+    return
 
 
 # ---------------------------------------------------------------------------
