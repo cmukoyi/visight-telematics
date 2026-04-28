@@ -473,6 +473,23 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
             detail="Email not verified. Please complete PIN verification first."
         )
 
+    # Double-check domain is still allowed (guards against race between PIN verify and register)
+    from app.models import UserGroup as _UserGroup
+    _email_domain = user_data.email.split("@")[-1].lower()
+    _allowed_groups = db.query(_UserGroup).filter(
+        _UserGroup.email_domain.isnot(None),
+        _UserGroup.is_active == True,
+    ).all()
+    _domain_allowed = any(
+        _email_domain in [d.strip().lower() for d in (g.email_domain or "").split(",") if d.strip()]
+        for g in _allowed_groups
+    )
+    if not _domain_allowed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Registration is not available for your email domain."
+        )
+
     # Reject if already fully registered
     existing_user = db.query(User).filter(User.email == user_data.email).first()
     if existing_user and existing_user.hashed_password is not None:
@@ -557,6 +574,23 @@ def send_verification_code(request: SendVerificationCodeRequest, db: Session = D
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered. Please sign in instead."
+        )
+
+    # Enforce email domain allowlist — only domains configured on active UserGroups may register
+    from app.models import UserGroup as _UserGroup
+    _email_domain = request.email.split("@")[-1].lower()
+    _allowed_groups = db.query(_UserGroup).filter(
+        _UserGroup.email_domain.isnot(None),
+        _UserGroup.is_active == True,
+    ).all()
+    _domain_allowed = any(
+        _email_domain in [d.strip().lower() for d in (g.email_domain or "").split(",") if d.strip()]
+        for g in _allowed_groups
+    )
+    if not _domain_allowed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Registration is not available for your email domain. Please contact your administrator."
         )
 
     # Generate 6-digit PIN
