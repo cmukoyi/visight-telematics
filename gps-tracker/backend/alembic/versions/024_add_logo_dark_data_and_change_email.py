@@ -8,7 +8,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = '024'
-down_revision = '023_add_portal_roles_and_features'
+down_revision = '023'
 branch_labels = None
 depends_on = None
 
