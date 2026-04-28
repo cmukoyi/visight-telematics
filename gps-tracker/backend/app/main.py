@@ -403,6 +403,61 @@ def manifest():
     }
 
 # Authentication endpoints
+
+def _auto_provision_portal_user(db: Session, user: "User") -> None:
+    """Auto-create a PortalUser for a self-registered User if their email domain
+    matches exactly one active UserGroup with email_domain configured.
+
+    Rules:
+      - Skipped if no UserGroup has a matching email_domain.
+      - Skipped if a PortalUser with that email already exists in *any* group.
+      - The new PortalUser is created as role='admin' (non-group-admin), active.
+        A random password is set — the user logs into the customer-facing app
+        directly; the portal password can be set later via "Forgot Password" flow.
+      - If multiple groups match (unlikely but valid), a PortalUser is created in each.
+    """
+    from app.models import UserGroup as _UG, PortalUser as _PU
+    from app.admin_auth import hash_password as _hash
+    import secrets as _secrets
+    import uuid as _uuid
+
+    email = user.email.lower().strip()
+    if not email or "@" not in email:
+        return
+    domain = email.split("@")[-1].lower()
+
+    # Already has a portal account somewhere?
+    if db.query(_PU).filter(_PU.email == email).first():
+        return
+
+    matching_groups = [
+        g for g in db.query(_UG).filter(_UG.email_domain.isnot(None), _UG.is_active == True).all()
+        if domain in [d.strip().lower() for d in (g.email_domain or "").split(",") if d.strip()]
+    ]
+    if not matching_groups:
+        return
+
+    for group in matching_groups:
+        temp_pw = _secrets.token_urlsafe(16)
+        portal_user = _PU(
+            id=str(_uuid.uuid4()),
+            usergroup_id=group.id,
+            email=email,
+            hashed_password=_hash(temp_pw),
+            first_name=user.first_name or None,
+            last_name=user.last_name or None,
+            is_active=True,
+            is_group_admin=False,
+            role="admin",
+        )
+        db.add(portal_user)
+        logger.info(
+            "👤 Auto-provisioned PortalUser %s into group '%s' (domain match: @%s)",
+            email, group.name, domain,
+        )
+    db.commit()
+
+
 @app.post("/api/v1/auth/register", response_model=Token)
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
     """Register a new user — only called after email/PIN verification and details entry"""
@@ -453,6 +508,7 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
         existing_user.is_active = True
         db.commit()
         db.refresh(existing_user)
+        _auto_provision_portal_user(db, existing_user)
         access_token = create_access_token(data={"sub": str(existing_user.id)})
         return {"access_token": access_token, "token_type": "bearer"}
 
@@ -470,6 +526,7 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_user)
 
+    _auto_provision_portal_user(db, db_user)
     access_token = create_access_token(data={"sub": str(db_user.id)})
     return {"access_token": access_token, "token_type": "bearer"}
 
