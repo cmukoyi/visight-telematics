@@ -1555,6 +1555,7 @@ def create_category(data: CategoryCreate, request: Request, db: Session = Depend
     exists = db.query(TagCategory).filter(
         TagCategory.usergroup_id == str(me.usergroup_id),
         TagCategory.name.ilike(name),
+        TagCategory.is_active == True,
     ).first()
     if exists:
         raise HTTPException(status_code=409, detail=f"Category '{name}' already exists")

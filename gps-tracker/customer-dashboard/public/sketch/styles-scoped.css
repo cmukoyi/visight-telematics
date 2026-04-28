@@ -70,14 +70,16 @@ html[data-theme="dark"] #sketch-root {
 
 /* ─── Sketch header (renamed .sk-header to avoid portal conflict) */
 #sketch-root .sk-header {
-  height: 54px;
+  min-height: 54px; height: auto;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
+  padding: 8px 20px;
   flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 8px;
   box-shadow: 0 1px 6px var(--shadow);
   z-index: 100;
 }
@@ -91,7 +93,7 @@ html[data-theme="dark"] #sketch-root {
 }
 #sketch-root .brand-name { font-size: 14px; font-weight: 600; color: var(--primary); line-height: 1.2; }
 #sketch-root .brand-sub  { font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.02em; }
-#sketch-root .header-actions { display: flex; align-items: center; gap: 6px; }
+#sketch-root .header-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
 /* ─── Buttons ────────────────────────────────────────────────── */
 #sketch-root .btn-icon {
