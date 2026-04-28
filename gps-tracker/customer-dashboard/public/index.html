@@ -1965,7 +1965,7 @@
             <p style="margin:12px 0 6px;font-size:13px">Email: <strong id="newUserEmail"></strong></p>
             <div style="display:flex;align-items:center;gap:8px">
                 <code id="newUserPwd" style="flex:1;padding:8px 12px;background:#f3f4f6;border-radius:6px;font-size:14px;letter-spacing:1px"></code>
-                <button class="btn btn-secondary btn-small" onclick="navigator.clipboard.writeText(document.getElementById('newUserPwd').textContent)">Copy</button>
+                <button class="btn btn-secondary btn-small" id="copyPwdBtn" onclick="navigator.clipboard.writeText(document.getElementById('newUserPwd').textContent).then(()=>{const b=document.getElementById('copyPwdBtn');b.textContent='Copied!';b.style.color='var(--success,#10b981)';setTimeout(()=>{b.textContent='Copy';b.style.color='';},2000)})">Copy</button>
             </div>
             <div style="text-align:right;margin-top:16px">
                 <button class="btn btn-primary" onclick="closeModal('addUserModal');loadUsers()">Done</button>
@@ -5197,16 +5197,20 @@ async function loadUsers() {
             const status = u.is_active ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-danger">Inactive</span>';
             const expiry = u.expires_at ? new Date(u.expires_at).toLocaleDateString() : '—';
             const isSelf = me && me.id === u.id;
+            // Non-admin users cannot deactivate or set expiry on admin-role users
+            const targetIsAdmin = u.is_group_admin || u.role === 'admin';
+            const meIsAdmin = me?.is_group_admin;
+            const canModifyAdmin = meIsAdmin || !targetIsAdmin;
             const actions = isSelf ? '<span style="color:var(--text-3);font-size:12px">You</span>' : `
                 <button class="btn btn-ghost btn-sm" onclick="openEditRoleModal('${esc(u.id)}','${esc(name)}','${esc(u.role||'admin')}',${JSON.stringify(u.custom_features||[])})" title="Change role">
                     <i class="fa-solid fa-shield-halved"></i> Role
                 </button>
-                <button class="btn btn-ghost btn-sm" onclick="toggleUserActive('${esc(u.id)}',${u.is_active},'${esc(name)}')" title="${u.is_active ? 'Deactivate' : 'Activate'} user">
+                ${canModifyAdmin ? `<button class="btn btn-ghost btn-sm" onclick="toggleUserActive('${esc(u.id)}',${u.is_active},'${esc(name)}')" title="${u.is_active ? 'Deactivate' : 'Activate'} user">
                     <i class="fa-solid fa-${u.is_active ? 'user-slash' : 'user-check'}"></i> ${u.is_active ? 'Deactivate' : 'Activate'}
-                </button>
-                <button class="btn btn-ghost btn-sm" onclick="openUserExpiryModal('${esc(u.id)}','${esc(name)}','${esc(u.expires_at||'')}')">
+                </button>` : ''}
+                ${canModifyAdmin ? `<button class="btn btn-ghost btn-sm" onclick="openUserExpiryModal('${esc(u.id)}','${esc(name)}','${esc(u.expires_at||'')}')">
                     <i class="fa-solid fa-clock"></i> Expiry
-                </button>
+                </button>` : ''}
             `;
             return `<tr>
                 <td>${esc(name)}</td>
@@ -5695,6 +5699,11 @@ let _alLoaded = false;
 let _alCatFilter = 'all'; // 'all' | category UUID from _categoriesCache
 
 async function initAssetList() {
+    // Show/hide admin-only controls
+    const _alIsAdmin = getSession().user?.is_group_admin;
+    document.querySelectorAll('#tab-assets .btn-primary, #tab-assets .btn-ghost').forEach(btn => {
+        if (btn.textContent.includes('Add Tag')) btn.style.display = _alIsAdmin ? '' : 'none';
+    });
     // Reuse tags from Live Map if already loaded, otherwise fetch fresh
     if (_lmTags.length) {
         _alLoaded = true;
@@ -6159,6 +6168,11 @@ function histExport() {
 // ASSET MANAGEMENT
 // ══════════════════════════════════════════
 async function initAssetMgmt() {
+    // Show/hide admin-only controls
+    const _amIsAdmin = getSession().user?.is_group_admin;
+    document.querySelectorAll('#tab-asset-mgmt .btn-primary, #tab-asset-mgmt .btn-ghost').forEach(btn => {
+        if (btn.textContent.includes('Add Tag') || btn.textContent.includes('Bulk Upload')) btn.style.display = _amIsAdmin ? '' : 'none';
+    });
     document.getElementById('am-grid').innerHTML =
         '<div style="padding:40px;text-align:center;color:var(--text-3)"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</div>';
     try {

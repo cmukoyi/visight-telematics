@@ -316,6 +316,15 @@ def patch_portal_user(
     if str(target.id) == str(me.id):
         raise HTTPException(status_code=400, detail="You cannot modify your own account")
 
+    # Non-admin portal users cannot deactivate or set expiry on admin users
+    target_is_admin = target.is_group_admin or target.role == "admin"
+    if target_is_admin and not me.is_group_admin:
+        if data.is_active is not None or "expires_at" in data.model_fields_set:
+            raise HTTPException(
+                status_code=403,
+                detail="Only group admins can deactivate or set expiry on admin users"
+            )
+
     if data.is_active is not None:
         target.is_active = data.is_active
         # Re-activating a user clears any expiry so it doesn't immediately lapse again
