@@ -389,7 +389,7 @@ input, select, textarea { font-family: var(--font); }
 /* ── Main content ──────────────────────────────────────────── */
 #main-content {
   grid-area: main;
-  overflow: hidden;
+  overflow: hidden; /* tabs manage their own scroll */
   display: flex;
   flex-direction: column;
   background: var(--bg);
@@ -1476,6 +1476,16 @@ tbody tr:hover { background: var(--bg-3); }
 
   /* Content padding */
   .content { padding: 14px; gap: 14px; }
+  #tab-users,
+  #tab-asset-mgmt,
+  #tab-locations,
+  #tab-settings,
+  #tab-qr,
+  #tab-reports-subscriptions,
+  #tab-reports-activity,
+  #tab-reports-trips,
+  #tab-reports-battery,
+  #tab-reports-alerts { padding: 14px; gap: 14px; }
 
   /* Cards */
   .card { padding: 16px; }
@@ -1523,6 +1533,16 @@ tbody tr:hover { background: var(--bg-3); }
   :root { --header-h: 52px; }
 
   .content { padding: 10px; gap: 10px; }
+  #tab-users,
+  #tab-asset-mgmt,
+  #tab-locations,
+  #tab-settings,
+  #tab-qr,
+  #tab-reports-subscriptions,
+  #tab-reports-activity,
+  #tab-reports-trips,
+  #tab-reports-battery,
+  #tab-reports-alerts { padding: 10px; gap: 10px; }
   .card { padding: 12px; }
 
   /* History map: taller relative */
@@ -1634,8 +1654,29 @@ tbody tr:hover { background: var(--bg-3); }
 .top-bar-company { font-size: 12px; color: var(--text-3); margin-top: 2px; }
 
 /* ── Tab pane containers ── */
-.tab-content { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+/* Default: scrollable so content never gets clipped on tablet/mobile */
+.tab-content { display: none; flex: 1; flex-direction: column; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
 .tab-content.active { display: flex; }
+/* Map-like tabs that manage their own internal scroll must NOT scroll at this level */
+#tab-livemap.active,
+#tab-history.active,
+#tab-building.active,
+#tab-floorplan.active { overflow: hidden; }
+
+/* Tabs whose direct children are .card elements need their own padding/gap */
+#tab-users,
+#tab-asset-mgmt,
+#tab-locations,
+#tab-settings,
+#tab-qr,
+#tab-reports-subscriptions,
+#tab-reports-activity,
+#tab-reports-trips,
+#tab-reports-battery,
+#tab-reports-alerts {
+  padding: 24px;
+  gap: 20px;
+}
 
 /* ── Floorplan Sketch tab — iframe fills all available space ── */
 #tab-building.active { padding: 0; overflow: hidden; }
