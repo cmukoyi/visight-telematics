@@ -512,7 +512,6 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
         existing_user.is_active = True
         db.commit()
         db.refresh(existing_user)
-        _auto_provision_portal_user(db, existing_user)
         access_token = create_access_token(data={"sub": str(existing_user.id)})
         return {"access_token": access_token, "token_type": "bearer"}
 
@@ -530,7 +529,6 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_user)
 
-    _auto_provision_portal_user(db, db_user)
     access_token = create_access_token(data={"sub": str(db_user.id)})
     return {"access_token": access_token, "token_type": "bearer"}
 

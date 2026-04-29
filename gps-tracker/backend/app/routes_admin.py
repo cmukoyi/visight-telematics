@@ -920,6 +920,7 @@ def create_usergroup(
         last_name=data.admin_last_name or None,
         is_active=True,
         is_group_admin=True,
+        role="system_admin",
     )
     db.add(portal_admin)
 

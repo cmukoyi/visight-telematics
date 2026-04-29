@@ -58,7 +58,7 @@ def _compute_effective_features(user: "PortalUser", group: "UserGroup") -> list:
     group_features = [f for s in allowed_sections for f in SECTION_FEATURES.get(s, [])]
 
     role = user.role or "admin"
-    if role == "admin":
+    if role in ("admin", "system_admin"):
         return group_features
     elif role == "manager":
         role_features = SECTION_FEATURES["tracking"] + SECTION_FEATURES["management"]

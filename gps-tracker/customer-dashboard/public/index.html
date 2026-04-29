@@ -236,7 +236,7 @@
 
             <button class="nav-item" data-tab="locations" onclick="switchTab('locations')">
                 <span class="nav-icon"><i class="fa-solid fa-location-dot"></i></span>
-                <span class="nav-label">Locations</span>
+                <span class="nav-label">Locations <span class="beta-badge">Beta</span></span>
             </button>
 
             <button class="nav-item" data-tab="users" onclick="switchTab('users')">
@@ -2951,6 +2951,11 @@ function applyTheme(theme) {
     if (typeof FP !== 'undefined' && FP.drawAll) FP.drawAll();
     // Re-render QR preview (corner-colour contrast may change)
     if (typeof QRG !== 'undefined' && QRG.generate) QRG.generate();
+    // Re-apply logo variant for the new theme (dark vs light logo)
+    try {
+        const stored = JSON.parse(localStorage.getItem('pinplot_branding') || 'null');
+        if (stored && typeof applyBranding === 'function') applyBranding(stored);
+    } catch (_) {}
 }
 function toggleTheme() {
     const current = document.documentElement.getAttribute('data-theme') || 'dark';
@@ -3112,7 +3117,7 @@ async function loadGroupTags() {
                 <td><code>${esc(t.imei)}</code></td>
                 <td>${esc(t.description || t.device_name || '—')}</td>
                 <td style="font-size:12px;color:var(--gray)">${esc(t.owner_email)}</td>
-                <td>${esc(t.tag_type || '—')}</td>
+                <td>${{scope:'Series 1',tracksolid:'Series 2',series1:'Series 1',series2:'Series 2'}[(t.tag_type||'').toLowerCase()] || t.tag_type || '—'}</td>
                 <td>${statusBadge}</td>
                 <td style="font-size:12px">${addedAt}</td>
                 <td style="font-size:12px">${esc(t.package_name || '—')}</td>
@@ -3240,7 +3245,12 @@ async function openAddTagModal() {
     imeiInput.style.color = '';
     imeiInput.setAttribute('required', '');
     document.getElementById('tagMgmtDesc').value = '';
-    document.getElementById('tagMgmtType').value = 'series1';
+    const _typeSelAdd = document.getElementById('tagMgmtType');
+    _typeSelAdd.value = 'series1';
+    _typeSelAdd.disabled = false;
+    _typeSelAdd.style.background = '';
+    _typeSelAdd.style.color = '';
+    _typeSelAdd.style.cursor = '';
     document.getElementById('tagMgmtImeiGroup').style.display = '';
     document.getElementById('tagMgmtDescGroup').style.display = '';
     document.getElementById('tagMgmtTypeGroup').style.display = '';
@@ -3297,7 +3307,12 @@ async function openTagMgmtModal(mode, imei) {
 
     // Tag type — normalise canonical DB values (scope/tracksolid) to select option values (series1/series2)
     const _typeAliasToSelect = { scope: 'series1', tracksolid: 'series2', series1: 'series1', series2: 'series2' };
-    document.getElementById('tagMgmtType').value = _typeAliasToSelect[(tag.tag_type || 'scope').toLowerCase()] || 'series1';
+    const _typeSelect = document.getElementById('tagMgmtType');
+    _typeSelect.value = _typeAliasToSelect[(tag.tag_type || 'scope').toLowerCase()] || 'series1';
+    _typeSelect.disabled = true;
+    _typeSelect.style.background = 'var(--bg-2,#f3f4f6)';
+    _typeSelect.style.color = 'var(--text-3,#6b7280)';
+    _typeSelect.style.cursor = 'not-allowed';
     document.getElementById('tagMgmtTypeGroup').style.display = '';
 
     // Category
@@ -3772,17 +3787,19 @@ function applyBranding(theme) {
     } else {
         root.style.removeProperty('--success');
     }
-    // Logo in header
+    // Logo in header — use dark-mode variant when active, fall back to light logo
     const logoWrap = document.querySelector('.logo-wrap');
     if (logoWrap) {
-        if (theme.logo_data) {
-            logoWrap.innerHTML = `<img src="${theme.logo_data}" alt="Logo" style="height:32px;max-width:140px;object-fit:contain">`;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const logoSrc = (isDark && theme.logo_dark_data) ? theme.logo_dark_data : theme.logo_data;
+        if (logoSrc) {
+            logoWrap.innerHTML = `<img src="${logoSrc}" alt="Logo" style="height:32px;max-width:140px;object-fit:contain">`;
         } else {
             logoWrap.innerHTML = `<div class="logo-icon"><i class="fa-solid fa-location-dot"></i></div><div>PinPlot<span class="logo-sub">Customer Portal</span></div>`;
         }
     }
-    // Persist to localStorage for next page load
-    try { localStorage.setItem('pinplot_branding', JSON.stringify({ theme_primary: theme.theme_primary, theme_accent: theme.theme_accent, logo_data: theme.logo_data })); } catch (_) {}
+    // Persist to localStorage for next page load (include both logo variants)
+    try { localStorage.setItem('pinplot_branding', JSON.stringify({ theme_primary: theme.theme_primary, theme_accent: theme.theme_accent, logo_data: theme.logo_data, logo_dark_data: theme.logo_dark_data })); } catch (_) {}
 }
 
 // Apply any persisted branding immediately (before API call) to avoid flash
@@ -6712,10 +6729,11 @@ async function loadUsers() {
         } else {
             const roleBadge = r => {
                 const map = {
-                    admin:    ['badge-info',    'Admin'],
-                    manager:  ['badge-primary', 'Manager'],
-                    reporter: ['badge-success', 'Reporter'],
-                    custom:   ['badge-warning', 'Custom'],
+                    system_admin: ['badge-danger',  'Built-in System Admin'],
+                    admin:        ['badge-info',    'Admin'],
+                    manager:      ['badge-primary', 'Manager'],
+                    reporter:     ['badge-success', 'Reporter'],
+                    custom:       ['badge-warning', 'Custom'],
                 };
                 const [cls, label] = map[r] || ['badge-secondary', r || 'User'];
                 return `<span class="badge ${cls}">${label}</span>`;
@@ -6726,10 +6744,11 @@ async function loadUsers() {
                 const status = u.is_active ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-danger">Inactive</span>';
                 const expiry = u.expires_at ? new Date(u.expires_at).toLocaleDateString() : '—';
                 const isSelf = me && me.id === u.id;
+                const isSystemAdmin = u.role === 'system_admin';
                 const targetIsAdmin = u.is_group_admin || u.role === 'admin';
                 const meIsAdmin = me?.is_group_admin;
                 const canModifyAdmin = meIsAdmin || !targetIsAdmin;
-                const actions = isSelf ? '<span style="color:var(--text-3);font-size:12px">You</span>' : `
+                const actions = isSelf ? '<span style="color:var(--text-3);font-size:12px">You</span>' : isSystemAdmin ? '<span style="color:var(--text-3);font-size:12px">Built-in</span>' : `
                     <button class="btn btn-ghost btn-sm" onclick="openEditRoleModal('${esc(u.id)}','${esc(name)}','${esc(u.role||'admin')}',${JSON.stringify(u.custom_features||[])})" title="Change role">
                         <i class="fa-solid fa-shield-halved"></i> Role
                     </button>
@@ -7371,6 +7390,8 @@ function _lmRenderDetail(t) {
     const status  = _lmStatusClass(t);
     const statusColors = { active: 'var(--success)', inactive: 'var(--danger)', stock: 'var(--text-3)' };
     const statusLabel  = { active: 'Active', inactive: 'Inactive', stock: 'Stock' };
+    const _tagTypeLabels = { scope: 'Series 1', tracksolid: 'Series 2', series1: 'Series 1', series2: 'Series 2' };
+    const tagTypeDisplay = _tagTypeLabels[(t.tag_type || '').toLowerCase()] || (t.tag_type ? esc(t.tag_type) : '—');
     const lastSeen  = t.last_seen   ? new Date(t.last_seen).toLocaleString()    : '—';
     const expiry    = t.expiry_date ? new Date(t.expiry_date).toLocaleDateString() : '—';
     const daysLeft  = t.package_id
@@ -7402,7 +7423,7 @@ function _lmRenderDetail(t) {
             <div class="detail-item"><label>Days Left</label><span>${daysLeft}</span></div>
             <div class="detail-item"><label>Expiry</label><span style="color:${expiryColor}">${expiry}</span></div>
             <div class="detail-item"><label>Last Seen</label><span>${lastSeen}</span></div>
-            <div class="detail-item detail-full"><label>Type</label><span>${esc(t.tag_type||'—')}</span></div>
+            <div class="detail-item detail-full"><label>Type</label><span>${tagTypeDisplay}</span></div>
         </div>
         ${_lmMarkers[t.imei] ? `<div class="detail-actions">
             <button class="btn btn-primary btn-sm" onclick="lmSelectFromList('${esc(t.imei)}')">
