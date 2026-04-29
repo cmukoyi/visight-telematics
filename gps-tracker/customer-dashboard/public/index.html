@@ -6749,7 +6749,7 @@ async function loadUsers() {
                 const meIsAdmin = me?.is_group_admin;
                 const canModifyAdmin = meIsAdmin || !targetIsAdmin;
                 const actions = isSelf ? '<span style="color:var(--text-3);font-size:12px">You</span>' : isSystemAdmin ? '<span style="color:var(--text-3);font-size:12px">Built-in</span>' : `
-                    <button class="btn btn-ghost btn-sm" onclick="openEditRoleModal('${esc(u.id)}','${esc(name)}','${esc(u.role||'admin')}',${JSON.stringify(u.custom_features||[])})" title="Change role">
+                    <button class="btn btn-ghost btn-sm" onclick="openEditRoleModal('${esc(u.id)}','${esc(name)}','${esc(u.role||'admin')}',${esc(JSON.stringify(u.custom_features||[]))})" title="Change role">
                         <i class="fa-solid fa-shield-halved"></i> Role
                     </button>
                     ${canModifyAdmin ? `<button class="btn btn-ghost btn-sm" onclick="toggleUserActive('${esc(u.id)}',${u.is_active},'${esc(name)}')" title="${u.is_active ? 'Deactivate' : 'Activate'} user">
