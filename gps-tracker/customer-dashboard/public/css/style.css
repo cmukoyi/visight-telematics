@@ -2277,6 +2277,7 @@ select option { background: var(--bg-3); }
 .rpt-badge-active   { background: rgba(16,185,129,.15); color: var(--success); }
 .rpt-badge-expiring { background: rgba(245,158,11,.15);  color: var(--warning); }
 .rpt-badge-expired  { background: rgba(239,68,68,.12);   color: var(--danger);  }
+.rpt-badge-new      { background: rgba(96,165,250,.15);  color: #60a5fa;        }
 .rpt-badge-none     { background: var(--bg-3);           color: var(--text-3);  }
 
 

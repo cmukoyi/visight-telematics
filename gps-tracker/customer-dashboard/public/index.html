@@ -1947,6 +1947,7 @@
                         <option value="active">Active</option>
                         <option value="expiring">Expiring soon (&lt;30 days)</option>
                         <option value="expired">Expired</option>
+                        <option value="new">New (awaiting first fix)</option>
                         <option value="none">No package</option>
                     </select>
                     <button class="btn btn-secondary btn-small" onclick="rptSubRefresh()">
@@ -1965,6 +1966,8 @@
                     <span id="rpt-sub-count-expiring" style="color:var(--warning)"><strong>—</strong> expiring</span>
                     <span class="rpt-sep">·</span>
                     <span id="rpt-sub-count-expired" style="color:var(--danger)"><strong>—</strong> expired</span>
+                    <span class="rpt-sep">·</span>
+                    <span id="rpt-sub-count-new" style="color:var(--info,#60a5fa)"><strong>—</strong> new</span>
                     <span class="rpt-sep">·</span>
                     <span id="rpt-sub-count-none" style="color:var(--text-3)"><strong>—</strong> no package</span>
                 </div>
@@ -5750,7 +5753,8 @@ function _rptSubBuildPkgFilter() {
 function _rptSubStatus(tag) {
     if (!tag.package_name) return 'none';
     const d = tag.days_remaining;
-    if (d === null || d === undefined) return 'none';
+    // Package assigned but no activation yet (waiting for first GPS fix)
+    if (d === null || d === undefined) return 'new';
     if (d < 0)  return 'expired';
     if (d <= 30) return 'expiring';
     return 'active';
@@ -5814,6 +5818,7 @@ const _RPT_STATUS_BADGE = {
     active:   '<span class="rpt-badge rpt-badge-active">Active</span>',
     expiring: '<span class="rpt-badge rpt-badge-expiring">Expiring soon</span>',
     expired:  '<span class="rpt-badge rpt-badge-expired">Expired</span>',
+    new:      '<span class="rpt-badge rpt-badge-new">New</span>',
     none:     '<span class="rpt-badge rpt-badge-none">No package</span>',
 };
 
@@ -5857,12 +5862,13 @@ function _rptFmtDate(iso) {
 
 // ─── Summary bar ─────────────────────────────────────────────────────────────
 function _rptSubUpdateSummary() {
-    const counts = { active: 0, expiring: 0, expired: 0, none: 0 };
+    const counts = { active: 0, expiring: 0, expired: 0, new: 0, none: 0 };
     _rptSubFiltered.forEach(t => counts[_rptSubStatus(t)]++);
     document.getElementById('rpt-sub-count-total').innerHTML    = `<strong>${_rptSubFiltered.length}</strong> tags`;
     document.getElementById('rpt-sub-count-active').innerHTML   = `<strong>${counts.active}</strong> active`;
     document.getElementById('rpt-sub-count-expiring').innerHTML = `<strong>${counts.expiring}</strong> expiring`;
     document.getElementById('rpt-sub-count-expired').innerHTML  = `<strong>${counts.expired}</strong> expired`;
+    document.getElementById('rpt-sub-count-new').innerHTML      = `<strong>${counts.new}</strong> new`;
     document.getElementById('rpt-sub-count-none').innerHTML     = `<strong>${counts.none}</strong> no package`;
     document.getElementById('rpt-sub-summary').style.display    = 'flex';
 }
