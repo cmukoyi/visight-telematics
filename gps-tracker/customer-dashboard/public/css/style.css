@@ -1476,16 +1476,7 @@ tbody tr:hover { background: var(--bg-3); }
 
   /* Content padding */
   .content { padding: 14px; gap: 14px; }
-  #tab-users,
-  #tab-asset-mgmt,
-  #tab-locations,
-  #tab-settings,
-  #tab-qr,
-  #tab-reports-subscriptions,
-  #tab-reports-activity,
-  #tab-reports-trips,
-  #tab-reports-battery,
-  #tab-reports-alerts { padding: 14px; gap: 14px; }
+  #tab-users { padding: 14px; gap: 14px; }
 
   /* Cards */
   .card { padding: 16px; }
@@ -1533,17 +1524,21 @@ tbody tr:hover { background: var(--bg-3); }
   :root { --header-h: 52px; }
 
   .content { padding: 10px; gap: 10px; }
-  #tab-users,
-  #tab-asset-mgmt,
-  #tab-locations,
-  #tab-settings,
-  #tab-qr,
-  #tab-reports-subscriptions,
-  #tab-reports-activity,
-  #tab-reports-trips,
-  #tab-reports-battery,
-  #tab-reports-alerts { padding: 10px; gap: 10px; }
+  #tab-users { padding: 10px; gap: 10px; }
   .card { padding: 12px; }
+
+  /* Settings: stack label + control vertically on tiny screens */
+  .settings-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .settings-row-label { min-width: unset; }
+  .settings-row-control { width: 100%; flex-wrap: wrap; }
+  .logo-preview-box { width: 120px; height: 44px; }
+  .settings-inline-edit input[type="text"] { max-width: 100%; }
+
+  /* Reports toolbar: stack selects/buttons */
+  .rpt-toolbar { flex-direction: column; align-items: stretch; }
+  .rpt-toolbar .search-input-wrap { max-width: 100%; }
+  .rpt-toolbar select,
+  .rpt-toolbar input[type="date"] { width: 100%; }
 
   /* History map: taller relative */
   #hist-map { flex: 0 0 40vh; }
@@ -1654,29 +1649,24 @@ tbody tr:hover { background: var(--bg-3); }
 .top-bar-company { font-size: 12px; color: var(--text-3); margin-top: 2px; }
 
 /* ── Tab pane containers ── */
-/* Default: scrollable so content never gets clipped on tablet/mobile */
-.tab-content { display: none; flex: 1; flex-direction: column; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+/* Default: overflow:hidden — structured tabs manage scroll via internal wrappers */
+.tab-content { display: none; flex: 1; flex-direction: column; overflow: hidden; }
 .tab-content.active { display: flex; }
-/* Map-like tabs that manage their own internal scroll must NOT scroll at this level */
-#tab-livemap.active,
-#tab-history.active,
-#tab-building.active,
-#tab-floorplan.active { overflow: hidden; }
 
-/* Tabs whose direct children are .card elements need their own padding/gap */
-#tab-users,
-#tab-asset-mgmt,
-#tab-locations,
-#tab-settings,
-#tab-qr,
-#tab-reports-subscriptions,
-#tab-reports-activity,
-#tab-reports-trips,
-#tab-reports-battery,
-#tab-reports-alerts {
+/* Card-only tabs have no internal flex scroll wrapper — must scroll at tab level */
+/* Users: two stacked cards that can exceed viewport on tablet/mobile             */
+#tab-users {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 24px;
   gap: 20px;
 }
+/* Settings: CSS columns layout, needs tab-level scroll */
+#tab-settings {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+/* QR tab: #qr-root already handles overflow-y:auto+height:100%, tab stays hidden */
 
 /* ── Floorplan Sketch tab — iframe fills all available space ── */
 #tab-building.active { padding: 0; overflow: hidden; }
