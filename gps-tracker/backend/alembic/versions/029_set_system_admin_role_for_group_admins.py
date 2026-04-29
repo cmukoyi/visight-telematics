@@ -1,9 +1,14 @@
-"""Set role='system_admin' for all portal_users where is_group_admin=True.
+"""Set role='system_admin' for portal_users created at UserGroup creation.
 
-These are the initial admin accounts created automatically when a UserGroup
-is provisioned. They are now distinguished from regular Admin users by the
-'system_admin' role, which is displayed as "Built-in System Admin" in the
-customer portal and cannot be edited or deactivated via the portal UI.
+The initial admin account created when a UserGroup is provisioned has
+is_group_admin=TRUE. This is the ONLY place in the codebase that sets
+is_group_admin=True (routes_admin.py create_usergroup), so the condition
+is precise — it does NOT affect regular Admin portal users added later
+(those always have is_group_admin=FALSE regardless of their role).
+
+These built-in accounts are now protected: they display as "Built-in System
+Admin" in the customer portal and cannot be modified or deactivated via
+the portal PATCH /users/{id} endpoint.
 
 Revision ID: 029
 Revises: 028

@@ -337,6 +337,10 @@ def patch_portal_user(
     if str(target.id) == str(me.id):
         raise HTTPException(status_code=400, detail="You cannot modify your own account")
 
+    # Built-in system admin accounts (created at group creation) cannot be modified
+    if target.role == "system_admin":
+        raise HTTPException(status_code=403, detail="Built-in system admin accounts cannot be modified")
+
     # Non-admin portal users cannot deactivate or set expiry on admin users
     target_is_admin = target.is_group_admin or target.role == "admin"
     if target_is_admin and not me.is_group_admin:
