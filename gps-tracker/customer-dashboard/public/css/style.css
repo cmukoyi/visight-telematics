@@ -1284,23 +1284,282 @@ tbody tr:hover { background: var(--bg-3); }
 ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
 
-/* ── Responsive ─────────────────────────────────────────────── */
+/* ── Map panel toggle button (mobile/tablet) ───────────────── */
+.map-panel-toggle {
+  display: none; /* hidden on desktop */
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 500;
+  width: 38px; height: 38px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: .9rem;
+  box-shadow: var(--shadow-sm);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.map-panel-toggle:hover { background: var(--bg-3); color: var(--text); }
+
+@media (max-width: 768px) {
+  .map-panel-toggle { display: flex; }
+  #hist-panel-btn { display: flex !important; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   RESPONSIVE — Tablet (≤900px) and Mobile (≤600px)
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Sidebar overlay backdrop ──────────────────────────────── */
+#sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  z-index: 99;
+  backdrop-filter: blur(2px);
+}
+#sidebar-backdrop.visible { display: block; }
+
+/* ── Tablet (769px – 900px): icon-only sidebar ─────────────── */
 @media (max-width: 900px) {
   #app {
     grid-template-columns: 56px 1fr;
   }
-  #sidebar { width: 56px; }
+  #sidebar {
+    width: 56px;
+    overflow: visible; /* allow drawer to expand without clipping */
+  }
   #sidebar .nav-label,
   #sidebar .nav-section-label,
   #sidebar .sidebar-footer-info { display: none; }
   #sidebar .nav-item { justify-content: center; padding: 10px; }
-  .map-sidebar { width: 260px; }
-  .hist-timeline-panel { width: 260px; }
+
+  /* Sidebar drawer open state (triggered by hamburger on small screens) */
+  #sidebar.drawer-open {
+    width: var(--sidebar-w);
+    position: fixed;
+    top: var(--header-h);
+    left: 0;
+    bottom: 0;
+    z-index: 100;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  #sidebar.drawer-open .nav-label,
+  #sidebar.drawer-open .nav-section-label,
+  #sidebar.drawer-open .sidebar-footer-info { display: block; }
+  #sidebar.drawer-open .nav-item { justify-content: flex-start; padding: 9px 12px; }
+
+  /* Live Map sidebar: narrower */
+  .map-sidebar { width: 240px; min-width: 200px; }
+
+  /* History panel: narrower */
+  .hist-timeline-panel { width: 240px; min-width: 200px; }
+
+  /* View header: allow buttons to wrap */
+  .view-header { flex-wrap: wrap; gap: 8px; padding: 10px 14px; }
+
+  /* Report toolbars */
+  .rpt-toolbar { padding: 10px 14px; gap: 8px; }
+
+  /* Tables always scrollable */
+  .table-wrap, .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 }
-@media (max-width: 640px) {
-  .map-sidebar { display: none; }
-  .hist-timeline-panel { width: 220px; }
-  #assetmgmt-grid { grid-template-columns: 1fr; }
+
+/* ── Small tablet / large mobile (≤768px): drawer sidebar ─── */
+@media (max-width: 768px) {
+  #app {
+    grid-template-columns: 0 1fr; /* sidebar takes no space — overlay only */
+    grid-template-areas:
+      "header header"
+      "main   main";
+  }
+
+  #sidebar {
+    position: fixed;
+    top: var(--header-h);
+    left: 0;
+    bottom: 0;
+    width: var(--sidebar-w);
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    overflow-y: auto;
+    overflow-x: hidden;
+    width: 260px;
+  }
+  #sidebar .nav-label,
+  #sidebar .nav-section-label,
+  #sidebar .sidebar-footer-info { display: block; }
+  #sidebar .nav-item { justify-content: flex-start; padding: 9px 12px; }
+
+  #sidebar.drawer-open {
+    transform: translateX(0);
+    width: 260px;
+    position: fixed; /* restate for specificity */
+  }
+
+  /* Main fills full width */
+  #main-content { grid-column: 1 / -1; }
+
+  /* Live Map: hide list sidebar by default, show with toggle button */
+  .map-sidebar {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    width: 280px;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    box-shadow: 4px 0 20px rgba(0,0,0,.4);
+  }
+  .map-sidebar.panel-open { transform: translateX(0); }
+
+  /* Map area takes full width always */
+  #tab-livemap { position: relative; }
+  .map-area { flex: 1; }
+
+  /* History view: stack vertically */
+  .hist-body { flex-direction: column; }
+  #hist-map { flex: 0 0 45vh; min-height: 240px; position: relative; }
+  .hist-timeline-panel {
+    width: 100%;
+    min-width: unset;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    flex: 1;
+    min-height: 200px;
+    /* On mobile the panel is shown below map — always visible in column layout */
+  }
+
+  /* History controls: wrap everything */
+  .hist-controls {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 14px;
+  }
+  .hist-controls .hist-field,
+  .hist-controls .hist-asset-name-wrap { width: 100%; }
+  .hist-controls select,
+  .hist-controls .hist-asset-name-wrap select { width: 100%; }
+
+  /* Locations: full-width sidebar, map below */
+  .loc-main {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto 1fr;
+  }
+  .loc-sidebar {
+    max-height: 45vh;
+    overflow-y: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  #locMap { min-height: 50vh !important; }
+  .loc-editor-panel { width: 100% !important; right: 0; left: 0; }
+
+  /* Asset management grid */
+  #assetmgmt-grid,
+  .asset-card-grid { grid-template-columns: 1fr; }
+
+  /* View headers: stack on small */
+  .view-header {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 14px;
+  }
+  .view-header .search-input-wrap { max-width: 100% !important; width: 100%; flex: 1 1 100%; }
+
+  /* Content padding */
+  .content { padding: 14px; gap: 14px; }
+
+  /* Cards */
+  .card { padding: 16px; }
+  .card-header { margin-bottom: 14px; padding-bottom: 10px; }
+
+  /* Settings cards: single column */
+  .settings-cards { padding: 14px; columns: 1 !important; }
+
+  /* Report toolbars */
+  .rpt-toolbar { padding: 10px 14px; flex-wrap: wrap; }
+  .rpt-table-wrap { padding: 0 14px 14px; }
+  .rpt-summary-bar { padding: 8px 14px; flex-wrap: wrap; gap: 6px; }
+
+  /* Stats grid: 2 columns */
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+
+  /* Modals: full-width on small screens */
+  .modal-content {
+    width: 96% !important;
+    max-width: 96vw !important;
+    padding: 20px 16px;
+    max-height: 92vh;
+  }
+
+  /* Tables */
+  .table-wrap, .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Logo: hide sub-label on very small header */
+  .logo-sub { display: none; }
+
+  /* Notification panel: full width */
+  #notif-panel { width: calc(100vw - 20px); right: 0; left: 0; margin: 0 10px; }
+
+  /* Header: compress */
+  #app-header { padding: 0 12px; gap: 8px; }
+  .logo-wrap { min-width: unset; }
+  #pageTitle { display: none; }
+}
+
+/* ── Mobile (≤480px): tighter layout ──────────────────────── */
+@media (max-width: 480px) {
+  :root { --header-h: 52px; }
+
+  .content { padding: 10px; gap: 10px; }
+  .card { padding: 12px; }
+
+  /* History map: taller relative */
+  #hist-map { flex: 0 0 40vh; }
+
+  /* Stats: 2-column */
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+
+  /* Hide some table columns on mobile via data attributes (progressive) */
+  .table-wrap table th:nth-child(n+5),
+  .table-wrap table td:nth-child(n+5) {
+    display: none;
+  }
+  /* Keep essential Asset List columns: IMEI, Description, Status, Actions */
+  #al-tbody tr td:nth-child(1),
+  #al-tbody tr td:nth-child(2),
+  #al-tbody tr td:nth-child(5),
+  #al-tbody tr td:nth-child(11),
+  thead tr th:nth-child(1),
+  thead tr th:nth-child(2),
+  thead tr th:nth-child(5) { display: table-cell !important; }
+
+  /* Full-width modals */
+  .modal-content {
+    width: 100% !important;
+    max-width: 100vw !important;
+    max-height: 95vh;
+    border-radius: var(--radius) var(--radius) 0 0;
+    margin-top: auto;
+  }
+
+  /* Buttons: compact */
+  .btn { padding: 6px 10px; font-size: .8rem; }
+  .btn-sm { padding: 4px 8px; font-size: .75rem; }
+
+  /* Loc sidebar: shorter */
+  .loc-sidebar { max-height: 38vh; }
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -1681,9 +1940,10 @@ select option { background: var(--bg-3); }
 
 /* ── Responsive (portal) ─────────────────────────────────── */
 @media (max-width: 768px) {
-  .content { padding: 16px; }
-  .top-bar { padding: 12px 16px; }
+  .content { padding: 14px; }
+  .top-bar { padding: 10px 14px; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  #gpsMap { height: 300px; }
 }
 
 /* ── Asset Categories ─────────────────────────────────────── */

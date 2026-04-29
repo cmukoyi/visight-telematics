@@ -140,11 +140,13 @@
 
 <!-- ══════════════════ DASHBOARD ══════════════════ -->
 <div id="dashboardPage" style="display:none">
+<!-- Sidebar overlay backdrop (mobile/tablet drawer) -->
+<div id="sidebar-backdrop" onclick="closeSidebarDrawer()"></div>
 <div id="app">
 
     <!-- ── HEADER ── -->
     <header id="app-header">
-        <button id="sidebar-toggle" title="Toggle sidebar" onclick="(function(){var s=document.getElementById('sidebar'),a=document.getElementById('app');s.classList.toggle('collapsed');a.classList.toggle('sidebar-collapsed');})()">
+        <button id="sidebar-toggle" title="Toggle sidebar" onclick="toggleSidebarResponsive()">
             <i class="fa-solid fa-bars"></i>
         </button>
 
@@ -350,6 +352,10 @@
                 </aside>
 
                 <div class="map-area">
+                    <!-- Mobile: toggle asset list panel -->
+                    <button id="lm-sidebar-btn" class="map-panel-toggle" onclick="toggleMapSidebar()" title="Toggle asset list">
+                        <i class="fa-solid fa-list"></i>
+                    </button>
                     <div id="liveMap"></div>
                 </div>
             </div>
@@ -426,9 +432,14 @@
                 </div>
 
                 <div class="hist-body">
-                    <div id="hist-map"></div>
+                    <div id="hist-map" style="position:relative">
+                        <!-- Mobile: toggle journey panel -->
+                        <button id="hist-panel-btn" class="map-panel-toggle" onclick="toggleHistPanel()" title="Toggle journeys panel" style="display:none">
+                            <i class="fa-solid fa-route"></i>
+                        </button>
+                    </div>
 
-                    <aside class="hist-timeline-panel">
+                    <aside class="hist-timeline-panel" id="hist-timeline-panel">
                         <div class="hist-timeline-header">
                             <i class="fa-solid fa-route" style="color:var(--primary)"></i>
                             Journeys
@@ -596,6 +607,14 @@
             @keyframes locToastIn { from{transform:translateX(16px);opacity:0} to{transform:translateX(0);opacity:1} }
             /* Responsive */
             @media (max-width:900px) { .loc-main { grid-template-columns:300px 1fr; } .loc-editor-panel { width:300px; } }
+            @media (max-width:768px) {
+              .loc-main { grid-template-columns:1fr !important; grid-template-rows:auto 1fr; }
+              .loc-sidebar { max-height:45vh; overflow-y:auto; border-right:none; border-bottom:1px solid var(--border); }
+              .loc-map-area { min-height:50vh; }
+              #locMap { min-height:50vh !important; }
+              .loc-editor-panel { width:100% !important; left:0 !important; right:0 !important; }
+              .loc-stats { grid-template-columns:repeat(2,1fr); }
+            }
             </style>
 
             <div id="tab-locations" class="tab-content" style="padding:0;overflow:hidden">
@@ -2963,6 +2982,60 @@ function toggleTheme() {
 }
 // Apply saved theme immediately (before login check)
 applyTheme(localStorage.getItem('pp-theme') || 'dark');
+
+// ══════════════════════════════════════════
+// Responsive sidebar + panel helpers
+// ══════════════════════════════════════════
+function _isMobileLayout() {
+    return window.innerWidth <= 768;
+}
+
+function toggleSidebarResponsive() {
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    const app = document.getElementById('app');
+    if (_isMobileLayout()) {
+        const open = sidebar.classList.toggle('drawer-open');
+        backdrop.classList.toggle('visible', open);
+    } else {
+        sidebar.classList.toggle('collapsed');
+        app.classList.toggle('sidebar-collapsed');
+    }
+}
+
+function closeSidebarDrawer() {
+    document.getElementById('sidebar').classList.remove('drawer-open');
+    document.getElementById('sidebar-backdrop').classList.remove('visible');
+}
+
+// Close sidebar drawer when a nav item is tapped on mobile
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('#sidebar .nav-item').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            if (_isMobileLayout()) closeSidebarDrawer();
+        });
+    });
+});
+
+function toggleMapSidebar() {
+    const sidebar = document.querySelector('#tab-livemap .map-sidebar');
+    if (sidebar) sidebar.classList.toggle('panel-open');
+}
+
+function toggleHistPanel() {
+    const panel = document.getElementById('hist-timeline-panel');
+    if (panel) panel.classList.toggle('panel-open');
+}
+
+// On window resize: reset drawer state if returning to desktop
+window.addEventListener('resize', function() {
+    if (window.innerWidth > 768) {
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        sidebar.classList.remove('drawer-open');
+        backdrop.classList.remove('visible');
+    }
+});
 
 // ══════════════════════════════════════════
 // Tab switching
