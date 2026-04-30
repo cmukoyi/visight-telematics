@@ -7,7 +7,6 @@ import 'package:ble_tracker_app/screens/poi_management_screen.dart';
 import 'package:ble_tracker_app/screens/add_tag_screen.dart';
 import 'package:ble_tracker_app/services/auth_service.dart';
 import 'package:ble_tracker_app/services/token_refresh_manager.dart';
-import 'package:ble_tracker_app/widgets/deployment_banner.dart';
 
 void main() {
   runApp(const MyApp());
@@ -30,19 +29,7 @@ class MyApp extends StatelessWidget {
           '/poi-management': (context) => const POIManagementScreen(),
           '/add-tag': (context) => const AddTagScreen(),
         },
-        builder: (context, child) {
-          return Stack(
-            children: [
-              child!,
-              const Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: DeploymentBanner(),
-              ),
-            ],
-          );
-        },
+        builder: (context, child) => child!,
       ),
     );
   }

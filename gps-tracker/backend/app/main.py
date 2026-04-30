@@ -1636,7 +1636,7 @@ def get_vehicles(
             
             formatted_vehicles.append({
                 "id": str(tag.id),  # Use BLETag database ID
-                "description": tag.device_name or tag.description or tag.imei,
+                "description": tag.description or tag.device_name or tag.imei,
                 "registration": tag.imei,
                 "ignitionOn": False,  # Not stored in database currently
                 "lastKnownPosition": last_known_position,

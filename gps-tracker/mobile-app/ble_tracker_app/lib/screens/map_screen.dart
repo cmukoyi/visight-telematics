@@ -308,7 +308,7 @@ class _MapScreenState extends State<MapScreen> {
                 position: position,
                 icon: markerIcon,
                 infoWindow: gmaps.InfoWindow(
-                  title: vehicle.description,
+                  title: _vehicleCustomNames[vehicle.id] ?? vehicle.description,
                   snippet: snippet,
                 ),
                 onTap: () => _showVehicleDetails(vehicle),
@@ -331,7 +331,7 @@ class _MapScreenState extends State<MapScreen> {
                 annotationId: apple.AnnotationId(vehicle.id),
                 position: apple.LatLng(position.latitude, position.longitude),
                 infoWindow: apple.InfoWindow(
-                  title: vehicle.description,
+                  title: _vehicleCustomNames[vehicle.id] ?? vehicle.description,
                   snippet: snippet,
                 ),
                 onTap: () => _showVehicleDetails(vehicle),
