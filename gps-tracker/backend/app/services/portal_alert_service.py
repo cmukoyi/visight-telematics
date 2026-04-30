@@ -1,9 +1,10 @@
 """
-Service for generating unified portal alerts (battery low, tag offline, geofence).
+Service for generating unified portal alerts (battery low, tag offline, geofence, GDPR deletion).
 
 Called by:
   - location_poller_service  (battery_low, tag_offline, purge old alerts)
   - geofence_service         (geofence_entry, geofence_exit)
+  - main._gdpr_cleanup_loop  (gdpr_deletion_warning)
 """
 import logging
 from datetime import datetime, timedelta
@@ -108,10 +109,11 @@ def create_alert(db: Session, usergroup_id: str, tag_id: str | None,
 
 # ── Notify flag per alert type ────────────────────────────────────────────────
 _NOTIFY_FLAG = {
-    "battery_low":    "notify_battery_low",
-    "tag_offline":    "notify_offline",
-    "geofence_entry": "notify_geofence_exit",   # same preference covers both directions
-    "geofence_exit":  "notify_geofence_exit",
+    "battery_low":           "notify_battery_low",
+    "tag_offline":           "notify_offline",
+    "geofence_entry":        "notify_geofence_exit",   # same preference covers both directions
+    "geofence_exit":         "notify_geofence_exit",
+    "gdpr_deletion_warning": "alerts_enabled",         # always send if alerts are on
 }
 
 
@@ -271,3 +273,47 @@ def purge_old_alerts(db: Session) -> int:
     if deleted:
         logger.info("🧹 Purged %d portal alerts older than %d days", deleted, ALERT_RETENTION_DAYS)
     return deleted
+
+
+TAG_DELETE_GRACE_DAYS = 7  # days after expiry before hard deletion
+
+
+def send_gdpr_deletion_warning(db: Session, tag: BLETag) -> bool:
+    """Send a one-time inbox alert + email warning that the tag and all its data
+    will be permanently deleted in TAG_DELETE_GRACE_DAYS days.
+
+    Returns True if at least one alert was created (i.e. a group was found).
+    The caller must set tag.gdpr_deletion_warned_at and commit after calling this.
+    """
+    group_ids = _groups_for_tag(db, tag)
+    if not group_ids:
+        # No group found — still log, deletion will proceed silently
+        logger.warning("[GDPR] No group found for tag %s — deletion warning skipped", tag.imei)
+        return False
+
+    label       = _tag_label(tag)
+    tag_id      = str(tag.id)
+    delete_date = (datetime.utcnow() + timedelta(days=TAG_DELETE_GRACE_DAYS)).strftime("%d %B %Y")
+    _title = f"Data deletion notice — {label}"
+    _msg   = (
+        f"The following Tag and all associated data will be permanently deleted in "
+        f"{TAG_DELETE_GRACE_DAYS} days as part of our GDPR data retention policy.\n\n"
+        f"IMEI: {tag.imei}\n"
+        f"Description: {label}\n\n"
+        f"Scheduled deletion date: {delete_date}\n\n"
+        f"If you wish to keep this tag, please renew its subscription before the deletion date."
+    )
+    _meta = {
+        "imei": tag.imei,
+        "tag_description": label,
+        "delete_on": delete_date,
+    }
+
+    for usergroup_id in group_ids:
+        create_alert(db, usergroup_id, tag_id,
+                     alert_type="gdpr_deletion_warning",
+                     title=_title, message=_msg, meta_data=_meta)
+        _notify_group_by_email(db, usergroup_id, "gdpr_deletion_warning", _title, _msg, _meta)
+        logger.info("[GDPR] Deletion warning sent for tag %s → group %s (deletes %s)",
+                    tag.imei, usergroup_id, delete_date)
+    return True

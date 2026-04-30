@@ -107,6 +107,7 @@ class BLETag(Base):
     package_id      = Column(String(36), ForeignKey("tag_packages.id"), nullable=True, index=True)
     expiry_date     = Column(DateTime(timezone=True), nullable=True)  # activation_date + package.validity_days
     activation_date = Column(DateTime(timezone=True), nullable=True)  # set on first GPS fix; expiry calculated from here
+    gdpr_deletion_warned_at = Column(DateTime(timezone=True), nullable=True)  # set when 7-day deletion warning is sent
 
     # Relationships
     user = relationship("User", back_populates="ble_tags")

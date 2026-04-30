@@ -489,10 +489,11 @@ Pinplot Team
             meta_data = meta_data or {}
             # ── Per-type styling ──────────────────────────────────────────
             styles = {
-                "battery_low":    {"emoji": "🔋", "color": "#F59E0B", "bg": "#FEF3C7", "label": "Battery Low"},
-                "tag_offline":    {"emoji": "📴", "color": "#6B7280", "bg": "#F3F4F6", "label": "Tag Offline"},
-                "geofence_entry": {"emoji": "🟢", "color": "#10B981", "bg": "#D1FAE5", "label": "Geofence Entry"},
-                "geofence_exit":  {"emoji": "🔴", "color": "#EF4444", "bg": "#FEE2E2", "label": "Geofence Exit"},
+                "battery_low":           {"emoji": "🔋", "color": "#F59E0B", "bg": "#FEF3C7", "label": "Battery Low"},
+                "tag_offline":           {"emoji": "📴", "color": "#6B7280", "bg": "#F3F4F6", "label": "Tag Offline"},
+                "geofence_entry":        {"emoji": "🟢", "color": "#10B981", "bg": "#D1FAE5", "label": "Geofence Entry"},
+                "geofence_exit":         {"emoji": "🔴", "color": "#EF4444", "bg": "#FEE2E2", "label": "Geofence Exit"},
+                "gdpr_deletion_warning": {"emoji": "🗑️", "color": "#7C3AED", "bg": "#EDE9FE", "label": "Data Deletion Notice"},
             }
             s = styles.get(alert_type, {"emoji": "🔔", "color": "#173C64", "bg": "#EFF6FF", "label": "Alert"})
 
@@ -508,6 +509,10 @@ Pinplot Team
                 detail_rows += f"<tr><td style='padding:6px 12px;color:#666'>Last seen</td><td style='padding:6px 12px'>{meta_data['last_seen'][:19].replace('T',' ')}</td></tr>"
             if "imei" in meta_data:
                 detail_rows += f"<tr><td style='padding:6px 12px;color:#666'>IMEI</td><td style='padding:6px 12px'>{meta_data['imei']}</td></tr>"
+            if "tag_description" in meta_data:
+                detail_rows += f"<tr><td style='padding:6px 12px;color:#666'>Description</td><td style='padding:6px 12px'>{meta_data['tag_description']}</td></tr>"
+            if "delete_on" in meta_data:
+                detail_rows += f"<tr><td style='padding:6px 12px;color:#666'>Scheduled deletion</td><td style='padding:6px 12px'><strong>{meta_data['delete_on']}</strong></td></tr>"
 
             subject = f"{s['emoji']} {title}"
             text_content = f"{title}\n\n{message}\n\nPinplot Alerts"

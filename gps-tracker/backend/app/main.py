@@ -245,45 +245,88 @@ def shutdown_event():
 
 
 # ---------------------------------------------------------------------------
-# GDPR cleanup — delete beacon data 40 days after package expiry
+# GDPR cleanup — hard-delete tag + all data 7 days after package expiry
 # ---------------------------------------------------------------------------
-GDPR_GRACE_DAYS = 40
+TAG_DELETE_GRACE_DAYS = 7   # days after expiry_date before hard deletion
 
 async def _gdpr_cleanup_loop():
-    """Run every 24 hours. Delete BeaconSighting rows for tags whose
-    package expiry_date + GDPR_GRACE_DAYS has passed, then clear
-    location fields on the tag so expired tags show no position."""
+    """Run every 24 hours.
+
+    Step 1 — Warning (fires once at expiry):
+        For every tag whose expiry_date has passed AND gdpr_deletion_warned_at
+        is NULL, send one inbox alert + one email to the owning group and record
+        the warning timestamp.
+
+    Step 2 — Hard delete (fires at expiry + 7 days):
+        For every tag whose expiry_date + TAG_DELETE_GRACE_DAYS has passed,
+        delete all associated rows (BeaconSightings, POITrackerLinks,
+        GeofenceAlerts, PortalAlerts) then delete the tag row itself.
+    """
     from app.database import SessionLocal
-    from app.models import BeaconSighting
+    from app.models import BeaconSighting, POITrackerLink, GeofenceAlert, PortalAlert
+    import app.services.portal_alert_service as _pas
+
     while True:
         try:
-            cutoff = datetime.utcnow() - timedelta(days=GDPR_GRACE_DAYS)
+            now = datetime.utcnow()
+            delete_cutoff  = now - timedelta(days=TAG_DELETE_GRACE_DAYS)
             db: Session = SessionLocal()
             try:
-                expired_tags = (
+                # ── Step 1: send deletion warnings ────────────────────────
+                tags_to_warn = (
                     db.query(BLETag)
                     .filter(
                         BLETag.expiry_date != None,
-                        BLETag.expiry_date <= cutoff,
+                        BLETag.expiry_date <= now,
+                        BLETag.gdpr_deletion_warned_at == None,
                     )
                     .all()
                 )
-                purged = 0
-                for tag in expired_tags:
-                    # Remove beacon sighting rows
-                    deleted = (
-                        db.query(BeaconSighting)
-                        .filter(BeaconSighting.tag_id == tag.imei)
-                        .delete(synchronize_session=False)
-                    )
-                    purged += deleted
-                    # Clear cached location on the tag
-                    tag.latitude = None
-                    tag.longitude = None
-                    tag.location_description = None
-                if purged > 0 or expired_tags:
+                warned = 0
+                for tag in tags_to_warn:
+                    _pas.send_gdpr_deletion_warning(db, tag)
+                    tag.gdpr_deletion_warned_at = now
+                    warned += 1
+                if warned:
                     db.commit()
-                    print(f"[GDPR] Purged {purged} sighting rows across {len(expired_tags)} expired tags")
+                    print(f"[GDPR] Deletion warnings sent for {warned} expired tag(s)")
+
+                # ── Step 2: hard-delete tags past the grace period ─────────
+                tags_to_delete = (
+                    db.query(BLETag)
+                    .filter(
+                        BLETag.expiry_date != None,
+                        BLETag.expiry_date <= delete_cutoff,
+                    )
+                    .all()
+                )
+                deleted_count = 0
+                for tag in tags_to_delete:
+                    tag_id  = tag.id
+                    tag_imei = tag.imei
+                    # 1. Beacon sightings (keyed by IMEI string)
+                    db.query(BeaconSighting).filter(
+                        BeaconSighting.tag_id == tag_imei
+                    ).delete(synchronize_session=False)
+                    # 2. POI tracker links
+                    db.query(POITrackerLink).filter(
+                        POITrackerLink.tracker_id == tag_id
+                    ).delete(synchronize_session=False)
+                    # 3. Geofence alerts (NOT NULL FK — must go before tag)
+                    db.query(GeofenceAlert).filter(
+                        GeofenceAlert.tracker_id == tag_id
+                    ).delete(synchronize_session=False)
+                    # 4. Portal alerts (nullable FK — delete to keep inbox clean)
+                    db.query(PortalAlert).filter(
+                        PortalAlert.tag_id == tag_id
+                    ).delete(synchronize_session=False)
+                    # 5. Delete the tag itself
+                    db.delete(tag)
+                    deleted_count += 1
+                    print(f"[GDPR] Hard-deleted tag {tag_imei} (expired {tag.expiry_date})")
+                if deleted_count:
+                    db.commit()
+                    print(f"[GDPR] Hard-deleted {deleted_count} expired tag(s) and all associated data")
             finally:
                 db.close()
         except Exception as exc:
