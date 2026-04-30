@@ -2550,10 +2550,11 @@
             <button class="modal-close" onclick="closeModal('bulkUploadModal')">×</button>
         </div>
         <div id="bulkUploadAlert" class="alert" style="display:none"><span id="bulkUploadAlertText"></span></div>
-        <p style="color:var(--text-2);font-size:13px;margin-bottom:16px">Upload an Excel (.xlsx) or CSV file with your tags. Each row must have <strong>imei</strong> and <strong>owner_email</strong> columns.</p>
+        <p style="color:var(--text-2);font-size:13px;margin-bottom:8px">Upload an Excel (.xlsx) or CSV file with your tags. Each row must have <strong>imei</strong> and <strong>owner_email</strong> columns.</p>
+        <p style="color:var(--warning,#f59e0b);font-size:12px;margin-bottom:14px"><i class="fa-solid fa-triangle-exclamation"></i> <strong>Always use the Excel template (.xlsx)</strong> — do not type IMEIs into a plain CSV/Excel file as "General" number format will corrupt long IMEI numbers.</p>
         <div style="margin-bottom:16px">
             <button class="btn btn-ghost btn-sm" onclick="downloadBulkTemplate()">
-                <i class="fa-solid fa-download"></i> Download Template
+                <i class="fa-solid fa-download"></i> Download Template (.xlsx)
             </button>
         </div>
         <div class="form-group">
@@ -8106,13 +8107,32 @@ async function deleteTag(tagId, imei) {
 let _bulkRows = [];
 
 function downloadBulkTemplate() {
-    const csv = 'imei,owner_email,description,tag_type\n867123456789012,user@company.com,Company Van 1,vehicle\n';
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'bulk_tag_template.csv';
-    a.click();
-    URL.revokeObjectURL(a.href);
+    // Generate XLSX (not CSV) so Excel does not auto-convert IMEI to a number.
+    // Column A (imei) cells are explicitly typed as strings ('t':'s') which
+    // tells Excel to store and display them as text — preventing the precision
+    // loss that turns e.g. 780901807533037 → 780902000000000.
+    const wb = XLSX.utils.book_new();
+    const rows = [
+        ['imei',              'owner_email',          'description',    'tag_type'],
+        ['867123456789012',   'user@company.com',     'Company Van 1',  'vehicle'],
+        ['780901807533037',   'user2@company.com',    'Company Van 2',  'vehicle'],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    // Force every cell in column A to string type so Excel never treats
+    // the value as a number (which would silently truncate precision).
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:D3');
+    for (let R = 0; R <= range.e.r; R++) {
+        const addr = XLSX.utils.encode_cell({ r: R, c: 0 });
+        if (ws[addr]) {
+            ws[addr].t = 's';
+            ws[addr].v = String(ws[addr].v);
+            delete ws[addr].z; // remove any inherited number format
+        }
+    }
+    // Sensible column widths
+    ws['!cols'] = [{ wch: 22 }, { wch: 32 }, { wch: 26 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(wb, ws, 'Tags');
+    XLSX.writeFile(wb, 'bulk_tag_template.xlsx');
 }
 
 document.addEventListener('change', function(e) {
@@ -8124,7 +8144,10 @@ document.addEventListener('change', function(e) {
         try {
             const wb = XLSX.read(evt.target.result, { type: 'array' });
             const ws = wb.Sheets[wb.SheetNames[0]];
-            const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
+            // raw:false forces all cells to string — prevents SheetJS returning
+            // a JavaScript number for IMEI cells, which would lose precision for
+            // 15-16 digit values even when the template cell type is correct.
+            const data = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
             _bulkRows = data.map(r => ({
                 imei:        String(r['imei'] || r['IMEI'] || '').trim(),
                 owner_email: String(r['owner_email'] || r['Owner Email'] || '').trim(),
