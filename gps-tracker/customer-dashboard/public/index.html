@@ -2547,9 +2547,7 @@
     <div class="modal-content" style="max-width:540px">
         <div class="modal-header">
             <span class="modal-title"><i class="fa-solid fa-file-arrow-up" style="margin-right:8px"></i>Bulk Upload Tags</span>
-            <button class="modal-close" onclick="closeModal('bulkUploadModal')">×</button>
-        </div>
-        <div id="bulkUploadAlert" class="alert" style="display:none"><span id="bulkUploadAlertText"></span></div>
+            <button class="modal-close" onclick="closeModal('bulkUploadModal');resetBulkUploadModal()">×</button> class="alert" style="display:none"><span id="bulkUploadAlertText"></span></div>
         <p style="color:var(--text-2);font-size:13px;margin-bottom:8px">Upload an Excel (.xlsx) or CSV file with your tags. Each row must have <strong>imei</strong> and <strong>owner_email</strong> columns.</p>
         <p style="color:var(--warning,#f59e0b);font-size:12px;margin-bottom:14px"><i class="fa-solid fa-triangle-exclamation"></i> <strong>Always use the Excel template (.xlsx)</strong> — do not type IMEIs into a plain CSV/Excel file as "General" number format will corrupt long IMEI numbers.</p>
         <div style="margin-bottom:16px">
@@ -2577,7 +2575,7 @@
             <div id="bulkResultDetail" style="max-height:160px;overflow-y:auto;font-size:12px;color:var(--text-2)"></div>
         </div>
         <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
-            <button class="btn btn-secondary" onclick="closeModal('bulkUploadModal')">Close</button>
+            <button class="btn btn-secondary" onclick="closeModal('bulkUploadModal');resetBulkUploadModal()">Close</button>
             <button class="btn btn-primary" id="bulkUploadBtn" onclick="submitBulkUpload()" disabled>
                 <i class="fa-solid fa-upload"></i> Upload
             </button>
@@ -3097,8 +3095,24 @@ function switchTab(name) {
 // ══════════════════════════════════════════
 // Modals
 // ══════════════════════════════════════════
-function openModal(id)  { document.getElementById(id).classList.add('active'); }
+function openModal(id) {
+    document.getElementById(id).classList.add('active');
+    if (id === 'bulkUploadModal') resetBulkUploadModal();
+}
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+function resetBulkUploadModal() {
+    _bulkRows = [];
+    document.getElementById('bulkFileInput').value = '';
+    document.getElementById('bulkPreview').style.display    = 'none';
+    document.getElementById('bulkResults').style.display    = 'none';
+    document.getElementById('bulkUploadAlert').style.display = 'none';
+    document.getElementById('bulkPreviewBody').innerHTML    = '';
+    document.getElementById('bulkResultDetail').innerHTML   = '';
+    document.getElementById('bulkResultSummary').textContent = '';
+    document.getElementById('bulkUploadBtn').disabled = true;
+    document.getElementById('bulkUploadBtn').innerHTML = '<i class="fa-solid fa-upload"></i> Upload';
+}
 
 document.querySelectorAll('.modal').forEach(m => {
     m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); });
