@@ -1147,6 +1147,14 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
 
     if data.description is not None:
         tag.description = data.description or None
+        # Track whether the user has explicitly named this tag so the poller
+        # never overwrites it with whatever the vendor API returns.
+        attrs = dict(tag.attributes or {})
+        if data.description:
+            attrs['_user_named'] = True   # user has set a custom name
+        else:
+            attrs.pop('_user_named', None)  # cleared name — allow API to fill it again
+        tag.attributes = attrs
     if data.tag_type is not None:
         # Normalise UI aliases ('series1'/'series2') to canonical DB values ('scope'/'tracksolid')
         tag.tag_type = _TAG_TYPE_ALIAS.get(data.tag_type.lower(), data.tag_type.lower())
@@ -1250,6 +1258,12 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
         raise HTTPException(status_code=400, detail=str(exc))
 
     now = datetime.utcnow()
+    # Build attributes — mark _user_named if a description was provided at creation
+    init_attrs: dict = {}
+    if data.category:
+        init_attrs['category'] = {'value': data.category}
+    if data.description:
+        init_attrs['_user_named'] = True
     tag = BLETag(
         user_id=str(data.user_id),
         imei=imei,
@@ -1258,7 +1272,7 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
         is_active=True,
         package_id=str(data.package_id),
         expiry_date=now + timedelta(days=pkg.validity_days),
-        attributes={'category': {'value': data.category}} if data.category else None,
+        attributes=init_attrs or None,
     )
     db.add(tag)
     db.commit()
