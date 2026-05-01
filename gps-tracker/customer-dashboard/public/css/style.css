@@ -634,6 +634,49 @@ input, select, textarea { font-family: var(--font); }
   cursor: pointer;
   display: flex; align-items: center; gap: 4px;
 }
+.btn-popup-share {
+  background: var(--bg-3);
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: .78rem;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 4px;
+  transition: border-color .15s, color .15s;
+}
+.btn-popup-share:hover { border-color: var(--primary); color: var(--primary); }
+.lm-share-menu {
+  position: fixed;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.22);
+  z-index: 9999;
+  min-width: 160px;
+  padding: 4px;
+  animation: lmShareIn .14s ease-out;
+}
+@keyframes lmShareIn { from{opacity:0;transform:scale(.95) translateY(-4px)} to{opacity:1;transform:scale(1) translateY(0)} }
+.lm-share-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: .8rem;
+  color: var(--text-1);
+  text-decoration: none;
+  cursor: pointer;
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  transition: background .12s;
+  box-sizing: border-box;
+}
+.lm-share-item:hover { background: var(--bg-3); }
+.lm-share-item .fa-whatsapp { color: #25d366; }
 
 /* ── Assets List View ──────────────────────────────────────── */
 .view-header {
