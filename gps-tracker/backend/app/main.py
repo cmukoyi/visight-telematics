@@ -191,7 +191,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # CORS middleware - restrict to known origins only
-_cors_origins_env = os.getenv("CORS_ORIGINS", "https://pinplot.me,https://www.pinplot.me")
+_cors_origins_env = os.getenv("CORS_ORIGINS", "https://beacontelematics.co.uk,https://www.beacontelematics.co.uk")
 _allowed_origins = [o.strip() for o in _cors_origins_env.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
@@ -1224,22 +1224,59 @@ def list_users_with_tags(db: Session = Depends(get_db)):
 
 # Demo tag endpoints (will be replaced with external API calls)
 @app.get("/api/v1/tags")
-def get_tags(current_user: User = Depends(get_current_user)) -> List[Dict]:
+def get_tags(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> List[Dict]:
     """
-    Get all BLE tags (demo data)
-    In production, this will proxy to external BLE API
+    Return the BLE tags registered to the current user.
     """
-    return DEMO_TAGS
+    tags = db.query(BLETag).filter(
+        BLETag.user_id == current_user.id,
+        BLETag.is_active == True,
+    ).order_by(BLETag.added_at.desc()).all()
+    return [
+        {
+            "id": str(t.id),
+            "imei": t.imei,
+            "name": t.description or t.device_name or t.imei,
+            "device_name": t.device_name,
+            "description": t.description,
+            "tag_type": t.tag_type,
+            "battery": t.battery_level,
+            "status": "active" if t.is_active else "inactive",
+            "last_seen": t.last_seen.isoformat() if t.last_seen else None,
+            "latitude": t.latitude,
+            "longitude": t.longitude,
+            "location_description": t.location_description,
+            "expiry_date": t.expiry_date.isoformat() if t.expiry_date else None,
+        }
+        for t in tags
+    ]
 
 @app.get("/api/v1/tags/{tag_id}")
-def get_tag_details(tag_id: str, current_user: User = Depends(get_current_user)) -> Dict:
+def get_tag_details(tag_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Dict:
     """
-    Get specific tag details (demo data)
+    Get specific tag details for the current user.
     """
-    tag = next((t for t in DEMO_TAGS if t["id"] == tag_id), None)
+    tag = db.query(BLETag).filter(
+        BLETag.id == tag_id,
+        BLETag.user_id == current_user.id,
+    ).first()
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
-    return tag
+    return {
+        "id": str(tag.id),
+        "imei": tag.imei,
+        "name": tag.description or tag.device_name or tag.imei,
+        "device_name": tag.device_name,
+        "description": tag.description,
+        "tag_type": tag.tag_type,
+        "battery": tag.battery_level,
+        "status": "active" if tag.is_active else "inactive",
+        "last_seen": tag.last_seen.isoformat() if tag.last_seen else None,
+        "latitude": tag.latitude,
+        "longitude": tag.longitude,
+        "location_description": tag.location_description,
+        "expiry_date": tag.expiry_date.isoformat() if tag.expiry_date else None,
+    }
 
 @app.get("/api/v1/tags/{tag_id}/location")
 def get_tag_location(tag_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Dict:

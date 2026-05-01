@@ -236,7 +236,11 @@ class _MapScreenState extends State<MapScreen> {
         if (vehicle.attributes != null && vehicle.attributes!.isNotEmpty) {
           print('   📋 Attributes details:');
           vehicle.attributes!.forEach((key, value) {
-            print('      - $key: ${value['value']} (show_on_map: ${value['show_on_map']})');
+            if (value is Map) {
+              print('      - $key: ${value['value']} (show_on_map: ${value['show_on_map']})');
+            } else {
+              print('      - $key: $value');
+            }
           });
           print('   👁️ Visible attributes: ${vehicle.visibleAttributes}');
         }
@@ -1631,7 +1635,7 @@ View on $mapProvider to see the vehicle location.''';
               child: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [AppTheme.brandPrimary, Color(0xFF007A00)],
+                    colors: [AppTheme.brandPrimary, AppTheme.brandPrimaryHover],
                   ),
                   boxShadow: [
                     BoxShadow(
@@ -1765,7 +1769,7 @@ View on $mapProvider to see the vehicle location.''';
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [AppTheme.brandPrimary, Color(0xFF007A00)],
+            colors: [AppTheme.brandPrimary, AppTheme.brandPrimaryHover],
           ),
           boxShadow: [
             BoxShadow(
@@ -3418,7 +3422,7 @@ View on $mapProvider to see the vehicle location.''';
                 padding: EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [AppTheme.brandPrimary, Color(0xFF007A00)],
+                    colors: [AppTheme.brandPrimary, AppTheme.brandPrimaryHover],
                   ),
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [

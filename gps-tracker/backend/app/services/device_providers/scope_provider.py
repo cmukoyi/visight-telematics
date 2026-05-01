@@ -81,13 +81,13 @@ class ScopeTagProvider(DeviceTagProvider):
         except httpx.RequestError:
             return TagValidationResult(
                 is_valid=False,
-                message="Could not reach the Scope platform to verify this tag. Please check your connection and try again.",
+                message="Could not verify this tag. Please check your connection and try again.",
             )
 
         if resp.status_code == 200:
             return TagValidationResult(
                 is_valid=True,
-                message="Series 1 tag verified on the Scope platform.",
+                message="Series 1 tag verified.",
             )
         elif resp.status_code == 404:
             return TagValidationResult(
@@ -97,5 +97,5 @@ class ScopeTagProvider(DeviceTagProvider):
         else:
             return TagValidationResult(
                 is_valid=False,
-                message=f"Scope platform returned an unexpected response (HTTP {resp.status_code}). Please try again.",
+                message=f"Tag verification returned an unexpected response (HTTP {resp.status_code}). Please try again.",
             )

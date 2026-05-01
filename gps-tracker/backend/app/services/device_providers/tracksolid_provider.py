@@ -145,7 +145,7 @@ _token_manager = TrackSolidTokenManager()
 # ── TrackSolid tag provider (Strategy) ─────────────────────────────────────
 class TrackSolidTagProvider(DeviceTagProvider):
     """
-    Validates a BLE tag IMEI against the Beacontelematics TrackSolid account.
+    Validates a BLE tag IMEI against the BeaconTelematics TrackSolid account.
 
     Flow:
       1. Obtain (or reuse) a valid JWT via TrackSolidTokenManager.
@@ -244,12 +244,12 @@ class TrackSolidTagProvider(DeviceTagProvider):
 
             return TagValidationResult(
                 is_valid=True,
-                message="Tag verified on TrackSolid.",
+                message="Series 2 tag verified.",
                 battery_level=battery_level,
             )
         return TagValidationResult(
             is_valid=False,
-            message="Unknown Tag or Incorrect Series",
+            message="Tag not supported — IMEI not found on TrackSolid account.",
         )
 
 
