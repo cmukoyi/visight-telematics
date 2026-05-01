@@ -424,9 +424,14 @@
                             <button class="btn btn-primary btn-sm" onclick="histLoadTrips()">
                                 <i class="fa-solid fa-magnifying-glass"></i> Load Journeys
                             </button>
-                            <button class="btn btn-ghost btn-sm" id="hist-export-btn" style="display:none" onclick="histExport()">
-                                <i class="fa-solid fa-download"></i> Export CSV
-                            </button>
+                            <div id="hist-export-btn" style="display:none;gap:4px" class="rpt-export-group">
+                                <button class="btn btn-ghost btn-sm" onclick="histExport()">
+                                    <i class="fa-solid fa-file-csv"></i> CSV
+                                </button>
+                                <button class="btn btn-ghost btn-sm" onclick="histExportXLSX()">
+                                    <i class="fa-solid fa-file-excel"></i> Excel
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1979,9 +1984,14 @@
                     <button class="btn btn-secondary btn-small" onclick="rptSubRefresh()">
                         <i class="fa-solid fa-rotate-right"></i> Refresh
                     </button>
-                    <button class="btn btn-primary btn-small" id="rpt-sub-export-btn" onclick="rptSubExportCSV()" disabled>
-                        <i class="fa-solid fa-file-csv"></i> Export CSV
-                    </button>
+                    <div class="rpt-export-group" id="rpt-sub-export-btn" style="display:none">
+                        <button class="btn btn-primary btn-small" onclick="rptSubExportCSV()">
+                            <i class="fa-solid fa-file-csv"></i> CSV
+                        </button>
+                        <button class="btn btn-primary btn-small" onclick="rptSubExportXLSX()">
+                            <i class="fa-solid fa-file-excel"></i> Excel
+                        </button>
+                    </div>
                 </div>
 
                 <div id="rpt-sub-summary" class="rpt-summary-bar" style="display:none">
@@ -2041,9 +2051,14 @@
                     <button class="btn btn-secondary btn-small" onclick="rptActRefresh()">
                         <i class="fa-solid fa-rotate-right"></i> Refresh
                     </button>
-                    <button class="btn btn-primary btn-small" id="rpt-act-export-btn" onclick="rptActExportCSV()" disabled>
-                        <i class="fa-solid fa-file-csv"></i> Export CSV
-                    </button>
+                    <div class="rpt-export-group" id="rpt-act-export-btn" style="display:none">
+                        <button class="btn btn-primary btn-small" onclick="rptActExportCSV()">
+                            <i class="fa-solid fa-file-csv"></i> CSV
+                        </button>
+                        <button class="btn btn-primary btn-small" onclick="rptActExportXLSX()">
+                            <i class="fa-solid fa-file-excel"></i> Excel
+                        </button>
+                    </div>
                 </div>
                 <div id="rpt-act-summary" class="rpt-summary-bar" style="display:none">
                     <span id="rpt-act-count-total"><strong>—</strong> assets</span>
@@ -2093,9 +2108,14 @@
                     <button class="btn btn-primary btn-small" id="rpt-trips-load-btn" onclick="rptTripsLoad()">
                         <i class="fa-solid fa-magnifying-glass"></i> Load Journeys
                     </button>
-                    <button class="btn btn-secondary btn-small" id="rpt-trips-export-btn" onclick="rptTripsExportCSV()" disabled>
-                        <i class="fa-solid fa-file-csv"></i> Export CSV
-                    </button>
+                    <div class="rpt-export-group" id="rpt-trips-export-btn" style="display:none">
+                        <button class="btn btn-secondary btn-small" onclick="rptTripsExportCSV()">
+                            <i class="fa-solid fa-file-csv"></i> CSV
+                        </button>
+                        <button class="btn btn-secondary btn-small" onclick="rptTripsExportXLSX()">
+                            <i class="fa-solid fa-file-excel"></i> Excel
+                        </button>
+                    </div>
                 </div>
                 <div id="rpt-trips-summary" class="rpt-summary-bar" style="display:none">
                     <span id="rpt-trips-count-total"><strong>—</strong> journeys</span>
@@ -2148,9 +2168,14 @@
                     <button class="btn btn-secondary btn-small" onclick="rptGeoRefresh()">
                         <i class="fa-solid fa-rotate-right"></i> Refresh
                     </button>
-                    <button class="btn btn-primary btn-small" id="rpt-geo-export-btn" onclick="rptGeoExportCSV()" disabled>
-                        <i class="fa-solid fa-file-csv"></i> Export CSV
-                    </button>
+                    <div class="rpt-export-group" id="rpt-geo-export-btn" style="display:none">
+                        <button class="btn btn-primary btn-small" onclick="rptGeoExportCSV()">
+                            <i class="fa-solid fa-file-csv"></i> CSV
+                        </button>
+                        <button class="btn btn-primary btn-small" onclick="rptGeoExportXLSX()">
+                            <i class="fa-solid fa-file-excel"></i> Excel
+                        </button>
+                    </div>
                 </div>
                 <div id="rpt-geo-summary" class="rpt-summary-bar" style="display:none">
                     <span id="rpt-geo-count-total"><strong>—</strong> events</span>
@@ -2203,9 +2228,14 @@
                     <button class="btn btn-secondary btn-small" onclick="rptBatRefresh()">
                         <i class="fa-solid fa-rotate-right"></i> Refresh
                     </button>
-                    <button class="btn btn-primary btn-small" id="rpt-bat-export-btn" onclick="rptBatExportCSV()" disabled>
-                        <i class="fa-solid fa-file-csv"></i> Export CSV
-                    </button>
+                    <div class="rpt-export-group" id="rpt-bat-export-btn" style="display:none">
+                        <button class="btn btn-primary btn-small" onclick="rptBatExportCSV()">
+                            <i class="fa-solid fa-file-csv"></i> CSV
+                        </button>
+                        <button class="btn btn-primary btn-small" onclick="rptBatExportXLSX()">
+                            <i class="fa-solid fa-file-excel"></i> Excel
+                        </button>
+                    </div>
                 </div>
                 <div id="rpt-bat-summary" class="rpt-summary-bar" style="display:none">
                     <span id="rpt-bat-count-total"><strong>—</strong> assets</span>
@@ -4232,6 +4262,98 @@ function _rptDownloadCSV(rows, filename) {
     URL.revokeObjectURL(url);
 }
 
+// ── Excel export helper ──────────────────────────────────────────────────────
+// rows[0] = header row (strings); rows[1..] = data rows.
+// imeiCols: array of 0-based column indices that should be forced to string type
+//           (prevents Excel truncating 15-digit IMEIs to floats).
+function _rptDownloadXLSX(rows, filename, sheetName, imeiCols) {
+    imeiCols = imeiCols || [];
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    // Style header row: bold + light grey fill
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    for (let C = range.s.c; C <= range.e.c; C++) {
+        const addr = XLSX.utils.encode_cell({ r: 0, c: C });
+        if (!ws[addr]) continue;
+        ws[addr].s = { font: { bold: true }, fill: { fgColor: { rgb: 'E9ECEF' } }, alignment: { horizontal: 'left' } };
+    }
+    // Force IMEI columns to string type so Excel never auto-converts to number
+    imeiCols.forEach(ci => {
+        for (let R = 1; R <= range.e.r; R++) {
+            const addr = XLSX.utils.encode_cell({ r: R, c: ci });
+            if (ws[addr]) { ws[addr].t = 's'; ws[addr].v = String(ws[addr].v); delete ws[addr].z; }
+        }
+    });
+    // Auto column widths based on longest value in each column
+    const widths = rows[0].map((_, ci) =>
+        Math.min(50, Math.max(10, ...rows.map(r => String(r[ci] == null ? '' : r[ci]).length)))
+    );
+    ws['!cols'] = widths.map(w => ({ wch: w }));
+    XLSX.utils.book_append_sheet(wb, ws, sheetName || 'Report');
+    XLSX.writeFile(wb, `${filename}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+function rptSubExportXLSX() {
+    const cols = ['Tag / Device', 'IMEI', 'Assigned User', 'Package', 'Date Added', 'Expiry Date', 'Days Remaining', 'Status'];
+    const rows = _rptSubFiltered.map(t => [
+        t.description || t.device_name || t.imei, t.imei, t.owner_email,
+        t.package_name || '', t.added_at ? _rptFmtDate(t.added_at) : '',
+        t.expiry_date ? _rptFmtDate(t.expiry_date) : '',
+        (t.days_remaining !== null && t.days_remaining !== undefined && t.package_name) ? Math.max(0, t.days_remaining) : '',
+        _rptSubStatus(t),
+    ]);
+    _rptDownloadXLSX([cols, ...rows], 'tag-subscriptions', 'Subscriptions', [1]);
+}
+
+function rptActExportXLSX() {
+    const cols = ['Tag / Device', 'IMEI', 'User', 'Category', 'Last Seen', 'Hrs Silent', 'Battery %', 'Location', 'Status'];
+    const rows = _rptActFiltered.map(t => [
+        t.description || t.device_name || t.imei, t.imei, t.owner_email, t.category_name || '',
+        t.last_seen ? _rptFmtDate(t.last_seen) : '',
+        t.hours_silent != null ? t.hours_silent : '',
+        t.battery_level != null ? t.battery_level : '',
+        t.location_description || '',
+        _rptActivityStatus(t.hours_silent),
+    ]);
+    _rptDownloadXLSX([cols, ...rows], 'asset-activity', 'Asset Activity', [1]);
+}
+
+function rptTripsExportXLSX() {
+    const tagLabel = document.getElementById('rpt-trips-tag').selectedOptions[0]?.text || '';
+    const cols = ['#', 'Tag', 'Start', 'End', 'Duration (s)', 'Distance (mi)', 'From', 'To'];
+    const rows = _rptTripsData.map((trip, idx) => [
+        idx + 1, tagLabel,
+        trip.startUtcTimestamp || '', trip.endUtcTimestamp || '',
+        trip.duration || 0, Number(trip.distance || 0).toFixed(2),
+        trip.startLocationDescription || '', trip.endLocationDescription || '',
+    ]);
+    _rptDownloadXLSX([cols, ...rows], 'journey-log', 'Journey Log', []);
+}
+
+function rptGeoExportXLSX() {
+    const cols = ['Date / Time', 'Tag', 'IMEI', 'Zone', 'Event'];
+    const rows = _rptGeoFiltered.map(e => [
+        e.created_at || '', e.tag_label, e.tag_imei, e.poi_name, e.event_type,
+    ]);
+    _rptDownloadXLSX([cols, ...rows], 'geofence-events', 'Geofence Events', [2]);
+}
+
+function rptBatExportXLSX() {
+    const cols = ['Tag / Device', 'IMEI', 'User', 'Battery %', 'Last Seen', 'Hrs Silent', 'Status'];
+    const rows = _rptBatFiltered.map(t => {
+        const isLowBat  = t.battery_level != null && t.battery_level <= 20;
+        const isOffline = t.hours_silent  != null && t.hours_silent  >= 48;
+        return [
+            t.description || t.device_name || t.imei, t.imei, t.owner_email,
+            t.battery_level != null ? t.battery_level : '',
+            t.last_seen ? _rptFmtDate(t.last_seen) : '',
+            t.hours_silent != null ? t.hours_silent : '',
+            (isLowBat && isOffline) ? 'Critical' : (isLowBat || isOffline) ? 'Warning' : 'Monitoring',
+        ];
+    });
+    _rptDownloadXLSX([cols, ...rows], 'battery-offline', 'Battery & Offline', [1]);
+}
+
 function _rptSortHelper(arr, col, asc) {
     return [...arr].sort((a, b) => {
         let va = a[col], vb = b[col];
@@ -4260,7 +4382,7 @@ async function loadReportsActivity() {
         // Augment with computed hours_silent
         _rptSharedTags = tags.map(t => ({ ...t, hours_silent: _rptHoursSilent(t) }));
         _rptActBuildCatFilter(_rptSharedTags);
-        document.getElementById('rpt-act-export-btn').disabled = false;
+        document.getElementById('rpt-act-export-btn').style.display = '';
         rptActFilter();
     } catch (err) {
         document.getElementById('rpt-act-alert-text').textContent = err.message;
@@ -4273,7 +4395,7 @@ async function loadReportsActivity() {
 
 function rptActRefresh() {
     _rptTagsInvalidate();
-    document.getElementById('rpt-act-export-btn').disabled = true;
+    document.getElementById('rpt-act-export-btn').style.display = 'none';
     loadReportsActivity();
 }
 
@@ -4412,7 +4534,7 @@ async function rptTripsLoad() {
     const tbody = document.getElementById('rpt-trips-tbody');
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-3)"><i class="fa-solid fa-spinner fa-spin"></i> Loading journeys…</td></tr>';
     document.getElementById('rpt-trips-summary').style.display   = 'none';
-    document.getElementById('rpt-trips-export-btn').disabled     = true;
+    document.getElementById('rpt-trips-export-btn').style.display = 'none';
     try {
         const res = await apiFetch('/api/portal/trips', {
             method:  'POST',
@@ -4424,7 +4546,7 @@ async function rptTripsLoad() {
         if (!data.success) throw new Error(data.error || 'Failed to load journeys');
         _rptTripsData = data.trips || [];
         _rptTripsRender();
-        document.getElementById('rpt-trips-export-btn').disabled = !_rptTripsData.length;
+        document.getElementById('rpt-trips-export-btn').style.display = _rptTripsData.length ? '' : 'none';
     } catch (err) {
         _rptTripsAlert(err.message);
         tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-3)">—</td></tr>';
@@ -4503,7 +4625,7 @@ async function loadReportsGeofence() {
         _rptGeoLoaded = true;
         _rptGeoBuildFilters();
         rptGeoFilter();
-        document.getElementById('rpt-geo-export-btn').disabled = false;
+        document.getElementById('rpt-geo-export-btn').style.display = '';
     } catch (err) {
         document.getElementById('rpt-geo-alert-text').textContent = err.message;
         const alertEl = document.getElementById('rpt-geo-alert');
@@ -4604,7 +4726,7 @@ async function loadReportsBattery() {
     try {
         const tags = await _rptEnsureTags();
         _rptSharedTags = tags.map(t => ({ ...t, hours_silent: _rptHoursSilent(t) }));
-        document.getElementById('rpt-bat-export-btn').disabled = false;
+        document.getElementById('rpt-bat-export-btn').style.display = '';
         rptBatFilter();
     } catch (err) {
         document.getElementById('rpt-bat-alert-text').textContent = err.message;
@@ -4617,7 +4739,7 @@ async function loadReportsBattery() {
 
 function rptBatRefresh() {
     _rptTagsInvalidate();
-    document.getElementById('rpt-bat-export-btn').disabled = true;
+    document.getElementById('rpt-bat-export-btn').style.display = 'none';
     loadReportsBattery();
 }
 
@@ -5887,7 +6009,7 @@ async function loadReports() {
         _rptSubLoaded = true;
         _rptSubBuildPkgFilter();
         rptSubFilter();
-        document.getElementById('rpt-sub-export-btn').disabled = false;
+        document.getElementById('rpt-sub-export-btn').style.display = '';
     } catch (err) {
         const alertEl = document.getElementById('rpt-sub-alert');
         document.getElementById('rpt-sub-alert-text').textContent = err.message;
@@ -5902,7 +6024,7 @@ async function loadReports() {
 
 function rptSubRefresh() {
     _rptSubLoaded = false;
-    document.getElementById('rpt-sub-export-btn').disabled = true;
+    document.getElementById('rpt-sub-export-btn').style.display = 'none';
     loadReports();
 }
 
@@ -8238,12 +8360,7 @@ function histExport() {
     if (!_histTrack.length) return;
     const rows = [['seq','lat','lng','timestamp','speed','event']];
     _histTrack.forEach((p, i) => rows.push([
-        i + 1,
-        p.lat || '',
-        p.lng || '',
-        p.timestamp || '',
-        p.speed || '',
-        p.event || ''
+        i + 1, p.lat || '', p.lng || '', p.timestamp || '', p.speed || '', p.event || ''
     ]));
     const csv  = rows.map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -8251,6 +8368,15 @@ function histExport() {
     a.href = URL.createObjectURL(blob);
     a.download = `history_${Date.now()}.csv`;
     a.click();
+}
+
+function histExportXLSX() {
+    if (!_histTrack.length) return;
+    const cols = ['#', 'Lat', 'Lng', 'Timestamp', 'Speed (km/h)', 'Event'];
+    const rows = _histTrack.map((p, i) => [
+        i + 1, p.lat || '', p.lng || '', p.timestamp || '', p.speed || '', p.event || ''
+    ]);
+    _rptDownloadXLSX([cols, ...rows], 'movement-history', 'History', []);
 }
 
 // ══════════════════════════════════════════
@@ -8378,6 +8504,8 @@ let _bulkRows = [];
 let _amBulkPreview = [];
 
 function openAmBulk() {
+    // Cancel any in-flight upload before resetting
+    if (_amUploadAbort) { _amUploadAbort.abort(); _amUploadAbort = null; }
     const m = document.getElementById('am-bulk-modal');
     document.getElementById('am-bulk-file').value = '';
     document.getElementById('am-preview-wrap').classList.remove('open');
@@ -8431,29 +8559,42 @@ function _amValidateImei(imei) {
     return { ok: true };
 }
 
+let _amUploadAbort = null;
+
 function _amHandleBulkFile(file) {
     const fileInput = document.getElementById('am-bulk-file');
     try { const dt = new DataTransfer(); dt.items.add(file); fileInput.files = dt.files; } catch(_) {}
+    const resultEl = document.getElementById('am-bulk-result');
+    const isCSV = /\.csv$/i.test(file.name);
     const reader = new FileReader();
+    reader.onerror = () => {
+        resultEl.innerHTML = `<div class="alert alert-error"><strong>Could not read the file.</strong><br><small>Make sure it is a valid .xlsx or .csv file and is not open in another program.</small></div>`;
+        resultEl.style.display = '';
+    };
     reader.onload = evt => {
         try {
-            const wb = XLSX.read(evt.target.result, { type: 'array' });
+            const wb = isCSV
+                ? XLSX.read(evt.target.result, { type: 'string' })
+                : XLSX.read(evt.target.result, { type: 'array' });
             const ws = wb.Sheets[wb.SheetNames[0]];
+            if (!ws) throw new Error('The file appears empty or has no valid sheet.');
             const data = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
+            if (!data.length) throw new Error('No data rows found. Check the file has headers: imei, owner_email, description, tag_type — and at least one data row.');
             const rows = data.map(r => ({
                 imei:        String(r['imei'] || r['IMEI'] || '').trim(),
                 owner_email: String(r['owner_email'] || r['Owner Email'] || '').trim(),
                 description: String(r['description'] || r['Description'] || '').trim() || null,
                 tag_type:    String(r['tag_type'] || r['Tag Type'] || '').trim() || null,
             })).filter(r => r.imei);
+            if (!rows.length) throw new Error('No rows with an IMEI value found. Expected column header: imei (lowercase). Download the template for a correct example.');
             _amValidateBulkPreview(rows);
         } catch (err) {
-            const el = document.getElementById('am-bulk-result');
-            el.innerHTML = `<div class="alert alert-error">${esc('Could not parse file: ' + err.message)}</div>`;
-            el.style.display = '';
+            resultEl.innerHTML = `<div class="alert alert-error"><strong>Could not parse file</strong><br><small>${esc(err.message)}</small></div>`;
+            resultEl.style.display = '';
         }
     };
-    reader.readAsArrayBuffer(file);
+    if (isCSV) reader.readAsText(file);
+    else reader.readAsArrayBuffer(file);
 }
 
 function _amValidateBulkPreview(rows) {
@@ -8494,21 +8635,26 @@ function _amValidateBulkPreview(rows) {
 
 async function submitBulkUpload() {
     if (!_bulkRows.length) return;
-    const btn        = document.getElementById('am-bulk-upload-btn');
+    const btn         = document.getElementById('am-bulk-upload-btn');
     const progressRow = document.getElementById('am-bulk-progress');
-    const fill       = document.getElementById('am-progress-fill');
-    const label      = document.getElementById('am-progress-label');
-    const resultEl   = document.getElementById('am-bulk-result');
+    const fill        = document.getElementById('am-progress-fill');
+    const label       = document.getElementById('am-progress-label');
+    const resultEl    = document.getElementById('am-bulk-result');
     resultEl.style.display = 'none';
     btn.disabled = true;
     progressRow.classList.add('open');
     fill.style.width = '0%'; label.textContent = 'Uploading…';
+    _amUploadAbort = new AbortController();
+    const uploadTimeout = setTimeout(() => _amUploadAbort?.abort(), 60000);
     try {
         fill.style.width = '40%';
         const res = await apiFetch('/api/portal/tags/bulk', {
             method: 'POST',
             body: JSON.stringify(_bulkRows),
+            signal: _amUploadAbort.signal,
         });
+        clearTimeout(uploadTimeout);
+        _amUploadAbort = null;
         fill.style.width = '100%';
         progressRow.classList.remove('open');
         const results = await res.json();
@@ -8516,15 +8662,20 @@ async function submitBulkUpload() {
         const ok  = results.filter(r => r.success).length;
         const bad = results.filter(r => !r.success);
         const failHtml = bad.length
-            ? `<details style="margin-top:8px;font-size:.82rem"><summary style="cursor:pointer;color:var(--warning)">${bad.length} failed</summary><ul style="margin:6px 0 0 16px;padding:0">${bad.map(r => `<li><strong>${esc(r.imei)}</strong>: ${esc(r.error)}</li>`).join('')}</ul></details>`
+            ? `<details style="margin-top:8px;font-size:.82rem"><summary style="cursor:pointer;color:var(--warning)">${bad.length} failed rows</summary><ul style="margin:6px 0 0 16px;padding:0">${bad.map(r => `<li><strong>${esc(r.imei)}</strong>: ${esc(r.error)}</li>`).join('')}</ul></details>`
             : '';
-        resultEl.innerHTML = `<div class="alert alert-${bad.length === 0 ? 'success' : 'warning'}" style="display:flex;flex-direction:column"><strong>${ok} tag${ok !== 1 ? 's' : ''} created</strong>${bad.length ? `<span>${bad.length} row${bad.length !== 1 ? 's' : ''} failed</span>` : ''}${failHtml}</div>`;
+        resultEl.innerHTML = `<div class="alert alert-${bad.length === 0 ? 'success' : 'warning'}" style="display:flex;flex-direction:column"><strong>${ok} tag${ok !== 1 ? 's' : ''} created</strong>${bad.length ? `<span>${bad.length} row${bad.length !== 1 ? 's' : ''} could not be added</span>` : ''}${failHtml}</div>`;
         resultEl.style.display = '';
         btn.textContent = 'Done';
         if (ok > 0) { _lmTags = []; initAssetMgmt(); }
     } catch (err) {
+        clearTimeout(uploadTimeout);
+        _amUploadAbort = null;
         progressRow.classList.remove('open');
-        resultEl.innerHTML = `<div class="alert alert-error">${esc(err.message)}</div>`;
+        const userMsg = err.name === 'AbortError'
+            ? 'Upload timed out. Check your connection and try again.'
+            : err.message;
+        resultEl.innerHTML = `<div class="alert alert-error">${esc(userMsg)}</div>`;
         resultEl.style.display = '';
         btn.disabled = false;
         btn.textContent = `Import ${_bulkRows.length} tag${_bulkRows.length !== 1 ? 's' : ''}`;

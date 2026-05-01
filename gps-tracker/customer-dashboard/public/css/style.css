@@ -1083,7 +1083,9 @@ tbody tr:hover { background: var(--bg-3); }
 
 .asset-card-footer {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
+  row-gap: 4px;
   padding: 10px 14px;
   border-top: 1px solid var(--border);
   background: var(--bg-3);
@@ -2380,6 +2382,14 @@ select option { background: var(--bg-3); }
   background: var(--bg-2);
   flex-shrink: 0;
 }
+/* Split CSV / Excel export button pair */
+.rpt-export-group {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+.rpt-export-group .btn:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+.rpt-export-group .btn:last-child  { border-radius: 0 var(--radius) var(--radius) 0; border-left: 1px solid rgba(255,255,255,.15); }
 .rpt-summary-bar {
   display: flex;
   align-items: center;
