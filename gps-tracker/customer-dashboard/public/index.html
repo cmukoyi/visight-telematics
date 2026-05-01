@@ -3598,6 +3598,7 @@ async function submitTagForm(e) {
         }
         amRenderCards();   // immediately refresh asset management grid
         alRenderTable();   // keep asset list table in sync
+        loadGroupTags();   // refresh the tags table so newly added tag is visible
     } catch (err) {
         const span = document.getElementById('tagMgmtAlertText');
         span.textContent = err.message;
