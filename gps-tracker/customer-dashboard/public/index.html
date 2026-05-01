@@ -402,7 +402,7 @@
                 <div class="hist-controls">
                     <div class="hist-asset-name-wrap">
                         <label for="hist-asset-select"><i class="fa-solid fa-tag"></i> Asset / Tag</label>
-                        <select id="hist-asset-select" onchange="histChangeAsset(this.value)" style="min-width:220px"></select>
+                        <select id="hist-asset-select" onchange="histChangeAsset(this.value); histLoadTrips()" style="min-width:220px"></select>
                     </div>
                     <div class="hist-field">
                         <label>From</label>
@@ -7771,6 +7771,8 @@ let _histTrack     = [];
 let _histTrips     = [];
 let _histSelectedTripId = null;
 let _histPendingImei    = null; // set before switchTab so initHistoryTab loads the right tag immediately
+let _histLoadSeq        = 0;    // incremented on every histLoadTrips call; stale responses are discarded
+let _histTripSeq        = 0;    // same guard for histSelectTrip waypoint fetches
 
 // Navigate to History tab pre-selecting a specific tag — avoids the old
 // setTimeout/histPreselect race where trips would load for the wrong asset.
@@ -7815,7 +7817,7 @@ async function initHistoryTab() {
     }
     if (sel && sel.value) {
         histChangeAsset(sel.value);
-        histLoadTrips();  // auto-load trips on tab open
+        histLoadTrips();  // auto-load trips on tab open — uses _histLoadSeq guard against stale responses
     }
 }
 
@@ -7841,9 +7843,15 @@ async function histLoadTrips() {
     if (!imei) return;
 
     // Find tag id (UUID) – needed by backend /api/trips
+    // Captured synchronously before any await so it always matches the IMEI
+    // that was selected when this call was initiated.
     const tag = _lmTags.find(t => t.imei === imei);
     if (!tag) return;
     histChangeAsset(imei);
+
+    // Sequence guard: discard responses that arrive out of order.
+    // e.g. the user changes dropdown twice quickly — only the last request renders.
+    const seq = ++_histLoadSeq;
 
     // Show trips panel, hide waypoints
     document.getElementById('hist-trips-list').style.display = '';
@@ -7867,11 +7875,15 @@ async function histLoadTrips() {
                 endDate:   `${to}T${toT}:59Z`
             })
         });
+        // Discard if a newer request has already been issued
+        if (seq !== _histLoadSeq) return;
         const data = await res.json();
+        if (seq !== _histLoadSeq) return;
         if (!data.success) throw new Error(data.error || 'API error');
         _histTrips = data.trips || [];
         _histRenderTripsList();
     } catch (err) {
+        if (seq !== _histLoadSeq) return; // stale error — ignore
         const raw = err.message || '';
         const userMsg = /vehicle.*not.*found|not.*found.*mzone|mzone|vehicle.*not/i.test(raw)
             ? 'No journeys in the selected date range.'
@@ -7934,6 +7946,7 @@ function _histRenderTripsList() {
 /* ── Select a trip: load events + draw on map ─────────────────────────────── */
 async function histSelectTrip(tripId, idx) {
     _histSelectedTripId = tripId;
+    const seq = ++_histTripSeq;
 
     // Highlight selected row
     document.querySelectorAll('.hist-trip-row').forEach(r => r.classList.remove('htrip-active'));
@@ -7950,7 +7963,9 @@ async function histSelectTrip(tripId, idx) {
 
     try {
         const res = await apiFetch(`/api/portal/trips/${encodeURIComponent(tripId)}/events`);
+        if (seq !== _histTripSeq) return;
         const data = await res.json();
+        if (seq !== _histTripSeq) return;
         if (!data.success) throw new Error(data.error || 'API error');
         _histTrack = (data.events || []).map(e => ({
             lat: e.latitude, lng: e.longitude,
@@ -7961,6 +7976,7 @@ async function histSelectTrip(tripId, idx) {
         _histRenderWaypoints();
         document.getElementById('hist-export-btn').style.display = _histTrack.length ? '' : 'none';
     } catch (err) {
+        if (seq !== _histTripSeq) return;
         document.getElementById('hist-waypoints').innerHTML =
             `<div style="padding:24px;text-align:center;color:var(--text-3)"><p style="font-size:.83rem">${esc(err.message)}</p></div>`;
     }
