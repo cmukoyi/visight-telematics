@@ -216,11 +216,13 @@ class LocationPollerService:
                         logger.debug(f"💾 Cached MZone vehicle_Id {mzone_vehicle_id} for IMEI {tracker.imei}")
 
                     description = vehicle.get('description')
-                    # Only sync MZone description if the user has NOT set a custom name.
-                    # Once a user names a tag (e.g. "My Wallet"), the _user_named flag
-                    # in attributes protects it from being overwritten by the API.
+                    # Only auto-fill description from MZone if the tag has no description
+                    # at all. Once any description exists (set by user via portal OR
+                    # previously set by the poller), never overwrite it — this prevents
+                    # MZone from undoing changes made on the Customer Portal.
+                    # The _user_named flag provides belt-and-suspenders for newly edited tags.
                     _user_named = (tracker.attributes or {}).get('_user_named', False)
-                    if description and not _user_named and tracker.description != description:
+                    if description and not _user_named and not tracker.description:
                         tracker.description = description
                         tracker.updated_at = datetime.utcnow()
 
