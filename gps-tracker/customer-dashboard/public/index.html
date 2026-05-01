@@ -7360,7 +7360,7 @@ function _lmPlaceMarkers() {
                 </div>
                 ${t.last_seen ? `<div style="font-size:.78rem;color:var(--text-3);margin-bottom:6px">${new Date(t.last_seen).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>` : ''}
                 <div style="display:flex;gap:5px;margin-top:2px">
-                    <button class="btn-popup-hist" onclick="switchTab('history');setTimeout(()=>histPreselect('${esc(t.imei)}'),300)">
+                    <button class="btn-popup-hist" onclick="lmOpenHistory('${esc(t.imei)}')">
                         <i class='fa-solid fa-route'></i> History
                     </button>
                     <button class="btn-popup-share" onclick="lmShareTag('${esc(t.imei)}',event)">
@@ -7751,7 +7751,7 @@ function alRenderTable() {
                     ${hasGPS ? `<button class="btn-icon-sm" title="View on map" onclick="switchTab('livemap');setTimeout(()=>lmSelectFromList('${esc(t.imei)}'),600)">
                         <i class="fa-solid fa-map-pin"></i>
                     </button>` : ''}
-                    <button class="btn-icon-sm" title="Movement History" onclick="switchTab('history');setTimeout(()=>histPreselect('${esc(t.imei)}'),300)">
+                    <button class="btn-icon-sm" title="Movement History" onclick="lmOpenHistory('${esc(t.imei)}')">
                         <i class="fa-solid fa-route"></i>
                     </button>
                 </div>
@@ -7770,6 +7770,14 @@ let _histPolyline  = null;
 let _histTrack     = [];
 let _histTrips     = [];
 let _histSelectedTripId = null;
+let _histPendingImei    = null; // set before switchTab so initHistoryTab loads the right tag immediately
+
+// Navigate to History tab pre-selecting a specific tag — avoids the old
+// setTimeout/histPreselect race where trips would load for the wrong asset.
+function lmOpenHistory(imei) {
+    _histPendingImei = imei;
+    switchTab('history');
+}
 
 async function initHistoryTab() {
     // Populate asset selector from live tags (load if needed)
@@ -7781,12 +7789,14 @@ async function initHistoryTab() {
     }
     const sel = document.getElementById('hist-asset-select');
     if (sel && _lmTags.length) {
-        const cur = sel.value;
+        const cur = _histPendingImei || sel.value;
         sel.innerHTML = _lmTags.map(t =>
             `<option value="${esc(t.imei)}">${esc(t.description || t.device_name || t.imei)}</option>`
         ).join('');
         if (cur) sel.value = cur;
     }
+    // Consume the pending IMEI now that it has been applied
+    _histPendingImei = null;
     // Default date range = today
     const today = new Date().toISOString().slice(0, 10);
     if (document.getElementById('hist-from').value === '') {
@@ -8160,7 +8170,7 @@ function amRenderCards() {
                 ${t.latitude && t.longitude ? `<button class="btn btn-ghost btn-sm" onclick="switchTab('livemap');setTimeout(()=>lmSelectFromList('${esc(t.imei)}'),600)">
                     <i class="fa-solid fa-map-pin"></i> Map
                 </button>` : ''}
-                <button class="btn btn-ghost btn-sm" onclick="switchTab('history');setTimeout(()=>histPreselect('${esc(t.imei)}'),300)">
+                <button class="btn btn-ghost btn-sm" onclick="lmOpenHistory('${esc(t.imei)}')">
                     <i class="fa-solid fa-route"></i> History
                 </button>
                 <button class="btn btn-ghost btn-sm btn-danger-ghost" onclick="deleteTag('${esc(t.id)}','${esc(t.imei)}')">
