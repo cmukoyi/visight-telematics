@@ -2446,7 +2446,7 @@
             <div class="alert alert-success">✅ User created! Share this temporary password — it won't be shown again.</div>
             <p style="margin:12px 0 6px;font-size:13px">Email: <strong id="newUserEmail"></strong></p>
             <div style="display:flex;align-items:center;gap:8px">
-                <code id="newUserPwd" style="flex:1;padding:8px 12px;background:#f3f4f6;border-radius:6px;font-size:14px;letter-spacing:1px"></code>
+                <code id="newUserPwd" style="flex:1;padding:8px 12px;background:#f3f4f6;border-radius:6px;font-size:14px;letter-spacing:1px;color:#111"></code>
                 <button class="btn btn-secondary btn-small" id="copyPwdBtn" onclick="navigator.clipboard.writeText(document.getElementById('newUserPwd').textContent).then(()=>{const b=document.getElementById('copyPwdBtn');b.textContent='Copied!';b.style.color='var(--success,#10b981)';setTimeout(()=>{b.textContent='Copy';b.style.color='';},2000)})">Copy</button>
             </div>
             <div style="text-align:right;margin-top:16px">
