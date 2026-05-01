@@ -481,7 +481,7 @@
                     <button class="btn btn-primary btn-sm" onclick="openAddTagModal()">
                         <i class="fa-solid fa-plus"></i> Add Tag
                     </button>
-                    <button class="btn btn-ghost btn-sm" onclick="openModal('bulkUploadModal')">
+                    <button class="btn btn-ghost btn-sm" onclick="openAmBulk()">
                         <i class="fa-solid fa-file-arrow-up"></i> Bulk Upload
                     </button>
                 </div>
@@ -2568,43 +2568,48 @@
     </div>
 </div>
 
-<!-- ═══ BULK UPLOAD MODAL ═══ -->
-<div id="bulkUploadModal" class="modal">
-    <div class="modal-content" style="max-width:540px">
+<!-- ═══ ASSET MANAGEMENT: BULK UPLOAD MODAL ═══ -->
+<div id="am-bulk-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeAmBulk()">
+    <div class="modal-box" style="max-width:560px">
         <div class="modal-header">
-            <span class="modal-title"><i class="fa-solid fa-file-arrow-up" style="margin-right:8px"></i>Bulk Upload Tags</span>
-            <button class="modal-close" onclick="closeModal('bulkUploadModal');resetBulkUploadModal()">×</button> class="alert" style="display:none"><span id="bulkUploadAlertText"></span></div>
-        <p style="color:var(--text-2);font-size:13px;margin-bottom:8px">Upload an Excel (.xlsx) or CSV file with your tags. Each row must have <strong>imei</strong> and <strong>owner_email</strong> columns.</p>
-        <p style="color:var(--warning,#f59e0b);font-size:12px;margin-bottom:14px"><i class="fa-solid fa-triangle-exclamation"></i> <strong>Always use the Excel template (.xlsx)</strong> — do not type IMEIs into a plain CSV/Excel file as "General" number format will corrupt long IMEI numbers.</p>
-        <div style="margin-bottom:16px">
-            <button class="btn btn-ghost btn-sm" onclick="downloadBulkTemplate()">
-                <i class="fa-solid fa-download"></i> Download Template (.xlsx)
-            </button>
+            <i class="fa-solid fa-file-arrow-up" style="color:var(--primary)"></i>
+            <span class="modal-title">Bulk Upload Tags</span>
+            <button class="btn-icon modal-close" onclick="closeAmBulk()"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <div class="form-group">
-            <label>Select File *</label>
-            <input type="file" id="bulkFileInput" accept=".xlsx,.xls,.csv" style="display:block;width:100%;padding:8px;border:2px dashed var(--border);border-radius:8px;cursor:pointer;background:var(--surface-2);color:var(--text)">
-        </div>
-        <div id="bulkPreview" style="display:none">
-            <p style="font-size:13px;color:var(--text-2);margin-bottom:8px" id="bulkPreviewCount"></p>
-            <div style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
-                <table style="width:100%;font-size:12px;border-collapse:collapse" id="bulkPreviewTable">
-                    <thead style="background:var(--surface-2);position:sticky;top:0">
-                        <tr><th style="padding:6px 10px;text-align:left">IMEI</th><th style="padding:6px 10px;text-align:left">Owner Email</th><th style="padding:6px 10px;text-align:left">Description</th><th style="padding:6px 10px;text-align:left">Type</th></tr>
-                    </thead>
-                    <tbody id="bulkPreviewBody"></tbody>
+        <div class="modal-body">
+            <div class="loc-dropzone" id="am-dropzone">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <div class="loc-dropzone-title">Drop your file here, or click to browse</div>
+                <div class="loc-dropzone-sub">.xlsx or .csv — columns: imei, owner_email, description, tag_type</div>
+                <input type="file" id="am-bulk-file" accept=".xlsx,.xls,.csv" style="display:none">
+            </div>
+            <div style="margin-top:10px;padding:8px 12px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:var(--radius);font-size:12px;color:var(--text-2)">
+                <i class="fa-solid fa-triangle-exclamation" style="color:var(--warning,#f59e0b);margin-right:6px"></i>
+                <strong>Use the Excel template</strong> — plain CSV may corrupt long IMEI numbers (15+ digits).
+            </div>
+            <div class="loc-template-banner" style="margin-top:10px">
+                <div class="loc-template-banner-icon"><i class="fa-solid fa-table"></i></div>
+                <div class="loc-template-banner-text">
+                    <div class="loc-template-banner-title">Need a template?</div>
+                    <div class="loc-template-banner-sub">Download the Excel template with correct column headers and example rows.</div>
+                </div>
+                <button class="btn btn-ghost btn-sm" id="am-bulk-template-btn"><i class="fa-solid fa-download"></i> Template</button>
+            </div>
+            <div class="loc-preview-wrap" id="am-preview-wrap">
+                <table class="loc-preview-table">
+                    <thead><tr><th>#</th><th>IMEI</th><th>Owner Email</th><th>Description</th><th>Type</th><th>Status</th></tr></thead>
+                    <tbody id="am-preview-body"></tbody>
                 </table>
             </div>
+            <div class="loc-progress-row" id="am-bulk-progress">
+                <div class="loc-progress-bar"><div class="loc-progress-fill" id="am-progress-fill"></div></div>
+                <div class="loc-progress-text"><span id="am-progress-label">Uploading…</span><span id="am-progress-count"></span></div>
+            </div>
+            <div id="am-bulk-result" style="display:none;margin-top:12px"></div>
         </div>
-        <div id="bulkResults" style="display:none;margin-top:12px">
-            <p id="bulkResultSummary" style="font-size:13px;font-weight:600;margin-bottom:8px"></p>
-            <div id="bulkResultDetail" style="max-height:160px;overflow-y:auto;font-size:12px;color:var(--text-2)"></div>
-        </div>
-        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
-            <button class="btn btn-secondary" onclick="closeModal('bulkUploadModal');resetBulkUploadModal()">Close</button>
-            <button class="btn btn-primary" id="bulkUploadBtn" onclick="submitBulkUpload()" disabled>
-                <i class="fa-solid fa-upload"></i> Upload
-            </button>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="closeAmBulk()">Close</button>
+            <button class="btn btn-primary" id="am-bulk-upload-btn" disabled>Import 0 tags</button>
         </div>
     </div>
 </div>
@@ -3123,22 +3128,8 @@ function switchTab(name) {
 // ══════════════════════════════════════════
 function openModal(id) {
     document.getElementById(id).classList.add('active');
-    if (id === 'bulkUploadModal') resetBulkUploadModal();
 }
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-
-function resetBulkUploadModal() {
-    _bulkRows = [];
-    document.getElementById('bulkFileInput').value = '';
-    document.getElementById('bulkPreview').style.display    = 'none';
-    document.getElementById('bulkResults').style.display    = 'none';
-    document.getElementById('bulkUploadAlert').style.display = 'none';
-    document.getElementById('bulkPreviewBody').innerHTML    = '';
-    document.getElementById('bulkResultDetail').innerHTML   = '';
-    document.getElementById('bulkResultSummary').textContent = '';
-    document.getElementById('bulkUploadBtn').disabled = true;
-    document.getElementById('bulkUploadBtn').innerHTML = '<i class="fa-solid fa-upload"></i> Upload';
-}
 
 document.querySelectorAll('.modal').forEach(m => {
     m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); });
@@ -8381,15 +8372,166 @@ async function deleteTag(tagId, imei) {
 }
 
 // ══════════════════════════════════════════
-// BULK UPLOAD
+// BULK UPLOAD — Asset Management (Tags)
 // ══════════════════════════════════════════
 let _bulkRows = [];
+let _amBulkPreview = [];
+
+function openAmBulk() {
+    const m = document.getElementById('am-bulk-modal');
+    document.getElementById('am-bulk-file').value = '';
+    document.getElementById('am-preview-wrap').classList.remove('open');
+    document.getElementById('am-bulk-progress').classList.remove('open');
+    document.getElementById('am-bulk-result').style.display = 'none';
+    document.getElementById('am-bulk-upload-btn').disabled = true;
+    document.getElementById('am-bulk-upload-btn').textContent = 'Import 0 tags';
+    document.getElementById('am-dropzone').classList.remove('drag');
+    _amBulkPreview = []; _bulkRows = [];
+    m.style.display = 'flex';
+    requestAnimationFrame(() => m.classList.add('modal-open'));
+}
+
+function closeAmBulk() {
+    const m = document.getElementById('am-bulk-modal');
+    m.classList.remove('modal-open');
+    setTimeout(() => { m.style.display = 'none'; }, 200);
+}
+
+function _amInitBulkDropzone() {
+    const dropzone  = document.getElementById('am-dropzone');
+    const fileInput = document.getElementById('am-bulk-file');
+    if (!dropzone || !fileInput) return;
+    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+    dropzone.addEventListener('drop', e => {
+        e.preventDefault(); dropzone.classList.remove('drag');
+        if (e.dataTransfer.files.length) _amHandleBulkFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', e => {
+        if (e.target.files.length) _amHandleBulkFile(e.target.files[0]);
+    });
+    document.getElementById('am-bulk-upload-btn').addEventListener('click', submitBulkUpload);
+    document.getElementById('am-bulk-template-btn')?.addEventListener('click', downloadBulkTemplate);
+}
+
+// IMEI validation: 14-16 digits; Luhn check for 15-digit IMEIs
+function _amValidateImei(imei) {
+    const s = String(imei).trim().replace(/\s/g, '');
+    if (!/^\d{14,16}$/.test(s)) return { ok: false, err: 'must be 14–16 digits' };
+    if (s.length === 15) {
+        let sum = 0;
+        for (let i = 0; i < 15; i++) {
+            let d = parseInt(s[i]);
+            if (i % 2 === 1) { d *= 2; if (d > 9) d -= 9; }
+            sum += d;
+        }
+        if (sum % 10 !== 0) return { ok: false, err: 'fails Luhn check' };
+    }
+    return { ok: true };
+}
+
+function _amHandleBulkFile(file) {
+    const fileInput = document.getElementById('am-bulk-file');
+    try { const dt = new DataTransfer(); dt.items.add(file); fileInput.files = dt.files; } catch(_) {}
+    const reader = new FileReader();
+    reader.onload = evt => {
+        try {
+            const wb = XLSX.read(evt.target.result, { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const data = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
+            const rows = data.map(r => ({
+                imei:        String(r['imei'] || r['IMEI'] || '').trim(),
+                owner_email: String(r['owner_email'] || r['Owner Email'] || '').trim(),
+                description: String(r['description'] || r['Description'] || '').trim() || null,
+                tag_type:    String(r['tag_type'] || r['Tag Type'] || '').trim() || null,
+            })).filter(r => r.imei);
+            _amValidateBulkPreview(rows);
+        } catch (err) {
+            const el = document.getElementById('am-bulk-result');
+            el.innerHTML = `<div class="alert alert-error">${esc('Could not parse file: ' + err.message)}</div>`;
+            el.style.display = '';
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+function _amValidateBulkPreview(rows) {
+    const tbody = document.getElementById('am-preview-body');
+    tbody.innerHTML = ''; _amBulkPreview = []; _bulkRows = [];
+    if (!rows.length) return;
+    let validCount = 0;
+    rows.forEach((row, idx) => {
+        const errs = [];
+        if (!row.imei) {
+            errs.push('missing IMEI');
+        } else {
+            const v = _amValidateImei(row.imei);
+            if (!v.ok) errs.push('IMEI ' + v.err);
+        }
+        if (!row.owner_email) errs.push('missing email');
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.owner_email)) errs.push('invalid email');
+        const valid = errs.length === 0;
+        if (valid) { validCount++; _bulkRows.push(row); }
+        _amBulkPreview.push({ ...row, valid, errs });
+        const tr = document.createElement('tr');
+        if (!valid) tr.classList.add('invalid');
+        tr.innerHTML = `<td>${idx + 1}</td>` +
+            `<td style="font-family:monospace;font-size:11px">${esc(row.imei || '—')}</td>` +
+            `<td>${esc(row.owner_email || '—')}</td>` +
+            `<td>${esc(row.description || '—')}</td>` +
+            `<td>${esc(row.tag_type || '—')}</td>` +
+            `<td>${valid
+                ? '<span class="loc-row-ok">● ready</span>'
+                : `<span class="loc-row-err" title="${esc(errs.join(', '))}">● ${esc(errs[0])}</span>`
+            }</td>`;
+        tbody.appendChild(tr);
+    });
+    document.getElementById('am-preview-wrap').classList.add('open');
+    document.getElementById('am-bulk-upload-btn').disabled = validCount === 0;
+    document.getElementById('am-bulk-upload-btn').textContent = `Import ${validCount} tag${validCount === 1 ? '' : 's'}`;
+}
+
+async function submitBulkUpload() {
+    if (!_bulkRows.length) return;
+    const btn        = document.getElementById('am-bulk-upload-btn');
+    const progressRow = document.getElementById('am-bulk-progress');
+    const fill       = document.getElementById('am-progress-fill');
+    const label      = document.getElementById('am-progress-label');
+    const resultEl   = document.getElementById('am-bulk-result');
+    resultEl.style.display = 'none';
+    btn.disabled = true;
+    progressRow.classList.add('open');
+    fill.style.width = '0%'; label.textContent = 'Uploading…';
+    try {
+        fill.style.width = '40%';
+        const res = await apiFetch('/api/portal/tags/bulk', {
+            method: 'POST',
+            body: JSON.stringify(_bulkRows),
+        });
+        fill.style.width = '100%';
+        progressRow.classList.remove('open');
+        const results = await res.json();
+        if (!res.ok) throw new Error(results.detail || 'Upload failed');
+        const ok  = results.filter(r => r.success).length;
+        const bad = results.filter(r => !r.success);
+        const failHtml = bad.length
+            ? `<details style="margin-top:8px;font-size:.82rem"><summary style="cursor:pointer;color:var(--warning)">${bad.length} failed</summary><ul style="margin:6px 0 0 16px;padding:0">${bad.map(r => `<li><strong>${esc(r.imei)}</strong>: ${esc(r.error)}</li>`).join('')}</ul></details>`
+            : '';
+        resultEl.innerHTML = `<div class="alert alert-${bad.length === 0 ? 'success' : 'warning'}" style="display:flex;flex-direction:column"><strong>${ok} tag${ok !== 1 ? 's' : ''} created</strong>${bad.length ? `<span>${bad.length} row${bad.length !== 1 ? 's' : ''} failed</span>` : ''}${failHtml}</div>`;
+        resultEl.style.display = '';
+        btn.textContent = 'Done';
+        if (ok > 0) { _lmTags = []; initAssetMgmt(); }
+    } catch (err) {
+        progressRow.classList.remove('open');
+        resultEl.innerHTML = `<div class="alert alert-error">${esc(err.message)}</div>`;
+        resultEl.style.display = '';
+        btn.disabled = false;
+        btn.textContent = `Import ${_bulkRows.length} tag${_bulkRows.length !== 1 ? 's' : ''}`;
+    }
+}
 
 function downloadBulkTemplate() {
-    // Generate XLSX (not CSV) so Excel does not auto-convert IMEI to a number.
-    // Column A (imei) cells are explicitly typed as strings ('t':'s') which
-    // tells Excel to store and display them as text — preventing the precision
-    // loss that turns e.g. 780901807533037 → 780902000000000.
     const wb = XLSX.utils.book_new();
     const rows = [
         ['imei',              'owner_email',          'description',    'tag_type'],
@@ -8397,102 +8539,17 @@ function downloadBulkTemplate() {
         ['780901807533037',   'user2@company.com',    'Company Van 2',  'vehicle'],
     ];
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    // Force every cell in column A to string type so Excel never treats
-    // the value as a number (which would silently truncate precision).
     const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:D3');
     for (let R = 0; R <= range.e.r; R++) {
         const addr = XLSX.utils.encode_cell({ r: R, c: 0 });
-        if (ws[addr]) {
-            ws[addr].t = 's';
-            ws[addr].v = String(ws[addr].v);
-            delete ws[addr].z; // remove any inherited number format
-        }
+        if (ws[addr]) { ws[addr].t = 's'; ws[addr].v = String(ws[addr].v); delete ws[addr].z; }
     }
-    // Sensible column widths
     ws['!cols'] = [{ wch: 22 }, { wch: 32 }, { wch: 26 }, { wch: 16 }];
     XLSX.utils.book_append_sheet(wb, ws, 'Tags');
     XLSX.writeFile(wb, 'bulk_tag_template.xlsx');
 }
 
-document.addEventListener('change', function(e) {
-    if (e.target.id !== 'bulkFileInput') return;
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(evt) {
-        try {
-            const wb = XLSX.read(evt.target.result, { type: 'array' });
-            const ws = wb.Sheets[wb.SheetNames[0]];
-            // raw:false forces all cells to string — prevents SheetJS returning
-            // a JavaScript number for IMEI cells, which would lose precision for
-            // 15-16 digit values even when the template cell type is correct.
-            const data = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
-            _bulkRows = data.map(r => ({
-                imei:        String(r['imei'] || r['IMEI'] || '').trim(),
-                owner_email: String(r['owner_email'] || r['Owner Email'] || '').trim(),
-                description: String(r['description'] || r['Description'] || '').trim() || null,
-                tag_type:    String(r['tag_type'] || r['Tag Type'] || '').trim() || null,
-            })).filter(r => r.imei);
-            showBulkPreview();
-        } catch (err) {
-            document.getElementById('bulkUploadAlertText').textContent = 'Could not parse file: ' + err.message;
-            document.getElementById('bulkUploadAlert').className = 'alert alert-error';
-            document.getElementById('bulkUploadAlert').style.display = 'flex';
-        }
-    };
-    reader.readAsArrayBuffer(file);
-});
-
-function showBulkPreview() {
-    const preview = document.getElementById('bulkPreview');
-    const body    = document.getElementById('bulkPreviewBody');
-    document.getElementById('bulkPreviewCount').textContent = `${_bulkRows.length} row(s) detected`;
-    body.innerHTML = _bulkRows.slice(0, 20).map(r =>
-        `<tr style="border-top:1px solid var(--border)">
-            <td style="padding:5px 10px">${esc(r.imei)}</td>
-            <td style="padding:5px 10px">${esc(r.owner_email)}</td>
-            <td style="padding:5px 10px">${esc(r.description||'—')}</td>
-            <td style="padding:5px 10px">${esc(r.tag_type||'—')}</td>
-        </tr>`
-    ).join('');
-    preview.style.display = 'block';
-    document.getElementById('bulkResults').style.display = 'none';
-    document.getElementById('bulkUploadBtn').disabled = _bulkRows.length === 0;
-    document.getElementById('bulkUploadAlert').style.display = 'none';
-}
-
-async function submitBulkUpload() {
-    if (!_bulkRows.length) return;
-    const btn = document.getElementById('bulkUploadBtn');
-    btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading…';
-    document.getElementById('bulkUploadAlert').style.display = 'none';
-    try {
-        const res = await apiFetch('/api/portal/tags/bulk', {
-            method: 'POST',
-            body: JSON.stringify(_bulkRows),
-        });
-        const results = await res.json();
-        if (!res.ok) throw new Error(results.detail || 'Upload failed');
-        const ok  = results.filter(r => r.success).length;
-        const bad = results.filter(r => !r.success);
-        document.getElementById('bulkResultSummary').textContent =
-            `${ok} tag(s) created successfully${bad.length ? `, ${bad.length} failed` : ''}.`;
-        document.getElementById('bulkResultDetail').innerHTML = bad.map(r =>
-            `<div style="margin-bottom:4px">❌ <strong>${esc(r.imei)}</strong>: ${esc(r.error)}</div>`
-        ).join('');
-        document.getElementById('bulkResults').style.display = 'block';
-        if (ok > 0) {
-            _lmTags = [];  // force reload
-            initAssetMgmt();
-        }
-    } catch (err) {
-        document.getElementById('bulkUploadAlertText').textContent = err.message;
-        document.getElementById('bulkUploadAlert').className = 'alert alert-error';
-        document.getElementById('bulkUploadAlert').style.display = 'flex';
-    } finally {
-        btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-upload"></i> Upload';
-    }
-}
+document.addEventListener('DOMContentLoaded', () => { _amInitBulkDropzone(); });
 
 // QR/NFC generator is handled by /customer/qr/app.js (window.QRG)
 </script>
