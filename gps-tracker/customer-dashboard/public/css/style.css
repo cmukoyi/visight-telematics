@@ -1243,6 +1243,101 @@ tbody tr:hover { background: var(--bg-3); }
   gap: 8px;
 }
 
+/* ── Bulk upload modal — reference design ───────────────────── */
+.loc-dropzone {
+  padding: 28px 20px;
+  background: var(--bg-elevated, var(--bg-2));
+  border: 2px dashed var(--border-2, var(--border));
+  border-radius: var(--radius);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  color: var(--text-3);
+}
+.loc-dropzone:hover, .loc-dropzone.drag {
+  border-color: var(--primary);
+  background: rgba(59,130,246,.06);
+  color: var(--primary);
+}
+.loc-dropzone svg { margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto; }
+.loc-dropzone-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; color: var(--text-1, var(--text)); }
+.loc-dropzone-sub { font-size: 12px; color: var(--text-3); }
+
+.loc-template-banner {
+  margin-top: 14px;
+  background: var(--bg-elevated, var(--bg-2));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.loc-template-banner-icon {
+  width: 36px; height: 36px; border-radius: 8px;
+  background: rgba(59,130,246,.1);
+  color: var(--primary);
+  display: grid; place-items: center; flex-shrink: 0;
+}
+.loc-template-banner-text { flex: 1; }
+.loc-template-banner-title { font-size: 13px; font-weight: 600; color: var(--text-1, var(--text)); }
+.loc-template-banner-sub { font-size: 11px; color: var(--text-3); }
+
+.loc-preview-wrap {
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  max-height: 260px;
+  overflow-y: auto;
+  display: none;
+}
+.loc-preview-wrap.open { display: block; }
+.loc-preview-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.loc-preview-table th {
+  text-align: left; padding: 9px 12px;
+  background: var(--bg-2);
+  color: var(--text-3);
+  font-weight: 500; font-size: 11px;
+  text-transform: uppercase; letter-spacing: .04em;
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0;
+}
+.loc-preview-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-1, var(--text));
+}
+.loc-preview-table tr:last-child td { border-bottom: none; }
+.loc-preview-table tr.invalid td { background: rgba(239,68,68,.07); }
+.loc-row-ok  { color: var(--success, #22c55e); font-size: 11px; }
+.loc-row-err { color: var(--danger); font-size: 11px; }
+
+.loc-progress-row {
+  margin-top: 14px;
+  display: none;
+}
+.loc-progress-row.open { display: block; }
+.loc-progress-bar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.loc-progress-fill {
+  height: 100%;
+  background: var(--primary);
+  width: 0%;
+  transition: width .25s;
+}
+.loc-progress-text {
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 5px;
+  display: flex;
+  justify-content: space-between;
+}
+
 /* ── Toast ──────────────────────────────────────────────────── */
 #toast-container {
   position: fixed;
