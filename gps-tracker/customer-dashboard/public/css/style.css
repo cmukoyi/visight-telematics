@@ -1208,7 +1208,7 @@ tbody tr:hover { background: var(--bg-3); }
   opacity: 1;
   pointer-events: auto;
 }
-.modal {
+.modal, .modal-box {
   background: var(--bg-2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1221,7 +1221,8 @@ tbody tr:hover { background: var(--bg-3); }
   transform: scale(.96) translateY(-10px);
   transition: var(--transition);
 }
-.modal-overlay.modal-open .modal {
+.modal-overlay.modal-open .modal,
+.modal-overlay.modal-open .modal-box {
   transform: scale(1) translateY(0);
 }
 .modal-header {
