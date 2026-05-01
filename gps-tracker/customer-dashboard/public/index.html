@@ -648,7 +648,7 @@
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
                       New Location
                     </button>
-                    <button class="loc-btn loc-btn-secondary" id="locBtnBulk">
+                    <button class="loc-btn loc-btn-secondary" id="locBtnBulk" onclick="locOpenBulk()">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                       Bulk
                     </button>
@@ -5028,7 +5028,8 @@ function _locBuildLayer(gf){
 /* ── Map initialization (lazy) ─────────── */
 function locInitMap(){
     if(_locMapInit) return;
-    _locMapInit = true;
+    // Note: _locMapInit is set to true at the END so that if initialisation
+    // throws (e.g. leaflet-draw CDN failed to load), the next tab visit retries.
 
     _locMap = L.map('locMap', { zoomControl:true, attributionControl:true })
         .setView([53.5, -2.38], 12);
@@ -5077,6 +5078,8 @@ function locInitMap(){
         locOpenEditor({ mode:'new', type:'circle', lat:c.lat, lng:c.lng, radius:300, address:'' });
     });
     document.getElementById('locBtnBulk')?.addEventListener('click', locOpenBulk);
+
+    _locMapInit = true; // mark success — must be last so a throw above causes a retry
 
     // Shape filter tabs
     document.getElementById('locShapeTabs')?.addEventListener('click', e=>{
@@ -5638,9 +5641,15 @@ function locOpenBulk(){
     document.getElementById('loc-bulk-progress').style.display='none';
     document.getElementById('loc-bulk-result').style.display='none';
     document.getElementById('loc-bulk-upload-btn').disabled=false;
-    document.getElementById('loc-bulk-modal').style.display='flex';
+    const m = document.getElementById('loc-bulk-modal');
+    m.style.display='flex';
+    requestAnimationFrame(() => m.classList.add('modal-open'));
 }
-function locCloseBulk(){ document.getElementById('loc-bulk-modal').style.display='none'; }
+function locCloseBulk(){
+    const m = document.getElementById('loc-bulk-modal');
+    m.classList.remove('modal-open');
+    setTimeout(() => { m.style.display='none'; }, 200);
+}
 async function locDoBulkUpload(){
     const fileInput=document.getElementById('loc-bulk-file');
     const alertEl=document.getElementById('loc-bulk-alert'), alertTx=document.getElementById('loc-bulk-alert-text');
@@ -5672,13 +5681,20 @@ async function locOpenTagsModal(locationId){
     const loc=_locsData.find(x=>x.id===locationId);
     document.getElementById('loc-tags-modal-title').textContent=`Manage Tags — ${loc?.name||''}`;
     document.getElementById('loc-tags-list').innerHTML='<div style="padding:20px;text-align:center;color:var(--text-3)"><i class="fa-solid fa-spinner fa-spin"></i></div>';
-    document.getElementById('loc-tags-modal').style.display='flex';
+    const m = document.getElementById('loc-tags-modal');
+    m.style.display='flex';
+    requestAnimationFrame(() => m.classList.add('modal-open'));
     if(!_allTagsCache){
         try { const r=await apiFetch('/api/portal/tags'); _allTagsCache=r.ok?await r.json():[]; } catch(_){ _allTagsCache=[]; }
     }
     _locRenderTagsList(loc);
 }
-function locCloseTagsModal(){ document.getElementById('loc-tags-modal').style.display='none'; _locTagsLocId=null; }
+function locCloseTagsModal(){
+    const m = document.getElementById('loc-tags-modal');
+    m.classList.remove('modal-open');
+    setTimeout(() => { m.style.display='none'; }, 200);
+    _locTagsLocId=null;
+}
 function _locRenderTagsList(loc){
     const listEl=document.getElementById('loc-tags-list');
     if(!_allTagsCache?.length){ listEl.innerHTML='<div style="padding:20px;color:var(--text-3);font-size:.85rem">No tags found for your group.</div>'; return; }
