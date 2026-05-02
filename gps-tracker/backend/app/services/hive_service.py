@@ -263,8 +263,46 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
     if state_changed:
         log.info("HIVE %s state transition: %s → %s (diameter=%.0fm)",
                  hive_id, prev_state, new_state, diameter_m or 0)
+        _maybe_send_hive_alert(hive, new_state, prev_state, diameter_m, cfg, db)
 
     return new_state
+
+
+def _maybe_send_hive_alert(hive: Hive, new_state: str, prev_state: str,
+                            diameter_m: Optional[float],
+                            cfg, db: Session) -> None:
+    """Fire a portal alert + email/SMS when a hive enters or clears a breach."""
+    from app.services import portal_alert_service as _pas
+
+    gid = str(hive.usergroup_id)
+    km = f"{diameter_m/1000:.1f} km" if diameter_m and diameter_m >= 1000 else (f"{diameter_m:.0f} m" if diameter_m else "unknown distance")
+
+    if new_state == "BREACHING":
+        alert_type = "hive_breach"
+        title      = f"🔴 HIVE Breach: {hive.name}"
+        message    = (
+            f"The hive '{hive.name}' is in breach. "
+            f"Tags are {km} apart (threshold: {cfg.distance_threshold_m:.0f} m)."
+        )
+    elif new_state == "OK" and prev_state in ("BREACHING", "RESOLVING"):
+        alert_type = "hive_breach_cleared"
+        title      = f"✅ HIVE Cleared: {hive.name}"
+        message    = (
+            f"The hive '{hive.name}' is back within range. "
+            f"Current spread: {km}."
+        )
+    else:
+        return  # BREACH_PENDING / RESOLVING don't warrant alerts
+
+    try:
+        _pas.create_alert(db, gid, None, alert_type, title, message,
+                          meta_data={"hive_id": str(hive.id), "diameter_m": diameter_m})
+        db.commit()
+        _pas._notify_group_by_email(db, gid, alert_type, title, message,
+                                    meta_data={"hive_id": str(hive.id)})
+        _pas._notify_group_by_sms(db, gid, alert_type, title, message)
+    except Exception as exc:
+        log.error("Failed to send hive alert for %s: %s", hive.id, exc)
 
 
 def _current_config(hive_id: str, db: Session) -> Optional[HiveConfigVersion]:
