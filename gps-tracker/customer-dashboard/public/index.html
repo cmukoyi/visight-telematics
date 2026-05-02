@@ -627,6 +627,9 @@
             }
 
 /* ═══════════════ HIVE TAB — sample design ═══════════════ */
+/* HIVE tab scrolls itself — it has no inner .content wrapper */
+#tab-hive { overflow-y: auto !important; -webkit-overflow-scrolling: touch; }
+
 #tab-hive {
   --hive-green:      var(--primary, #00d96b);
   --hive-green-dim:  color-mix(in srgb, var(--primary, #00d96b) 70%, transparent);
@@ -1088,7 +1091,87 @@
 }
 #tab-hive .hive-info-strip i { color:var(--hive-blue);font-size:15px;flex-shrink:0; }
 
-@media (max-width:1100px) { #tab-hive .hive-detail { grid-template-columns:1fr; } #tab-hive .hive-stats-row { grid-template-columns:repeat(2,1fr); } }
+@media (max-width:1100px) {
+  #tab-hive .hive-detail     { grid-template-columns:1fr; }
+  #tab-hive .hive-stats-row  { grid-template-columns:repeat(2,1fr); }
+}
+
+/* ── Mobile: 768px ──────────────────────────────────── */
+@media (max-width:768px) {
+  #tab-hive { padding:14px !important; }
+
+  /* sub-nav: New Hive button drops to its own row */
+  #tab-hive #hive-subnav { gap:6px; }
+  #tab-hive #hive-subnav .hive-btn[style*="margin-left:auto"] { margin-left:0 !important; width:100%; justify-content:center; }
+
+  /* page header: stack title + search */
+  #tab-hive .hive-page-header { flex-direction:column; align-items:flex-start; gap:10px; padding:14px 16px; }
+  #tab-hive .hive-search-box  { max-width:100%; width:100%; }
+
+  /* stats: 2x2 */
+  #tab-hive .hive-stats-row { grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:14px; }
+  #tab-hive .hive-stat-card { padding:12px 14px; gap:10px; }
+  #tab-hive .hive-stat-num  { font-size:20px; }
+
+  /* card grid: single column */
+  #tab-hive .hive-grid { grid-template-columns:1fr; }
+
+  /* card actions: 2x2 grid */
+  #tab-hive .hive-card-actions { grid-template-columns:repeat(2,1fr); }
+  #tab-hive .hive-card-actions button:nth-child(2) { border-right:none; }
+  #tab-hive .hive-card-actions button:nth-child(1),
+  #tab-hive .hive-card-actions button:nth-child(2) { border-bottom:1px solid var(--hive-border); }
+  #tab-hive .hive-card-actions.hive-3col { grid-template-columns:repeat(3,1fr); }
+
+  /* detail head: wrap action buttons below */
+  #tab-hive .hive-detail-head { flex-wrap:wrap; gap:12px; }
+  #tab-hive .hive-detail-head .hive-btn-row { width:100%; justify-content:flex-end; flex-wrap:wrap; }
+  #tab-hive .hive-detail-head-name { font-size:16px; }
+
+  /* diameter row: drop status below bar */
+  #tab-hive .hive-diameter-row {
+    grid-template-columns:auto 1fr;
+    grid-template-rows:auto auto;
+    gap:12px 16px;
+  }
+  #tab-hive .hive-diameter-row > div:last-child { grid-column:1 / -1; }
+  #tab-hive .hive-diameter-num { font-size:34px; }
+
+  /* map: shorter */
+  #tab-hive .hive-map-canvas { height:240px; }
+
+  /* express summary: single column */
+  #tab-hive .hive-express-summary { grid-template-columns:1fr; }
+  #tab-hive .hive-express-item { border-right:none; border-bottom:1px solid var(--hive-border); }
+  #tab-hive .hive-express-item:last-child { border-bottom:none; }
+
+  /* wizard: full width, smaller heading, wrapping footer */
+  #tab-hive .hive-wizard   { max-width:100%; }
+  #tab-hive .hive-wizard-q { font-size:18px; }
+  #tab-hive .hive-wizard-foot { flex-wrap:wrap; gap:8px; }
+  #tab-hive .hive-wizard-foot .hive-btn { flex:1; min-width:120px; justify-content:center; }
+}
+
+/* ── Small mobile: 480px ────────────────────────────── */
+@media (max-width:480px) {
+  #tab-hive { padding:10px !important; }
+
+  /* stats: compact */
+  #tab-hive .hive-stat-icon { width:36px; height:36px; font-size:15px; }
+  #tab-hive .hive-stat-num  { font-size:17px; }
+
+  /* card actions: icon-only (text is a bare text node; font-size:0 hides it) */
+  #tab-hive .hive-card-actions button { font-size:0; padding:12px 4px; gap:0; }
+  #tab-hive .hive-card-actions button i { font-size:14px; }
+
+  /* wizard */
+  #tab-hive .hive-wizard-q { font-size:16px; }
+  #tab-hive .hive-diameter-num { font-size:28px; }
+
+  /* timeline: compact */
+  #tab-hive .hive-tl-item { grid-template-columns:44px 12px 1fr; gap:8px; }
+  #tab-hive .hive-tl-time { font-size:10px; }
+}
 /* ═══════════════════════════════════════════════════════ */
             </style>
 
@@ -2944,6 +3027,7 @@
                         </div>
                       </div>
                       <!-- tag table -->
+                      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
                       <table class="hive-tag-table">
                         <thead>
                           <tr>
@@ -2958,6 +3042,7 @@
                           <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-3)"><i class="fa-solid fa-spinner fa-spin"></i></td></tr>
                         </tbody>
                       </table>
+                      </div><!-- /table scroll wrapper -->
                     </div>
                   </div>
 
