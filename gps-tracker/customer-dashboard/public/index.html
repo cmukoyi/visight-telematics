@@ -2408,9 +2408,19 @@
 
               <!-- SCREEN: detail -->
               <div id="hive-screen-detail" style="display:none">
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
                   <button class="btn btn-secondary btn-small" onclick="hiveShowScreen('list')"><i class="fa-solid fa-arrow-left"></i> Back</button>
-                  <span id="hive-detail-title" style="font-size:16px;font-weight:600;color:var(--text-1)"></span>
+                  <div style="flex:1;min-width:0">
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                      <span id="hive-detail-title" style="font-size:16px;font-weight:600;color:var(--text-1)"></span>
+                      <span id="hive-detail-id-badge" style="font-family:monospace;font-size:11px;color:var(--text-3);background:var(--bg-3);border:1px solid var(--border);padding:2px 7px;border-radius:4px"></span>
+                    </div>
+                    <div id="hive-detail-meta" style="font-size:12px;color:var(--text-3);margin-top:3px"></div>
+                  </div>
+                  <div style="display:flex;gap:8px;flex-shrink:0">
+                    <button class="btn btn-secondary btn-small" onclick="hiveOpenConfigModal()"><i class="fa-solid fa-sliders"></i> Configure</button>
+                    <button class="btn btn-secondary btn-small" style="color:var(--danger);border-color:color-mix(in srgb,var(--danger) 35%,transparent)" onclick="hiveArchiveCurrent()"><i class="fa-solid fa-trash"></i> Delete</button>
+                  </div>
                 </div>
                 <!-- alert banner (hidden by default) -->
                 <div id="hive-alert-banner" style="display:none;background:color-mix(in srgb,var(--danger) 10%,transparent);border:1px solid color-mix(in srgb,var(--danger) 40%,transparent);border-radius:8px;padding:16px 18px;margin-bottom:16px">
@@ -2424,6 +2434,22 @@
                 <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:16px" id="hive-detail-grid">
                   <!-- left column -->
                   <div>
+                    <!-- position map -->
+                    <div id="hive-map-section" style="background:var(--bg-2);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px">
+                      <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+                        <span style="font-weight:600;color:var(--text-1)"><i class="fa-solid fa-map-location-dot" style="color:var(--primary);margin-right:8px"></i>Position Map</span>
+                        <span id="hive-map-info" style="font-size:11px;color:var(--text-3)"></span>
+                      </div>
+                      <div style="position:relative;padding:12px">
+                        <canvas id="hive-map-canvas" style="width:100%;height:280px;display:block;border-radius:6px;background:var(--bg-3)"></canvas>
+                        <div id="hive-map-legend" style="position:absolute;bottom:20px;left:20px;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);border-radius:6px;padding:7px 10px;font-size:11px;display:flex;gap:12px">
+                          <span style="color:#4ade80"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#4ade80;margin-right:4px"></span>Fresh</span>
+                          <span style="color:#4a9eff"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#4a9eff;margin-right:4px"></span>Recent</span>
+                          <span style="color:#f59e0b"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:4px"></span>Stale</span>
+                          <span style="color:#ef4444"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef4444;margin-right:4px"></span>Outlier</span>
+                        </div>
+                      </div>
+                    </div>
                     <!-- tag table -->
                     <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px">
                       <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
@@ -2432,7 +2458,7 @@
                       </div>
                       <table style="width:100%;border-collapse:collapse">
                         <thead>
-                          <tr><th style="padding:10px 16px;font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);text-align:left">ID / Label</th><th style="padding:10px 16px;font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);text-align:right">Freshness</th><th style="padding:10px 16px;font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);text-align:right">Last Seen</th><th style="padding:10px 16px;font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);text-align:right">Role</th></tr>
+                          <tr><th style="padding:10px 16px;font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);text-align:left">ID / Label</th><th style="padding:10px 16px;font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);text-align:right">Freshness</th><th style="padding:10px 16px;font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);text-align:right">Last Seen</th><th style="padding:10px 16px;font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);text-align:right">Distance</th><th style="padding:10px 16px;font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);text-align:right">Role</th></tr>
                         </thead>
                         <tbody id="hive-tag-tbody">
                           <tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-3)"><i class="fa-solid fa-spinner fa-spin"></i></td></tr>
@@ -2485,10 +2511,7 @@
                       </div>
                       <div style="padding:10px 18px" id="hive-timeline"></div>
                     </div>
-                    <!-- danger zone -->
-                    <div style="margin-top:12px;display:flex;gap:8px">
-                      <button class="btn btn-secondary btn-small" style="flex:1;justify-content:center;color:var(--danger);border-color:color-mix(in srgb,var(--danger) 35%,transparent)" onclick="hiveArchiveCurrent()"><i class="fa-solid fa-trash"></i> Delete Hive</button>
-                    </div>
+                    <!-- danger zone: delete is now in the header -->
                   </div>
                 </div>
               </div>
@@ -8993,7 +9016,7 @@ const HIVE_PROFILE_LABELS = { stationary: 'Stationary', slow: 'Slow', mobile: 'M
 let _hiveCurrentId = null;
 let _hiveWizAvailableTags = [];
 
-const hiveWizState = { step: 1, name: '', selectedTags: [], profile: '', threshold_m: null };
+const hiveWizState = { step: 1, name: '', selectedTags: [], profile: '', threshold_m: null, _suggestion: null };
 
 // ── sub-screen navigation ─────────────────
 function hiveShowScreen(name) {
@@ -9065,31 +9088,34 @@ function hiveCardHTML(h) {
         return `<span style="position:relative;width:22px;height:22px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;background:${bg};color:${fc}" title="${t.tag_id}">${(t.label||t.tag_id).substring(0,2).toUpperCase()}${outlierDot}</span>`;
     }).join('');
     const outlierText = h.outlier_tag_id ? `<span style="color:var(--danger)">${h.outlier_tag_id}${h.outlier_label ? ' · ' + h.outlier_label : ''}</span>` : '<span style="color:var(--text-3)">—</span>';
-    return `<div style="background:var(--bg-2);border:1px solid var(--border);border-top:2px solid ${topBorder};border-radius:8px;overflow:hidden;cursor:pointer;transition:all .18s" onclick="hiveOpenDetail(${h.id})" onmouseenter="this.style.transform='translateY(-2px)'" onmouseleave="this.style.transform=''">
+    return `<div style="background:var(--bg-2);border:1px solid var(--border);border-top:2px solid ${topBorder};border-radius:8px;overflow:hidden;cursor:pointer;transition:all .18s" onclick="hiveOpenDetail('${h.hive_id}')" onmouseenter="this.style.transform='translateY(-2px)'" onmouseleave="this.style.transform=''">
       <div style="padding:14px 16px 12px;display:flex;align-items:flex-start;justify-content:space-between;border-bottom:1px solid var(--border)">
         <div style="display:flex;gap:10px;align-items:flex-start">
           <i class="fa-solid fa-shield-halved" style="color:${iconColor};font-size:17px;margin-top:2px"></i>
           <div>
             <div style="font-size:15px;font-weight:600;color:var(--text-1)">${hiveEsc(h.name)}</div>
-            <div style="font-size:12px;color:${subColor};font-weight:500">${hiveEsc(h.status_label)} · ${HIVE_PROFILE_LABELS[h.profile]||h.profile} Profile</div>
+            <div style="font-size:12px;color:${subColor};font-weight:500">${hiveEsc(h.status_label)} · ${HIVE_PROFILE_LABELS[h.mobility_profile]||h.mobility_profile||'—'} Profile</div>
           </div>
         </div>
         <span style="width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:4px;${dotStyle};display:inline-block"></span>
       </div>
       <div style="padding:4px 16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;font-size:12px;border-bottom:1px solid var(--border)"><span style="color:var(--text-3)">ID</span><span style="font-family:monospace;font-size:11px;color:var(--text-3)">${h.hive_id.substring(0,8)}</span></div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;font-size:13px;border-bottom:1px solid var(--border)"><span style="color:var(--text-2)">Diameter</span><span style="font-weight:500;color:${diameterColor}">${diameterText}</span></div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;font-size:13px;border-bottom:1px solid var(--border)"><span style="color:var(--text-2)">Tags</span><span style="display:flex;gap:4px;flex-wrap:wrap">${pips}</span></div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;font-size:13px;border-bottom:1px solid var(--border)"><span style="color:var(--text-2)">Outlier</span>${outlierText}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;font-size:12px"><span style="color:var(--text-3)">Last Update</span><span style="color:var(--text-3)">${h.last_evaluated_at ? _hiveRelTime(h.last_evaluated_at) : '—'}</span></div>
       </div>
       <div style="padding:10px 16px;background:var(--bg-3);border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:12px;${expiryStyle}">
         <i class="fa-solid fa-hourglass-half" style="color:${expiryUrgent?'var(--warning)':'var(--text-3)'}"></i>
         <span style="color:var(--text-2)">Expires ${h.expires_at ? new Date(h.expires_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—'}</span>
         <span style="margin-left:auto;font-weight:600;color:${expiryUrgent?'var(--warning)':'var(--text-2)'}">${h.days_remaining != null ? h.days_remaining + ' days left' : ''}</span>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--border)">
-        <button style="background:transparent;border:none;border-right:1px solid var(--border);color:var(--text-2);padding:11px 6px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px" onclick="event.stopPropagation();hiveOpenDetail(${h.id})"><i class="fa-solid fa-circle-info" style="font-size:11px"></i> Detail</button>
-        <button style="background:transparent;border:none;border-right:1px solid var(--border);color:var(--text-2);padding:11px 6px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px" onclick="event.stopPropagation();hiveManualEval(${h.id})"><i class="fa-solid fa-rotate" style="font-size:11px"></i> Evaluate</button>
-        <button style="background:transparent;border:none;color:var(--danger);padding:11px 6px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px" onclick="event.stopPropagation();hiveArchive(${h.id},'${hiveEsc(h.name)}')"><i class="fa-solid fa-trash" style="font-size:11px"></i> Delete</button>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--border)">
+        <button style="background:transparent;border:none;border-right:1px solid var(--border);color:var(--text-2);padding:10px 4px;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px" onclick="event.stopPropagation();hiveOpenDetail('${h.hive_id}')"><i class="fa-solid fa-circle-info" style="font-size:10px"></i> Detail</button>
+        <button style="background:transparent;border:none;border-right:1px solid var(--border);color:var(--text-2);padding:10px 4px;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px" onclick="event.stopPropagation();hiveOpenDetailMap('${h.hive_id}')"><i class="fa-solid fa-map-location-dot" style="font-size:10px"></i> Map</button>
+        <button style="background:transparent;border:none;border-right:1px solid var(--border);color:var(--text-2);padding:10px 4px;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px" onclick="event.stopPropagation();hiveManualEval('${h.hive_id}')"><i class="fa-solid fa-rotate" style="font-size:10px"></i> Eval</button>
+        <button style="background:transparent;border:none;color:var(--danger);padding:10px 4px;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px" onclick="event.stopPropagation();hiveArchive('${h.hive_id}','${hiveEsc(h.name)}')"><i class="fa-solid fa-trash" style="font-size:10px"></i> Delete</button>
       </div>
     </div>`;
 }
@@ -9110,7 +9136,15 @@ async function hiveOpenDetail(id) {
 }
 
 function hiveRenderDetail(d) {
+    // Compute threshold early — detail API returns it inside d.config
+    const _cfg = d.config || {};
+    const _threshold = _cfg.distance_threshold_m || 100;
     document.getElementById('hive-detail-title').textContent = d.name;
+    document.getElementById('hive-detail-id-badge').textContent = d.hive_id ? d.hive_id.substring(0,8) : '';
+    const tagCountStr = d.tags ? d.tags.length + ' tag' + (d.tags.length !== 1 ? 's' : '') : '';
+    const profileStr = d.config ? (HIVE_PROFILE_LABELS[d.config.mobility_profile] || d.config.mobility_profile || '') + ' profile' : '';
+    const createdStr = d.created_at ? 'Created ' + new Date(d.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '';
+    document.getElementById('hive-detail-meta').textContent = [profileStr, tagCountStr, createdStr].filter(Boolean).join(' · ');
     // alert banner
     const banner = document.getElementById('hive-alert-banner');
     if (d.alert_state === 'BREACHING' || d.alert_state === 'BREACH_PENDING') {
@@ -9118,9 +9152,12 @@ function hiveRenderDetail(d) {
         document.getElementById('hive-alert-banner-title').textContent = d.alert_state === 'BREACHING' ? 'Confirmed Breach' : 'Suspected Breach';
         const outlier = (d.tags||[]).find(t => t.tag_id === d.outlier_tag_id);
         document.getElementById('hive-alert-banner-body').textContent = outlier
-            ? `${outlier.label||outlier.tag_id} has separated from the group, exceeding the ${d.threshold_m}m threshold.`
-            : `Group diameter exceeds the ${d.threshold_m}m threshold.`;
-        document.getElementById('hive-alert-banner-meta').textContent = `Alert state: ${d.alert_state}`;
+            ? `${outlier.label||outlier.tag_id} has separated from the group, exceeding the ${_threshold}m threshold.`
+            : `Group diameter exceeds the ${_threshold}m threshold.`;
+        const breachEvent = (d.recent_events||[]).find(e => e.event_type === 'BREACH_START' || e.event_type === 'CONFIRMED_BREACH' || e.event_type === 'BREACH_PENDING');
+        const raisedAgo = breachEvent ? 'Raised ' + _hiveRelTime(breachEvent.occurred_at) : '';
+        const confirmCount = d.config ? d.config.confirmation_count : null;
+        document.getElementById('hive-alert-banner-meta').textContent = [raisedAgo, confirmCount ? `Confirmed by ${confirmCount} reports` : '', d.breach_confidence ? d.breach_confidence + ' confidence' : ''].filter(Boolean).join(' · ');
     } else { banner.style.display = 'none'; }
 
     // tag table
@@ -9133,32 +9170,33 @@ function hiveRenderDetail(d) {
           <td style="padding:11px 14px;font-size:13px;font-weight:600;color:${isOutlier?'var(--danger)':'var(--text-1)'}">${hiveEsc(t.tag_id)}<br><span style="font-size:11px;color:var(--text-3);font-weight:400">${hiveEsc(t.label||'')}</span></td>
           <td style="padding:11px 14px;font-size:12px;text-align:right"><span style="background:color-mix(in srgb,${fc} 15%,transparent);color:${fc};padding:3px 8px;border-radius:12px">${t.freshness||'—'}</span></td>
           <td style="padding:11px 14px;font-size:12px;color:var(--text-2);text-align:right">${lastSeen}</td>
+          <td style="padding:11px 14px;font-size:12px;color:var(--text-2);text-align:right">${t.distance_from_centre_m != null ? Math.round(t.distance_from_centre_m) + 'm' : '—'}</td>
           <td style="padding:11px 14px;font-size:11px;text-align:right;color:${isOutlier?'var(--danger)':'var(--text-3)'};font-weight:600;text-transform:uppercase;letter-spacing:.04em">${isOutlier?'⚠ outlier':'core'}</td>
         </tr>`;
-    }).join('') || '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-3)">No members</td></tr>';
+    }).join('') || '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-3)">No members</td></tr>';
 
     // diameter
     const cfg = d.config || {};
-    const threshold = d.threshold_m || cfg.distance_threshold_m || 100;
-    const diam = d.diameter_m;
+    const threshold = cfg.distance_threshold_m || d.threshold_m || 100;
+    const diam = d.current_diameter_m != null ? d.current_diameter_m : d.diameter_m;
     document.getElementById('hive-diameter-num').textContent = diam != null ? Math.round(diam) : '—';
     document.getElementById('hive-diameter-num').style.color = (diam != null && diam > threshold) ? 'var(--danger)' : 'var(--primary)';
     const pct = diam != null ? Math.min(100, Math.round(diam / threshold * 100)) : 0;
     document.getElementById('hive-diameter-bar').style.width = pct + '%';
     document.getElementById('hive-diameter-state').textContent = d.alert_state === 'BREACHING' ? `Breaching · ${Math.round(diam - threshold)}m over` : d.alert_state === 'OK' ? 'Together' : d.alert_state || '—';
     document.getElementById('hive-diameter-state').style.color = d.alert_state === 'BREACHING' ? 'var(--danger)' : d.alert_state === 'OK' ? 'var(--primary)' : 'var(--warning)';
-    document.getElementById('hive-detail-updated').textContent = d.last_evaluated ? 'Updated ' + _hiveRelTime(d.last_evaluated) : '';
+    document.getElementById('hive-detail-updated').textContent = d.last_evaluated_at ? 'Updated ' + _hiveRelTime(d.last_evaluated_at) : '';
 
     // config
-    const ver = d.config_version || {};
-    document.getElementById('hive-config-ver').textContent = ver.version ? `v${ver.version} · current` : '';
+    const cfg_d = d.config || {};
+    document.getElementById('hive-config-ver').textContent = cfg_d.version_number ? `v${cfg_d.version_number} · current` : '';
     document.getElementById('hive-config-body').innerHTML = [
-        ['Mobility Profile', HIVE_PROFILE_LABELS[ver.profile||d.profile]||d.profile, 'fa-route'],
+        ['Mobility Profile', HIVE_PROFILE_LABELS[cfg_d.mobility_profile]||cfg_d.mobility_profile||'—', 'fa-route'],
         ['Distance Threshold', `${threshold}m`, 'fa-ruler-horizontal'],
-        ['Fresh Window', `${Math.round((ver.fresh_window_s||300)/60)} min`, 'fa-clock'],
-        ['Lost Threshold', `${Math.round((ver.lost_threshold_s||7200)/3600)} hr`, 'fa-signal'],
-        ['Hysteresis', `${Math.round((ver.hysteresis_pct||0.8)*100)}%`, 'fa-wave-square'],
-        ['Confirmation', `${ver.confirmation_count||2} reports`, 'fa-check-double'],
+        ['Fresh Window', `${Math.round((cfg_d.fresh_window_s||300)/60)} min`, 'fa-clock'],
+        ['Lost Threshold', `${Math.round((cfg_d.lost_threshold_s||7200)/3600)} hr`, 'fa-signal'],
+        ['Hysteresis', `${Math.round((cfg_d.hysteresis_pct||0.8)*100)}%`, 'fa-wave-square'],
+        ['Confirmation', `${cfg_d.confirmation_count||2} reports`, 'fa-check-double'],
     ].map(([k,v,ico]) => `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px"><span style="color:var(--text-2);display:flex;align-items:center;gap:7px"><i class="fa-solid ${ico}" style="color:var(--text-3);width:13px"></i>${k}</span><span style="font-weight:600;color:var(--text-1)">${v}</span></div>`).join('');
 
     // lifecycle
@@ -9171,25 +9209,217 @@ function hiveRenderDetail(d) {
 
     // timeline
     hiveRenderTimeline(d.recent_events || []);
+    // map
+    setTimeout(() => hiveDrawMap(d), 50);
 }
 
+const HIVE_EVENT_LABELS = {
+    CONFIRMED_BREACH: 'Breach Confirmed',
+    SUSPECTED_BREACH: 'Breach Suspected',
+    BREACH_CLEARED: 'Breach Cleared',
+    LOST_CONTACT: 'Lost Contact',
+    PARTIALLY_OBSERVABLE: 'Partial Data',
+    HIVE_CREATED: 'Hive Created',
+    HIVE_EXPIRED: 'Hive Expired',
+    HIVE_ARCHIVED: 'Hive Archived',
+    HIVE_RECREATED: 'Hive Recreated',
+    BREACH_START: 'Breach Started',
+    BREACH_RESOLVE: 'Breach Resolved',
+    ARCHIVE: 'Archived',
+    RECREATE: 'Recreated',
+};
 function hiveRenderTimeline(events) {
     const el = document.getElementById('hive-timeline');
     if (!events.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-3);font-size:12px">No events yet</div>'; return; }
-    const colourMap = { BREACH_START: 'var(--danger)', BREACH_PENDING: 'var(--warning)', BREACH_RESOLVE: 'var(--primary)', ARCHIVE: 'var(--text-3)', PURGE: 'var(--text-3)', EVAL: '#4a9eff', RECREATE: 'var(--primary)' };
+    const colourMap = { CONFIRMED_BREACH: 'var(--danger)', BREACH_START: 'var(--danger)', SUSPECTED_BREACH: 'var(--warning)', BREACH_PENDING: 'var(--warning)', BREACH_CLEARED: 'var(--primary)', BREACH_RESOLVE: 'var(--primary)', ARCHIVE: 'var(--text-3)', HIVE_ARCHIVED: 'var(--text-3)', PURGE: 'var(--text-3)', RECREATE: 'var(--primary)', HIVE_RECREATED: 'var(--primary)' };
     el.innerHTML = events.map(ev => {
-        const c = colourMap[ev.event_type] || 'var(--text-3)';
-        const t = new Date(ev.created_at);
+        const c = colourMap[ev.event_type] || '#4a9eff';
+        const t = new Date(ev.occurred_at);
         const timeStr = t.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+        const label = HIVE_EVENT_LABELS[ev.event_type] || ev.event_type;
+        const detailStr = ev.details && typeof ev.details === 'object' && ev.details.reason ? ev.details.reason : '';
         return `<div style="display:grid;grid-template-columns:50px 14px 1fr;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)">
           <div style="font-size:11px;color:var(--text-3);font-weight:500;padding-top:2px">${timeStr}</div>
           <div style="width:10px;height:10px;border-radius:50%;background:${c};margin:5px auto 0;box-shadow:0 0 6px ${c}"></div>
           <div>
-            <div style="font-size:13px;color:var(--text-1)">${hiveEsc(ev.description||ev.event_type)}</div>
-            ${ev.detail ? `<div style="font-size:11px;color:var(--text-3);margin-top:2px">${hiveEsc(ev.detail)}</div>` : ''}
+            <div style="font-size:13px;color:var(--text-1)">${hiveEsc(label)}</div>
+            ${detailStr ? `<div style="font-size:11px;color:var(--text-3);margin-top:2px">${hiveEsc(detailStr)}</div>` : ''}
           </div>
         </div>`;
     }).join('');
+}
+
+
+// ── position map ──────────────────────────────────────────────────────────
+function hiveDrawMap(d) {
+    const canvas = document.getElementById('hive-map-canvas');
+    if (!canvas) return;
+    // Sizing: match CSS width
+    const W = canvas.offsetWidth || 600;
+    const H = 280;
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+
+    // Gather positioned tags
+    const positioned = (d.tags || []).filter(t => t.latitude != null && t.longitude != null);
+    const cfg = d.config || {};
+    const threshold = cfg.distance_threshold_m || d.threshold_m || 100;
+    const infoEl = document.getElementById('hive-map-info');
+
+    if (positioned.length === 0) {
+        ctx.fillStyle = 'rgba(255,255,255,.1)';
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = 'rgba(255,255,255,.3)';
+        ctx.font = '13px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('No position data available', W/2, H/2);
+        if (infoEl) infoEl.textContent = 'No GPS data';
+        return;
+    }
+
+    // Compute centroid
+    const lats = positioned.map(t => t.latitude);
+    const lons = positioned.map(t => t.longitude);
+    const cLat = lats.reduce((a,b) => a+b, 0) / lats.length;
+    const cLon = lons.reduce((a,b) => a+b, 0) / lons.length;
+
+    // Convert lat/lon offset to metres (approximate equirectangular)
+    const degToM = 111320;
+    const cosLat = Math.cos(cLat * Math.PI / 180);
+    const pts = positioned.map(t => ({
+        ...t,
+        mx: (t.longitude - cLon) * degToM * cosLat,  // metres east
+        my: -(t.latitude - cLat) * degToM,             // metres south (canvas y down)
+    }));
+
+    // Compute max radius for scaling
+    const maxR = Math.max(threshold, ...pts.map(p => Math.sqrt(p.mx*p.mx + p.my*p.my))) * 1.3 || threshold;
+    const scale = Math.min(W, H) * 0.42 / maxR;
+    const ox = W / 2, oy = H / 2;
+    const sx = p => ox + p.mx * scale;
+    const sy = p => oy + p.my * scale;
+
+    // Background
+    const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg-3').trim() || '#1a1a2e';
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    // Grid rings at threshold intervals
+    ctx.strokeStyle = 'rgba(255,255,255,.06)';
+    ctx.lineWidth = 1;
+    for (let r = 1; r <= 3; r++) {
+        ctx.beginPath();
+        ctx.arc(ox, oy, threshold * scale * r, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+
+    // Threshold circle (dashed)
+    ctx.setLineDash([6, 4]);
+    ctx.strokeStyle = 'rgba(255,255,255,.25)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(ox, oy, threshold * scale, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Separation lines
+    const outlier = pts.find(t => t.is_outlier);
+    const group = pts.filter(t => !t.is_outlier);
+
+    // Green solid lines between group members
+    if (group.length > 1) {
+        ctx.strokeStyle = 'rgba(74,222,128,.3)';
+        ctx.lineWidth = 1.5;
+        for (let i = 0; i < group.length; i++) {
+            for (let j = i+1; j < group.length; j++) {
+                ctx.beginPath();
+                ctx.moveTo(sx(group[i]), sy(group[i]));
+                ctx.lineTo(sx(group[j]), sy(group[j]));
+                ctx.stroke();
+            }
+        }
+    }
+
+    // Dashed red line from centroid to outlier
+    if (outlier) {
+        ctx.setLineDash([5, 4]);
+        ctx.strokeStyle = 'rgba(239,68,68,.7)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(ox, oy);
+        ctx.lineTo(sx(outlier), sy(outlier));
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    // Centroid dot
+    ctx.fillStyle = 'rgba(255,255,255,.15)';
+    ctx.beginPath();
+    ctx.arc(ox, oy, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Tag markers
+    const freshColor  = '#4ade80';
+    const recentColor = '#4a9eff';
+    const staleColor  = '#f59e0b';
+    const lostColor   = '#94a3b8';
+    const outlierColor = '#ef4444';
+    const R = 14;
+    pts.forEach(t => {
+        const x = sx(t), y = sy(t);
+        const isOut = t.is_outlier;
+        const col = isOut ? outlierColor :
+                    t.freshness === 'fresh' ? freshColor :
+                    t.freshness === 'recent' ? recentColor :
+                    t.freshness === 'stale' ? staleColor : lostColor;
+
+        // Pulsing ring for outlier (static approximation — full animation needs requestAnimationFrame)
+        if (isOut) {
+            ctx.strokeStyle = col + '55';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(x, y, R + 8, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        // Filled circle
+        ctx.fillStyle = col + '33';
+        ctx.beginPath();
+        ctx.arc(x, y, R, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Label initials
+        const initials = (t.label || t.tag_id || '').substring(0, 2).toUpperCase();
+        ctx.fillStyle = col;
+        ctx.font = `bold 10px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(initials, x, y);
+    });
+
+    // Info overlay
+    const diameter = d.current_diameter_m;
+    const outlierLabel = outlier ? (outlier.label || outlier.tag_id || '').substring(0, 8) : null;
+    if (infoEl) {
+        infoEl.textContent = [
+            diameter != null ? `Diameter ${Math.round(diameter)}m` : '',
+            threshold ? `/ ${threshold}m threshold` : '',
+            outlierLabel ? `· Outlier ${outlierLabel}` : '',
+        ].filter(Boolean).join(' ');
+    }
+}
+
+function hiveOpenDetailMap(id) {
+    hiveOpenDetail(id);
+    // scroll to map after load
+    setTimeout(() => {
+        const s = document.getElementById('hive-map-section');
+        if (s) s.scrollIntoView({behavior:'smooth',block:'start'});
+    }, 600);
 }
 
 // ── manual evaluate ───────────────────────
@@ -9218,7 +9448,7 @@ async function hiveRecreate() {
     if (!_hiveCurrentId) return;
     if (!confirm('Recreate this hive? A new 60-day clock will start with the same config and tags.')) return;
     const r = await apiFetch(`/api/portal/hive/${_hiveCurrentId}/recreate`, { method: 'POST' });
-    if (r.ok) { const d = await r.json(); _hiveCurrentId = d.id; hiveOpenDetail(d.id); hiveLoadStats(); } else { alert('Recreate failed'); }
+    if (r.ok) { const d = await r.json(); _hiveCurrentId = d.hive_id; hiveOpenDetail(d.hive_id); hiveLoadStats(); } else { alert('Recreate failed'); }
 }
 
 // ── config modal (simple inline edit) ────
@@ -9250,7 +9480,7 @@ async function hiveLoadArchive() {
     const hives = await r.json();
     if (!hives.length) { grid.innerHTML = '<div style="text-align:center;padding:60px;color:var(--text-3)"><i class="fa-solid fa-box-archive" style="font-size:32px;display:block;margin-bottom:12px;opacity:.3"></i>No archived hives</div>'; return; }
     grid.innerHTML = hives.map(h => {
-        const purgeIn = h.archive_expires_at ? Math.max(0, Math.ceil((new Date(h.archive_expires_at) - Date.now()) / 86400000)) : null;
+        const purgeIn = h.days_until_purge != null ? h.days_until_purge : (h.archive_expires_at ? Math.max(0, Math.ceil((new Date(h.archive_expires_at) - Date.now()) / 86400000)) : null);
         const urgent = purgeIn != null && purgeIn <= 7;
         return `<div style="background:var(--bg-2);border:1px solid var(--border);border-top:2px solid var(--text-3);border-radius:8px;overflow:hidden;opacity:.9">
           <div style="padding:14px 16px 12px;display:flex;align-items:flex-start;justify-content:space-between;border-bottom:1px solid var(--border)">
@@ -9258,13 +9488,16 @@ async function hiveLoadArchive() {
               <i class="fa-solid fa-box-archive" style="color:var(--text-3);font-size:17px;margin-top:2px"></i>
               <div>
                 <div style="font-size:15px;font-weight:600;color:var(--text-2)">${hiveEsc(h.name)}</div>
-                <div style="font-size:12px;color:var(--text-3)">Archived · ${hiveEsc(h.archive_reason||'')}</div>
+                <div style="font-size:12px;color:var(--text-3)">Archived · ${hiveEsc(h.archived_reason||'')}</div>
+                <div style="font-size:11px;color:var(--text-3);font-family:monospace;margin-top:2px">${h.hive_id.substring(0,8)}</div>
               </div>
             </div>
           </div>
           <div style="padding:4px 16px">
-            <div style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px;border-bottom:1px solid var(--border)"><span style="color:var(--text-2)">Tags</span><span>${h.tag_count||'—'}</span></div>
-            <div style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px"><span style="color:var(--text-2)">Profile</span><span>${HIVE_PROFILE_LABELS[h.profile]||h.profile||'—'}</span></div>
+            <div style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px;border-bottom:1px solid var(--border)"><span style="color:var(--text-2)">Lifetime</span><span>${h.lifetime_days != null ? h.lifetime_days + ' days' : '—'}</span></div>
+            <div style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px;border-bottom:1px solid var(--border)"><span style="color:var(--text-2)">Total Alerts</span><span style="color:${h.total_alerts > 0 ? 'var(--danger)' : 'var(--text-2)'}">${h.total_alerts != null ? h.total_alerts : '—'}</span></div>
+            <div style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px;border-bottom:1px solid var(--border)"><span style="color:var(--text-2)">Profile</span><span>${HIVE_PROFILE_LABELS[h.mobility_profile]||h.mobility_profile||'—'}</span></div>
+            <div style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px"><span style="color:var(--text-2)">Created</span><span style="color:var(--text-3)">${h.created_at ? new Date(h.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—'}</span></div>
           </div>
           <div style="padding:10px 16px;background:var(--bg-3);border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:12px;${urgent?'background:color-mix(in srgb,var(--warning) 6%,transparent)':''}">
             <i class="fa-solid fa-trash-can" style="color:${urgent?'var(--warning)':'var(--text-3)'}"></i>
@@ -9272,9 +9505,9 @@ async function hiveLoadArchive() {
             <span style="margin-left:auto;font-weight:600;color:${urgent?'var(--warning)':'var(--text-2)'}">${purgeIn != null ? 'Purges in ' + purgeIn + 'd' : ''}</span>
           </div>
           <div style="display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--border)">
-            <button style="background:transparent;border:none;border-right:1px solid var(--border);color:var(--text-2);padding:11px 6px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px" onclick="hiveArchiveRecreate(${h.id})"><i class="fa-solid fa-rotate-right" style="font-size:11px"></i> Recreate</button>
-            <button style="background:transparent;border:none;border-right:1px solid var(--border);color:var(--text-2);padding:11px 6px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px" onclick="hiveOpenDetail(${h.id})"><i class="fa-solid fa-clock-rotate-left" style="font-size:11px"></i> History</button>
-            <button style="background:transparent;border:none;color:var(--danger);padding:11px 6px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px" onclick="hivePurge(${h.id},'${hiveEsc(h.name)}')"><i class="fa-solid fa-trash" style="font-size:11px"></i> Purge</button>
+            <button style="background:transparent;border:none;border-right:1px solid var(--border);color:var(--text-2);padding:11px 6px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px" onclick="hiveArchiveRecreate('${h.hive_id}')"><i class="fa-solid fa-rotate-right" style="font-size:11px"></i> Recreate</button>
+            <button style="background:transparent;border:none;border-right:1px solid var(--border);color:var(--text-2);padding:11px 6px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px" onclick="hiveOpenDetail('${h.hive_id}')"><i class="fa-solid fa-clock-rotate-left" style="font-size:11px"></i> History</button>
+            <button style="background:transparent;border:none;color:var(--danger);padding:11px 6px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px" onclick="hivePurge('${h.hive_id}','${hiveEsc(h.name)}')"><i class="fa-solid fa-trash" style="font-size:11px"></i> Purge</button>
           </div>
         </div>`;
     }).join('');
@@ -9283,7 +9516,7 @@ async function hiveLoadArchive() {
 async function hiveArchiveRecreate(id) {
     if (!confirm('Recreate this archived hive? A fresh 60-day clock will start.')) return;
     const r = await apiFetch(`/api/portal/hive/${id}/recreate`, { method: 'POST' });
-    if (r.ok) { const d = await r.json(); hiveShowScreen('list'); hiveLoadStats(); hiveLoadList(); hiveOpenDetail(d.id); } else { alert('Recreate failed'); }
+    if (r.ok) { const d = await r.json(); hiveShowScreen('list'); hiveLoadStats(); hiveLoadList(); hiveOpenDetail(d.hive_id); } else { alert('Recreate failed'); }
 }
 
 async function hivePurge(id, name) {
@@ -9346,7 +9579,32 @@ function hiveWizRender() {
             </label>`;
           }).join('') : '<div style="text-align:center;padding:40px;color:var(--text-3)">No available tags — all tags are already in active hives.</div>'}</div>`;
     } else if (step === 2) {
-        content.innerHTML = `<div style="font-size:20px;font-weight:700;margin-bottom:8px;color:var(--text-1)">How much do these items move?</div>
+        const sug = hiveWizState._suggestion;
+        const sugCard = (sug && (sug.confidence === 'high' || sug.confidence === 'medium')) ? `
+          <div style="background:color-mix(in srgb,var(--primary) 6%,transparent);border:1px solid color-mix(in srgb,var(--primary) 30%,transparent);border-radius:10px;padding:16px 18px;margin-bottom:18px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+              <div style="width:30px;height:30px;background:var(--primary);color:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fa-solid fa-wand-magic-sparkles" style="font-size:13px"></i></div>
+              <div>
+                <div style="font-size:14px;font-weight:700;color:var(--text-1)">${sug.confidence === 'high' ? 'High Confidence' : 'Suggested'} Settings</div>
+                <div style="font-size:12px;color:var(--text-3)">${sug.tag_count} tags · based on recent history</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;margin-bottom:12px">
+              <div style="flex:1;background:var(--bg-2);border-radius:6px;padding:10px 12px;text-align:center">
+                <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Profile</div>
+                <div style="font-size:14px;font-weight:600;color:var(--text-1)">${HIVE_PROFILE_LABELS[sug.suggested_profile]||sug.suggested_profile}</div>
+              </div>
+              <div style="flex:1;background:var(--bg-2);border-radius:6px;padding:10px 12px;text-align:center">
+                <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Threshold</div>
+                <div style="font-size:14px;font-weight:600;color:var(--text-1)">${sug.suggested_threshold_m}m</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-small" style="flex:1;justify-content:center" onclick="hiveWizUseSuggested()"><i class="fa-solid fa-bolt"></i> Use Suggested Settings</button>
+              <button class="btn btn-secondary btn-small" style="flex:1;justify-content:center" onclick="hiveWizState._suggestion=null;hiveWizRender()">Review Settings</button>
+            </div>
+          </div>` : '';
+        content.innerHTML = sugCard + `<div style="font-size:20px;font-weight:700;margin-bottom:8px;color:var(--text-1)">How much do these items move?</div>
           <div style="color:var(--text-2);font-size:14px;line-height:1.5;margin-bottom:20px">We'll use this to set freshness windows, confirmation rules, and alert sensitivity.</div>
           <div style="display:flex;flex-direction:column;gap:8px">${WIZARD_PROFILES.map(p => {
             const sel = hiveWizState.profile === p.id;
@@ -9375,13 +9633,16 @@ async function hiveWizNext() {
     const { step } = hiveWizState;
     if (step === 1) {
         if (!hiveWizState.selectedTags.length) { hiveWizErr('Select at least one tag'); return; }
+        // fetch suggestion for selected tags
+        const sr = await apiFetch('/api/portal/hive/suggest?tag_ids=' + hiveWizState.selectedTags.join(',')).catch(()=>null);
+        if (sr && sr.ok) { hiveWizState._suggestion = await sr.json(); }
         hiveWizState.step = 2; hiveWizRender();
     } else if (step === 2) {
         if (!hiveWizState.profile) { hiveWizErr('Choose a movement profile'); return; }
         // auto-suggest threshold
         if (!hiveWizState.threshold_m) {
             const r = await apiFetch('/api/portal/hive/suggest?tag_ids=' + hiveWizState.selectedTags.join(',')).catch(()=>null);
-            if (r && r.ok) { const s = await r.json(); hiveWizState.threshold_m = s.threshold_m; }
+            if (r && r.ok) { const s = await r.json(); hiveWizState.threshold_m = s.suggested_threshold_m; hiveWizState._suggestion = s; }
         }
         hiveWizState.step = 3; hiveWizRender();
     } else {
@@ -9392,16 +9653,25 @@ async function hiveWizNext() {
         btn.disabled = true; btn.textContent = 'Creating…';
         const r = await apiFetch('/api/portal/hive', {
             method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ name: hiveWizState.name.trim(), profile: hiveWizState.profile, threshold_m: hiveWizState.threshold_m, tag_ids: hiveWizState.selectedTags })
+            body: JSON.stringify({ name: hiveWizState.name.trim(), mobility_profile: hiveWizState.profile, distance_threshold_m: hiveWizState.threshold_m, tag_ids: hiveWizState.selectedTags })
         }).catch(()=>null);
         btn.disabled = false; btn.textContent = 'Create Hive';
         if (!r || !r.ok) { const d = r ? await r.json().catch(()=>({detail:'Error'})) : {detail:'Network error'}; hiveWizErr(d.detail||'Create failed'); return; }
         const created = await r.json();
-        hiveLoadStats(); hiveLoadList(); hiveOpenDetail(created.id);
+        hiveLoadStats(); hiveLoadList(); hiveOpenDetail(created.hive_id);
     }
 }
 
 function hiveWizStep(n) { if (n >= 1 && n <= 3) { hiveWizState.step = n; hiveWizRender(); } }
+
+function hiveWizUseSuggested() {
+    const sug = hiveWizState._suggestion;
+    if (!sug) return;
+    hiveWizState.profile = sug.suggested_profile;
+    hiveWizState.threshold_m = sug.suggested_threshold_m;
+    hiveWizState.step = 3;
+    hiveWizRender();
+}
 function hiveWizErr(msg) { document.getElementById('hive-wiz-err-text').textContent = msg; document.getElementById('hive-wiz-err').style.display = ''; }
 
 // ── helpers ───────────────────────────────
