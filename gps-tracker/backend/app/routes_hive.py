@@ -391,14 +391,7 @@ def create_hive(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    import traceback as _tb
-    try:
-        return _create_hive_inner(data, request, db)
-    except HTTPException:
-        raise
-    except Exception as exc:
-        db.rollback()
-        raise HTTPException(500, detail=f"[DEBUG] {type(exc).__name__}: {exc}") from exc
+    return _create_hive_inner(data, request, db)
 
 
 def _create_hive_inner(
@@ -407,7 +400,6 @@ def _create_hive_inner(
     db: Session,
 ):
     me = get_portal_user_from_request(request, db)
-    gid = str(me.usergroup_id)
 
     # Validate mobility profile
     profile = data.mobility_profile
@@ -417,7 +409,9 @@ def _create_hive_inner(
 
     # Validate tags — not already in an active hive
     for tid in data.tag_ids:
-        existing = db.query(HiveTagMembership).filter(HiveTagMembership.tag_id == tid).first()
+        existing = db.query(HiveTagMembership).filter(
+            HiveTagMembership.tag_id == uuid.UUID(tid)
+        ).first()
         if existing:
             existing_hive = db.query(Hive).filter(
                 Hive.id == existing.hive_id, Hive.status == "active"
@@ -429,12 +423,12 @@ def _create_hive_inner(
                 )
 
     now = datetime.now(UTC)
-    hive_id = str(uuid.uuid4())
+    hive_uuid = uuid.uuid4()
 
     hive = Hive(
-        id=hive_id,
-        usergroup_id=gid,
-        created_by=str(me.id),
+        id=hive_uuid,
+        usergroup_id=me.usergroup_id,
+        created_by=me.id,
         name=data.name,
         status="active",
         expires_at=now + timedelta(days=60),
@@ -445,8 +439,8 @@ def _create_hive_inner(
 
     # Config version 1
     cfg = HiveConfigVersion(
-        id=str(uuid.uuid4()),
-        hive_id=hive_id,
+        id=uuid.uuid4(),
+        hive_id=hive_uuid,
         version_number=1,
         valid_from=now,
         valid_to=None,
@@ -459,7 +453,7 @@ def _create_hive_inner(
         meaningful_change_m=data.meaningful_change_m or preset["meaningful_change_m"],
         hysteresis_pct=data.hysteresis_pct or preset["hysteresis_pct"],
         confirmation_count=data.confirmation_count or preset["confirmation_count"],
-        changed_by=str(me.id),
+        changed_by=me.id,
     )
     db.add(cfg)
 
@@ -467,22 +461,22 @@ def _create_hive_inner(
     labels = data.tag_labels or {}
     for tid in data.tag_ids:
         db.add(HiveTagMembership(
-            tag_id=tid,
-            hive_id=hive_id,
+            tag_id=uuid.UUID(tid),
+            hive_id=hive_uuid,
             label=labels.get(tid),
         ))
 
     # Live state
     db.add(HiveLiveState(
-        hive_id=hive_id,
+        hive_id=hive_uuid,
         alert_state="OK",
         consecutive_confirms=0,
     ))
 
     # Lifecycle creation event
     db.add(HiveEvent(
-        id=str(uuid.uuid4()),
-        hive_id=hive_id,
+        id=uuid.uuid4(),
+        hive_id=hive_uuid,
         occurred_at=now,
         event_type="HIVE_CREATED",
         config_version_number=1,
@@ -491,7 +485,7 @@ def _create_hive_inner(
     db.commit()
     db.refresh(hive)
 
-    return {"hive_id": hive_id, "message": "Hive created", "name": hive.name}
+    return {"hive_id": str(hive_uuid), "message": "Hive created", "name": hive.name}
 
 # ─── Get hive detail ─────────────────────────────────────────────────────────
 
