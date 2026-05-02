@@ -195,7 +195,8 @@ class GeofenceService:
             poi.latitude, poi.longitude,
             effective_radius
         )
-        
+        current_state = GeofenceState.INSIDE if is_inside else GeofenceState.OUTSIDE
+
         # Strict pairing logic - only alert on expected transitions
         should_alert = False
         event_type = None
