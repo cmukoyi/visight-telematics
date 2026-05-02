@@ -869,6 +869,12 @@
                             <span>Health</span>
                         </button>
                     </li>
+                    <li class="sidebar-item">
+                        <button class="sidebar-link" onclick="switchTab('sendgrid')">
+                            <span>📧</span>
+                            <span>SendGrid</span>
+                        </button>
+                    </li>
                 </ul>
 
                 <div style="position: absolute; bottom: 24px; left: 24px; right: 24px;">
@@ -1760,6 +1766,102 @@
         </div>
     </div>
 
+                    <!-- SENDGRID TAB -->
+                    <div id="sendgrid" class="tab-content">
+                        <div class="page-header">
+                            <h2 class="page-title">SendGrid Email Stats</h2>
+                            <p class="page-subtitle">Email delivery, opens, bounces and daily usage</p>
+                        </div>
+
+                        <!-- Controls -->
+                        <div class="card" style="margin-bottom:16px">
+                            <div class="filters" style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap">
+                                <div class="filter-group">
+                                    <label>From date</label>
+                                    <input type="date" id="sgStartDate" value="2026-01-01" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);color:var(--text)">
+                                </div>
+                                <div class="filter-group">
+                                    <label>Group by</label>
+                                    <select id="sgGroupBy" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);color:var(--text)">
+                                        <option value="month">Month</option>
+                                        <option value="week">Week</option>
+                                        <option value="day">Day</option>
+                                    </select>
+                                </div>
+                                <button class="btn btn-primary btn-small" onclick="loadSendgridStats()">↻ Refresh</button>
+                            </div>
+                        </div>
+
+                        <!-- Daily limit bar -->
+                        <div class="card" id="sgLimitCard" style="margin-bottom:16px;display:none">
+                            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-bottom:6px">
+                                <span>Today's sends (free plan: 100/day limit)</span>
+                                <span id="sgLimitText">— / 100</span>
+                            </div>
+                            <div style="height:10px;background:var(--border);border-radius:5px;overflow:hidden">
+                                <div id="sgLimitFill" style="height:100%;border-radius:5px;transition:width .4s;width:0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Summary cards -->
+                        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:12px;margin-bottom:16px" id="sgSummaryCards">
+                            <div class="card" style="border-top:3px solid #3b82f6;padding:14px 16px">
+                                <div style="font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Sent</div>
+                                <div id="sgTotSent" style="font-size:1.8rem;font-weight:700;line-height:1">—</div>
+                            </div>
+                            <div class="card" style="border-top:3px solid #22c55e;padding:14px 16px">
+                                <div style="font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Delivered</div>
+                                <div id="sgTotDel" style="font-size:1.8rem;font-weight:700;line-height:1">—</div>
+                                <div id="sgDelRate" style="font-size:11px;color:var(--text-secondary);margin-top:3px"></div>
+                            </div>
+                            <div class="card" style="border-top:3px solid #a78bfa;padding:14px 16px">
+                                <div style="font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Opens</div>
+                                <div id="sgTotOpens" style="font-size:1.8rem;font-weight:700;line-height:1">—</div>
+                                <div id="sgOpenRate" style="font-size:11px;color:var(--text-secondary);margin-top:3px"></div>
+                            </div>
+                            <div class="card" style="border-top:3px solid #ef4444;padding:14px 16px">
+                                <div style="font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Bounces</div>
+                                <div id="sgTotBounces" style="font-size:1.8rem;font-weight:700;line-height:1">—</div>
+                                <div id="sgBounceRate" style="font-size:11px;color:var(--text-secondary);margin-top:3px"></div>
+                            </div>
+                            <div class="card" style="border-top:3px solid #f59e0b;padding:14px 16px">
+                                <div style="font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Deferred</div>
+                                <div id="sgTotDeferred" style="font-size:1.8rem;font-weight:700;line-height:1">—</div>
+                            </div>
+                            <div class="card" style="border-top:3px solid #94a3b8;padding:14px 16px">
+                                <div style="font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Blocks</div>
+                                <div id="sgTotBlocks" style="font-size:1.8rem;font-weight:700;line-height:1">—</div>
+                            </div>
+                        </div>
+
+                        <!-- Breakdown table -->
+                        <div class="card">
+                            <h3 style="font-size:14px;font-weight:700;margin-bottom:12px">📊 Breakdown by period</h3>
+                            <div class="table-wrapper">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Period</th>
+                                            <th style="text-align:right">Requests</th>
+                                            <th style="text-align:right">Delivered</th>
+                                            <th style="text-align:right">Del. Rate</th>
+                                            <th style="text-align:right">Opens</th>
+                                            <th style="text-align:right">Open Rate</th>
+                                            <th style="text-align:right">Bounces</th>
+                                            <th style="text-align:right">Bounce %</th>
+                                            <th style="text-align:right">Deferred</th>
+                                            <th style="text-align:right">Blocks</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sgTableBody">
+                                        <tr><td colspan="10" style="text-align:center;color:var(--text-secondary);padding:2rem">Click ↻ Refresh to load data</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END SENDGRID TAB -->
+
     <!-- ADD USER MODAL -->
     <div id="addUserModal" class="modal">
         <div class="modal-content">
@@ -1935,7 +2037,8 @@
                 'usergroups': 'User Groups',
                 'packages': 'Tag Packages',
                 'buildings': 'Buildings & Floor Plans',
-                'health': 'System Health'
+                'health': 'System Health',
+                'sendgrid': 'SendGrid Email Stats'
             };
             document.getElementById('pageTitle').textContent = titles[tabName];
 
@@ -1949,6 +2052,7 @@
             if (tabName === 'packages') loadPackages();
             if (tabName === 'buildings') { loadBuildings(); }
             if (tabName === 'health') { healthRefresh(); }
+            if (tabName === 'sendgrid') { loadSendgridStats(); }
         }
 
         // DASHBOARD
@@ -3435,6 +3539,95 @@
 
     function escH(s) {
         return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ── SENDGRID STATS ────────────────────────────────────────────────────
+    async function loadSendgridStats() {
+        const startDate = document.getElementById('sgStartDate').value;
+        const groupBy   = document.getElementById('sgGroupBy').value;
+        const tbody     = document.getElementById('sgTableBody');
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem">Loading…</td></tr>';
+
+        try {
+            const res = await fetch(
+                `${API_URL}/api/admin/sendgrid/stats?start_date=${startDate}&aggregated_by=${groupBy}`,
+                { headers: { 'Authorization': 'Bearer ' + authToken } }
+            );
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ detail: res.statusText }));
+                throw new Error(err.detail || res.statusText);
+            }
+            const data = await res.json();
+            renderSendgridStats(data, groupBy);
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:#ef4444;padding:2rem">Error: ${escH(e.message)}</td></tr>`;
+        }
+    }
+
+    function renderSendgridStats(data, groupBy) {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        let totSent=0, totDel=0, totOpens=0, totBounces=0, totDeferred=0, totBlocks=0, todaySent=0;
+
+        const fmt = n => (n||0).toLocaleString();
+        const pct = (n,d) => d ? ((n/d)*100).toFixed(1)+'%' : '—';
+        const cls = (type, val) => {
+            const v = parseFloat(val);
+            if (isNaN(v)) return '';
+            if (type==='del')    return v>=95 ? 'color:#16a34a;font-weight:600' : v>=80 ? 'color:#d97706;font-weight:600' : 'color:#dc2626;font-weight:600';
+            if (type==='open')   return v>=20 ? 'color:#16a34a;font-weight:600' : v>=10 ? 'color:#d97706;font-weight:600' : '';
+            if (type==='bounce') return v<=2  ? 'color:#16a34a;font-weight:600' : v<=5  ? 'color:#d97706;font-weight:600' : 'color:#dc2626;font-weight:600';
+            return '';
+        };
+        const fmtPeriod = (dateStr) => {
+            const d = new Date(dateStr + 'T00:00:00Z');
+            if (groupBy==='month') return d.toLocaleString('default',{month:'long',year:'numeric',timeZone:'UTC'});
+            if (groupBy==='week')  return 'Week of ' + d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'});
+            return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'});
+        };
+
+        const rows = data.map(item => {
+            const m = item.stats[0]?.metrics || {};
+            const req=m.requests||0, del=m.delivered||0, opn=m.opens||0,
+                  bnc=m.bounces||0, def=m.deferred||0, blk=m.blocks||0;
+            totSent+=req; totDel+=del; totOpens+=opn;
+            totBounces+=bnc; totDeferred+=def; totBlocks+=blk;
+            if (item.date===todayStr) todaySent=req;
+            const dr=pct(del,req), or_=pct(opn,del), br=pct(bnc,req);
+            return `<tr>
+                <td style="font-weight:600">${fmtPeriod(item.date)}</td>
+                <td style="text-align:right">${fmt(req)}</td>
+                <td style="text-align:right">${fmt(del)}</td>
+                <td style="text-align:right;${cls('del',dr)}">${dr}</td>
+                <td style="text-align:right">${fmt(opn)}</td>
+                <td style="text-align:right;${cls('open',or_)}">${or_}</td>
+                <td style="text-align:right">${fmt(bnc)}</td>
+                <td style="text-align:right;${cls('bounce',br)}">${br}</td>
+                <td style="text-align:right">${fmt(def)}</td>
+                <td style="text-align:right">${fmt(blk)}</td>
+            </tr>`;
+        });
+
+        document.getElementById('sgTableBody').innerHTML = rows.length
+            ? rows.join('')
+            : '<tr><td colspan="10" style="text-align:center;color:var(--text-secondary);padding:2rem">No data for this period</td></tr>';
+
+        // Summary cards
+        document.getElementById('sgTotSent').textContent     = fmt(totSent);
+        document.getElementById('sgTotDel').textContent      = fmt(totDel);
+        document.getElementById('sgTotOpens').textContent    = fmt(totOpens);
+        document.getElementById('sgTotBounces').textContent  = fmt(totBounces);
+        document.getElementById('sgTotDeferred').textContent = fmt(totDeferred);
+        document.getElementById('sgTotBlocks').textContent   = fmt(totBlocks);
+        document.getElementById('sgDelRate').textContent     = pct(totDel, totSent) + ' delivery';
+        document.getElementById('sgOpenRate').textContent    = pct(totOpens, totDel) + ' open rate';
+        document.getElementById('sgBounceRate').textContent  = pct(totBounces, totSent) + ' bounce rate';
+
+        // Daily limit bar
+        const LIMIT = 100, used = Math.min(100, Math.round((todaySent/LIMIT)*100));
+        const fillColor = used>=100 ? '#ef4444' : used>=80 ? '#f59e0b' : '#22c55e';
+        document.getElementById('sgLimitFill').style.cssText = `height:100%;border-radius:5px;width:${used}%;background:${fillColor};transition:width .4s`;
+        document.getElementById('sgLimitText').textContent = `${todaySent} / ${LIMIT} today`;
+        document.getElementById('sgLimitCard').style.display = 'block';
     }
     </script>
 </body>
