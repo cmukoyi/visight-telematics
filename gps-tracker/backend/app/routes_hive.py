@@ -43,7 +43,7 @@ def _str_id(val: Any) -> str:
     return str(val) if val is not None else None
 
 
-def _current_config(hive_id: str, db: Session) -> Optional[HiveConfigVersion]:
+def _current_config(hive_id, db: Session) -> Optional[HiveConfigVersion]:
     return (
         db.query(HiveConfigVersion)
         .filter(
@@ -187,10 +187,10 @@ def get_hive_stats(request: Request, db: Session = Depends(get_db)):
     stale_tags = 0
 
     for hive in active_hives:
-        ls = db.query(HiveLiveState).filter(HiveLiveState.hive_id == str(hive.id)).first()
+        ls = db.query(HiveLiveState).filter(HiveLiveState.hive_id == hive.id).first()
         if ls and ls.alert_state in ("BREACHING", "BREACH_PENDING"):
             in_breach += 1
-        cfg = _current_config(str(hive.id), db)
+        cfg = _current_config(hive.id, db)
         for m in hive.memberships:
             tags_tracked += 1
             tag = db.query(BLETag).filter(BLETag.id == m.tag_id).first()

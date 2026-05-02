@@ -9636,10 +9636,10 @@ async function hiveLoadStats() {
     const r = await apiFetch('/api/portal/hive/stats').catch(() => null);
     if (!r || !r.ok) return;
     const d = await r.json();
-    document.getElementById('hive-stat-active').textContent = d.active_hives ?? '—';
-    document.getElementById('hive-stat-breach').textContent = d.breaching ?? '—';
-    document.getElementById('hive-stat-tags').textContent   = d.total_tags ?? '—';
-    document.getElementById('hive-stat-stale').textContent  = d.stale_tags ?? '—';
+    document.getElementById('hive-stat-active').textContent = d.active_hives  ?? '—';
+    document.getElementById('hive-stat-breach').textContent = d.in_breach     ?? '—';
+    document.getElementById('hive-stat-tags').textContent   = d.tags_tracked  ?? '—';
+    document.getElementById('hive-stat-stale').textContent  = d.stale_tags    ?? '—';
 }
 
 // ── list ──────────────────────────────────────────────────────────────────────
