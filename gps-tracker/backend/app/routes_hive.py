@@ -391,6 +391,21 @@ def create_hive(
     request: Request,
     db: Session = Depends(get_db),
 ):
+    import traceback as _tb
+    try:
+        return _create_hive_inner(data, request, db)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(500, detail=f"[DEBUG] {type(exc).__name__}: {exc}") from exc
+
+
+def _create_hive_inner(
+    data: HiveCreateRequest,
+    request: Request,
+    db: Session,
+):
     me = get_portal_user_from_request(request, db)
     gid = str(me.usergroup_id)
 
@@ -477,7 +492,6 @@ def create_hive(
     db.refresh(hive)
 
     return {"hive_id": hive_id, "message": "Hive created", "name": hive.name}
-
 
 # ─── Get hive detail ─────────────────────────────────────────────────────────
 
