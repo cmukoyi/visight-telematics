@@ -18,6 +18,10 @@ if use_sqlite:
         return Column(String(36), ForeignKey(table_col), nullable=False)
     def get_uuid_fk_nullable(table_col):
         return Column(String(36), ForeignKey(table_col), nullable=True)
+    def get_uuid_pk_fk(table_col):
+        return Column(String(36), ForeignKey(table_col), primary_key=True)
+    def get_uuid_nullable():
+        return Column(String(36), nullable=True)
 else:
     # For PostgreSQL, use native UUID type
     from sqlalchemy.dialects.postgresql import UUID
@@ -27,6 +31,10 @@ else:
         return Column(UUID(as_uuid=True), ForeignKey(table_col), nullable=False)
     def get_uuid_fk_nullable(table_col):
         return Column(UUID(as_uuid=True), ForeignKey(table_col), nullable=True)
+    def get_uuid_pk_fk(table_col):
+        return Column(UUID(as_uuid=True), ForeignKey(table_col), primary_key=True)
+    def get_uuid_nullable():
+        return Column(UUID(as_uuid=True), nullable=True)
 
 class User(Base):
     __tablename__ = "users"
@@ -600,7 +608,7 @@ class HiveConfigVersion(Base):
 class HiveTagMembership(Base):
     __tablename__ = "hive_tag_membership"
 
-    tag_id    = Column(String(36), ForeignKey("ble_tags.id"), primary_key=True)
+    tag_id    = get_uuid_pk_fk("ble_tags.id")  # PK — enforces one-hive-per-tag
     hive_id   = get_uuid_fk("hives.id")
     joined_at = Column(DateTime(timezone=True), server_default=func.now())
     label     = Column(String(100), nullable=True)   # per-tag display label within hive
@@ -618,7 +626,7 @@ class HiveEvaluation(Base):
     config_version_number = Column(Integer, nullable=False)
     diameter_m            = Column(Float, nullable=True)
     threshold_m           = Column(Float, nullable=False)
-    outlier_tag_id        = Column(String(36), nullable=True)
+    outlier_tag_id        = get_uuid_nullable()
     freshness_composition = Column(Text, nullable=True)   # JSON
     alert_state           = Column(String(30), nullable=False, default="OK")
     breach_confidence     = Column(String(10), nullable=True)  # high | low
@@ -636,7 +644,7 @@ class HiveEvent(Base):
     config_version_number = Column(Integer, nullable=True)
     from_state            = Column(String(30), nullable=True)
     to_state              = Column(String(30), nullable=True)
-    triggering_tag_id     = Column(String(36), nullable=True)
+    triggering_tag_id     = get_uuid_nullable()
     details               = Column(Text, nullable=True)   # JSON
 
     hive = relationship("Hive", back_populates="events")
@@ -646,12 +654,12 @@ class HiveLiveState(Base):
     """Denormalised live state — replaces Redis for MVP."""
     __tablename__ = "hive_live_state"
 
-    hive_id               = Column(String(36), ForeignKey("hives.id"), primary_key=True)
+    hive_id               = get_uuid_pk_fk("hives.id")
     alert_state           = Column(String(30), nullable=False, default="OK")
     breach_confidence     = Column(String(10), nullable=True)
     last_evaluated_at     = Column(DateTime(timezone=True), nullable=True)
     current_diameter_m    = Column(Float, nullable=True)
-    outlier_tag_id        = Column(String(36), nullable=True)
+    outlier_tag_id        = get_uuid_nullable()
     pending_breach_since  = Column(DateTime(timezone=True), nullable=True)
     pending_clear_since   = Column(DateTime(timezone=True), nullable=True)
     consecutive_confirms  = Column(Integer, nullable=False, default=0)
