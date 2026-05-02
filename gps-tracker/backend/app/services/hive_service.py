@@ -163,6 +163,10 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
     # Use fresh+recent for diameter; prefer fresh-only for high confidence
     diameter_m, outlier_id = pairwise_max_distance(fresh_recent_positions)
 
+    # No meaningful spread — clear outlier so UI doesn't flag a tag incorrectly
+    if diameter_m is not None and diameter_m < cfg.meaningful_change_m:
+        outlier_id = None
+
     # ── Determine breach ──────────────────────────────────────────────
     threshold = cfg.distance_threshold_m
     prev_state = live.alert_state or "OK"
