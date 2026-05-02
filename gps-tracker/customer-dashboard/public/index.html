@@ -3847,7 +3847,7 @@ function showDashboard(user, group, effectiveFeatures) {
     // and Leaflet can read real pixel dimensions (avoids 0×0 tile issue on login).
     requestAnimationFrame(() => requestAnimationFrame(() => {
         switchTab('livemap');
-        loadBuildings();
+        if (document.getElementById('buildingSelect')) loadBuildings();
     }));
     // Pre-load categories so filter bars are populated before user opens Settings
     _fetchCategories();
@@ -3985,7 +3985,7 @@ function switchTab(name) {
     if (name === 'reports-geofence')  loadReportsGeofence();
     if (name === 'reports-battery')   loadReportsBattery();
     if (name === 'reports-alerts')    rptAlertsLoad();
-    if (name === 'hive')              loadHive();
+    if (name === 'hive')              { hiveLoadStats(); hiveLoadList(); }
     // Sketch tab: resize canvases now the container is visible
     if (name === 'building' && typeof resizeCanvases === 'function') {
         requestAnimationFrame(() => { resizeCanvases(); if (typeof render === 'function') render(); });

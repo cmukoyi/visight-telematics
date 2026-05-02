@@ -140,7 +140,7 @@ def _hive_summary(hive: Hive, cfg: Optional[HiveConfigVersion],
 
 class HiveCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
-    tag_ids: List[str] = Field(..., min_items=2)
+    tag_ids: List[str] = Field(..., min_length=2)
     tag_labels: Optional[Dict[str, str]] = None      # tag_id → label
     mobility_profile: str = "mobile"                 # stationary|slow|mobile|fast
     distance_threshold_m: Optional[float] = None     # None → use preset default
