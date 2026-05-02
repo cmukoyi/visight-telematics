@@ -186,6 +186,10 @@ app.include_router(beacons_router)
 from app.routes_ops import router as ops_router  # noqa: E402
 app.include_router(ops_router)
 
+# Include HIVE tracking router
+from app.routes_hive import router as hive_router  # noqa: E402
+app.include_router(hive_router)
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -234,6 +238,11 @@ async def startup_event():
     asyncio.create_task(location_poller.start())
     print("🚀 Location Poller Service started (60-second interval)")
 
+    # Start HIVE proximity tracking sweeper
+    from app.services import hive_service as _hive_svc
+    _hive_svc.start_sweeper()
+    print("🛡️  HIVE sweeper started (2-minute freshness sweep)")
+
     # Start GDPR cleanup task (runs daily)
     asyncio.create_task(_gdpr_cleanup_loop())
     print("📜 GDPR cleanup task started (runs every 24 h)")
@@ -241,7 +250,10 @@ async def startup_event():
 @app.on_event("shutdown")
 def shutdown_event():
     location_poller.stop()
+    from app.services import hive_service as _hive_svc
+    _hive_svc.stop_sweeper()
     print("🛑 Location Poller Service stopped")
+    print("🛑 HIVE sweeper stopped")
 
 
 # ---------------------------------------------------------------------------

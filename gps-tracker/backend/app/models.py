@@ -474,3 +474,186 @@ class BeaconSighting(Base):
 
     # Relationships
     user = relationship("User", back_populates="beacon_sightings")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# HIVE TRACKING — proximity group monitoring
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class HiveStatus(str, enum.Enum):
+    ACTIVE   = "active"
+    ARCHIVED = "archived"
+    PURGED   = "purged"
+
+
+class HiveAlertState(str, enum.Enum):
+    OK              = "OK"
+    BREACH_PENDING  = "BREACH_PENDING"
+    BREACHING       = "BREACHING"
+    RESOLVING       = "RESOLVING"
+
+
+class MobilityProfile(str, enum.Enum):
+    STATIONARY = "stationary"
+    SLOW       = "slow"
+    MOBILE     = "mobile"
+    FAST       = "fast"
+    CUSTOM     = "custom"
+
+
+# Preset parameters per mobility profile (sourced from spec Appendix A)
+MOBILITY_PRESETS = {
+    "stationary": {
+        "fresh_window_s":    1800,   # 30 min
+        "recent_window_s":   14400,  # 4 hr
+        "stale_window_s":    86400,  # 24 hr
+        "lost_threshold_s":  86400,
+        "meaningful_change_m": 2.5,
+        "distance_threshold_m": 50.0,
+        "hysteresis_pct":    90.0,
+        "confirmation_count": 1,
+    },
+    "slow": {
+        "fresh_window_s":    900,    # 15 min
+        "recent_window_s":   3600,   # 1 hr
+        "stale_window_s":    21600,  # 6 hr
+        "lost_threshold_s":  21600,
+        "meaningful_change_m": 7.5,
+        "distance_threshold_m": 100.0,
+        "hysteresis_pct":    85.0,
+        "confirmation_count": 1,
+    },
+    "mobile": {
+        "fresh_window_s":    300,    # 5 min
+        "recent_window_s":   1200,   # 20 min
+        "stale_window_s":    7200,   # 2 hr
+        "lost_threshold_s":  7200,
+        "meaningful_change_m": 20.0,
+        "distance_threshold_m": 200.0,
+        "hysteresis_pct":    80.0,
+        "confirmation_count": 2,
+    },
+    "fast": {
+        "fresh_window_s":    120,    # 2 min
+        "recent_window_s":   600,    # 10 min
+        "stale_window_s":    1800,   # 30 min
+        "lost_threshold_s":  1800,
+        "meaningful_change_m": 40.0,
+        "distance_threshold_m": 500.0,
+        "hysteresis_pct":    75.0,
+        "confirmation_count": 2,
+    },
+}
+
+
+class Hive(Base):
+    __tablename__ = "hives"
+
+    id               = get_uuid_column()
+    usergroup_id     = get_uuid_fk("user_groups.id")
+    created_by       = get_uuid_fk_nullable("portal_users.id")
+    name             = Column(String(200), nullable=False)
+    status           = Column(String(20), nullable=False, default="active")
+    created_at       = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at       = Column(DateTime(timezone=True), nullable=False)
+    archived_at      = Column(DateTime(timezone=True), nullable=True)
+    archived_reason  = Column(String(50), nullable=True)      # expired | user_deleted
+    archive_expires_at = Column(DateTime(timezone=True), nullable=True)
+    purged_at        = Column(DateTime(timezone=True), nullable=True)
+    purged_reason    = Column(String(50), nullable=True)      # auto_retention | user_purged
+    parent_hive_id   = get_uuid_fk_nullable("hives.id")
+    settling_until   = Column(DateTime(timezone=True), nullable=True)
+
+    config_versions  = relationship("HiveConfigVersion", back_populates="hive",
+                                    order_by="HiveConfigVersion.version_number")
+    memberships      = relationship("HiveTagMembership", back_populates="hive",
+                                    cascade="all, delete-orphan")
+    evaluations      = relationship("HiveEvaluation", back_populates="hive",
+                                    order_by="HiveEvaluation.evaluated_at.desc()")
+    events           = relationship("HiveEvent", back_populates="hive",
+                                    order_by="HiveEvent.occurred_at.desc()")
+    live_state       = relationship("HiveLiveState", back_populates="hive", uselist=False)
+
+
+class HiveConfigVersion(Base):
+    __tablename__ = "hive_config_versions"
+
+    id               = get_uuid_column()
+    hive_id          = get_uuid_fk("hives.id")
+    version_number   = Column(Integer, nullable=False)
+    valid_from       = Column(DateTime(timezone=True), server_default=func.now())
+    valid_to         = Column(DateTime(timezone=True), nullable=True)    # null = current
+    mobility_profile = Column(String(30), nullable=False)
+    distance_threshold_m  = Column(Float, nullable=False)
+    fresh_window_s        = Column(Integer, nullable=False)
+    recent_window_s       = Column(Integer, nullable=False)
+    stale_window_s        = Column(Integer, nullable=False)
+    lost_threshold_s      = Column(Integer, nullable=False)
+    meaningful_change_m   = Column(Float, nullable=False)
+    hysteresis_pct        = Column(Float, nullable=False)
+    confirmation_count    = Column(Integer, nullable=False)
+    changed_by            = get_uuid_fk_nullable("portal_users.id")
+
+    hive = relationship("Hive", back_populates="config_versions")
+
+
+class HiveTagMembership(Base):
+    __tablename__ = "hive_tag_membership"
+
+    tag_id    = Column(String(36), ForeignKey("ble_tags.id"), primary_key=True)
+    hive_id   = get_uuid_fk("hives.id")
+    joined_at = Column(DateTime(timezone=True), server_default=func.now())
+    label     = Column(String(100), nullable=True)   # per-tag display label within hive
+
+    hive = relationship("Hive", back_populates="memberships")
+    tag  = relationship("BLETag")
+
+
+class HiveEvaluation(Base):
+    __tablename__ = "hive_evaluations"
+
+    id                    = get_uuid_column()
+    hive_id               = get_uuid_fk("hives.id")
+    evaluated_at          = Column(DateTime(timezone=True), server_default=func.now())
+    config_version_number = Column(Integer, nullable=False)
+    diameter_m            = Column(Float, nullable=True)
+    threshold_m           = Column(Float, nullable=False)
+    outlier_tag_id        = Column(String(36), nullable=True)
+    freshness_composition = Column(Text, nullable=True)   # JSON
+    alert_state           = Column(String(30), nullable=False, default="OK")
+    breach_confidence     = Column(String(10), nullable=True)  # high | low
+
+    hive = relationship("Hive", back_populates="evaluations")
+
+
+class HiveEvent(Base):
+    __tablename__ = "hive_events"
+
+    id                    = get_uuid_column()
+    hive_id               = get_uuid_fk("hives.id")
+    occurred_at           = Column(DateTime(timezone=True), server_default=func.now())
+    event_type            = Column(String(50), nullable=False)
+    config_version_number = Column(Integer, nullable=True)
+    from_state            = Column(String(30), nullable=True)
+    to_state              = Column(String(30), nullable=True)
+    triggering_tag_id     = Column(String(36), nullable=True)
+    details               = Column(Text, nullable=True)   # JSON
+
+    hive = relationship("Hive", back_populates="events")
+
+
+class HiveLiveState(Base):
+    """Denormalised live state — replaces Redis for MVP."""
+    __tablename__ = "hive_live_state"
+
+    hive_id               = Column(String(36), ForeignKey("hives.id"), primary_key=True)
+    alert_state           = Column(String(30), nullable=False, default="OK")
+    breach_confidence     = Column(String(10), nullable=True)
+    last_evaluated_at     = Column(DateTime(timezone=True), nullable=True)
+    current_diameter_m    = Column(Float, nullable=True)
+    outlier_tag_id        = Column(String(36), nullable=True)
+    pending_breach_since  = Column(DateTime(timezone=True), nullable=True)
+    pending_clear_since   = Column(DateTime(timezone=True), nullable=True)
+    consecutive_confirms  = Column(Integer, nullable=False, default=0)
+
+    hive = relationship("Hive", back_populates="live_state")
