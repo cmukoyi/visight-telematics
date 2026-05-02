@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SendGrid Stats — Admin Portal</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background: #f5f7fa; }
+        .header { background: #3b82f6; color: white; padding: 1.5rem 2rem; box-shadow: 0 2px 4px rgba(0,0,0,.1); }
+        .header h1 { font-size: 1.5rem; margin-bottom: .25rem; }
+        .header p  { opacity: .8; font-size: .9rem; }
+        .nav { background: white; padding: .5rem 2rem; box-shadow: 0 1px 3px rgba(0,0,0,.1); display: flex; gap: 1rem; flex-wrap: wrap; }
+        .nav a { padding: .75rem 1.25rem; text-decoration: none; color: #64748b; font-weight: 500; border-bottom: 2px solid transparent; transition: all .2s; white-space: nowrap; }
+        .nav a:hover  { color: #3b82f6; }
+        .nav a.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+
+        /* ── Summary cards ── */
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .s-card { background: white; border-radius: 10px; padding: 1.2rem 1.4rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); border-top: 3px solid #e2e8f0; }
+        .s-card.sent     { border-top-color: #3b82f6; }
+        .s-card.delivered{ border-top-color: #22c55e; }
+        .s-card.opens    { border-top-color: #a78bfa; }
+        .s-card.bounces  { border-top-color: #ef4444; }
+        .s-card.deferred { border-top-color: #f59e0b; }
+        .s-card.blocks   { border-top-color: #94a3b8; }
+        .s-label { font-size: 11px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; margin-bottom: .4rem; }
+        .s-value { font-size: 2rem; font-weight: 700; color: #1e293b; line-height: 1; }
+        .s-sub   { font-size: 11px; color: #94a3b8; margin-top: .3rem; }
+
+        /* ── Controls ── */
+        .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 1.5rem; }
+        .controls label { font-size: 13px; color: #475569; font-weight: 500; }
+        .controls select, .controls input[type=date] {
+            padding: .45rem .75rem; border: 1px solid #e2e8f0; border-radius: 6px;
+            font-size: 13px; background: white; color: #1e293b; cursor: pointer;
+        }
+        .btn { padding: .5rem 1.1rem; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; transition: background .15s; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn:disabled { opacity: .5; cursor: not-allowed; }
+        .spin { display: inline-block; width: 13px; height: 13px; border: 2px solid rgba(255,255,255,.35); border-top-color: white; border-radius: 50%; animation: doSpin .7s linear infinite; }
+        @keyframes doSpin { to { transform: rotate(360deg); } }
+
+        /* ── Table ── */
+        .panel { background: white; border-radius: 10px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); overflow-x: auto; }
+        .panel-title { font-size: 14px; font-weight: 700; color: #1e293b; margin-bottom: 1.1rem; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        thead th { background: #f8fafc; padding: .7rem .9rem; text-align: left; font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+        tbody td { padding: .7rem .9rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover td { background: #f8fafc; }
+        .num { text-align: right; font-family: monospace; }
+        .period { font-weight: 600; color: #1e293b; }
+        .rate { font-size: 11px; color: #94a3b8; }
+        .good { color: #16a34a; font-weight: 600; }
+        .bad  { color: #dc2626; font-weight: 600; }
+        .warn { color: #d97706; font-weight: 600; }
+
+        /* ── Empty / error ── */
+        .empty { text-align: center; padding: 3rem; color: #94a3b8; font-size: 14px; }
+        .error-msg { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 1rem 1.25rem; color: #dc2626; font-size: 13px; margin-bottom: 1.5rem; display: none; }
+
+        /* ── Daily limit bar ── */
+        .limit-bar-wrap { background: white; border-radius: 10px; padding: 1.2rem 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 1.5rem; }
+        .limit-bar-label { display: flex; justify-content: space-between; font-size: 12px; color: #64748b; margin-bottom: .5rem; }
+        .limit-bar-track { height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden; }
+        .limit-bar-fill  { height: 100%; border-radius: 5px; transition: width .5s; }
+        .fill-ok   { background: #22c55e; }
+        .fill-warn { background: #f59e0b; }
+        .fill-bad  { background: #ef4444; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🛡️ Admin Portal</h1>
+    <p>User Management &amp; System Administration</p>
+</div>
+
+<div class="nav">
+    <a href="index.html">Users</a>
+    <a href="billing.html">Billing &amp; Tags</a>
+    <a href="trips.html">📍 Journeys &amp; Trips</a>
+    <a href="health.html">🔬 Health</a>
+    <a href="sendgrid.html" class="active">📧 SendGrid</a>
+</div>
+
+<div class="container">
+
+    <div class="error-msg" id="errorMsg"></div>
+
+    <!-- Controls -->
+    <div class="controls">
+        <label>From
+            <input type="date" id="startDate" value="2026-01-01" style="margin-left:6px">
+        </label>
+        <label>Group by
+            <select id="groupBy" style="margin-left:6px">
+                <option value="month">Month</option>
+                <option value="week">Week</option>
+                <option value="day">Day</option>
+            </select>
+        </label>
+        <button class="btn btn-primary" id="loadBtn" onclick="loadStats()">
+            <span id="btnText">Load Stats</span>
+        </button>
+    </div>
+
+    <!-- Daily limit bar (only meaningful for free plan: 100/day) -->
+    <div class="limit-bar-wrap" id="limitBarWrap" style="display:none">
+        <div class="limit-bar-label">
+            <span>Today's sends vs daily limit (free plan: 100/day)</span>
+            <span id="limitText">— / 100</span>
+        </div>
+        <div class="limit-bar-track">
+            <div class="limit-bar-fill" id="limitFill" style="width:0%"></div>
+        </div>
+    </div>
+
+    <!-- Summary totals -->
+    <div class="summary-grid">
+        <div class="s-card sent">     <div class="s-label">Total Sent</div>    <div class="s-value" id="totSent">—</div>    <div class="s-sub">requests</div></div>
+        <div class="s-card delivered"><div class="s-label">Delivered</div>     <div class="s-value" id="totDel">—</div>     <div class="s-sub" id="delRate">—</div></div>
+        <div class="s-card opens">    <div class="s-label">Opens</div>         <div class="s-value" id="totOpens">—</div>   <div class="s-sub" id="openRate">—</div></div>
+        <div class="s-card bounces">  <div class="s-label">Bounces</div>       <div class="s-value" id="totBounces">—</div> <div class="s-sub" id="bounceRate">—</div></div>
+        <div class="s-card deferred"> <div class="s-label">Deferred</div>      <div class="s-value" id="totDeferred">—</div><div class="s-sub">retried by SG</div></div>
+        <div class="s-card blocks">   <div class="s-label">Blocks</div>        <div class="s-value" id="totBlocks">—</div>  <div class="s-sub">suppressed</div></div>
+    </div>
+
+    <!-- Per-period table -->
+    <div class="panel">
+        <div class="panel-title">📊 Breakdown by period</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Period</th>
+                    <th class="num">Requests</th>
+                    <th class="num">Delivered</th>
+                    <th class="num">Del. Rate</th>
+                    <th class="num">Opens</th>
+                    <th class="num">Open Rate</th>
+                    <th class="num">Bounces</th>
+                    <th class="num">Bounce Rate</th>
+                    <th class="num">Deferred</th>
+                    <th class="num">Blocks</th>
+                </tr>
+            </thead>
+            <tbody id="statsBody">
+                <tr><td colspan="10" class="empty">Click "Load Stats" to fetch data</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+    const TOKEN_KEY = 'admin_token';
+
+    function getToken() {
+        return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || '';
+    }
+
+    function fmt(n) { return (n ?? 0).toLocaleString(); }
+    function pct(num, den) { return den ? ((num / den) * 100).toFixed(1) + '%' : '—'; }
+
+    function rateClass(type, rate) {
+        const val = parseFloat(rate);
+        if (isNaN(val)) return '';
+        if (type === 'del')    return val >= 95 ? 'good' : val >= 80 ? 'warn' : 'bad';
+        if (type === 'open')   return val >= 20 ? 'good' : val >= 10 ? 'warn' : '';
+        if (type === 'bounce') return val <= 2  ? 'good' : val <= 5  ? 'warn' : 'bad';
+        return '';
+    }
+
+    function formatPeriod(dateStr, groupBy) {
+        const d = new Date(dateStr + 'T00:00:00Z');
+        if (groupBy === 'month') return d.toLocaleString('default', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+        if (groupBy === 'week')  return 'Week of ' + d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
+    }
+
+    async function loadStats() {
+        const token = getToken();
+        if (!token) { showError('Not authenticated. Please log in first.'); return; }
+
+        const startDate = document.getElementById('startDate').value;
+        const groupBy   = document.getElementById('groupBy').value;
+        const btn       = document.getElementById('loadBtn');
+        const btnText   = document.getElementById('btnText');
+
+        btn.disabled = true;
+        btnText.innerHTML = '<span class="spin"></span> Loading…';
+        hideError();
+
+        try {
+            const res = await fetch(
+                `/api/admin/sendgrid/stats?start_date=${startDate}&aggregated_by=${groupBy}`,
+                { headers: { 'Authorization': 'Bearer ' + token } }
+            );
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ detail: res.statusText }));
+                throw new Error(err.detail || res.statusText);
+            }
+            const data = await res.json();
+            renderStats(data, groupBy);
+        } catch (e) {
+            showError('Failed to load stats: ' + e.message);
+        } finally {
+            btn.disabled = false;
+            btnText.textContent = 'Refresh';
+        }
+    }
+
+    function renderStats(data, groupBy) {
+        let totSent = 0, totDel = 0, totOpens = 0, totBounces = 0, totDeferred = 0, totBlocks = 0;
+        let todaySent = 0;
+        const todayStr = new Date().toISOString().slice(0, 10);
+
+        const rows = data.map(item => {
+            const m = item.stats[0]?.metrics || {};
+            const req  = m.requests  || 0;
+            const del  = m.delivered || 0;
+            const opn  = m.opens     || 0;
+            const bnc  = m.bounces   || 0;
+            const def  = m.deferred  || 0;
+            const blk  = m.blocks    || 0;
+
+            totSent     += req;
+            totDel      += del;
+            totOpens    += opn;
+            totBounces  += bnc;
+            totDeferred += def;
+            totBlocks   += blk;
+
+            if (item.date === todayStr) todaySent = req;
+
+            const delR = pct(del, req);
+            const opnR = pct(opn, del);
+            const bncR = pct(bnc, req);
+
+            return `<tr>
+                <td class="period">${formatPeriod(item.date, groupBy)}</td>
+                <td class="num">${fmt(req)}</td>
+                <td class="num">${fmt(del)}</td>
+                <td class="num ${rateClass('del', delR)}">${delR}</td>
+                <td class="num">${fmt(opn)}</td>
+                <td class="num ${rateClass('open', opnR)}">${opnR}</td>
+                <td class="num">${fmt(bnc)}</td>
+                <td class="num ${rateClass('bounce', bncR)}">${bncR}</td>
+                <td class="num">${fmt(def)}</td>
+                <td class="num">${fmt(blk)}</td>
+            </tr>`;
+        });
+
+        document.getElementById('statsBody').innerHTML = rows.length
+            ? rows.join('')
+            : '<tr><td colspan="10" class="empty">No data for this period</td></tr>';
+
+        // Summary cards
+        document.getElementById('totSent').textContent     = fmt(totSent);
+        document.getElementById('totDel').textContent      = fmt(totDel);
+        document.getElementById('totOpens').textContent    = fmt(totOpens);
+        document.getElementById('totBounces').textContent  = fmt(totBounces);
+        document.getElementById('totDeferred').textContent = fmt(totDeferred);
+        document.getElementById('totBlocks').textContent   = fmt(totBlocks);
+
+        const delRate    = pct(totDel, totSent);
+        const openRate   = pct(totOpens, totDel);
+        const bounceRate = pct(totBounces, totSent);
+        document.getElementById('delRate').innerHTML    = `<span class="${rateClass('del', delRate)}">${delRate} delivery rate</span>`;
+        document.getElementById('openRate').innerHTML   = `<span class="${rateClass('open', openRate)}">${openRate} open rate</span>`;
+        document.getElementById('bounceRate').innerHTML = `<span class="${rateClass('bounce', bounceRate)}">${bounceRate} bounce rate</span>`;
+
+        // Daily limit bar (free plan = 100/day)
+        const DAILY_LIMIT = 100;
+        const pctUsed = Math.min(100, Math.round((todaySent / DAILY_LIMIT) * 100));
+        const fillCls = pctUsed >= 100 ? 'fill-bad' : pctUsed >= 80 ? 'fill-warn' : 'fill-ok';
+        document.getElementById('limitFill').className = 'limit-bar-fill ' + fillCls;
+        document.getElementById('limitFill').style.width = pctUsed + '%';
+        document.getElementById('limitText').textContent = `${todaySent} / ${DAILY_LIMIT} today`;
+        document.getElementById('limitBarWrap').style.display = 'block';
+    }
+
+    function showError(msg) {
+        const el = document.getElementById('errorMsg');
+        el.textContent = '⚠️ ' + msg;
+        el.style.display = 'block';
+    }
+    function hideError() {
+        document.getElementById('errorMsg').style.display = 'none';
+    }
+
+    // Auto-load on page open if we have a token
+    window.addEventListener('load', () => {
+        if (getToken()) loadStats();
+    });
+</script>
+</body>
+</html>

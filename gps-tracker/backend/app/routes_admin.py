@@ -2026,3 +2026,40 @@ def health_system(request: Request, db: Session = Depends(get_db)):
         result["table_counts"] = {}
 
     return result
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SendGrid email statistics
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/sendgrid/stats")
+def get_sendgrid_stats(
+    start_date: str = "2026-01-01",
+    aggregated_by: str = "month",
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    """Proxy SendGrid stats API — keeps the API key server-side."""
+    get_admin_from_request(request, db)
+
+    import os, httpx
+    from datetime import date
+
+    api_key = os.getenv("SENDGRID_API_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="SENDGRID_API_KEY not configured")
+
+    end_date = date.today().isoformat()
+    url = (
+        f"https://api.sendgrid.com/v3/stats"
+        f"?start_date={start_date}&end_date={end_date}&aggregated_by={aggregated_by}"
+    )
+    try:
+        resp = httpx.get(url, headers={"Authorization": f"Bearer {api_key}"}, timeout=10)
+        resp.raise_for_status()
+        return resp.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code,
+                            detail=f"SendGrid error: {exc.response.text}")
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to reach SendGrid: {exc}")
