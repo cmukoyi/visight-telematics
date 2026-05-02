@@ -16,6 +16,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from sqlalchemy import or_
+
 from app.models import (
     BLETag,
     Hive,
@@ -25,6 +27,7 @@ from app.models import (
     HiveLiveState,
     HiveTagMembership,
     MOBILITY_PRESETS,
+    User,
     UserGroup,
 )
 from app.routes_portal import get_portal_user_from_request   # reuse auth helper
@@ -210,12 +213,12 @@ def get_available_tags(request: Request, db: Session = Depends(get_db)):
     me = get_portal_user_from_request(request, db)
     gid = str(me.usergroup_id)
 
-    # Tags in active hive memberships
+    # IDs of tags already in an active hive for this group
     active_hive_ids = [
         str(row[0]) for row in
         db.query(Hive.id).filter(Hive.usergroup_id == gid, Hive.status == "active").all()
     ]
-    in_use_tag_ids: set[str] = set()
+    in_use_tag_ids: set = set()
     if active_hive_ids:
         in_use_tag_ids = {
             str(row[0]) for row in
@@ -224,43 +227,46 @@ def get_available_tags(request: Request, db: Session = Depends(get_db)):
             .all()
         }
 
-    # All active tags in this group
-    from app.models import UserGroupPackage  # local import to avoid circular
+    # Get all User IDs whose email matches the group's email domain
+    group = db.query(UserGroup).filter(UserGroup.id == gid).first()
+    if not group or not group.email_domain:
+        return []
+
+    domains = [d.strip().lower() for d in group.email_domain.split(",") if d.strip()]
+    if not domains:
+        return []
+
+    domain_filter = or_(*(User.email.ilike(f"%@{d}") for d in domains))
+    user_ids = [
+        str(row[0]) for row in
+        db.query(User.id).filter(domain_filter, User.is_active == True).all()
+    ]
+    if not user_ids:
+        return []
+
+    # Active tags owned by those users, excluding ones already in a hive
     tags = (
         db.query(BLETag)
-        .join(UserGroup, UserGroup.id == gid)
-        .filter(BLETag.is_active == True)
+        .filter(
+            BLETag.user_id.in_(user_ids),
+            BLETag.is_active == True,
+            ~BLETag.id.in_(list(in_use_tag_ids)) if in_use_tag_ids else True,
+        )
+        .order_by(BLETag.device_name)
         .all()
     )
-    # Filter to tags belonging to this usergroup via portal_users
-    from app.models import PortalUser
-    portal_user_ids = {
-        str(row[0]) for row in
-        db.query(PortalUser.id).filter(PortalUser.usergroup_id == gid).all()
-    }
-    # BLETag.user_id → User; need tags whose owning User.id is linked to a PortalUser
-    # Simpler: just list all tags visible to the group (same query as the assets tab)
-    from app.models import User
-    group_user_ids = {
-        str(row[0]) for row in
-        db.query(User.id).all()  # we'll narrow via usergroup below
-    }
-    portal_users = db.query(PortalUser).filter(PortalUser.usergroup_id == gid).all()
-    user_ids_in_group = {str(pu.user_id) for pu in portal_users if pu.user_id}
-
-    group_tags = [t for t in tags if str(t.user_id) in user_ids_in_group]
 
     return [
         {
             "tag_id": str(t.id),
+            "label": t.device_name or t.imei or str(t.id),
             "device_name": t.device_name,
             "imei": t.imei,
             "last_seen": _format_dt(t.last_seen),
-            "in_use": str(t.id) in in_use_tag_ids,
             "latitude": t.latitude,
             "longitude": t.longitude,
         }
-        for t in group_tags
+        for t in tags
     ]
 
 
