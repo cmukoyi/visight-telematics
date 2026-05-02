@@ -241,7 +241,12 @@ def check_offline_alert(db: Session, tag: BLETag) -> bool:
 
 def create_geofence_alert(db: Session, tag: BLETag, poi_name: str, poi_id: str,
                            event_type: str) -> bool:
-    """Generate a geofence_entry or geofence_exit PortalAlert."""
+    """Generate a geofence_entry or geofence_exit PortalAlert.
+
+    Deduped: at most one alert per (group, tag, alert_type) per 24 hours.
+    Catches UniqueViolation and rolls back cleanly so the caller's session
+    is never left in a failed-transaction state.
+    """
     from app.models import POI
     # For geofence alerts prefer the POI's own group first (most specific)
     poi = db.query(POI).filter(POI.id == poi_id).first()
@@ -257,13 +262,28 @@ def create_geofence_alert(db: Session, tag: BLETag, poi_name: str, poi_id: str,
     verb = "entered" if is_entry else "exited"
     tag_id = str(tag.id)
     _meta = {"poi_name": poi_name, "poi_id": poi_id, "imei": tag.imei, "event_type": event_type}
+    created = False
     for usergroup_id in group_ids:
+        # ── Dedupe: skip if same alert already raised in the last 24 h ──
+        if _recent_alert_exists(db, usergroup_id, tag_id, atype, within_hours=24):
+            logger.debug("Geofence alert dedupe: %s for tag %s group %s — skipped",
+                         atype, tag.imei, usergroup_id)
+            continue
         _title = f"Geofence {verb} — {label}"
         _msg   = f"{label} has {verb} the zone '{poi_name}'."
-        create_alert(db, usergroup_id, tag_id, alert_type=atype,
-                     title=_title, message=_msg, meta_data=_meta)
+        try:
+            create_alert(db, usergroup_id, tag_id, alert_type=atype,
+                         title=_title, message=_msg, meta_data=_meta)
+            db.flush()   # surface UniqueViolation now, before commit
+        except Exception as exc:
+            db.rollback()
+            logger.warning("Geofence alert insert skipped (already exists today): %s", exc)
+            continue
         _notify_group_by_email(db, usergroup_id, atype, _title, _msg, _meta)
-    return True
+        logger.info("🚨 Geofence alert created: %s for tag %s → group %s",
+                    atype, tag.imei, usergroup_id)
+        created = True
+    return created
 
 
 def purge_old_alerts(db: Session) -> int:

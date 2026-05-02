@@ -180,15 +180,21 @@ class GeofenceService:
             logger.warning(f"No armed link found for POI {poi.id} and tracker {tracker_id}")
             return alerts
         
-        # Determine current position state
+        # Determine current position state with hysteresis to prevent GPS boundary jitter.
+        # When INSIDE: require tracker to be >10% beyond radius before flipping to OUTSIDE.
+        # When OUTSIDE: require tracker to be >10% inside radius before flipping to INSIDE.
+        # This dead-band prevents rapid oscillation when a device sits on the fence edge.
+        HYSTERESIS = 0.10  # 10% of radius
+        last_state = link.last_known_state
+        if last_state == GeofenceState.INSIDE:
+            effective_radius = poi.radius * (1 + HYSTERESIS)
+        else:
+            effective_radius = poi.radius * (1 - HYSTERESIS)
         is_inside = GeofenceService.is_inside_geofence(
             current_lat, current_lon,
             poi.latitude, poi.longitude,
-            poi.radius
+            effective_radius
         )
-        
-        current_state = GeofenceState.INSIDE if is_inside else GeofenceState.OUTSIDE
-        last_state = link.last_known_state
         
         # Strict pairing logic - only alert on expected transitions
         should_alert = False
@@ -287,11 +293,8 @@ class GeofenceService:
             logger.info(
                 f"✅ ALERT GENERATED: tracker {event_type.value} {poi.name} (strict pairing)"
             )
-            
-            # Send email alert
-            GeofenceService._send_email_alert(
-                db, user_id, tracker_id, poi, event_type, current_lat, current_lon
-            )
+            # Email is sent via portal_alert_service._notify_group_by_email (Path B).
+            # _send_email_alert (Path A) is intentionally removed to avoid duplicate emails.
         
         return alerts
     
@@ -402,10 +405,7 @@ class GeofenceService:
                 f"Route alert: Package {'LEFT' if pending_event_type == GeofenceEventType.EXIT else 'ARRIVED AT'} "
                 f"{pending_location_name} for {poi.name}"
             )
-            GeofenceService._send_email_alert(
-                db, user_id, tracker_id, poi, pending_event_type,
-                current_lat, current_lon, location_name=pending_location_name
-            )
+            # Email handled by portal_alert_service (Path B). Path A removed to avoid duplicates.
 
         return alerts
     
