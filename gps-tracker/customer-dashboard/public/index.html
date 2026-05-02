@@ -1629,6 +1629,67 @@
                                     </div>
                                     <div class="alert" id="notif-email-alert" style="display:none;margin-top:8px"><span id="notif-email-alert-text"></span></div>
                                 </div>
+                                <!-- SMS section (only shown when group has sms_addon) -->
+                                <div id="notif-sms-section" style="display:none">
+                                    <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-3);padding:14px 0 8px">
+                                        <i class="fa-solid fa-mobile-screen-button" style="margin-right:5px;color:var(--primary)"></i>SMS Alerts
+                                    </p>
+                                    <div class="settings-row">
+                                        <div>
+                                            <div class="settings-row-label">SMS Alerts</div>
+                                            <div class="settings-row-hint">Receive text messages for your alerts.</div>
+                                        </div>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="notif-sms-enabled" onchange="settingsSaveNotifications()">
+                                            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                                        </label>
+                                    </div>
+                                    <div id="notif-sms-details" style="transition:opacity .2s">
+                                        <!-- Phone number -->
+                                        <div class="settings-row" style="gap:12px;flex-wrap:wrap">
+                                            <div style="flex:1;min-width:180px">
+                                                <div class="settings-row-label">Mobile Number</div>
+                                                <div class="settings-row-hint">UK numbers: 07xxx will be converted to +44 automatically.</div>
+                                            </div>
+                                            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                                                <input type="tel" id="notif-phone" placeholder="e.g. 07700900123 or +447700900123"
+                                                       style="min-width:220px;max-width:300px"
+                                                       onkeydown="if(event.key==='Enter'){event.preventDefault();settingsSavePhone();}">
+                                                <button class="btn btn-secondary btn-small" onclick="settingsSavePhone()">Save</button>
+                                            </div>
+                                        </div>
+                                        <div class="alert" id="notif-phone-alert" style="display:none;margin:4px 0 8px"><span id="notif-phone-alert-text"></span></div>
+                                        <!-- Per-type SMS toggles -->
+                                        <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-3);padding:10px 0 6px">SMS alert types</p>
+                                        <div class="settings-row">
+                                            <div>
+                                                <div class="settings-row-label"><i class="fa-solid fa-draw-polygon" style="margin-right:6px;color:var(--warning)"></i>Geofence alerts</div>
+                                            </div>
+                                            <label class="toggle-switch">
+                                                <input type="checkbox" id="notif-sms-geofence" onchange="settingsSaveNotifications()">
+                                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                                            </label>
+                                        </div>
+                                        <div class="settings-row">
+                                            <div>
+                                                <div class="settings-row-label"><i class="fa-solid fa-battery-low" style="margin-right:6px;color:var(--danger)"></i>Battery low alerts</div>
+                                            </div>
+                                            <label class="toggle-switch">
+                                                <input type="checkbox" id="notif-sms-battery" onchange="settingsSaveNotifications()">
+                                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                                            </label>
+                                        </div>
+                                        <div class="settings-row">
+                                            <div>
+                                                <div class="settings-row-label"><i class="fa-solid fa-signal-slash" style="margin-right:6px;color:var(--text-3)"></i>Tag offline alerts</div>
+                                            </div>
+                                            <label class="toggle-switch">
+                                                <input type="checkbox" id="notif-sms-offline" onchange="settingsSaveNotifications()">
+                                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="alert" id="notif-alert" style="display:none"><span id="notif-alert-text"></span></div>
                         </div>
@@ -4025,6 +4086,7 @@ async function _loadSettingsNotifications() {
 
     _renderNotifications(_notifCache);
     _renderNotifEmailTags(_notifCache.notification_emails || []);
+    _renderSmsSection(_notifCache);
 }
 
 // Render the email address chips
@@ -4124,6 +4186,25 @@ function _renderNotifications(p) {
     triggers?.querySelectorAll('input[type=checkbox]:not(#notif-enabled)').forEach(cb => cb.disabled = !p.alerts_enabled);
 }
 
+function _renderSmsSection(p) {
+    const smsSection = document.getElementById('notif-sms-section');
+    if (!smsSection) return;
+    if (!p.group_sms_enabled) { smsSection.style.display = 'none'; return; }
+    smsSection.style.display = '';
+    const setChk = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
+    setChk('notif-sms-enabled', p.sms_enabled);
+    setChk('notif-sms-geofence', p.notify_geofence_sms);
+    setChk('notif-sms-battery', p.notify_battery_sms);
+    setChk('notif-sms-offline', p.notify_offline_sms);
+    const phoneEl = document.getElementById('notif-phone');
+    if (phoneEl) phoneEl.value = p.phone_number || '';
+    const detailsEl = document.getElementById('notif-sms-details');
+    if (detailsEl) {
+        detailsEl.style.opacity = p.sms_enabled ? '1' : '0.4';
+        detailsEl.querySelectorAll('input[type=checkbox], input[type=tel], button').forEach(el => el.disabled = !p.sms_enabled);
+    }
+}
+
 async function settingsSaveNotifications() {
     const alertEl = document.getElementById('notif-alert');
     const alertTx = document.getElementById('notif-alert-text');
@@ -4144,12 +4225,42 @@ async function settingsSaveNotifications() {
                 notify_battery_low:   getChk('notif-battery'),
                 notify_offline:       getChk('notif-offline'),
                 notify_via_email:     getChk('notif-email'),
+                sms_enabled:          getChk('notif-sms-enabled'),
+                notify_geofence_sms:  getChk('notif-sms-geofence'),
+                notify_battery_sms:   getChk('notif-sms-battery'),
+                notify_offline_sms:   getChk('notif-sms-offline'),
             }),
         });
         if (!res.ok) throw new Error(await safeJsonDetail(res, 'Save failed'));
         _notifCache = await res.json();
+        _renderSmsSection(_notifCache);
         // Brief success flash
         alertTx.textContent   = 'Preferences saved.';
+        alertEl.className     = 'alert alert-success';
+        alertEl.style.display = 'flex';
+        setTimeout(() => { alertEl.style.display = 'none'; }, 2000);
+    } catch (err) {
+        alertTx.textContent   = err.message;
+        alertEl.className     = 'alert alert-error';
+        alertEl.style.display = 'flex';
+    }
+}
+
+async function settingsSavePhone() {
+    const phoneEl   = document.getElementById('notif-phone');
+    const alertEl   = document.getElementById('notif-phone-alert');
+    const alertTx   = document.getElementById('notif-phone-alert-text');
+    alertEl.style.display = 'none';
+    try {
+        const res = await apiFetch('/api/portal/notifications', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone_number: phoneEl?.value?.trim() || '' }),
+        });
+        if (!res.ok) throw new Error(await safeJsonDetail(res, 'Save failed'));
+        _notifCache = await res.json();
+        if (phoneEl) phoneEl.value = _notifCache.phone_number || '';
+        alertTx.textContent   = 'Phone number saved.';
         alertEl.className     = 'alert alert-success';
         alertEl.style.display = 'flex';
         setTimeout(() => { alertEl.style.display = 'none'; }, 2000);

@@ -650,6 +650,14 @@ class NotificationPrefsOut(BaseModel):
     notify_offline: bool
     notify_via_email: bool
     notification_emails: Optional[List[str]] = None   # extra notification addresses
+    # SMS
+    phone_number: Optional[str] = None
+    sms_enabled: bool = False
+    notify_geofence_sms: bool = True
+    notify_battery_sms: bool = True
+    notify_offline_sms: bool = True
+    # Whether the group has SMS enabled (read-only, for UI gating)
+    group_sms_enabled: bool = False
 
     class Config:
         from_attributes = True
@@ -662,13 +670,22 @@ class NotificationPrefsUpdate(BaseModel):
     notify_offline: Optional[bool] = None
     notify_via_email: Optional[bool] = None
     notification_emails: Optional[List[str]] = None   # None = do not change; [] = clear all extra
+    # SMS
+    phone_number: Optional[str] = None
+    sms_enabled: Optional[bool] = None
+    notify_geofence_sms: Optional[bool] = None
+    notify_battery_sms: Optional[bool] = None
+    notify_offline_sms: Optional[bool] = None
 
 
 @router.get("/notifications", response_model=NotificationPrefsOut)
 def get_notification_prefs(request: Request, db: Session = Depends(get_db)):
     """Return the current user's notification preferences."""
     me = get_portal_user_from_request(request, db)
-    return NotificationPrefsOut.model_validate(me)
+    group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
+    out = NotificationPrefsOut.model_validate(me)
+    out.group_sms_enabled = bool(group and getattr(group, 'sms_enabled', False))
+    return out
 
 
 @router.put("/notifications", response_model=NotificationPrefsOut)
@@ -696,9 +713,30 @@ def update_notification_prefs(
             if '@' not in addr or '.' not in addr.split('@')[-1]:
                 raise HTTPException(status_code=400, detail=f"Invalid email address: {addr}")
         me.notification_emails = cleaned if cleaned else None
+    # SMS prefs
+    import re as _re
+    if data.phone_number is not None:
+        cleaned_num = _re.sub(r"[\s\-\(\)]", "", data.phone_number.strip())
+        if cleaned_num and not cleaned_num.startswith("+"):
+            if cleaned_num.startswith("07") and len(cleaned_num) == 11:
+                cleaned_num = "+44" + cleaned_num[1:]
+        if cleaned_num and not _re.match(r"^\+[1-9]\d{7,14}$", cleaned_num):
+            raise HTTPException(status_code=400, detail="Invalid phone number — use E.164 format e.g. +447700123456")
+        me.phone_number = cleaned_num or None
+    if data.sms_enabled is not None:
+        me.sms_enabled = data.sms_enabled
+    if data.notify_geofence_sms is not None:
+        me.notify_geofence_sms = data.notify_geofence_sms
+    if data.notify_battery_sms is not None:
+        me.notify_battery_sms = data.notify_battery_sms
+    if data.notify_offline_sms is not None:
+        me.notify_offline_sms = data.notify_offline_sms
     db.commit()
     db.refresh(me)
-    return NotificationPrefsOut.model_validate(me)
+    group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
+    out = NotificationPrefsOut.model_validate(me)
+    out.group_sms_enabled = bool(group and getattr(group, 'sms_enabled', False))
+    return out
 
 
 # ---------------------------------------------------------------------------

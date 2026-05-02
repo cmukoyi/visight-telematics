@@ -157,5 +157,6 @@ class TagPackage(Base):
     auto_delete_days = Column(Integer, nullable=True)  # days after expiry to hard-delete tag; NULL = never
     is_default    = Column(Boolean, nullable=False, default=False)  # applied to self-registered tags
     is_active     = Column(Boolean, nullable=False, default=True)
+    sms_addon     = Column(Boolean, nullable=False, default=False)  # whether this package includes SMS alerts
     created_at    = Column(DateTime(timezone=True), server_default=func.now())
     updated_at    = Column(DateTime(timezone=True), onupdate=func.now())

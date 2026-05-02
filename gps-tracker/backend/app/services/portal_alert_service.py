@@ -10,9 +10,10 @@ import logging
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
-from app.models import PortalAlert, BLETag, PortalUser
+from app.models import PortalAlert, BLETag, PortalUser, UserGroup
 from app.database import SessionLocal
 from app.services.email_service import EmailService
+from app.services.sms_service import sms_service as _sms_svc
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +108,15 @@ def create_alert(db: Session, usergroup_id: str, tag_id: str | None,
     return alert
 
 
+# ── SMS flag per alert type ─────────────────────────────────────────────────
+_SMS_FLAG = {
+    "battery_low":           "notify_battery_sms",
+    "tag_offline":           "notify_offline_sms",
+    "geofence_entry":        "notify_geofence_sms",
+    "geofence_exit":         "notify_geofence_sms",
+    "gdpr_deletion_warning": "sms_enabled",
+}
+
 # ── Notify flag per alert type ────────────────────────────────────────────────
 _NOTIFY_FLAG = {
     "battery_low":           "notify_battery_low",
@@ -115,6 +125,53 @@ _NOTIFY_FLAG = {
     "geofence_exit":         "notify_geofence_exit",
     "gdpr_deletion_warning": "alerts_enabled",         # always send if alerts are on
 }
+
+
+def _notify_group_by_sms(db: Session, usergroup_id: str, alert_type: str,
+                          title: str, message: str) -> None:
+    """Send an SMS alert to all opted-in portal users in the group.
+
+    Only fires if:
+      - The UserGroup has sms_enabled=True
+      - The PortalUser has sms_enabled=True and a phone_number set
+      - The per-type SMS flag is True for that user
+    Uses its own DB session, isolated from the caller's transaction.
+    """
+    import uuid as _uuid
+    flag = _SMS_FLAG.get(alert_type, "sms_enabled")
+    notify_db = SessionLocal()
+    try:
+        try:
+            gid = _uuid.UUID(usergroup_id)
+        except ValueError:
+            return
+
+        group = notify_db.query(UserGroup).filter(UserGroup.id == gid).first()
+        if not group or not getattr(group, 'sms_enabled', False):
+            return
+
+        users = notify_db.query(PortalUser).filter(
+            PortalUser.usergroup_id == gid,
+            PortalUser.is_active == True,
+            PortalUser.alerts_enabled == True,
+            PortalUser.sms_enabled == True,
+        ).all()
+
+        for pu in users:
+            if not getattr(pu, flag, True):
+                continue
+            if not getattr(pu, 'phone_number', None):
+                continue
+            ok = _sms_svc.send_alert(pu.phone_number, alert_type, title, message)
+            if ok:
+                logger.info("📱 Alert SMS sent to %s (%s)", pu.phone_number, alert_type)
+            else:
+                logger.warning("📱 Failed SMS to %s (%s)", pu.phone_number, alert_type)
+
+    except Exception as exc:
+        logger.error("Failed to send SMS alerts for group %s: %s", usergroup_id, exc)
+    finally:
+        notify_db.close()
 
 
 def _notify_group_by_email(db: Session, usergroup_id: str, alert_type: str,
@@ -204,6 +261,7 @@ def check_battery_alert(db: Session, tag: BLETag) -> bool:
         create_alert(db, usergroup_id, tag_id, alert_type="battery_low",
                      title=_title, message=_msg, meta_data=_meta)
         _notify_group_by_email(db, usergroup_id, "battery_low", _title, _msg, _meta)
+        _notify_group_by_sms(db, usergroup_id, "battery_low", _title, _msg)
         logger.info("🔋 Battery-low alert created for tag %s (%d%%) → group %s", tag.imei, tag.battery_level, usergroup_id)
         created = True
     return created
@@ -234,6 +292,7 @@ def check_offline_alert(db: Session, tag: BLETag) -> bool:
         create_alert(db, usergroup_id, tag_id, alert_type="tag_offline",
                      title=_title, message=_msg, meta_data=_meta)
         _notify_group_by_email(db, usergroup_id, "tag_offline", _title, _msg, _meta)
+        _notify_group_by_sms(db, usergroup_id, "tag_offline", _title, _msg)
         logger.info("📡 Offline alert created for tag %s (%d days) → group %s", tag.imei, age_days, usergroup_id)
         created = True
     return created
@@ -280,6 +339,7 @@ def create_geofence_alert(db: Session, tag: BLETag, poi_name: str, poi_id: str,
             logger.warning("Geofence alert insert skipped (already exists today): %s", exc)
             continue
         _notify_group_by_email(db, usergroup_id, atype, _title, _msg, _meta)
+        _notify_group_by_sms(db, usergroup_id, atype, _title, _msg)
         logger.info("🚨 Geofence alert created: %s for tag %s → group %s",
                     atype, tag.imei, usergroup_id)
         created = True
@@ -334,6 +394,7 @@ def send_gdpr_deletion_warning(db: Session, tag: BLETag) -> bool:
                      alert_type="gdpr_deletion_warning",
                      title=_title, message=_msg, meta_data=_meta)
         _notify_group_by_email(db, usergroup_id, "gdpr_deletion_warning", _title, _msg, _meta)
+        _notify_group_by_sms(db, usergroup_id, "gdpr_deletion_warning", _title, _msg)
         logger.info("[GDPR] Deletion warning sent for tag %s → group %s (deletes %s)",
                     tag.imei, usergroup_id, delete_date)
     return True

@@ -1296,6 +1296,7 @@ class PackageCreate(BaseModel):
     validity_days: int          # e.g. 80, 120, 300
     auto_delete_days: Optional[int] = None  # days after expiry to auto-delete tag
     is_default: bool = False
+    sms_addon: bool = False     # whether this package includes SMS alerts
 
 
 class PackageUpdate(BaseModel):
@@ -1305,6 +1306,7 @@ class PackageUpdate(BaseModel):
     auto_delete_days: Optional[int] = None
     is_default: Optional[bool] = None
     is_active: Optional[bool] = None
+    sms_addon: Optional[bool] = None
 
 
 class PackageOut(BaseModel):
@@ -1315,6 +1317,7 @@ class PackageOut(BaseModel):
     auto_delete_days: Optional[int] = None
     is_default: bool
     is_active: bool
+    sms_addon: bool = False
     created_at: datetime
 
     @field_validator('id', mode='before')
@@ -1346,6 +1349,7 @@ def create_package(data: PackageCreate, request: Request, db: Session = Depends(
         validity_days=data.validity_days,
         auto_delete_days=data.auto_delete_days,
         is_default=data.is_default,
+        sms_addon=data.sms_addon,
         is_active=True,
     )
     db.add(pkg)

@@ -290,6 +290,9 @@ class UserGroup(Base):
     theme_accent          = Column(String(20), nullable=True)    # secondary hex
     # Data retention
     history_retention_days = Column(Integer, nullable=True, default=365)  # days to keep tag history
+    # SMS add-on
+    sms_enabled       = Column(Boolean, nullable=False, default=False)  # tenant-level SMS on/off
+    sms_monthly_limit = Column(Integer, nullable=True)                  # NULL = no limit
     # Feature access control (portal RBAC)
     # List of section keys enabled for this tenant: 'tracking', 'management', 'reports'
     # NULL means all sections are enabled (default — backward-compatible).
@@ -364,6 +367,12 @@ class PortalUser(Base):
     notify_offline       = Column(Boolean, nullable=False, default=True)
     notify_via_email     = Column(Boolean, nullable=False, default=True)
     notification_emails  = Column(JSON, nullable=True)               # extra notification addresses (list of strings)
+    # SMS notification preferences
+    phone_number         = Column(String(30), nullable=True)          # E.164 number, e.g. +447700123456
+    sms_enabled          = Column(Boolean, nullable=False, default=False)
+    notify_geofence_sms  = Column(Boolean, nullable=False, default=True)
+    notify_battery_sms   = Column(Boolean, nullable=False, default=True)
+    notify_offline_sms   = Column(Boolean, nullable=False, default=True)
 
     usergroup = relationship("UserGroup", back_populates="portal_users")
 
