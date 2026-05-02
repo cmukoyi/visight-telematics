@@ -183,9 +183,12 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
         if prev_state == "OK":
             if is_breaching:
                 if confidence == "high":
-                    new_state = "BREACH_PENDING"
                     live.pending_breach_since = now
                     live.consecutive_confirms = 1
+                    if 1 >= cfg.confirmation_count:
+                        new_state = "BREACHING"
+                    else:
+                        new_state = "BREACH_PENDING"
                 # low confidence → stay OK
 
         elif prev_state == "BREACH_PENDING":
@@ -283,12 +286,13 @@ def _get_or_create_live_state(hive_id: str, db: Session) -> HiveLiveState:
 
 def _state_transition_event(from_s: str, to_s: str) -> str:
     transitions = {
-        ("BREACH_PENDING", "BREACHING"): "CONFIRMED_BREACH",
-        ("OK", "BREACH_PENDING"):        "SUSPECTED_BREACH",
-        ("BREACH_PENDING", "OK"):        "BREACH_CLEARED",
-        ("BREACHING", "RESOLVING"):      "BREACH_CLEARING",
-        ("RESOLVING", "OK"):             "BREACH_CLEARED",
-        ("RESOLVING", "BREACHING"):      "CONFIRMED_BREACH",
+        ("OK",             "BREACH_PENDING"): "SUSPECTED_BREACH",
+        ("OK",             "BREACHING"):      "CONFIRMED_BREACH",
+        ("BREACH_PENDING", "BREACHING"):      "CONFIRMED_BREACH",
+        ("BREACH_PENDING", "OK"):             "BREACH_CLEARED",
+        ("BREACHING",      "RESOLVING"):      "BREACH_CLEARING",
+        ("RESOLVING",      "OK"):             "BREACH_CLEARED",
+        ("RESOLVING",      "BREACHING"):      "CONFIRMED_BREACH",
     }
     return transitions.get((from_s, to_s), f"{from_s}_TO_{to_s}")
 
