@@ -41,7 +41,7 @@ PORTAL_TOKEN_EXPIRE_HOURS = 12
 # ---------------------------------------------------------------------------
 
 SECTION_FEATURES: dict = {
-    "tracking":   ["livemap", "floorplan", "assets", "history"],
+    "tracking":   ["livemap", "floorplan", "assets", "history", "hive"],
     "management": ["asset-mgmt", "users", "qr", "building", "locations", "settings"],
     "reports":    [
         "reports-subscriptions", "reports-activity", "reports-trips",

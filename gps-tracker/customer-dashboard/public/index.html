@@ -2770,6 +2770,7 @@
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="floorplan" class="au-feat"> Floor Plan</label>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="assets" class="au-feat"> Asset List</label>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="history" class="au-feat"> Movement History</label>
+                    <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="hive" class="au-feat"> Hive Tracking</label>
                     <p style="margin:4px 0 4px;font-size:12px;color:var(--text-secondary)">Management</p>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="asset-mgmt" class="au-feat"> Asset Management</label>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="users" class="au-feat"> User Accounts</label>
@@ -2899,6 +2900,7 @@
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="floorplan" class="er-feat"> Floor Plan</label>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="assets" class="er-feat"> Asset List</label>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="history" class="er-feat"> Movement History</label>
+                <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="hive" class="er-feat"> Hive Tracking</label>
                 <p style="margin:4px 0 4px;font-size:12px;color:var(--text-secondary)">Management</p>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="asset-mgmt" class="er-feat"> Asset Management</label>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="users" class="er-feat"> User Accounts</label>
@@ -3196,7 +3198,7 @@ function applyNavFeatures(features) {
     });
     // Section label visibility — hide the label when ALL its tabs are hidden
     const sectionTabs = {
-        'Tracking':   ['livemap', 'floorplan', 'assets', 'history'],
+        'Tracking':   ['livemap', 'floorplan', 'assets', 'history', 'hive'],
         'Management': ['asset-mgmt', 'users', 'qr', 'building', 'locations', 'settings'],
         'Reports':    ['reports-subscriptions', 'reports-activity', 'reports-trips',
                        'reports-battery', 'reports-alerts'],
