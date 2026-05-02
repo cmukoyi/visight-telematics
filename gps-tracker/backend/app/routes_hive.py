@@ -91,7 +91,7 @@ def _hive_summary(hive: Hive, cfg: Optional[HiveConfigVersion],
         tier = _freshness_for_tag(tag, cfg) if cfg else "lost"
         tags_info.append({
             "tag_id": _str_id(m.tag_id),
-            "label": m.label or (tag.device_name or _str_id(m.tag_id)),
+            "label": m.label or tag.description or tag.device_name or _str_id(m.tag_id),
             "freshness": tier,
             "is_outlier": _str_id(m.tag_id) == _str_id(live.outlier_tag_id) if live else False,
             "last_seen": _format_dt(tag.last_seen),
@@ -259,7 +259,7 @@ def get_available_tags(request: Request, db: Session = Depends(get_db)):
     return [
         {
             "tag_id": str(t.id),
-            "label": t.device_name or t.imei or str(t.id),
+            "label": t.description or t.device_name or t.imei or str(t.id),
             "device_name": t.device_name,
             "imei": t.imei,
             "last_seen": _format_dt(t.last_seen),
@@ -514,7 +514,7 @@ def get_hive(hive_id: str, request: Request, db: Session = Depends(get_db)):
         lon = float(tag.longitude) if tag.longitude else None
         tag_details.append({
             "tag_id": str(m.tag_id),
-            "label": m.label or tag.device_name or str(m.tag_id),
+            "label": m.label or tag.description or tag.device_name or str(m.tag_id),
             "imei": tag.imei,
             "latitude": lat,
             "longitude": lon,
