@@ -80,9 +80,9 @@ def _groups_for_tag(db: Session, tag: BLETag) -> list[str]:
 
 
 def _recent_alert_exists(db: Session, usergroup_id: str, tag_id: str,
-                          alert_type: str, within_hours: int) -> bool:
-    """True if an alert of this type for this tag already exists within N hours."""
-    since = datetime.utcnow() - timedelta(hours=within_hours)
+                          alert_type: str, within_hours: float) -> bool:
+    """True if an alert of this type for this tag already exists within N hours (fractional OK)."""
+    since = datetime.utcnow() - timedelta(seconds=within_hours * 3600)
     return db.query(PortalAlert).filter(
         PortalAlert.usergroup_id == usergroup_id,
         PortalAlert.tag_id == tag_id,
@@ -327,8 +327,10 @@ def create_geofence_alert(db: Session, tag: BLETag, poi_name: str, poi_id: str,
     _meta = {"poi_name": poi_name, "poi_id": poi_id, "imei": tag.imei, "event_type": event_type}
     created = False
     for usergroup_id in group_ids:
-        # ── Dedupe: skip if same alert already raised in the last 1 h ──
-        if _recent_alert_exists(db, usergroup_id, tag_id, atype, within_hours=1):
+        # ── Dedupe: skip if same alert already raised in the last 5 min ──
+        # (state machine already enforces strict EXIT↔ENTRY pairing; this
+        #  guard only catches rapid GPS-jitter duplicates slipping through)
+        if _recent_alert_exists(db, usergroup_id, tag_id, atype, within_hours=0.083):
             logger.debug("Geofence alert dedupe: %s for tag %s group %s — skipped",
                          atype, tag.imei, usergroup_id)
             continue
