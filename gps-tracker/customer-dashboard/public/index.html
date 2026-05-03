@@ -10369,3 +10369,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (archBtn) archBtn.addEventListener('click', () => { hiveShowScreen('archive'); hiveLoadArchive(); });
 });
 </script>
+
+<!-- Sub-app JS — must come after their DOM is in place -->
+<script src="/customer/sketch/app.js"></script>
+<script src="/customer/floorplan/app.js"></script>
+<script src="/customer/qr/app.js"></script>
