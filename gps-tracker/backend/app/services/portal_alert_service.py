@@ -327,8 +327,8 @@ def create_geofence_alert(db: Session, tag: BLETag, poi_name: str, poi_id: str,
     _meta = {"poi_name": poi_name, "poi_id": poi_id, "imei": tag.imei, "event_type": event_type}
     created = False
     for usergroup_id in group_ids:
-        # ── Dedupe: skip if same alert already raised in the last 24 h ──
-        if _recent_alert_exists(db, usergroup_id, tag_id, atype, within_hours=24):
+        # ── Dedupe: skip if same alert already raised in the last 1 h ──
+        if _recent_alert_exists(db, usergroup_id, tag_id, atype, within_hours=1):
             logger.debug("Geofence alert dedupe: %s for tag %s group %s — skipped",
                          atype, tag.imei, usergroup_id)
             continue
