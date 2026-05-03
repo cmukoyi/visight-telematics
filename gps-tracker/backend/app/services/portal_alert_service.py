@@ -324,7 +324,14 @@ def create_geofence_alert(db: Session, tag: BLETag, poi_name: str, poi_id: str,
     label = _tag_label(tag)
     verb = "entered" if is_entry else "exited"
     tag_id = str(tag.id)
-    _meta = {"poi_name": poi_name, "poi_id": poi_id, "imei": tag.imei, "event_type": event_type}
+    # Normalise the event_type stored in meta so it always matches the alert
+    # type ('entry'/'exit') regardless of what the caller passed in
+    # (the GeofenceEventType enum's `.value` for EXIT is 'EXIT' in some
+    #  paths and 'exit' in others, plus we don't want stale 'entry' on an
+    #  EXIT row to confuse downstream consumers).
+    canonical_event = "entry" if is_entry else "exit"
+    _meta = {"poi_name": poi_name, "poi_id": poi_id, "imei": tag.imei,
+             "event_type": canonical_event}
     created = False
     for usergroup_id in group_ids:
         # ── Dedupe: skip if same alert already raised in the last 5 min ──
@@ -336,13 +343,22 @@ def create_geofence_alert(db: Session, tag: BLETag, poi_name: str, poi_id: str,
             continue
         _title = f"Geofence {verb} — {label}"
         _msg   = f"{label} has {verb} the zone '{poi_name}'."
+        # IMPORTANT: wrap the insert in a SAVEPOINT so that if the per-day
+        # unique constraint (uq_portal_alert_per_day) trips, ONLY the alert
+        # insert is rolled back — not the caller's geofence-state update.
+        # Previously a db.rollback() here was wiping the
+        # last_known_state INSIDE→OUTSIDE change in geofence_service,
+        # causing the same transition to re-fire on every poll (every 10s
+        # after the poll-interval change), spamming the DB with
+        # duplicate-key errors and never actually transitioning state.
         try:
-            create_alert(db, usergroup_id, tag_id, alert_type=atype,
-                         title=_title, message=_msg, meta_data=_meta)
-            db.flush()   # surface UniqueViolation now, before commit
+            with db.begin_nested():   # SAVEPOINT
+                create_alert(db, usergroup_id, tag_id, alert_type=atype,
+                             title=_title, message=_msg, meta_data=_meta)
+                # flush inside savepoint so IntegrityError raises here
+                db.flush()
         except Exception as exc:
-            db.rollback()
-            logger.warning("Geofence alert insert skipped (already exists today): %s", exc)
+            logger.debug("Geofence alert insert skipped (already exists today): %s", exc)
             continue
         _notify_group_by_email(db, usergroup_id, atype, _title, _msg, _meta)
         _notify_group_by_sms(db, usergroup_id, atype, _title, _msg)
