@@ -267,27 +267,63 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
     if state_changed:
         log.info("HIVE %s state transition: %s → %s (diameter=%.0fm)",
                  hive_id, prev_state, new_state, diameter_m or 0)
-        _maybe_send_hive_alert(hive, new_state, prev_state, diameter_m, cfg, db)
+        _maybe_send_hive_alert(hive, new_state, prev_state, diameter_m,
+                                outlier_id, cfg, db)
 
     return new_state
 
 
+def _describe_tag(tag_id, db: Session):
+    """Return (label, imei) for a tag id, where label is human-friendly."""
+    if not tag_id:
+        return None, None
+    from app.models import BLETag
+    t = db.query(BLETag).filter(BLETag.id == tag_id).first()
+    if not t:
+        return None, None
+    label = (t.description or t.device_name or t.imei or str(t.id))
+    return label.strip() if isinstance(label, str) else str(label), t.imei
+
+
 def _maybe_send_hive_alert(hive: Hive, new_state: str, prev_state: str,
                             diameter_m: Optional[float],
+                            outlier_tag_id,
                             cfg, db: Session) -> None:
-    """Fire a portal alert + email/SMS when a hive enters or clears a breach."""
+    """Fire a portal alert + email/SMS when a hive enters or clears a breach.
+
+    Includes the outlier tag (the one that left the cluster) in the title,
+    message body and meta so notifications identify *which* IMEI triggered
+    the breach.
+    """
     from app.services import portal_alert_service as _pas
 
     gid = str(hive.usergroup_id)
     km = f"{diameter_m/1000:.1f} km" if diameter_m and diameter_m >= 1000 else (f"{diameter_m:.0f} m" if diameter_m else "unknown distance")
 
+    outlier_label, outlier_imei = _describe_tag(outlier_tag_id, db)
+    # Build a compact "Label / IMEI 1234..." suffix used in the title
+    if outlier_label and outlier_imei and outlier_imei != outlier_label:
+        outlier_suffix = f" – {outlier_label} (IMEI {outlier_imei})"
+    elif outlier_label:
+        outlier_suffix = f" – {outlier_label}"
+    else:
+        outlier_suffix = ""
+
     if new_state == "BREACHING":
         alert_type = "hive_breach"
-        title      = f"🔴 HIVE Breach: {hive.name}"
-        message    = (
-            f"The hive '{hive.name}' is in breach. "
-            f"Tags are {km} apart (threshold: {cfg.distance_threshold_m:.0f} m)."
-        )
+        title      = f"🔴 HIVE Breach: {hive.name}{outlier_suffix}"
+        if outlier_label:
+            message = (
+                f"Tag {outlier_label}"
+                + (f" (IMEI {outlier_imei})" if outlier_imei and outlier_imei != outlier_label else "")
+                + f" has left hive '{hive.name}'. "
+                f"Spread is now {km} (threshold: {cfg.distance_threshold_m:.0f} m)."
+            )
+        else:
+            message = (
+                f"The hive '{hive.name}' is in breach. "
+                f"Tags are {km} apart (threshold: {cfg.distance_threshold_m:.0f} m)."
+            )
     elif new_state == "OK" and prev_state in ("BREACHING", "RESOLVING"):
         alert_type = "hive_breach_cleared"
         title      = f"✅ HIVE Cleared: {hive.name}"
@@ -298,12 +334,21 @@ def _maybe_send_hive_alert(hive: Hive, new_state: str, prev_state: str,
     else:
         return  # BREACH_PENDING / RESOLVING don't warrant alerts
 
+    meta_data = {
+        "hive_id": str(hive.id),
+        "diameter_m": diameter_m,
+        "outlier_tag_id": str(outlier_tag_id) if outlier_tag_id else None,
+        "outlier_imei": outlier_imei,
+        "outlier_label": outlier_label,
+    }
+
     try:
-        _pas.create_alert(db, gid, None, alert_type, title, message,
-                          meta_data={"hive_id": str(hive.id), "diameter_m": diameter_m})
+        _pas.create_alert(db, gid,
+                          str(outlier_tag_id) if outlier_tag_id else None,
+                          alert_type, title, message, meta_data=meta_data)
         db.commit()
         _pas._notify_group_by_email(db, gid, alert_type, title, message,
-                                    meta_data={"hive_id": str(hive.id)})
+                                    meta_data=meta_data)
         _pas._notify_group_by_sms(db, gid, alert_type, title, message)
     except Exception as exc:
         log.error("Failed to send hive alert for %s: %s", hive.id, exc)
