@@ -144,6 +144,9 @@ class HiveCreateRequest(BaseModel):
     tag_labels: Optional[Dict[str, str]] = None      # tag_id → label
     mobility_profile: str = "mobile"                 # stationary|slow|mobile|fast
     distance_threshold_m: Optional[float] = None     # None → use preset default
+    # Validity — how many days the hive remains active before auto-archive.
+    # Default 60 days; min 1, max 3650 (10 years).
+    validity_days: Optional[int] = Field(60, ge=1, le=3650)
     # Advanced overrides (ignored if not custom)
     fresh_window_s:     Optional[int]   = None
     recent_window_s:    Optional[int]   = None
@@ -156,6 +159,10 @@ class HiveCreateRequest(BaseModel):
 
 class HiveUpdateRequest(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=200)
+    # Either set an absolute new expiry, or extend by N days from now.
+    # If both are supplied, expires_at wins.
+    expires_at: Optional[datetime] = None
+    validity_days: Optional[int] = Field(None, ge=1, le=3650)
 
 
 class HiveConfigUpdateRequest(BaseModel):
@@ -425,13 +432,14 @@ def _create_hive_inner(
     now = datetime.now(UTC)
     hive_uuid = uuid.uuid4()
 
+    validity_days = data.validity_days or 60
     hive = Hive(
         id=hive_uuid,
         usergroup_id=me.usergroup_id,
         created_by=me.id,
         name=data.name,
         status="active",
-        expires_at=now + timedelta(days=60),
+        expires_at=now + timedelta(days=validity_days),
         settling_until=now + timedelta(minutes=10),  # 10-min settling window
     )
     db.add(hive)
@@ -620,8 +628,24 @@ def update_hive(
 
     if data.name is not None:
         hive.name = data.name
+    if data.expires_at is not None:
+        # Caller supplied a specific new expiry timestamp
+        new_exp = data.expires_at
+        if new_exp.tzinfo is None:
+            new_exp = new_exp.replace(tzinfo=UTC)
+        if new_exp <= datetime.now(UTC):
+            raise HTTPException(400, "expires_at must be in the future")
+        hive.expires_at = new_exp
+    elif data.validity_days is not None:
+        # Caller asked to extend validity by N days from NOW
+        hive.expires_at = datetime.now(UTC) + timedelta(days=data.validity_days)
     db.commit()
-    return {"hive_id": hive_id, "name": hive.name}
+    return {
+        "hive_id": hive_id,
+        "name": hive.name,
+        "expires_at": _format_dt(hive.expires_at),
+        "days_remaining": _days_remaining(hive.expires_at),
+    }
 
 
 # ─── Update config ────────────────────────────────────────────────────────────

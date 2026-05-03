@@ -243,7 +243,7 @@
 
             <button class="nav-item" data-tab="locations" onclick="switchTab('locations')">
                 <span class="nav-icon"><i class="fa-solid fa-location-dot"></i></span>
-                <span class="nav-label">Locations</span>
+                <span class="nav-label">Geofences</span>
             </button>
 
             <button class="nav-item" data-tab="users" onclick="switchTab('users')">
@@ -285,7 +285,7 @@
                 <span class="nav-label">Journey Log</span>
             </button>
 
-            <button class="nav-item" data-tab="reports-geofence" onclick="switchTab('reports-geofence')" style="display:none">
+            <button class="nav-item" data-tab="reports-geofence" onclick="switchTab('reports-geofence')">
                 <span class="nav-icon"><i class="fa-solid fa-draw-polygon"></i></span>
                 <span class="nav-label">Geofence Events</span>
             </button>
@@ -360,6 +360,13 @@
                     <!-- Mobile: toggle asset list panel -->
                     <button id="lm-sidebar-btn" class="map-panel-toggle" onclick="toggleMapSidebar()" title="Toggle asset list">
                         <i class="fa-solid fa-list"></i>
+                    </button>
+                    <!-- POI overlay toggle (floating top-right of map) -->
+                    <button id="lm-poi-toggle" onclick="lmTogglePOIs()"
+                            title="Show / hide geofences on the map"
+                            style="position:absolute;top:10px;right:10px;z-index:500;background:var(--bg-2);color:var(--text-1);border:1px solid var(--border);border-radius:6px;padding:6px 12px;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;box-shadow:0 2px 6px rgba(0,0,0,.2)">
+                        <i class="fa-solid fa-draw-polygon"></i>
+                        <span id="lm-poi-toggle-label">Show Geofences</span>
                     </button>
                     <div id="liveMap"></div>
                 </div>
@@ -1182,7 +1189,7 @@
                 <aside class="loc-sidebar">
                   <div class="loc-sidebar-hd">
                     <div class="loc-sidebar-title">
-                      <span class="loc-pulse"></span> Locations
+                      <span class="loc-pulse"></span> Geofences
                     </div>
                     <div class="loc-search-wrap" id="locAddrWrap">
                       <svg class="loc-search-ico" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -1194,8 +1201,6 @@
 
                   <div class="loc-stats" id="locStats">
                     <div class="loc-stat loc-stat-total lsf-active" data-lsf="all"><div class="loc-stat-num" id="locStatTotal">0</div><div class="loc-stat-lbl">Total</div></div>
-                    <div class="loc-stat loc-stat-active" data-lsf="active"><div class="loc-stat-num" id="locStatActive">0</div><div class="loc-stat-lbl">Active</div></div>
-                    <div class="loc-stat loc-stat-draft" data-lsf="draft"><div class="loc-stat-num" id="locStatDraft">0</div><div class="loc-stat-lbl">Draft</div></div>
                     <div class="loc-stat loc-stat-armed" data-lsf="armed"><div class="loc-stat-num" id="locStatArmed">0</div><div class="loc-stat-lbl">Armed</div></div>
                   </div>
 
@@ -1204,7 +1209,7 @@
                   <div class="loc-action-bar">
                     <button class="loc-btn loc-btn-primary" id="locBtnNew">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-                      New Location
+                      New Geofence
                     </button>
                     <button class="loc-btn loc-btn-secondary" id="locBtnBulk" onclick="locOpenBulk()">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -1282,7 +1287,7 @@
                       <div style="display:flex;align-items:center;gap:10px;min-width:0">
                         <span class="loc-editor-badge" id="locEditorBadge">New</span>
                         <div>
-                          <div class="loc-editor-title" id="locEditorTitle">New location</div>
+                          <div class="loc-editor-title" id="locEditorTitle">New geofence</div>
                           <div class="loc-editor-sub" id="locEditorSub">Adjust shape on the map</div>
                         </div>
                       </div>
@@ -2760,7 +2765,7 @@
             </div>
 
             <!-- ═══ REPORTS — Geofence Events ═══ -->
-            <div id="tab-reports-geofence" class="tab-content" style="display:none">
+            <div id="tab-reports-geofence" class="tab-content">
                 <div class="rpt-toolbar">
                     <select id="rpt-geo-days" onchange="rptGeoLoad()" style="min-width:130px">
                         <option value="7">Last 7 days</option>
@@ -3941,7 +3946,7 @@ window.addEventListener('resize', function() {
 // ══════════════════════════════════════════
 // Tab switching
 // ══════════════════════════════════════════
-const TAB_TITLES = { livemap: 'Live Map', assets: 'Asset List', history: 'Movement History', 'asset-mgmt': 'Asset Management', locations: 'Locations', users: 'User Accounts', building: 'Floor Plan Sketch', floorplan: 'Floor Plan', settings: 'Settings', qr: 'QR / NFC Tags', 'reports-subscriptions': 'Tag Subscriptions Report', 'reports-activity': 'Asset Activity Summary', 'reports-trips': 'Movement / Journey Log', 'reports-battery': 'Battery & Offline Report', 'reports-alerts': 'Alerts Inbox', hive: 'Hive Tracking' };
+const TAB_TITLES = { livemap: 'Live Map', assets: 'Asset List', history: 'Movement History', 'asset-mgmt': 'Asset Management', locations: 'Geofences', users: 'User Accounts', building: 'Floor Plan Sketch', floorplan: 'Floor Plan', settings: 'Settings', qr: 'QR / NFC Tags', 'reports-subscriptions': 'Tag Subscriptions Report', 'reports-activity': 'Asset Activity Summary', 'reports-trips': 'Movement / Journey Log', 'reports-battery': 'Battery & Offline Report', 'reports-alerts': 'Alerts Inbox', 'reports-geofence': 'Geofence Events', hive: 'Hive Tracking' };
 let _mapInitialized = false;
 
 function switchTab(name) {
@@ -6325,7 +6330,7 @@ function locOpenEditor({ mode='new', id=null, name='', type='circle', status='ac
     const title = document.getElementById('locEditorTitle');
     const sub   = document.getElementById('locEditorSub');
     if(badge){ badge.textContent=mode==='edit'?'Editing':'New'; badge.classList.toggle('editing', mode==='edit'); }
-    if(title) title.textContent=mode==='edit'?(name||'Location'):'New location';
+    if(title) title.textContent=mode==='edit'?(name||'Geofence'):'New geofence';
     if(sub)   sub.textContent=mode==='edit'?'Drag the shape on the map to reposition':'Adjust the shape on the map as you go';
 
     const nameEl=document.getElementById('locGfName');
@@ -6507,7 +6512,7 @@ function locRenderList(){
         el.innerHTML=`<div class="loc-gf-empty">
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".3"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
             <div>${filt?'No locations match this filter':'No locations yet'}</div>
-            <div style="font-size:11px;margin-top:4px">${filt?'Clear the filter to see all':'Use + New Location or draw on the map'}</div>
+            <div style="font-size:11px;margin-top:4px">${filt?'Clear the filter to see all':'Use + New Geofence or draw on the map'}</div>
         </div>`;
         return;
     }
@@ -6533,14 +6538,10 @@ function locRenderList(){
 
 function locRenderStats(){
     const total=_locsData.length;
-    const active=_locsData.filter(g=>g.is_active).length;
-    const draft=_locsData.filter(g=>!g.is_active).length;
     const armed=_locsData.filter(g=>(g.armed_count||0)>0).length;
-    const t=document.getElementById('locStatTotal'), a=document.getElementById('locStatActive'),
-          d=document.getElementById('locStatDraft'), m=document.getElementById('locStatArmed');
+    const t=document.getElementById('locStatTotal'),
+          m=document.getElementById('locStatArmed');
     if(t) t.textContent=total;
-    if(a) a.textContent=active;
-    if(d) d.textContent=draft;
     if(m) m.textContent=armed;
 }
 
@@ -8439,6 +8440,9 @@ async function submitEditRole() {
 // LIVE MAP  (GPS tags + Leaflet map)
 // ══════════════════════════════════════════
 let _liveMap        = null;
+let _lmPOIsVisible  = false;     // Show/Hide geofence overlay on the live map
+let _lmPOILayers    = [];        // L.layer instances added when overlay is on
+let _lmPOIData      = null;      // cached geofence list
 let _lmMapReady     = false;
 let _lmTags         = [];        // all tags from API
 let _lmMarkers      = {};        // imei → L.marker
@@ -8457,6 +8461,67 @@ function _lmStatusClass(tag) {
     if (ageMs <= 24 * 60 * 60 * 1000)       return 'active';
     if (ageMs <= 7  * 24 * 60 * 60 * 1000)  return 'idle';
     return 'offline';
+}
+
+// ── Geofence (POI) overlay on the Live Map ─────────────────────────────
+async function lmTogglePOIs() {
+    _lmPOIsVisible = !_lmPOIsVisible;
+    const lbl = document.getElementById('lm-poi-toggle-label');
+    const btn = document.getElementById('lm-poi-toggle');
+    if (_lmPOIsVisible) {
+        if (lbl) lbl.textContent = 'Hide Geofences';
+        if (btn) btn.style.background = 'var(--primary)';
+        if (btn) btn.style.color = '#fff';
+        if (!_lmPOIData) {
+            try {
+                const res = await apiFetch('/api/portal/locations');
+                if (!res.ok) throw new Error('Failed to load geofences');
+                _lmPOIData = await res.json();
+            } catch (err) {
+                _lmPOIsVisible = false;
+                if (lbl) lbl.textContent = 'Show Geofences';
+                if (btn) { btn.style.background = 'var(--bg-2)'; btn.style.color = 'var(--text-1)'; }
+                alert('Could not load geofences: ' + err.message);
+                return;
+            }
+        }
+        _lmRenderPOIs();
+    } else {
+        if (lbl) lbl.textContent = 'Show Geofences';
+        if (btn) { btn.style.background = 'var(--bg-2)'; btn.style.color = 'var(--text-1)'; }
+        _lmClearPOIs();
+    }
+}
+
+function _lmClearPOIs() {
+    _lmPOILayers.forEach(l => { try { _liveMap.removeLayer(l); } catch (e) {} });
+    _lmPOILayers = [];
+}
+
+function _lmRenderPOIs() {
+    if (!_liveMap || !_lmPOIData) return;
+    _lmClearPOIs();
+    _lmPOIData.forEach(gf => {
+        const armed = (gf.armed_count || 0) > 0;
+        const color = armed ? '#10B981' : '#6B7280';
+        const opts  = { color, weight: 2, fillColor: color, fillOpacity: 0.12, interactive: true };
+        let layer = null;
+        const type = (gf.shape_type || gf.type || '').toLowerCase();
+        try {
+            if (type === 'polygon' && Array.isArray(gf.polygon_points)) {
+                layer = L.polygon(gf.polygon_points, opts);
+            } else if (type === 'rectangle' && Array.isArray(gf.polygon_points)) {
+                layer = L.rectangle(gf.polygon_points, opts);
+            } else if (gf.latitude && gf.longitude) {
+                layer = L.circle([gf.latitude, gf.longitude], { ...opts, radius: gf.radius || 150 });
+            }
+        } catch (e) { return; }
+        if (!layer) return;
+        const armedTxt = armed ? `<br><span style="color:#10B981;font-weight:600">Armed: ${gf.armed_count} tag${gf.armed_count>1?'s':''}</span>` : '<br><span style="color:var(--text-3)">Not armed</span>';
+        layer.bindPopup(`<strong>${esc(gf.name||'Geofence')}</strong>${gf.address?'<br><small>'+esc(gf.address)+'</small>':''}${armedTxt}`);
+        layer.addTo(_liveMap);
+        _lmPOILayers.push(layer);
+    });
 }
 
 function _lmMarkerIcon(tag) {
@@ -10214,6 +10279,11 @@ function hiveWizRender() {
             <label class="hive-form-label">Distance Threshold (metres) *</label>
             <input type="number" class="hive-form-input" placeholder="e.g. 100" min="1" max="50000" value="${hiveWizState.threshold_m||''}" oninput="hiveWizState.threshold_m=parseFloat(this.value)">
           </div>
+          <div class="hive-form-group">
+            <label class="hive-form-label">Validity (days)</label>
+            <input type="number" class="hive-form-input" placeholder="60" min="1" max="3650" value="${hiveWizState.validity_days||60}" oninput="hiveWizState.validity_days=parseInt(this.value)||60">
+            <div class="hive-wizard-help" style="margin-top:4px">Hive auto-archives after this many days. Default 60 days. You can extend later.</div>
+          </div>
           <div class="hive-form-summary"><strong>${hiveWizState.selectedTags.length} tags</strong> · <strong>${HIVE_PROFILE_LABELS[hiveWizState.profile]||''} profile</strong>${sug ? ' · Suggested: ' + sug.suggested_threshold_m + 'm threshold' : ''}</div>`;
     }
     document.getElementById('hive-wiz-err').style.display = 'none';
@@ -10263,6 +10333,7 @@ async function hiveWizNext() {
                 name: hiveWizState.name.trim(),
                 mobility_profile: hiveWizState.profile,
                 distance_threshold_m: hiveWizState.threshold_m,
+                validity_days: hiveWizState.validity_days || 60,
                 tag_ids: hiveWizState.selectedTags,
             }),
         }).catch(() => null);
