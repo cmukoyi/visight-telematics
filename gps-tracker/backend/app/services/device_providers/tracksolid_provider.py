@@ -19,7 +19,8 @@ import hashlib
 import logging
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 
 import httpx
 
@@ -48,6 +49,7 @@ class TrackSolidLocationInfo:
     longitude: float
     address: str | None = None
     battery_level: int | None = None  # 0-100 parsed from elecQuantity
+    gps_time: "datetime | None" = None  # actual GPS fix time from device
 
 # Credentials are read lazily from env vars when first needed.
 # Reading them at module level would crash startup if they aren't set yet.
@@ -351,12 +353,37 @@ def _parse_monitor_info_location(data: dict) -> "TrackSolidLocationInfo | None":
     Extracts:
       - lat/lng from data[latestPosition].latlng[source_latlng] ("lat,lng")
       - address from data[latestPosition].address
+      - gps_time from data[latestPosition].positionTime (or gpsTime / time)
       - battery from data[todayActivity].battery[battery]
     """
     sections: list = data.get("data") or []
     lat, lng = 0.0, 0.0
     address: str | None = None
     battery_level: int | None = None
+    gps_time: datetime | None = None
+
+    # Candidate key names for the GPS fix timestamp in latestPosition
+    _TIME_KEYS = {"positionTime", "gpsTime", "time", "dateTime", "posTime"}
+
+    def _try_parse_ts(value: str) -> "datetime | None":
+        """Try common timestamp formats: ISO, 'YYYY-MM-DD HH:MM:SS', epoch int."""
+        if not value:
+            return None
+        # Unix epoch (int or float as string)
+        try:
+            epoch = float(value)
+            if epoch > 1_000_000_000:  # sanity check
+                return datetime.utcfromtimestamp(epoch)
+        except (ValueError, TypeError):
+            pass
+        # String formats
+        for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S",
+                    "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S.%fZ"):
+            try:
+                return datetime.strptime(str(value), fmt)
+            except (ValueError, TypeError):
+                pass
+        return None
 
     for section in sections:
         model = section.get("modeleName", "")
@@ -376,6 +403,15 @@ def _parse_monitor_info_location(data: dict) -> "TrackSolidLocationInfo | None":
                                 pass
                 elif key == "address":
                     address = item.get("value") or None
+                elif key in _TIME_KEYS and gps_time is None:
+                    gps_time = _try_parse_ts(item.get("value"))
+                    if gps_time is None:
+                        # Also check sub-values
+                        for sub in (item.get("value") or []) if isinstance(item.get("value"), list) else []:
+                            if sub.get("key") in _TIME_KEYS:
+                                gps_time = _try_parse_ts(sub.get("value"))
+                                if gps_time:
+                                    break
 
         elif model == "todayActivity":
             for item in vos:
@@ -394,6 +430,7 @@ def _parse_monitor_info_location(data: dict) -> "TrackSolidLocationInfo | None":
         longitude=lng,
         address=address,
         battery_level=battery_level,
+        gps_time=gps_time,
     )
 
 

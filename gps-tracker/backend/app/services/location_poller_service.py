@@ -1,11 +1,15 @@
 """
-Background service that polls MZone API every 60 seconds to:
+Background service that polls MZone API every 10 seconds to:
 1. Update tracker positions in database
 2. Check geofences automatically
-3. Enable real-time alerts without manual refresh
+3. Enable real-time alerts without manual refresh (critical for HIVE breach detection)
 
 TrackSolid tags are polled via the TrackSolid getMonitorInfo endpoint instead
 of MZone, and their battery level is refreshed at the same interval.
+
+Note: 10s poll interval is faster than the device hardware reporting frequency
+(typically 30s-2min), but ensures we catch new positions as soon as the upstream
+API's lastKnownPosition cache is refreshed.
 """
 
 import asyncio
@@ -27,12 +31,12 @@ class LocationPollerService:
     def __init__(self):
         self.mzone_service = MZoneService()
         self.running = False
-        self.poll_interval = 60  # seconds
+        self.poll_interval = 10  # seconds
         
     async def start(self):
         """Start the background polling service"""
         self.running = True
-        logger.info("🚀 Location Poller Service started - polling every 60 seconds")
+        logger.info(f"🚀 Location Poller Service started - polling every {self.poll_interval} seconds")
         
         while self.running:
             try:
@@ -40,7 +44,7 @@ class LocationPollerService:
             except Exception as e:
                 logger.error(f"❌ Error in location polling cycle: {str(e)}")
             
-            # Wait 60 seconds before next poll
+            # Wait before next poll
             await asyncio.sleep(self.poll_interval)
     
     def stop(self):
@@ -131,7 +135,9 @@ class LocationPollerService:
                     tracker.longitude = str(loc.longitude)
                     if loc.address:
                         tracker.location_description = loc.address
-                    tracker.last_seen = datetime.utcnow()
+                    # Use the actual GPS fix time from the device; fall back to
+                    # poll time only if the API didn't return a timestamp.
+                    tracker.last_seen = loc.gps_time or datetime.utcnow()
 
                     # Set activation_date on first GPS fix and (re)calculate expiry
                     if tracker.activation_date is None:
@@ -199,7 +205,24 @@ class LocationPollerService:
                     tracker.latitude = str(position.get('latitude'))
                     tracker.longitude = str(position.get('longitude'))
                     tracker.location_description = position.get('locationDescription')
-                    tracker.last_seen = datetime.utcnow()
+                    # MZone returns utcTimestamp = when the device last reported a fix.
+                    # Parse it so last_seen shows real GPS age, not poll time.
+                    _mzone_ts = position.get('utcTimestamp')
+                    if _mzone_ts:
+                        try:
+                            tracker.last_seen = datetime.strptime(
+                                str(_mzone_ts).replace('Z', ''),
+                                '%Y-%m-%dT%H:%M:%S'
+                            )
+                        except (ValueError, TypeError):
+                            try:
+                                tracker.last_seen = datetime.fromisoformat(
+                                    str(_mzone_ts).rstrip('Z')
+                                )
+                            except (ValueError, TypeError):
+                                tracker.last_seen = datetime.utcnow()
+                    else:
+                        tracker.last_seen = datetime.utcnow()
 
                     # Set activation_date on first GPS fix and (re)calculate expiry
                     if tracker.activation_date is None:
