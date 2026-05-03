@@ -330,17 +330,17 @@
                             <span class="stat-num" id="lm-stat-total">—</span>
                             <span>Total</span>
                         </div>
-                        <div class="stat-chip online" style="cursor:pointer" onclick="lmFilterStatus('active', this)" title="Show active only">
+                        <div class="stat-chip online" style="cursor:pointer" onclick="lmFilterStatus('active', this)" title="Reported within last 24 h">
                             <span class="stat-num" id="lm-stat-online">—</span>
                             <span>Active</span>
                         </div>
-                        <div class="stat-chip idle" style="cursor:pointer" onclick="lmFilterStatus('inactive', this)" title="Show inactive only">
+                        <div class="stat-chip idle" style="cursor:pointer" onclick="lmFilterStatus('idle', this)" title="Reported in last 7 days but not within 24 h">
                             <span class="stat-num" id="lm-stat-idle">—</span>
-                            <span>Inactive</span>
+                            <span>Idle</span>
                         </div>
-                        <div class="stat-chip offline" style="cursor:pointer" onclick="lmFilterStatus('stock', this)" title="Show stock only">
+                        <div class="stat-chip offline" style="cursor:pointer" onclick="lmFilterStatus('offline', this)" title="No position in over 7 days">
                             <span class="stat-num" id="lm-stat-offline">—</span>
-                            <span>Stock</span>
+                            <span>Offline</span>
                         </div>
                     </div>
 
@@ -8446,23 +8446,28 @@ let _lmSelected     = null;      // currently selected imei
 let _lmCatFilter    = 'all';     // 'all' | category UUID from _categoriesCache
 let _lmStatusFilter = 'all';     // 'all' | 'active' | 'inactive' | 'stock'
 
+// Activity status — UNIFIED across asset list, live map and reports.
+// Conditions (based on real GPS-fix age, not poll time):
+//   ACTIVE  : last_seen within 24 hours
+//   IDLE    : last_seen between 24 h and 7 days ago
+//   OFFLINE : last_seen older than 7 days, or never reported
 function _lmStatusClass(tag) {
-    if (!tag.package_id) return 'inactive';  // no package → always inactive
-    if (!tag.last_seen) return 'stock';
-    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    if (new Date(tag.last_seen).getTime() >= sevenDaysAgo) return 'active';
-    return 'inactive';
+    if (!tag.last_seen) return 'offline';
+    const ageMs = Date.now() - new Date(tag.last_seen).getTime();
+    if (ageMs <= 24 * 60 * 60 * 1000)       return 'active';
+    if (ageMs <= 7  * 24 * 60 * 60 * 1000)  return 'idle';
+    return 'offline';
 }
 
 function _lmMarkerIcon(tag) {
     const status = _lmStatusClass(tag);
-    const colors = { active: '#10B981', inactive: '#EF4444', stock: '#9CA3AF' };
+    const colors = { active: '#10B981', idle: '#F59E0B', offline: '#EF4444' };
     const c = colors[status] || '#9CA3AF';
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44">
       <path d="M18 0C8.06 0 0 8.06 0 18c0 13.5 18 26 18 26S36 31.5 36 18C36 8.06 27.94 0 18 0z" fill="${c}"/>
       <circle cx="18" cy="18" r="11" fill="white" opacity="0.95"/>
       <text x="18" y="23" text-anchor="middle" font-size="13" font-family="sans-serif" fill="${c}">
-        ${status === 'active' ? '●' : status === 'inactive' ? '◐' : '○'}
+        ${status === 'active' ? '●' : status === 'idle' ? '◐' : '○'}
       </text>
     </svg>`;
     return L.divIcon({
@@ -8517,7 +8522,7 @@ function _lmPlaceMarkers() {
             .addTo(_liveMap);
         const label = esc(t.description || t.device_name || t.imei);
         const status = _lmStatusClass(t);
-        const statusLabels = { active: 'Active', inactive: 'Inactive', stock: 'Stock' };
+        const statusLabels = { active: 'Active', idle: 'Idle', offline: 'Offline' };
         m.bindPopup(`
             <div class="map-popup">
                 <strong>${label}</strong><br>
@@ -8657,13 +8662,13 @@ function _lmRenderList(query) {
 }
 
 function _lmUpdateStats() {
-    const active   = _lmTags.filter(t => _lmStatusClass(t) === 'active').length;
-    const inactive = _lmTags.filter(t => _lmStatusClass(t) === 'inactive').length;
-    const stock    = _lmTags.filter(t => _lmStatusClass(t) === 'stock').length;
+    const active  = _lmTags.filter(t => _lmStatusClass(t) === 'active').length;
+    const idle    = _lmTags.filter(t => _lmStatusClass(t) === 'idle').length;
+    const offline = _lmTags.filter(t => _lmStatusClass(t) === 'offline').length;
     document.getElementById('lm-stat-total').textContent    = _lmTags.length;
     document.getElementById('lm-stat-online').textContent   = active;
-    document.getElementById('lm-stat-idle').textContent     = inactive;
-    document.getElementById('lm-stat-offline').textContent  = stock;
+    document.getElementById('lm-stat-idle').textContent     = idle;
+    document.getElementById('lm-stat-offline').textContent  = offline;
 }
 
 function lmFilterList() {
@@ -8723,8 +8728,8 @@ function _lmRenderDetail(t) {
     if (!panel) return;
     const label   = esc(t.description || t.device_name || t.imei);
     const status  = _lmStatusClass(t);
-    const statusColors = { active: 'var(--success)', inactive: 'var(--danger)', stock: 'var(--text-3)' };
-    const statusLabel  = { active: 'Active', inactive: 'Inactive', stock: 'Stock' };
+    const statusColors = { active: 'var(--success)', idle: 'var(--warning,#f59e0b)', offline: 'var(--danger)' };
+    const statusLabel  = { active: 'Active', idle: 'Idle', offline: 'Offline' };
     const _tagTypeLabels = { scope: 'Series 1', tracksolid: 'Series 2', series1: 'Series 1', series2: 'Series 2' };
     const tagTypeDisplay = _tagTypeLabels[(t.tag_type || '').toLowerCase()] || (t.tag_type ? esc(t.tag_type) : '—');
     const lastSeen  = t.last_seen   ? new Date(t.last_seen).toLocaleString()    : '—';
@@ -8858,8 +8863,8 @@ function alRenderTable() {
         tbody.innerHTML = '<tr><td colspan="10" class="table-empty" style="text-align:center;padding:40px;color:var(--text-3)">No assets match the search.</td></tr>';
         return;
     }
-    const statusColors = { active: 'var(--success)', inactive: 'var(--danger)', stock: 'var(--text-3)' };
-    const statusLabel  = { active: 'Active', inactive: 'Inactive', stock: 'Stock' };
+    const statusColors = { active: 'var(--success)', idle: 'var(--warning,#f59e0b)', offline: 'var(--danger)' };
+    const statusLabel  = { active: 'Active', idle: 'Idle', offline: 'Offline' };
     const _tagTypeLabel = tt => ({ scope: 'Series 1', series1: 'Series 1', tracksolid: 'Series 2', series2: 'Series 2' })[(tt||'').toLowerCase()] || (tt || '—');
     tbody.innerHTML = list.map(t => {
         const status = _lmStatusClass(t);
@@ -9305,8 +9310,8 @@ function amRenderCards() {
             <p>No assets found.</p></div>`;
         return;
     }
-    const statusColors = { active: 'var(--success)', inactive: 'var(--danger)', stock: 'var(--text-3)' };
-    const statusLabel  = { active: 'Active', inactive: 'Inactive', stock: 'Stock' };
+    const statusColors = { active: 'var(--success)', idle: 'var(--warning,#f59e0b)', offline: 'var(--danger)' };
+    const statusLabel  = { active: 'Active', idle: 'Idle', offline: 'Offline' };
     const _tagTypeLabel = tt => ({ scope: 'Series 1', series1: 'Series 1', tracksolid: 'Series 2', series2: 'Series 2' })[(tt||'').toLowerCase()] || (tt || '—');
     grid.innerHTML = `<div class="asset-card-grid">${list.map(t => {
         const status   = _lmStatusClass(t);

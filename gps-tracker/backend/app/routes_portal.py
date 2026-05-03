@@ -824,9 +824,33 @@ class PortalTagOut(BaseModel):
     # Category (from attributes.category.value)
     category_id: Optional[str] = None
     category_name: Optional[str] = None
+    # Activity status derived from last_seen (real GPS-fix age):
+    #   active  : reported within last 24 h
+    #   idle    : reported within last 7 days but not within 24 h
+    #   offline : older than 7 days, or never reported
+    activity_status: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+
+def _compute_activity_status(last_seen: Optional[datetime]) -> str:
+    """Tri-state activity status based on real GPS-fix age.
+
+    Conditions (single source of truth, mirrored in customer-dashboard JS):
+      - active  : last_seen within 24 h
+      - idle    : last_seen between 24 h and 7 days ago
+      - offline : older than 7 days, or never reported
+    """
+    if last_seen is None:
+        return "offline"
+    ls = last_seen.replace(tzinfo=None) if last_seen.tzinfo else last_seen
+    age_s = (datetime.utcnow() - ls).total_seconds()
+    if age_s <= 24 * 3600:
+        return "active"
+    if age_s <= 7 * 24 * 3600:
+        return "idle"
+    return "offline"
 
 
 @router.get("/tags", response_model=List[PortalTagOut])
@@ -907,6 +931,7 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
             activation_date=tag.activation_date,
             category_id=cat_id,
             category_name=cat_name,
+            activity_status=_compute_activity_status(tag.last_seen),
         ))
     return result
 
@@ -1124,6 +1149,7 @@ def _build_tag_out(tag: BLETag, owner_email: str, db: Optional[Session] = None) 
         expiry_date=tag.expiry_date,
         days_remaining=days_remaining,
         activation_date=tag.activation_date,
+        activity_status=_compute_activity_status(tag.last_seen),
     )
 
 
