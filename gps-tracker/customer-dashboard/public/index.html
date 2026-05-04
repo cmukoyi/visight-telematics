@@ -9757,7 +9757,8 @@ const hiveWizState = { step: 1, name: '', selectedTags: [], profile: '', thresho
 
 const HIVE_EVENT_LABELS = {
     CONFIRMED_BREACH:'Breach confirmed', SUSPECTED_BREACH:'Suspected breach',
-    BREACH_CLEARED:'Breach cleared', LOST_CONTACT:'Lost contact',
+    BREACH_CLEARING:'Breach clearing', BREACH_CLEARED:'Breach cleared',
+    LOST_CONTACT:'Lost contact',
     PARTIALLY_OBSERVABLE:'Partial data', HIVE_CREATED:'Hive created',
     HIVE_EXPIRED:'Hive expired', HIVE_ARCHIVED:'Hive archived', HIVE_RECREATED:'Hive recreated',
     BREACH_START:'Breach confirmed', BREACH_RESOLVE:'Breach resolved',
@@ -9765,6 +9766,7 @@ const HIVE_EVENT_LABELS = {
 const HIVE_EVENT_COLOR = {
     CONFIRMED_BREACH:'hive-red', BREACH_START:'hive-red',
     SUSPECTED_BREACH:'hive-amber', BREACH_PENDING:'hive-amber',
+    BREACH_CLEARING:'hive-amber',
     BREACH_CLEARED:'hive-green', BREACH_RESOLVE:'hive-green', HIVE_RECREATED:'hive-green',
     HIVE_CREATED:'hive-blue',
 };
