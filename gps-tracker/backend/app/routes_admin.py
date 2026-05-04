@@ -1086,6 +1086,118 @@ def update_usergroup(
     return {"id": str(group.id), "name": group.name, "email_domain": group.email_domain, "allowed_sections": group.allowed_sections}
 
 
+# ---------------------------------------------------------------------------
+# System Admin (built-in) management for a usergroup
+# ---------------------------------------------------------------------------
+
+class SystemAdminCreate(BaseModel):
+    email: EmailStr
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+
+
+class SystemAdminCreateResponse(BaseModel):
+    portal_user_id: str
+    email: str
+    temp_password: str
+
+
+@router.post("/usergroups/{group_id}/system-admin", response_model=SystemAdminCreateResponse)
+def create_system_admin(
+    group_id: str,
+    data: SystemAdminCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Create an additional Built-in System Admin for an existing usergroup.
+
+    System admins always have role='system_admin' and is_group_admin=True. The
+    generated password is returned ONCE — it is not stored or recoverable.
+    Requires admin role on the admin portal.
+    """
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "admin"):
+        raise HTTPException(status_code=403, detail="Requires admin role")
+
+    group = db.query(UserGroup).filter(UserGroup.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="User group not found")
+
+    email = data.email.lower().strip()
+    if db.query(PortalUser).filter(PortalUser.email == email).first():
+        raise HTTPException(status_code=409, detail="A portal user with that email already exists")
+
+    import uuid as _uuid
+    temp_password = _secrets.token_urlsafe(12)
+    new_user = PortalUser(
+        id=str(_uuid.uuid4()),
+        usergroup_id=group.id,
+        email=email,
+        hashed_password=hash_password(temp_password),
+        first_name=data.first_name or None,
+        last_name=data.last_name or None,
+        is_active=True,
+        is_group_admin=True,
+        role="system_admin",
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    log_audit(db, str(admin.id), "create_system_admin", "PortalUser", str(new_user.id),
+              new_value={"email": email, "usergroup_id": str(group.id)},
+              description=f"Created system admin {email} for {group.name}",
+              ip_address=request.client.host if request.client else None)
+
+    return SystemAdminCreateResponse(
+        portal_user_id=str(new_user.id),
+        email=new_user.email,
+        temp_password=temp_password,
+    )
+
+
+class PortalPasswordResetResponse(BaseModel):
+    portal_user_id: str
+    email: str
+    temp_password: str
+
+
+@router.post("/portal-users/{portal_user_id}/reset-password",
+             response_model=PortalPasswordResetResponse)
+def reset_portal_user_password(
+    portal_user_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Admin override: reset a portal user's password to a generated value.
+
+    Intended for recovering Built-in System Admin accounts. Returns the new
+    password ONCE. Requires admin role on the admin portal.
+    """
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "admin"):
+        raise HTTPException(status_code=403, detail="Requires admin role")
+
+    target = db.query(PortalUser).filter(PortalUser.id == portal_user_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Portal user not found")
+
+    temp_password = _secrets.token_urlsafe(12)
+    target.hashed_password = hash_password(temp_password)
+    db.commit()
+
+    log_audit(db, str(admin.id), "reset_portal_password", "PortalUser", str(target.id),
+              new_value={"email": target.email, "role": target.role},
+              description=f"Reset password for portal user {target.email} ({target.role})",
+              ip_address=request.client.host if request.client else None)
+
+    return PortalPasswordResetResponse(
+        portal_user_id=str(target.id),
+        email=target.email,
+        temp_password=temp_password,
+    )
+
+
 class UserGroupPackageAssign(BaseModel):
     package_id: Optional[str] = None  # None clears the default package (legacy)
 

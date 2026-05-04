@@ -1370,6 +1370,56 @@
                             </div>
                         </div>
 
+                        <!-- ── Built-in System Admins Modal ── -->
+                        <div id="sysAdminModal" class="modal">
+                            <div class="modal-content" style="max-width:640px">
+                                <div class="modal-header">
+                                    <h3 class="modal-title">Built-in System Admins — <span id="saGroupName"></span></h3>
+                                    <button class="modal-close" onclick="closeModal('sysAdminModal')">×</button>
+                                </div>
+                                <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">
+                                    System admins have <strong>see-all access</strong> to the customer portal for this group. Use this panel to add additional system admins (in case the original is lost) or reset their passwords.
+                                </p>
+                                <div id="saAlert" class="alert" style="display:none"><span id="saAlertText"></span></div>
+
+                                <h4 style="margin:6px 0 8px;font-size:14px">Existing System Admins</h4>
+                                <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:18px">
+                                    <thead>
+                                        <tr style="background:var(--bg-secondary);text-align:left">
+                                            <th style="padding:8px 10px">Email</th>
+                                            <th style="padding:8px 10px">Name</th>
+                                            <th style="padding:8px 10px">Status</th>
+                                            <th style="padding:8px 10px"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="saAdminRows"><tr><td colspan="4" style="padding:10px;text-align:center;color:var(--text-secondary)">—</td></tr></tbody>
+                                </table>
+
+                                <h4 style="margin:6px 0 8px;font-size:14px">Add New System Admin</h4>
+                                <form id="saCreateForm" onsubmit="submitCreateSysAdmin(event)" style="display:flex;flex-direction:column;gap:10px">
+                                    <input type="hidden" id="saGroupId">
+                                    <input type="email" id="saNewEmail" class="form-input" placeholder="email@company.com" required>
+                                    <div style="display:flex;gap:10px">
+                                        <input type="text" id="saNewFirst" class="form-input" placeholder="First name" style="flex:1">
+                                        <input type="text" id="saNewLast"  class="form-input" placeholder="Last name"  style="flex:1">
+                                    </div>
+                                    <div style="text-align:right">
+                                        <button type="submit" class="btn btn-primary" id="saCreateBtn">Create System Admin</button>
+                                    </div>
+                                </form>
+
+                                <!-- One-time password display (shared by create + reset) -->
+                                <div id="saPwdResult" style="display:none;margin-top:16px;padding:14px;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border-color)">
+                                    <p style="margin:0 0 6px;font-weight:600;color:var(--success-color)">✅ <span id="saPwdAction">Password set</span> for <span id="saPwdEmail"></span></p>
+                                    <p style="margin:0 0 8px;font-size:12px;color:var(--text-secondary)">Temporary password (shown <span style="color:red;font-weight:600">once</span>):</p>
+                                    <div style="display:flex;gap:8px">
+                                        <code id="saPwdValue" style="flex:1;padding:8px 12px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:6px;font-size:14px;letter-spacing:1px"></code>
+                                        <button class="btn btn-secondary" style="padding:6px 12px" onclick="saCopyPwd()">Copy</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                     <!-- ═══════════════════════════════════════════════════ -->
                     <!-- PACKAGES TAB                                        -->
                     <!-- ═══════════════════════════════════════════════════ -->
@@ -2518,8 +2568,9 @@
                         <td title="${portalUsers.map(u=>u.email).join(', ')}">${portalUsers.length}</td>
                         <td>${badge}</td>
                         <td>${date}</td>
-                        <td style="display:flex;gap:6px">
+                        <td style="display:flex;gap:6px;flex-wrap:wrap">
                             <button class="btn btn-secondary" style="padding:4px 10px;font-size:12px" onclick="openEditGroupModal('${g.id}','${escHtml(g.name)}','${escHtml(g.email_domain||'')}',${JSON.stringify(g.allowed_sections||null).replace(/"/g,'&quot;')})">Edit</button>
+                            <button class="btn btn-secondary" style="padding:4px 10px;font-size:12px" onclick="openSysAdminModal('${g.id}','${escHtml(g.name)}')" title="Manage Built-in System Admins">🔑 Sys Admins</button>
                             ${deactivateBtn}
                         </td>
                     </tr>`;
@@ -2640,6 +2691,115 @@
 
         // --- Edit Group helpers ---
         let _egAllPackages = [];   // all active packages from API (used to populate "Add" dropdown)
+
+        // ── Built-in System Admins management ──────────────────────────────
+        let _saCurrentGroupId = null;
+
+        async function openSysAdminModal(groupId, groupName) {
+            _saCurrentGroupId = groupId;
+            document.getElementById('saGroupId').value = groupId;
+            document.getElementById('saGroupName').textContent = groupName;
+            document.getElementById('saAlert').style.display = 'none';
+            document.getElementById('saPwdResult').style.display = 'none';
+            document.getElementById('saCreateForm').reset();
+            document.getElementById('saAdminRows').innerHTML = '<tr><td colspan="4" style="padding:10px;text-align:center;color:var(--text-secondary)">Loading…</td></tr>';
+            document.getElementById('sysAdminModal').classList.add('active');
+            await refreshSysAdminList();
+        }
+
+        async function refreshSysAdminList() {
+            const groupId = _saCurrentGroupId;
+            if (!groupId) return;
+            try {
+                const res = await fetch(`${API_URL}/api/admin/usergroups`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const groups = await res.json();
+                const grp = groups.find(g => g.id === groupId);
+                const sysAdmins = (grp?.portal_users || []).filter(u => u.role === 'system_admin');
+                const tbody = document.getElementById('saAdminRows');
+                if (!sysAdmins.length) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="padding:10px;text-align:center;color:var(--text-secondary)">No system admins yet.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = sysAdmins.map(u => {
+                    const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || '—';
+                    const status = u.is_active
+                        ? '<span class="badge badge-success">Active</span>'
+                        : '<span class="badge badge-error">Inactive</span>';
+                    return `<tr>
+                        <td style="padding:8px 10px"><strong>${escHtml(u.email)}</strong></td>
+                        <td style="padding:8px 10px">${escHtml(name)}</td>
+                        <td style="padding:8px 10px">${status}</td>
+                        <td style="padding:8px 10px;text-align:right"><button class="btn btn-secondary" style="padding:4px 10px;font-size:12px" onclick="resetSysAdminPwd('${u.id}','${escHtml(u.email)}')">Reset Password</button></td>
+                    </tr>`;
+                }).join('');
+            } catch (err) {
+                document.getElementById('saAdminRows').innerHTML = `<tr><td colspan="4" style="padding:10px;text-align:center;color:var(--error-color)">Failed to load: ${escHtml(err.message)}</td></tr>`;
+            }
+        }
+
+        async function submitCreateSysAdmin(e) {
+            e.preventDefault();
+            const btn = document.getElementById('saCreateBtn');
+            btn.disabled = true; btn.textContent = 'Creating…';
+            document.getElementById('saAlert').style.display = 'none';
+            const groupId = document.getElementById('saGroupId').value;
+            const payload = {
+                email:      document.getElementById('saNewEmail').value.trim(),
+                first_name: document.getElementById('saNewFirst').value.trim() || null,
+                last_name:  document.getElementById('saNewLast').value.trim()  || null,
+            };
+            try {
+                const res = await fetch(`${API_URL}/api/admin/usergroups/${groupId}/system-admin`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                    body: JSON.stringify(payload),
+                });
+                if (res.status === 401) { handle401(); return; }
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Create failed');
+                _saShowPwd('Created system admin', data.email, data.temp_password);
+                document.getElementById('saCreateForm').reset();
+                refreshSysAdminList();
+                loadUsergroups();
+            } catch (err) {
+                const al = document.getElementById('saAlert');
+                document.getElementById('saAlertText').textContent = err.message;
+                al.className = 'alert alert-error'; al.style.display = 'block';
+            } finally {
+                btn.disabled = false; btn.textContent = 'Create System Admin';
+            }
+        }
+
+        async function resetSysAdminPwd(portalUserId, email) {
+            if (!confirm(`Reset password for ${email}?\n\nA new temporary password will be generated and shown once.`)) return;
+            try {
+                const res = await fetch(`${API_URL}/api/admin/portal-users/${portalUserId}/reset-password`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                });
+                if (res.status === 401) { handle401(); return; }
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Reset failed');
+                _saShowPwd('Password reset', data.email, data.temp_password);
+            } catch (err) {
+                const al = document.getElementById('saAlert');
+                document.getElementById('saAlertText').textContent = err.message;
+                al.className = 'alert alert-error'; al.style.display = 'block';
+            }
+        }
+
+        function _saShowPwd(action, email, pwd) {
+            document.getElementById('saPwdAction').textContent = action;
+            document.getElementById('saPwdEmail').textContent = email;
+            document.getElementById('saPwdValue').textContent = pwd;
+            document.getElementById('saPwdResult').style.display = 'block';
+        }
+
+        function saCopyPwd() {
+            const pwd = document.getElementById('saPwdValue').textContent;
+            navigator.clipboard.writeText(pwd).catch(() => {});
+        }
 
         async function openEditGroupModal(groupId, groupName, emailDomain, allowedSections) {
             document.getElementById('egGroupId').value = groupId;

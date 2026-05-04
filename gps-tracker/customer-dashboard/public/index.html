@@ -8090,8 +8090,12 @@ async function loadUsers() {
                 const isSystemAdmin = u.role === 'system_admin';
                 const targetIsAdmin = u.is_group_admin || u.role === 'admin';
                 const meIsAdmin = me?.is_group_admin;
+                const meIsSysAdmin = me?.role === 'system_admin';
                 const canModifyAdmin = meIsAdmin || !targetIsAdmin;
-                const actions = isSelf ? '<span style="color:var(--text-3);font-size:12px">You</span>' : isSystemAdmin ? '<span style="color:var(--text-3);font-size:12px">Built-in</span>' : `
+                const resetBtn = (meIsSysAdmin && !isSelf) ? `<button class="btn btn-ghost btn-sm" onclick="sysAdminResetPassword('${esc(u.id)}','${esc(u.email)}','${esc(name)}')" title="Reset this user's password">
+                        <i class="fa-solid fa-key"></i> Reset Pwd
+                    </button>` : '';
+                const actions = isSelf ? '<span style="color:var(--text-3);font-size:12px">You</span>' : isSystemAdmin ? `<span style="color:var(--text-3);font-size:12px;margin-right:6px">Built-in</span>${resetBtn}` : `
                     <button class="btn btn-ghost btn-sm" onclick="openEditRoleModal('${esc(u.id)}','${esc(name)}','${esc(u.role||'admin')}',${esc(JSON.stringify(u.custom_features||[]))})" title="Change role">
                         <i class="fa-solid fa-shield-halved"></i> Role
                     </button>
@@ -8101,6 +8105,7 @@ async function loadUsers() {
                     ${canModifyAdmin ? `<button class="btn btn-ghost btn-sm" onclick="openUserExpiryModal('${esc(u.id)}','${esc(name)}','${esc(u.expires_at||'')}')">
                         <i class="fa-solid fa-clock"></i> Expiry
                     </button>` : ''}
+                    ${resetBtn}
                 `;
                 return `<tr>
                     <td>${esc(name)}</td>
@@ -8454,6 +8459,22 @@ async function submitEditRole() {
         al.className = 'alert alert-error'; al.style.display = 'flex';
     } finally {
         btn.disabled = false; btn.textContent = 'Save Role';
+    }
+}
+
+// ── System Admin: reset another user's password ───────────────────────────
+async function sysAdminResetPassword(userId, userEmail, userName) {
+    if (!confirm(`Reset password for ${userName} (${userEmail})?\n\nA new temporary password will be generated and shown once.`)) return;
+    try {
+        const res = await apiFetch(`/api/portal/users/${userId}/reset-password`, { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || 'Failed to reset password');
+        // Show the temp password in a copyable prompt-style modal-less alert
+        const msg = `Password reset for ${data.email}\n\nTemporary password:\n\n    ${data.temp_password}\n\nCopy and share with the user — it will not be shown again.`;
+        // Use a simple textarea prompt so it's selectable
+        window.prompt(msg, data.temp_password);
+    } catch (err) {
+        alert('Reset failed: ' + err.message);
     }
 }
 

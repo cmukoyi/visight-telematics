@@ -751,6 +751,46 @@ def update_notification_prefs(
 # Account — Change Password
 # ---------------------------------------------------------------------------
 
+class AdminPasswordResetResponse(BaseModel):
+    user_id: UUID
+    email: str
+    temp_password: str
+
+
+@router.post("/users/{user_id}/reset-password", response_model=AdminPasswordResetResponse)
+def admin_reset_user_password(
+    user_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Built-in System Admin can reset any other portal user's password in
+    the same usergroup. Returns the new temporary password ONCE.
+    """
+    me = get_portal_user_from_request(request, db)
+    if me.role != "system_admin":
+        raise HTTPException(status_code=403, detail="Only Built-in System Admins can reset passwords")
+
+    target = db.query(PortalUser).filter(
+        PortalUser.id == str(user_id),
+        PortalUser.usergroup_id == me.usergroup_id,
+    ).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found in your group")
+    if str(target.id) == str(me.id):
+        raise HTTPException(status_code=400, detail="Use change-password to update your own password")
+
+    import secrets as _secrets
+    temp_password = _secrets.token_urlsafe(12)
+    target.hashed_password = hash_password(temp_password)
+    db.commit()
+
+    return AdminPasswordResetResponse(
+        user_id=target.id,
+        email=target.email,
+        temp_password=temp_password,
+    )
+
+
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
