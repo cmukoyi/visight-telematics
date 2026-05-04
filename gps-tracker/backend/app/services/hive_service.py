@@ -146,6 +146,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
 
     fresh_positions: List[Tuple[str, float, float]] = []
     fresh_recent_positions: List[Tuple[str, float, float]] = []
+    usable_positions: List[Tuple[str, float, float]] = []   # fresh + recent + stale (anything not fully lost)
     composition = {"fresh": 0, "recent": 0, "stale": 0, "lost": 0}
 
     for m in memberships:
@@ -159,14 +160,21 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
                 lat, lon = float(tag.latitude), float(tag.longitude)
             except (TypeError, ValueError):
                 continue
+            if tier in ("fresh", "recent", "stale"):
+                usable_positions.append((m.tag_id, lat, lon))
             if tier in ("fresh", "recent"):
                 fresh_recent_positions.append((m.tag_id, lat, lon))
             if tier == "fresh":
                 fresh_positions.append((m.tag_id, lat, lon))
 
     # ── Compute diameter ───────────────────────────────────────────────
-    # Use fresh+recent for diameter; prefer fresh-only for high confidence
-    diameter_m, outlier_id = pairwise_max_distance(fresh_recent_positions)
+    # Prefer fresh+recent; fall back to stale so a hive with infrequent
+    # GPS reports still surfaces a diameter and can detect breach (with
+    # 'low' confidence). Tags fully 'lost' are excluded.
+    if len(fresh_recent_positions) >= 2:
+        diameter_m, outlier_id = pairwise_max_distance(fresh_recent_positions)
+    else:
+        diameter_m, outlier_id = pairwise_max_distance(usable_positions)
 
     # No meaningful spread — clear outlier so UI doesn't flag a tag incorrectly
     if diameter_m is not None and diameter_m < cfg.meaningful_change_m:
@@ -191,14 +199,14 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
 
         if prev_state == "OK":
             if is_breaching:
-                if confidence == "high":
-                    live.pending_breach_since = now
-                    live.consecutive_confirms = 1
-                    if 1 >= cfg.confirmation_count:
-                        new_state = "BREACHING"
-                    else:
-                        new_state = "BREACH_PENDING"
-                # low confidence → stay OK
+                live.pending_breach_since = now
+                live.consecutive_confirms = 1
+                if confidence == "high" and 1 >= cfg.confirmation_count:
+                    new_state = "BREACHING"
+                else:
+                    # Low-confidence (stale GPS) or pending confirmation
+                    # \u2192 surface as a Suspected Breach so the user sees it.
+                    new_state = "BREACH_PENDING"
 
         elif prev_state == "BREACH_PENDING":
             if not is_breaching:

@@ -854,8 +854,28 @@
 }
 #tab-hive .hive-threshold-circle {
   position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-  border:1px dashed color-mix(in srgb,var(--hive-green) 40%,transparent);border-radius:50%;
+  border:1.5px dashed color-mix(in srgb,var(--hive-green) 65%,transparent);
+  border-radius:50%;
   pointer-events:none;
+  background:
+    radial-gradient(circle,
+      color-mix(in srgb,var(--hive-green) 8%,transparent) 0%,
+      color-mix(in srgb,var(--hive-green) 4%,transparent) 60%,
+      transparent 100%);
+  box-shadow:
+    inset 0 0 30px color-mix(in srgb,var(--hive-green) 12%,transparent),
+    0 0 24px color-mix(in srgb,var(--hive-green) 18%,transparent);
+}
+#tab-hive .hive-threshold-circle.hive-threshold-breaching {
+  border-color: color-mix(in srgb,var(--hive-red) 65%,transparent);
+  background:
+    radial-gradient(circle,
+      color-mix(in srgb,var(--hive-red) 8%,transparent) 0%,
+      color-mix(in srgb,var(--hive-red) 4%,transparent) 60%,
+      transparent 100%);
+  box-shadow:
+    inset 0 0 30px color-mix(in srgb,var(--hive-red) 14%,transparent),
+    0 0 28px color-mix(in srgb,var(--hive-red) 22%,transparent);
 }
 #tab-hive .hive-threshold-label {
   position:absolute;top:50%;left:50%;transform:translate(-50%,-210%);
@@ -10202,11 +10222,14 @@ function hiveDrawMap(d) {
     const pyPct = p => (50 + p.my * scale / H * 100);
 
     // Threshold circle (centred on canvas centroid; diameter in real px)
-    const diamPx = Math.max(20, 2 * threshold * scale);
+    // Floor at 120px so the green halo around the group is always visible
+    // even when the canvas is auto-zoomed out for a far-away outlier.
+    const diamPx = Math.max(120, 2 * threshold * scale);
     circleEl.style.width  = diamPx + 'px';
     circleEl.style.height = diamPx + 'px';
     circleEl.style.aspectRatio = '';
     circleEl.style.display = '';
+    circleEl.classList.toggle('hive-threshold-breaching', d.alert_state === 'BREACHING' || d.alert_state === 'BREACH_PENDING');
     labelEl.textContent = `Threshold · ${threshold}m`;
     // Place label above the circle (slightly outside the top edge)
     labelEl.style.transform = `translate(-50%, calc(-50% - ${diamPx/2 + 14}px))`;

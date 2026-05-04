@@ -531,7 +531,11 @@ def get_hive(hive_id: str, request: Request, db: Session = Depends(get_db)):
             "is_outlier": is_outlier,
             "distance_from_centre_m": None,  # computed below
         })
-        if lat and lon and tier in ("fresh", "recent"):
+        # Include any tag with a known position (regardless of freshness) so
+        # the per-tag distance column is populated even when GPS reports are
+        # infrequent. Freshness is conveyed by the badge/colour, not by
+        # hiding the geometric distance.
+        if lat and lon and tier != "lost":
             positions.append((str(m.tag_id), lat, lon))
 
     # Compute per-tag max distance from others (for the table)
