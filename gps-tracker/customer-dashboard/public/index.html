@@ -906,6 +906,20 @@
 #tab-hive .hive-legend-item { display:flex;align-items:center;gap:6px;color:var(--hive-text2); }
 #tab-hive .hive-legend-dot  { width:8px;height:8px;border-radius:50%;flex-shrink:0; }
 
+/* zoom controls */
+#tab-hive .hive-map-zoom {
+  position:absolute;top:12px;right:12px;
+  display:flex;flex-direction:column;gap:4px;z-index:5;
+}
+#tab-hive .hive-map-zoom button {
+  width:34px;height:34px;border:1px solid var(--hive-border);
+  background:rgba(14,24,34,.92);backdrop-filter:blur(8px);
+  color:var(--hive-text1);border-radius:6px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:13px;
+  transition:all .15s;
+}
+#tab-hive .hive-map-zoom button:hover { background:var(--hive-card-2);border-color:var(--hive-border-bright); }
+
 /* diameter row */
 #tab-hive .hive-diameter-row {
   padding:16px 18px;display:grid;grid-template-columns:auto 1fr auto;gap:22px;align-items:center;
@@ -2160,6 +2174,16 @@
                                         <span class="toggle-track"><span class="toggle-thumb"></span></span>
                                     </label>
                                 </div>
+                                <div class="settings-row">
+                                    <div>
+                                        <div class="settings-row-label"><i class="fa-solid fa-shield-halved" style="margin-right:6px;color:var(--primary)"></i>Hive breach detected</div>
+                                        <div class="settings-row-hint">Alert when a tag separates from its HIVE group beyond the configured threshold.</div>
+                                    </div>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="notif-hive" onchange="settingsSaveNotifications()">
+                                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                                    </label>
+                                </div>
                                 <!-- Delivery method -->
                                 <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-3);padding:14px 0 8px">
                                     How to notify me
@@ -2244,6 +2268,15 @@
                                             </div>
                                             <label class="toggle-switch">
                                                 <input type="checkbox" id="notif-sms-offline" onchange="settingsSaveNotifications()">
+                                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                                            </label>
+                                        </div>
+                                        <div class="settings-row">
+                                            <div>
+                                                <div class="settings-row-label"><i class="fa-solid fa-shield-halved" style="margin-right:6px;color:var(--primary)"></i>Hive breach alerts</div>
+                                            </div>
+                                            <label class="toggle-switch">
+                                                <input type="checkbox" id="notif-sms-hive" onchange="settingsSaveNotifications()">
                                                 <span class="toggle-track"><span class="toggle-thumb"></span></span>
                                             </label>
                                         </div>
@@ -3010,6 +3043,11 @@
                         <div id="hive-threshold-circle" class="hive-threshold-circle" style="display:none"></div>
                         <div id="hive-threshold-label" class="hive-threshold-label" style="display:none"></div>
                         <div id="hive-map-markers"></div>
+                        <div class="hive-map-zoom">
+                          <button onclick="hiveMapZoom(1)" title="Zoom in"><i class="fa-solid fa-plus"></i></button>
+                          <button onclick="hiveMapZoom(-1)" title="Zoom out"><i class="fa-solid fa-minus"></i></button>
+                          <button onclick="hiveMapZoom(0)" title="Reset"><i class="fa-solid fa-expand"></i></button>
+                        </div>
                         <div class="hive-map-legend">
                           <div class="hive-legend-item"><div class="hive-legend-dot" style="background:var(--hive-green)"></div>Fresh</div>
                           <div class="hive-legend-item"><div class="hive-legend-dot" style="background:var(--hive-blue)"></div>Recent</div>
@@ -3149,6 +3187,42 @@
 
 
 <!-- ══════════════════ MODALS ══════════════════ -->
+
+<!-- Hive Configuration -->
+<div id="hiveConfigModal" class="modal">
+    <div class="modal-content" style="max-width:520px">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-sliders" style="margin-right:8px;color:var(--primary)"></i>Hive Configuration</h3>
+            <button class="modal-close" onclick="hiveCloseConfigModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div style="margin-bottom:18px">
+                <label style="display:block;font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Mobility Profile</label>
+                <select id="hive-cfg-profile" class="form-control" style="width:100%">
+                    <option value="stationary">Stationary — items stay put</option>
+                    <option value="slow">Slow — moves occasionally</option>
+                    <option value="mobile">Mobile — moves regularly</option>
+                    <option value="fast">Fast — usually in transit</option>
+                </select>
+            </div>
+            <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:baseline">
+                <label style="font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.05em">Distance Threshold</label>
+                <span style="font-size:18px;font-weight:700;color:var(--primary)"><span id="hive-cfg-threshold-val">100</span> m</span>
+            </div>
+            <input type="range" id="hive-cfg-threshold" min="10" max="2000" step="10" value="100"
+                   style="width:100%;margin-bottom:6px"
+                   oninput="document.getElementById('hive-cfg-threshold-val').textContent=this.value">
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-3);margin-bottom:18px">
+                <span>10 m</span><span>500 m</span><span>1000 m</span><span>2000 m</span>
+            </div>
+            <div class="alert" id="hive-cfg-err" style="display:none;margin-bottom:12px"><span id="hive-cfg-err-text"></span></div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+                <button class="btn btn-secondary" onclick="hiveCloseConfigModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="hiveSaveConfigModal()"><i class="fa-solid fa-check"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Single Tag -->
 <div id="singleTagModal" class="modal">
@@ -4863,7 +4937,7 @@ async function _loadSettingsNotifications() {
         if (!res.ok) throw new Error(await safeJsonDetail(res, 'Failed'));
         _notifCache = await res.json();
     } catch (_) {
-        _notifCache = { alerts_enabled: true, notify_geofence_exit: true, notify_battery_low: true, notify_offline: true, notify_via_email: true };
+        _notifCache = { alerts_enabled: true, notify_geofence_exit: true, notify_battery_low: true, notify_offline: true, notify_hive_breach: true, notify_via_email: true };
     }
     if (loading) loading.style.display = 'none';
     if (body)    body.style.display    = '';
@@ -4964,6 +5038,7 @@ function _renderNotifications(p) {
     setChk('notif-geofence', p.notify_geofence_exit);
     setChk('notif-battery',  p.notify_battery_low);
     setChk('notif-offline',  p.notify_offline);
+    setChk('notif-hive',     p.notify_hive_breach);
     setChk('notif-email',    p.notify_via_email);
     const triggers = document.getElementById('notif-triggers');
     if (triggers) triggers.style.opacity = p.alerts_enabled ? '1' : '0.4';
@@ -4980,6 +5055,7 @@ function _renderSmsSection(p) {
     setChk('notif-sms-geofence', p.notify_geofence_sms);
     setChk('notif-sms-battery', p.notify_battery_sms);
     setChk('notif-sms-offline', p.notify_offline_sms);
+    setChk('notif-sms-hive', p.notify_hive_breach_sms);
     const phoneEl = document.getElementById('notif-phone');
     if (phoneEl) phoneEl.value = p.phone_number || '';
     const detailsEl = document.getElementById('notif-sms-details');
@@ -5008,11 +5084,13 @@ async function settingsSaveNotifications() {
                 notify_geofence_exit: getChk('notif-geofence'),
                 notify_battery_low:   getChk('notif-battery'),
                 notify_offline:       getChk('notif-offline'),
+                notify_hive_breach:   getChk('notif-hive'),
                 notify_via_email:     getChk('notif-email'),
                 sms_enabled:          getChk('notif-sms-enabled'),
                 notify_geofence_sms:  getChk('notif-sms-geofence'),
                 notify_battery_sms:   getChk('notif-sms-battery'),
                 notify_offline_sms:   getChk('notif-sms-offline'),
+                notify_hive_breach_sms: getChk('notif-sms-hive'),
             }),
         });
         if (!res.ok) throw new Error(await safeJsonDetail(res, 'Save failed'));
@@ -9898,12 +9976,15 @@ function hiveRenderDetail(d) {
 
     // config panel
     document.getElementById('hive-config-ver').textContent = cfg.version_number ? `v${cfg.version_number} · current` : '';
+    // Hysteresis is stored as integer percent (e.g. 80) — handle legacy decimal (0.8) too.
+    const hystRaw = cfg.hysteresis_pct;
+    const hystPct = (hystRaw == null) ? 80 : (hystRaw <= 1 ? Math.round(hystRaw * 100) : Math.round(hystRaw));
     document.getElementById('hive-config-body').innerHTML = [
         ['Mobility Profile', HIVE_PROFILE_LABELS[cfg.mobility_profile]||cfg.mobility_profile||'—', 'fa-route', ''],
         ['Distance Threshold', threshold + '', 'fa-ruler-horizontal', 'm'],
         ['Fresh Window', Math.round((cfg.fresh_window_s||300)/60) + '', 'fa-regular fa-clock', ' min'],
         ['Lost Threshold', Math.round((cfg.lost_threshold_s||7200)/3600) + '', 'fa-signal', ' hr'],
-        ['Hysteresis', Math.round((cfg.hysteresis_pct||0.8)*100) + '', 'fa-wave-square', '%'],
+        ['Hysteresis', hystPct + '', 'fa-wave-square', '%'],
         ['Confirmation', (cfg.confirmation_count||2) + '', 'fa-check-double', ' reports'],
     ].map(([k,v,ico,unit]) => `<div class="hive-config-item"><div class="hive-config-key"><i class="fa-solid ${ico}"></i>${k}</div><div class="hive-config-value">${v}<span class="hive-config-unit">${unit}</span></div></div>`).join('');
 
@@ -9919,25 +10000,31 @@ function hiveRenderDetail(d) {
         : '';
 
     // timeline
-    hiveRenderTimeline(d.recent_events || []);
+    hiveRenderTimeline(d.recent_events || [], d.tags || []);
     // map
     hiveDrawMap(d);
 }
 
-function hiveRenderTimeline(events) {
+function hiveRenderTimeline(events, tags) {
     const el = document.getElementById('hive-timeline');
     if (!events.length) { el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-3);font-size:12px">No events yet</div>'; return; }
+    const tagLabel = (id) => {
+        if (!id) return '';
+        const t = (tags||[]).find(x => x.tag_id === id);
+        return t ? (t.label || t.tag_id) : id;
+    };
     el.innerHTML = events.map(ev => {
         const col   = HIVE_EVENT_COLOR[ev.event_type] || '';
         const label = HIVE_EVENT_LABELS[ev.event_type] || ev.event_type;
         const t     = new Date(ev.occurred_at);
         const timeStr = t.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
         const detail  = ev.details && typeof ev.details === 'object' && ev.details.reason ? ev.details.reason : '';
+        const trigName = ev.triggering_tag_id ? tagLabel(ev.triggering_tag_id) : '';
         return `<div class="hive-tl-item">
           <div class="hive-tl-time">${timeStr}</div>
           <div class="hive-tl-marker ${col}"></div>
           <div>
-            <div class="hive-tl-text">${hiveEsc(label)}${ev.triggering_tag_id ? ' · <span style="color:var(--hive-red)">' + hiveEsc(ev.triggering_tag_id) + '</span>' : ''}</div>
+            <div class="hive-tl-text">${hiveEsc(label)}${trigName ? ' · <span style="color:var(--hive-red)">' + hiveEsc(trigName) + '</span>' : ''}</div>
             ${detail ? `<div class="hive-tl-detail">${hiveEsc(detail)}</div>` : ''}
           </div>
         </div>`;
@@ -9945,7 +10032,17 @@ function hiveRenderTimeline(events) {
 }
 
 // ── position map (DOM-based, matching sample design) ─────────────────────────
+let _hiveMapZoom = 1;
+let _hiveLastDetail = null;
+function hiveMapZoom(dir) {
+    if (dir === 0) _hiveMapZoom = 1;
+    else if (dir > 0) _hiveMapZoom = Math.min(8, _hiveMapZoom * 1.4);
+    else _hiveMapZoom = Math.max(0.25, _hiveMapZoom / 1.4);
+    if (_hiveLastDetail) hiveDrawMap(_hiveLastDetail);
+}
+
 function hiveDrawMap(d) {
+    _hiveLastDetail = d;
     const container  = document.getElementById('hive-map-section');
     const svgEl      = document.getElementById('hive-map-svg');
     const markersEl  = document.getElementById('hive-map-markers');
@@ -9960,6 +10057,7 @@ function hiveDrawMap(d) {
 
     const cfg       = d.config || {};
     const threshold = cfg.distance_threshold_m || 100;
+    const outlierId = d.outlier_tag_id;
     const positioned = (d.tags||[]).filter(t => t.latitude != null && t.longitude != null);
 
     if (!positioned.length) {
@@ -9976,17 +10074,42 @@ function hiveDrawMap(d) {
     // Convert to metres offset from centroid
     const degToM = 111320;
     const cosLat = Math.cos(cLat * Math.PI / 180);
-    const pts = positioned.map(t => ({
+    let pts = positioned.map(t => ({
         ...t,
+        is_outlier: (t.tag_id === outlierId) || !!t.is_outlier,
         mx: (t.longitude - cLon) * degToM * cosLat,
         my: -(t.latitude - cLat) * degToM,
     }));
 
+    // Spread overlapping tags: group by ~1m proximity, distribute around small ring
+    const COLLAPSE_M = 2;
+    const visited = new Array(pts.length).fill(false);
+    for (let i = 0; i < pts.length; i++) {
+        if (visited[i]) continue;
+        const cluster = [i];
+        for (let j = i+1; j < pts.length; j++) {
+            if (visited[j]) continue;
+            const dx = pts[i].mx - pts[j].mx, dy = pts[i].my - pts[j].my;
+            if (Math.sqrt(dx*dx + dy*dy) < COLLAPSE_M) { cluster.push(j); visited[j] = true; }
+        }
+        visited[i] = true;
+        if (cluster.length > 1) {
+            // ring radius: small fraction of threshold so it stays visually meaningful
+            const ringR = Math.max(3, Math.min(threshold * 0.06, 8));
+            const cx = pts[cluster[0]].mx, cy = pts[cluster[0]].my;
+            cluster.forEach((idx, k) => {
+                const ang = (2 * Math.PI * k) / cluster.length - Math.PI / 2;
+                pts[idx].mx = cx + ringR * Math.cos(ang);
+                pts[idx].my = cy + ringR * Math.sin(ang);
+            });
+        }
+    }
+
     const W = container.offsetWidth || 600;
     const H = 380;
-    const maxR = Math.max(threshold, ...pts.map(p => Math.sqrt(p.mx*p.mx + p.my*p.my))) * 1.3 || threshold;
+    const baseMaxR = Math.max(threshold, ...pts.map(p => Math.sqrt(p.mx*p.mx + p.my*p.my))) * 1.3 || threshold;
+    const maxR = baseMaxR / _hiveMapZoom;
     const scale = Math.min(W, H) * 0.42 / maxR;
-    const ox = 50, oy = 50; // percentages
 
     // Convert to % positions
     const pxPct = p => (50 + p.mx * scale / W * 100);
@@ -10095,18 +10218,39 @@ async function hiveRecreate() {
 
 // ── config modal ──────────────────────────────────────────────────────────────
 function hiveOpenConfigModal() {
-    const thresholdStr = prompt('Distance threshold (metres):');
-    if (thresholdStr === null) return;
-    const threshold_m = parseFloat(thresholdStr);
-    if (isNaN(threshold_m) || threshold_m <= 0) { alert('Invalid distance'); return; }
-    if (!_hiveCurrentId) return;
-    apiFetch(`/api/portal/hive/${_hiveCurrentId}/config`, {
+    if (!_hiveCurrentId || !_hiveLastDetail) return;
+    const cfg = _hiveLastDetail.config || {};
+    document.getElementById('hive-cfg-profile').value = cfg.mobility_profile || 'mobile';
+    const thr = cfg.distance_threshold_m || 100;
+    document.getElementById('hive-cfg-threshold').value = thr;
+    document.getElementById('hive-cfg-threshold-val').textContent = thr;
+    document.getElementById('hive-cfg-err').style.display = 'none';
+    document.getElementById('hiveConfigModal').classList.add('active');
+}
+function hiveCloseConfigModal() {
+    document.getElementById('hiveConfigModal').classList.remove('active');
+}
+async function hiveSaveConfigModal() {
+    const profile = document.getElementById('hive-cfg-profile').value;
+    const threshold_m = parseFloat(document.getElementById('hive-cfg-threshold').value);
+    if (isNaN(threshold_m) || threshold_m <= 0) {
+        const e = document.getElementById('hive-cfg-err');
+        document.getElementById('hive-cfg-err-text').textContent = 'Invalid distance';
+        e.style.display = ''; return;
+    }
+    const r = await apiFetch(`/api/portal/hive/${_hiveCurrentId}/config`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobility_profile: 'mobile', distance_threshold_m: threshold_m }),
-    }).then(r => {
-        if (r.ok) { hiveOpenDetail(_hiveCurrentId); } else { alert('Config update failed'); }
-    });
+        body: JSON.stringify({ mobility_profile: profile, distance_threshold_m: threshold_m }),
+    }).catch(() => null);
+    if (r && r.ok) {
+        hiveCloseConfigModal();
+        hiveOpenDetail(_hiveCurrentId);
+    } else {
+        const e = document.getElementById('hive-cfg-err');
+        document.getElementById('hive-cfg-err-text').textContent = 'Update failed';
+        e.style.display = '';
+    }
 }
 
 // ── archive screen ────────────────────────────────────────────────────────────

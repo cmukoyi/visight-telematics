@@ -373,6 +373,7 @@ class PortalUser(Base):
     notify_geofence_exit = Column(Boolean, nullable=False, default=True)
     notify_battery_low   = Column(Boolean, nullable=False, default=True)
     notify_offline       = Column(Boolean, nullable=False, default=True)
+    notify_hive_breach   = Column(Boolean, nullable=False, default=True)
     notify_via_email     = Column(Boolean, nullable=False, default=True)
     notification_emails  = Column(JSON, nullable=True)               # extra notification addresses (list of strings)
     # SMS notification preferences
@@ -381,6 +382,7 @@ class PortalUser(Base):
     notify_geofence_sms  = Column(Boolean, nullable=False, default=True)
     notify_battery_sms   = Column(Boolean, nullable=False, default=True)
     notify_offline_sms   = Column(Boolean, nullable=False, default=True)
+    notify_hive_breach_sms = Column(Boolean, nullable=False, default=True)
 
     usergroup = relationship("UserGroup", back_populates="portal_users")
 

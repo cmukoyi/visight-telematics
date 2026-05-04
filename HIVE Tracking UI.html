@@ -1,0 +1,2012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinplot — HIVE Tracking</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep:        #0e1822;
+    --bg-sidebar:     #122130;
+    --bg-panel:       #16263a;
+    --bg-card:        #1a2d44;
+    --bg-card-2:      #1f3550;
+    --bg-input:       #0e1f30;
+    --border:         #243b56;
+    --border-bright:  #2f4d70;
+
+    --text-primary:   #ffffff;
+    --text-secondary: #a3b3c7;
+    --text-tertiary:  #6b7d94;
+    --text-muted:     #4f6178;
+
+    --green:          #00d96b;
+    --green-dim:      #00a854;
+    --green-bg:       rgba(0, 217, 107, 0.12);
+    --green-glow:     rgba(0, 217, 107, 0.4);
+
+    --red:            #ff4757;
+    --red-bg:         rgba(255, 71, 87, 0.12);
+    --amber:          #ffb648;
+    --amber-bg:       rgba(255, 182, 72, 0.12);
+    --blue:           #4a9eff;
+    --blue-bg:        rgba(74, 158, 255, 0.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  /* ===== Top Bar ===== */
+  .topbar {
+    background: var(--bg-sidebar);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .topbar-left { display: flex; align-items: center; gap: 18px; }
+  .menu-btn {
+    background: none; border: none;
+    color: var(--text-secondary);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 6px;
+  }
+  .menu-btn:hover { color: var(--text-primary); }
+
+  .logo {
+    display: flex; align-items: center; gap: 4px;
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: -0.02em;
+  }
+  .logo-pin {
+    color: var(--green);
+    font-size: 24px;
+  }
+  .logo-text { color: var(--text-primary); }
+
+  .topbar-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-left: 12px;
+  }
+
+  .topbar-right {
+    display: flex; align-items: center; gap: 18px;
+  }
+  .topbar-icon {
+    position: relative;
+    color: var(--text-secondary);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 6px;
+  }
+  .topbar-icon:hover { color: var(--text-primary); }
+  .badge-count {
+    position: absolute;
+    top: 0; right: 0;
+    background: var(--red);
+    color: white;
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 10px;
+    min-width: 16px;
+    height: 16px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 4px;
+  }
+  .user-info {
+    display: flex; align-items: center; gap: 12px;
+    padding-left: 18px;
+    border-left: 1px solid var(--border);
+  }
+  .user-text {
+    text-align: right;
+    line-height: 1.2;
+  }
+  .user-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+  .user-org {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-top: 2px;
+  }
+  .user-avatar {
+    width: 36px; height: 36px;
+    background: var(--green);
+    color: var(--bg-deep);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+  }
+
+  /* ===== Layout ===== */
+  .app {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    min-height: calc(100vh - 60px);
+  }
+
+  /* ===== Sidebar ===== */
+  .sidebar {
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border);
+    padding: 18px 0;
+  }
+  .nav-section {
+    padding: 0 16px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 18px 0 8px;
+  }
+  .nav-section:first-child { margin-top: 0; }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 14px;
+    border-left: 3px solid transparent;
+    transition: all 0.15s;
+  }
+  .nav-item i {
+    width: 18px;
+    text-align: center;
+    font-size: 14px;
+  }
+  .nav-item:hover {
+    background: var(--bg-panel);
+    color: var(--text-primary);
+  }
+  .nav-item.active {
+    background: var(--bg-panel);
+    color: var(--green);
+    border-left-color: var(--green);
+    font-weight: 500;
+  }
+  .nav-item .beta-tag {
+    font-size: 9px;
+    background: var(--bg-card);
+    color: var(--text-tertiary);
+    padding: 2px 5px;
+    border-radius: 3px;
+    margin-left: auto;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+
+  /* ===== Main ===== */
+  .main {
+    padding: 24px;
+    overflow-x: auto;
+  }
+
+  .page-header {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 22px;
+    display: flex; align-items: center; gap: 18px;
+    margin-bottom: 20px;
+  }
+  .page-title {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  .page-title i { color: var(--green); font-size: 20px; }
+
+  .search-box {
+    flex: 1;
+    max-width: 360px;
+    position: relative;
+  }
+  .search-box i {
+    position: absolute;
+    left: 14px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-tertiary);
+    font-size: 13px;
+  }
+  .search-box input {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 10px 14px 10px 38px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 13px;
+  }
+  .search-box input:focus {
+    outline: none;
+    border-color: var(--green);
+  }
+  .search-box input::placeholder { color: var(--text-tertiary); }
+
+  /* ===== Buttons ===== */
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--green);
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn:hover { background: var(--green-dim); }
+  .btn i { font-size: 12px; }
+
+  .btn.secondary {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border-bright);
+  }
+  .btn.secondary:hover { background: var(--bg-card-2); }
+
+  .btn.danger {
+    background: transparent;
+    color: var(--red);
+    border: 1px solid rgba(255, 71, 87, 0.3);
+  }
+  .btn.danger:hover { background: var(--red-bg); }
+
+  .btn.ghost {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+  .btn.ghost:hover { color: var(--text-primary); border-color: var(--border-bright); }
+
+  .btn-row { display: flex; gap: 8px; align-items: center; }
+
+  /* ===== Stats Strip ===== */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .stat-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 20px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .stat-icon {
+    width: 44px; height: 44px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .stat-icon.green { background: var(--green-bg); color: var(--green); }
+  .stat-icon.red { background: var(--red-bg); color: var(--red); }
+  .stat-icon.blue { background: var(--blue-bg); color: var(--blue); }
+  .stat-icon.amber { background: var(--amber-bg); color: var(--amber); }
+
+  .stat-body { line-height: 1.2; }
+  .stat-num {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  .stat-label {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    margin-top: 2px;
+  }
+
+  /* ===== Hive Cards ===== */
+  .hive-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+    gap: 16px;
+  }
+
+  .hive-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-top: 2px solid var(--green);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.18s;
+    cursor: pointer;
+  }
+  .hive-card:hover {
+    border-color: var(--border-bright);
+    border-top-color: var(--green);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  }
+  .hive-card.alert { border-top-color: var(--red); }
+  .hive-card.warn { border-top-color: var(--amber); }
+
+  .card-head {
+    padding: 16px 18px 14px;
+    display: flex; align-items: flex-start; justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+  .card-head-left { display: flex; gap: 10px; align-items: flex-start; }
+  .card-head-icon {
+    color: var(--green);
+    font-size: 18px;
+    margin-top: 2px;
+  }
+  .alert .card-head-icon { color: var(--red); }
+  .warn .card-head-icon { color: var(--amber); }
+
+  .card-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+  }
+  .card-sub {
+    font-size: 12px;
+    color: var(--green);
+    font-weight: 500;
+  }
+  .alert .card-sub { color: var(--red); }
+  .warn .card-sub { color: var(--amber); }
+
+  .status-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green-glow);
+  }
+  .status-dot.red { background: var(--red); box-shadow: 0 0 8px rgba(255, 71, 87, 0.6); }
+  .status-dot.amber { background: var(--amber); box-shadow: 0 0 8px rgba(255, 182, 72, 0.6); }
+  .status-dot.muted { background: var(--text-muted); box-shadow: none; }
+
+  .card-body {
+    padding: 4px 18px;
+  }
+  .card-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border);
+  }
+  .card-row:last-child { border-bottom: none; }
+  .row-label { color: var(--text-secondary); }
+  .row-value { color: var(--text-primary); font-weight: 500; }
+  .row-value.muted { color: var(--text-muted); }
+  .row-value.alert { color: var(--red); }
+  .row-value.warn { color: var(--amber); }
+  .row-value.green { color: var(--green); }
+
+  /* small inline pills */
+  .inline-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--bg-input);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  /* tag pips */
+  .tag-pips {
+    display: flex; gap: 4px; flex-wrap: wrap;
+  }
+  .pip {
+    width: 22px; height: 22px;
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    position: relative;
+  }
+  .pip.fresh { background: var(--green-bg); color: var(--green); }
+  .pip.recent { background: var(--blue-bg); color: var(--blue); }
+  .pip.stale { background: var(--amber-bg); color: var(--amber); }
+  .pip.lost { background: var(--red-bg); color: var(--red); }
+  .pip.outlier::after {
+    content: '';
+    position: absolute;
+    top: -2px; right: -2px;
+    width: 6px; height: 6px;
+    background: var(--red);
+    border-radius: 50%;
+    border: 1px solid var(--bg-panel);
+  }
+
+  /* expiry block */
+  .expiry-block {
+    padding: 12px 18px;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    font-size: 12px;
+  }
+  .expiry-block i { color: var(--text-tertiary); }
+  .expiry-block.urgent { background: rgba(255, 182, 72, 0.06); }
+  .expiry-block.urgent i { color: var(--amber); }
+  .expiry-block .days {
+    color: var(--text-primary);
+    font-weight: 600;
+    margin-left: auto;
+  }
+  .expiry-block.urgent .days { color: var(--amber); }
+
+  .card-actions {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-top: 1px solid var(--border);
+  }
+  .card-actions button {
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 12px 8px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    transition: all 0.15s;
+  }
+  .card-actions button:last-child { border-right: none; }
+  .card-actions button:hover { background: var(--bg-card); color: var(--text-primary); }
+  .card-actions button.delete:hover { background: var(--red-bg); color: var(--red); }
+  .card-actions button.danger { color: var(--red); }
+  .card-actions button i { font-size: 11px; }
+
+  /* ===== Detail screen ===== */
+  .detail {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 16px;
+  }
+
+  .panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .panel-head {
+    padding: 16px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-title {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .panel-title i { color: var(--green); }
+  .panel-meta {
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+  .panel-body { padding: 18px 20px; }
+
+  /* ===== Detail head ===== */
+  .detail-head {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--red);
+    border-radius: 8px;
+    padding: 18px 22px;
+    display: flex; align-items: center; gap: 22px;
+    margin-bottom: 16px;
+  }
+  .detail-head-icon {
+    width: 50px; height: 50px;
+    background: var(--red-bg);
+    color: var(--red);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .detail-head-text { flex: 1; }
+  .detail-head-name {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .detail-head-meta {
+    font-size: 12px;
+    color: var(--text-secondary);
+    display: flex; gap: 14px;
+  }
+  .detail-head-meta span i {
+    color: var(--text-tertiary);
+    margin-right: 4px;
+  }
+
+  /* ===== Map ===== */
+  .map-canvas {
+    position: relative;
+    height: 400px;
+    background:
+      radial-gradient(circle at 30% 40%, rgba(0, 217, 107, 0.04), transparent 60%),
+      var(--bg-input);
+    overflow: hidden;
+  }
+  .map-grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  .threshold-circle {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 280px; height: 280px;
+    border: 1px dashed rgba(0, 217, 107, 0.4);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .threshold-label {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -200%);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--green);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    background: var(--bg-input);
+    padding: 3px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+  }
+  .connection-svg {
+    position: absolute; inset: 0;
+    pointer-events: none;
+  }
+  .tag-marker {
+    position: absolute;
+    width: 36px; height: 36px;
+    margin-left: -18px; margin-top: -18px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .tag-marker .ring {
+    position: absolute;
+    inset: 0;
+    border: 1px solid;
+    border-radius: 50%;
+    opacity: 0.5;
+  }
+  .tag-marker .core {
+    width: 14px; height: 14px;
+    background: currentColor;
+    border-radius: 50%;
+    box-shadow: 0 0 12px currentColor;
+  }
+  .tag-marker .label {
+    position: absolute;
+    top: 100%; left: 50%;
+    transform: translateX(-50%);
+    margin-top: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    background: var(--bg-deep);
+    padding: 3px 7px;
+    border: 1px solid var(--border-bright);
+    border-radius: 4px;
+    color: var(--text-primary);
+    white-space: nowrap;
+  }
+  .tag-marker.fresh { color: var(--green); }
+  .tag-marker.recent { color: var(--blue); }
+  .tag-marker.outlier { color: var(--red); }
+  .tag-marker.outlier .core { animation: pulse-marker 1.5s infinite; }
+  .tag-marker.outlier .ring { animation: ring-pulse 1.5s infinite; }
+  @keyframes pulse-marker {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.3); }
+  }
+  @keyframes ring-pulse {
+    0% { transform: scale(1); opacity: 0.6; }
+    100% { transform: scale(2.5); opacity: 0; }
+  }
+
+  .map-info {
+    position: absolute;
+    top: 14px; left: 14px;
+    background: rgba(14, 24, 34, 0.92);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .map-info b { color: var(--green); font-weight: 600; }
+  .map-info b.alert { color: var(--red); }
+
+  .map-legend {
+    position: absolute;
+    bottom: 14px; left: 14px;
+    background: rgba(14, 24, 34, 0.92);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: flex; gap: 14px;
+    font-size: 11px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* diameter readout */
+  .diameter-row {
+    padding: 18px 20px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 24px;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+  }
+  .diameter-num {
+    font-size: 42px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--red);
+  }
+  .diameter-num .unit {
+    font-size: 16px;
+    color: var(--text-tertiary);
+    font-weight: 400;
+    margin-left: 2px;
+  }
+  .diameter-bar {
+    height: 8px;
+    background: var(--bg-input);
+    border-radius: 4px;
+    position: relative;
+    overflow: visible;
+  }
+  .diameter-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green), var(--red));
+    width: 100%;
+    border-radius: 4px;
+    box-shadow: 0 0 8px rgba(255, 71, 87, 0.4);
+  }
+  .threshold-mark {
+    position: absolute;
+    top: -4px; bottom: -4px;
+    left: 82%;
+    width: 2px;
+    background: var(--green);
+  }
+  .threshold-mark::after {
+    content: 'THRESHOLD 100m';
+    position: absolute;
+    top: -16px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    color: var(--green);
+    font-weight: 600;
+    white-space: nowrap;
+    letter-spacing: 0.06em;
+  }
+  .diameter-info {
+    text-align: right;
+  }
+  .diameter-state {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--red);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 4px;
+  }
+
+  /* tag table */
+  .tag-table { width: 100%; border-collapse: collapse; }
+  .tag-table th {
+    text-align: left;
+    padding: 12px 20px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 1px solid var(--border);
+  }
+  .tag-table td {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .tag-table tr:last-child td { border-bottom: none; }
+  .tag-table tr:hover td { background: rgba(255, 255, 255, 0.02); }
+  .tag-table tr.outlier-row td { background: rgba(255, 71, 87, 0.04); }
+  .tag-id {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-family: 'Inter', monospace;
+  }
+  .tag-name { color: var(--text-primary); }
+  .tag-coords { color: var(--text-tertiary); font-size: 11px; margin-top: 2px; }
+  .text-right { text-align: right; }
+  .freshness-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .freshness-badge.fresh { background: var(--green-bg); color: var(--green); }
+  .freshness-badge.recent { background: var(--blue-bg); color: var(--blue); }
+  .freshness-badge.stale { background: var(--amber-bg); color: var(--amber); }
+  .role-tag {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-tertiary);
+  }
+  .role-tag.outlier { color: var(--red); }
+
+  /* alert banner */
+  .alert-banner {
+    background: linear-gradient(135deg, rgba(255, 71, 87, 0.12), rgba(255, 71, 87, 0.04));
+    border: 1px solid rgba(255, 71, 87, 0.3);
+    border-radius: 8px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+  }
+  .alert-banner-head {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 10px;
+  }
+  .alert-icon {
+    width: 32px; height: 32px;
+    background: var(--red-bg);
+    color: var(--red);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .alert-banner-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--red);
+  }
+  .alert-banner-body {
+    color: var(--text-primary);
+    font-size: 13px;
+    line-height: 1.5;
+    margin-bottom: 12px;
+  }
+  .alert-banner-meta {
+    display: flex; gap: 14px;
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+  .alert-banner-meta span i { margin-right: 5px; }
+
+  /* config grid */
+  .config-grid { display: flex; flex-direction: column; gap: 0; }
+  .config-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .config-item:last-child { border-bottom: none; }
+  .config-key {
+    color: var(--text-secondary);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .config-key i {
+    color: var(--text-tertiary);
+    font-size: 11px;
+    width: 14px;
+  }
+  .config-value {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+  .config-value .unit { color: var(--text-tertiary); font-weight: 400; font-size: 12px; }
+
+  /* lifecycle big number */
+  .lifecycle-num {
+    display: flex; align-items: baseline; gap: 8px;
+    margin-bottom: 12px;
+  }
+  .lifecycle-num .num {
+    font-size: 38px;
+    font-weight: 700;
+    color: var(--amber);
+    line-height: 1;
+  }
+  .lifecycle-num .label {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .lifecycle-bar {
+    height: 6px;
+    background: var(--bg-input);
+    border-radius: 3px;
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+  .lifecycle-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green), var(--amber));
+    width: 80%;
+  }
+
+  /* timeline */
+  .timeline { display: flex; flex-direction: column; }
+  .tl-item {
+    display: grid;
+    grid-template-columns: 60px 16px 1fr;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .tl-item:last-child { border-bottom: none; }
+  .tl-time {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    padding-top: 2px;
+    font-weight: 500;
+  }
+  .tl-marker {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin: 5px auto 0;
+    background: var(--text-tertiary);
+  }
+  .tl-marker.red { background: var(--red); box-shadow: 0 0 8px rgba(255, 71, 87, 0.5); }
+  .tl-marker.amber { background: var(--amber); }
+  .tl-marker.green { background: var(--green); }
+  .tl-marker.blue { background: var(--blue); }
+  .tl-text {
+    font-size: 13px;
+    color: var(--text-primary);
+    line-height: 1.4;
+  }
+  .tl-text b { color: var(--green); font-weight: 600; }
+  .tl-text b.alert { color: var(--red); }
+  .tl-detail {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-top: 3px;
+  }
+
+  /* ===== Wizard ===== */
+  .wizard {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  .wizard-progress {
+    display: flex; gap: 6px;
+    margin-bottom: 14px;
+  }
+  .wizard-step-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--bg-input);
+    border-radius: 2px;
+  }
+  .wizard-step-bar.done { background: var(--green); }
+  .wizard-step-bar.current { background: var(--green-dim); }
+
+  .wizard-step-meta {
+    display: flex; justify-content: space-between;
+    margin-bottom: 22px;
+    font-size: 12px;
+    color: var(--text-tertiary);
+    font-weight: 500;
+  }
+
+  .wizard-q {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+  }
+  .wizard-help {
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.5;
+    margin-bottom: 24px;
+  }
+
+  .options { display: flex; flex-direction: column; gap: 10px; }
+  .option {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex; align-items: flex-start; gap: 14px;
+  }
+  .option:hover { border-color: var(--border-bright); }
+  .option.selected {
+    border-color: var(--green);
+    background: rgba(0, 217, 107, 0.04);
+  }
+  .option-radio {
+    width: 18px; height: 18px;
+    border: 2px solid var(--border-bright);
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 2px;
+    position: relative;
+    transition: all 0.15s;
+  }
+  .option.selected .option-radio { border-color: var(--green); }
+  .option.selected .option-radio::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    background: var(--green);
+    border-radius: 50%;
+  }
+  .option-body { flex: 1; }
+  .option-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .option-title .badge {
+    font-size: 9px;
+    color: var(--green);
+    background: var(--green-bg);
+    border: 1px solid var(--green-dim);
+    padding: 2px 7px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+  }
+  .option-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+  .option-desc em {
+    font-style: italic;
+    color: var(--text-tertiary);
+  }
+
+  .wizard-foot {
+    display: flex; justify-content: space-between;
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .express-card {
+    background: linear-gradient(135deg, rgba(0, 217, 107, 0.08), rgba(0, 217, 107, 0.02));
+    border: 1px solid var(--green-dim);
+    border-radius: 8px;
+    padding: 22px;
+    margin-bottom: 18px;
+    position: relative;
+  }
+  .express-tag {
+    position: absolute;
+    top: -10px; right: 22px;
+    background: var(--green);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 4px 10px;
+    border-radius: 3px;
+  }
+  .express-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .express-title i { color: var(--green); }
+  .express-desc {
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.5;
+    margin-bottom: 16px;
+  }
+  .express-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-input);
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .express-summary-item {
+    padding: 12px 16px;
+    border-right: 1px solid var(--border);
+  }
+  .express-summary-item:last-child { border-right: none; }
+  .express-summary-label {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+  .express-summary-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  /* archive notice strip */
+  .info-strip {
+    background: var(--blue-bg);
+    border: 1px solid rgba(74, 158, 255, 0.3);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-bottom: 18px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .info-strip i { color: var(--blue); font-size: 16px; }
+  .info-strip b { color: var(--text-primary); }
+
+  @media (max-width: 1100px) {
+    .detail { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 768px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== Top Bar ===== -->
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="menu-btn"><i class="fa-solid fa-bars"></i></button>
+    <div class="logo">
+      <i class="fa-solid fa-location-dot logo-pin"></i>
+      <span class="logo-text">PINPLOT</span>
+    </div>
+    <div class="topbar-title" id="page-title">HIVE Tracking</div>
+  </div>
+  <div class="topbar-right">
+    <div class="topbar-icon">
+      <i class="fa-regular fa-bell"></i>
+      <span class="badge-count">3</span>
+    </div>
+    <div class="topbar-icon">
+      <i class="fa-solid fa-gear"></i>
+    </div>
+    <div class="user-info">
+      <div class="user-text">
+        <div class="user-name">Hoi cheng</div>
+        <div class="user-org">Pinplot Consulting</div>
+      </div>
+      <div class="user-avatar">HC</div>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- ===== Sidebar ===== -->
+  <div class="sidebar">
+    <div class="nav-section">Tracking</div>
+    <div class="nav-item"><i class="fa-regular fa-map"></i> Live Map</div>
+    <div class="nav-item"><i class="fa-solid fa-table-cells"></i> Floor Plan <span class="beta-tag">BETA</span></div>
+    <div class="nav-item"><i class="fa-solid fa-list"></i> Asset List</div>
+    <div class="nav-item"><i class="fa-solid fa-route"></i> Movement History</div>
+
+    <div class="nav-section">Management</div>
+    <div class="nav-item"><i class="fa-solid fa-tag"></i> Asset Management</div>
+    <div class="nav-item active" data-screen="list"><i class="fa-solid fa-shield-halved"></i> HIVE Tracking</div>
+    <div class="nav-item"><i class="fa-solid fa-location-dot"></i> Locations <span class="beta-tag">BETA</span></div>
+    <div class="nav-item"><i class="fa-solid fa-users"></i> User Accounts</div>
+    <div class="nav-item"><i class="fa-solid fa-qrcode"></i> QR / NFC Tags <span class="beta-tag">BETA</span></div>
+    <div class="nav-item"><i class="fa-solid fa-pencil"></i> Floor Plan Sketch <span class="beta-tag">BETA</span></div>
+    <div class="nav-item"><i class="fa-solid fa-gear"></i> Settings</div>
+
+    <div class="nav-section">Reports</div>
+    <div class="nav-item"><i class="fa-solid fa-chart-line"></i> Analytics</div>
+    <div class="nav-item"><i class="fa-solid fa-file-export"></i> Exports</div>
+  </div>
+
+  <!-- ===== Main ===== -->
+  <div class="main">
+
+    <!-- Sub-nav for screen switching (demo only) -->
+    <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
+      <button class="btn secondary" data-screen="list" style="font-size: 12px; padding: 8px 14px;">
+        <i class="fa-solid fa-grip"></i> Hive List
+      </button>
+      <button class="btn secondary" data-screen="detail" style="font-size: 12px; padding: 8px 14px;">
+        <i class="fa-solid fa-circle-info"></i> Hive Detail
+      </button>
+      <button class="btn secondary" data-screen="wizard" style="font-size: 12px; padding: 8px 14px;">
+        <i class="fa-solid fa-plus"></i> New Hive
+      </button>
+      <button class="btn secondary" data-screen="archive" style="font-size: 12px; padding: 8px 14px;">
+        <i class="fa-solid fa-box-archive"></i> Archive
+      </button>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SCREEN 1: HIVE LIST                          -->
+    <!-- ============================================ -->
+    <div class="screen active" id="screen-list">
+
+      <!-- Header bar -->
+      <div class="page-header">
+        <div class="page-title">
+          <i class="fa-solid fa-shield-halved"></i>
+          HIVE Tracking
+        </div>
+        <div class="search-box">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" placeholder="Search hives, tag IDs, names...">
+        </div>
+        <div class="btn-row" style="margin-left: auto;">
+          <button class="btn"><i class="fa-solid fa-plus"></i> New Hive</button>
+          <button class="btn secondary"><i class="fa-solid fa-filter"></i> Filter</button>
+        </div>
+      </div>
+
+      <!-- Stats row -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-icon green"><i class="fa-solid fa-shield-halved"></i></div>
+          <div class="stat-body">
+            <div class="stat-num">04</div>
+            <div class="stat-label">Active Hives</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon red"><i class="fa-solid fa-triangle-exclamation"></i></div>
+          <div class="stat-body">
+            <div class="stat-num">01</div>
+            <div class="stat-label">In Breach</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon blue"><i class="fa-solid fa-tag"></i></div>
+          <div class="stat-body">
+            <div class="stat-num">17</div>
+            <div class="stat-label">Tags Tracked</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon amber"><i class="fa-solid fa-clock"></i></div>
+          <div class="stat-body">
+            <div class="stat-num">02</div>
+            <div class="stat-label">Stale Tags</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hive cards -->
+      <div class="hive-grid">
+
+        <!-- BREACH -->
+        <div class="hive-card alert" onclick="showScreen('detail')">
+          <div class="card-head">
+            <div class="card-head-left">
+              <i class="fa-solid fa-shield-halved card-head-icon"></i>
+              <div>
+                <div class="card-name">Travel Kit</div>
+                <div class="card-sub">In Breach · Mobile Profile</div>
+              </div>
+            </div>
+            <div class="status-dot red"></div>
+          </div>
+          <div class="card-body">
+            <div class="card-row">
+              <span class="row-label">Hive ID</span>
+              <span class="row-value">HV-7A2F</span>
+            </div>
+            <div class="card-row">
+              <span class="row-label">Diameter</span>
+              <span class="row-value alert">122m / 100m</span>
+            </div>
+            <div class="card-row">
+              <span class="row-label">Tags</span>
+              <span class="row-value">
+                <div class="tag-pips">
+                  <div class="pip fresh">01</div>
+                  <div class="pip fresh">02</div>
+                  <div class="pip recent">03</div>
+                  <div class="pip fresh outlier">04</div>
+                  <div class="pip fresh">05</div>
+                </div>
+              </span>
+            </div>
+            <div class="card-row">
+              <span class="row-label">Outlier</span>
+              <span class="row-value alert">T-04 · Headphones</span>
+            </div>
+            <div class="card-row">
+              <span class="row-label">Last Update</span>
+              <span class="row-value">Apr 30, 09:18 AM</span>
+            </div>
+          </div>
+          <div class="expiry-block urgent">
+            <i class="fa-solid fa-hourglass-half"></i>
+            Expires Jun 13, 2026
+            <span class="days">12 days left</span>
+          </div>
+          <div class="card-actions">
+            <button><i class="fa-solid fa-pen"></i> Edit</button>
+            <button><i class="fa-solid fa-map-location-dot"></i> Map</button>
+            <button><i class="fa-solid fa-clock-rotate-left"></i> History</button>
+            <button class="delete"><i class="fa-solid fa-trash"></i> Delete</button>
+          </div>
+        </div>
+
+        <!-- OK -->
+        <div class="hive-card" onclick="showScreen('detail')">
+          <div class="card-head">
+            <div class="card-head-left">
+              <i class="fa-solid fa-shield-halved card-head-icon"></i>
+              <div>
+                <div class="card-name">Workshop Tools</div>
+                <div class="card-sub">Together · Stationary Profile</div>
+              </div>
+            </div>
+            <div class="status-dot"></div>
+          </div>
+          <div class="card-body">
+            <div class="card-row">
+              <span class="row-label">Hive ID</span>
+              <span class="row-value">HV-3B19</span>
+            </div>
+            <div class="card-row">
+              <span class="row-label">Diameter</span>
+              <span class="row-value green">14m / 50m</span>
+            </div>
+            <div class="card-row">
+              <span class="row-label">Tags</span>
+              <span class="row-value">
+                <div class="tag-pips">
+                  <div class="pip fresh">01</div>
+                  <div class="pip fresh">02</div>
+                  <div class="pip fresh">03</div>
+                  <div class="pip fresh">04</div>
+                </div>
+              </span>
+            </div>
+            <div class="card-row">
+              <span class="row-label">Outlier</span>
+              <span class="row-value muted">—</span>
+            </div>
+            <div class="card-row">
+              <span class="row-label">Last Update</span>
+              <span class="row-value">Apr 30, 09:16 AM</span>
+            </div>
+          </div>
+          <div class="expiry-block">
+            <i class="fa-solid fa-hourglass-half"></i>
+            Expires Jun 16, 2026
+            <span class="days">47 days left</span>
+          </div>
+          <div class="card-actions">
+            <button><i class="fa-solid fa-pen"></i> Edit</button>
+            <button><i class="fa-solid fa-map-location-dot"></i> Map</button>
+            <button><i class="fa-solid fa-clock-rotate-left"></i> History</button>
+            <button class="delete"><i class="fa-solid fa-trash"></i> Delete</button>
+          </div>
+        </div>
+
+        <!-- WARN -->
+        <div class="hive-card warn" onclick="showScreen('detail')">
+          <div class="card-head">
+            <div class="card-head-left">
+              <i class="fa-solid fa-shield-halved card-head-icon"></i>
+              <div>
+                <div class="card-name">Bike Bag</div>
+                <div class="card-sub">Partial Data · Slow Profile</div>
+              </div>
+            </div>
+            <div class="status-dot amber"></div>
+          </div>
+          <div class="card-body">
+            <div class="card-row">
+              <span class="row-label">Hive ID</span>
+              <span class="row-value">HV-5C04</span>
+            </div>
+            <div class="card-row">
+              <span class="row-label">Diameter</span>
+              <span class="row-value muted">— / 100m</span>
+            </div>
+            <div class="card-row">
+              <span class="row-label">Tags</span>
+              <span class="row-value">
+                <div class="tag-pips">
+                  <div class="pip fresh">01</div>
+                  <div class="pip stale">02</div>
+                  <div class="pip stale">03</div>
+                </div>
+              </span>
+            </div>
+            <div class="card-row">
+              <span class="row-label">Last Eval</span>
+              <span class="row-value warn">42m ago</span>
+            </div>
+            <div class="card-row">
+              <span class="row-label">Last Update</span>
+              <span class="row-value">Apr 30, 08:36 AM</span>
+            </div>
+          </div>
+          <div class="expiry-block urgent">
+            <i class="fa-solid fa-hourglass-half"></i>
+            Expires May 03, 2026
+            <span class="days">3 days left</span>
+          </div>
+          <div class="card-actions">
+            <button><i class="fa-solid fa-pen"></i> Edit</button>
+            <button><i class="fa-solid fa-map-location-dot"></i> Map</button>
+            <button><i class="fa-solid fa-clock-rotate-left"></i> History</button>
+            <button class="delete"><i class="fa-solid fa-trash"></i> Delete</button>
+          </div>
+        </div>
+
+        <!-- OK Fast -->
+        <div class="hive-card" onclick="showScreen('detail')">
+          <div class="card-head">
+            <div class="card-head-left">
+              <i class="fa-solid fa-shield-halved card-head-icon"></i>
+              <div>
+                <div class="card-name">Delivery Run 41</div>
+                <div class="card-sub">Together · Fast Profile</div>
+              </div>
+            </div>
+            <div class="status-dot"></div>
+          </div>
+          <div class="card-body">
+            <div class="card-row">
+              <span class="row-label">Hive ID</span>
+              <span class="row-value">HV-9D77</span>
+            </div>
+            <div class="card-row">
+              <span class="row-label">Diameter</span>
+              <span class="row-value green">86m / 500m</span>
+            </div>
+            <div class="card-row">
+              <span class="row-label">Tags</span>
+              <span class="row-value">
+                <div class="tag-pips">
+                  <div class="pip fresh">01</div>
+                  <div class="pip fresh">02</div>
+                  <div class="pip recent">03</div>
+                  <div class="pip fresh">04</div>
+                  <div class="pip fresh">05</div>
+                </div>
+              </span>
+            </div>
+            <div class="card-row">
+              <span class="row-label">Outlier</span>
+              <span class="row-value muted">—</span>
+            </div>
+            <div class="card-row">
+              <span class="row-label">Last Update</span>
+              <span class="row-value">Apr 30, 09:18 AM</span>
+            </div>
+          </div>
+          <div class="expiry-block">
+            <i class="fa-solid fa-hourglass-half"></i>
+            Expires May 22, 2026
+            <span class="days">22 days left</span>
+          </div>
+          <div class="card-actions">
+            <button><i class="fa-solid fa-pen"></i> Edit</button>
+            <button><i class="fa-solid fa-map-location-dot"></i> Map</button>
+            <button><i class="fa-solid fa-clock-rotate-left"></i> History</button>
+            <button class="delete"><i class="fa-solid fa-trash"></i> Delete</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SCREEN 2: HIVE DETAIL                        -->
+    <!-- ============================================ -->
+    <div class="screen" id="screen-detail" style="display:none">
+
+      <div class="detail-head">
+        <div class="detail-head-icon"><i class="fa-solid fa-shield-halved"></i></div>
+        <div class="detail-head-text">
+          <div class="detail-head-name">Travel Kit</div>
+          <div class="detail-head-meta">
+            <span><i class="fa-solid fa-fingerprint"></i>HV-7A2F</span>
+            <span><i class="fa-solid fa-calendar"></i>Created 17 Apr 2026</span>
+            <span><i class="fa-solid fa-route"></i>Mobile Profile</span>
+            <span><i class="fa-solid fa-tag"></i>5 tags</span>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn secondary"><i class="fa-solid fa-pen"></i> Configure</button>
+          <button class="btn danger"><i class="fa-solid fa-trash"></i> Delete</button>
+        </div>
+      </div>
+
+      <div class="detail">
+
+        <!-- Map column -->
+        <div>
+
+          <div class="panel" style="margin-bottom: 16px;">
+            <div class="panel-head">
+              <div class="panel-title"><i class="fa-solid fa-map-location-dot"></i> Live Position</div>
+              <div class="panel-meta">Updated 42s ago</div>
+            </div>
+            <div class="map-canvas">
+              <div class="map-grid"></div>
+              <div class="map-info">
+                Group Diameter <b class="alert">122m</b> · Outlier <b class="alert">T-04</b>
+              </div>
+
+              <svg class="connection-svg" viewBox="0 0 800 400" preserveAspectRatio="none">
+                <line x1="380" y1="190" x2="430" y2="230" stroke="rgba(0, 217, 107, 0.4)" stroke-width="1.5" />
+                <line x1="380" y1="190" x2="340" y2="250" stroke="rgba(0, 217, 107, 0.4)" stroke-width="1.5" />
+                <line x1="380" y1="190" x2="410" y2="170" stroke="rgba(0, 217, 107, 0.4)" stroke-width="1.5" />
+                <line x1="430" y1="230" x2="340" y2="250" stroke="rgba(0, 217, 107, 0.4)" stroke-width="1.5" />
+                <line x1="430" y1="230" x2="410" y2="170" stroke="rgba(0, 217, 107, 0.4)" stroke-width="1.5" />
+                <line x1="340" y1="250" x2="410" y2="170" stroke="rgba(0, 217, 107, 0.4)" stroke-width="1.5" />
+                <line x1="380" y1="190" x2="640" y2="110" stroke="rgba(255, 71, 87, 0.6)" stroke-width="1.5" stroke-dasharray="5,4" />
+                <line x1="430" y1="230" x2="640" y2="110" stroke="rgba(255, 71, 87, 0.6)" stroke-width="1.5" stroke-dasharray="5,4" />
+                <line x1="340" y1="250" x2="640" y2="110" stroke="rgba(255, 71, 87, 0.6)" stroke-width="1.5" stroke-dasharray="5,4" />
+                <line x1="410" y1="170" x2="640" y2="110" stroke="rgba(255, 71, 87, 0.6)" stroke-width="1.5" stroke-dasharray="5,4" />
+              </svg>
+
+              <div class="threshold-circle"></div>
+              <div class="threshold-label">Threshold · 100m</div>
+
+              <div class="tag-marker fresh" style="left: 47.5%; top: 47%;">
+                <div class="ring"></div>
+                <div class="core"></div>
+                <div class="label">T-01 · Passport</div>
+              </div>
+              <div class="tag-marker fresh" style="left: 53.75%; top: 58%;">
+                <div class="ring"></div>
+                <div class="core"></div>
+                <div class="label">T-02 · Wallet</div>
+              </div>
+              <div class="tag-marker recent" style="left: 42.5%; top: 63%;">
+                <div class="ring"></div>
+                <div class="core"></div>
+                <div class="label">T-03 · Camera</div>
+              </div>
+              <div class="tag-marker fresh" style="left: 51.25%; top: 42%;">
+                <div class="ring"></div>
+                <div class="core"></div>
+                <div class="label">T-05 · Charger</div>
+              </div>
+              <div class="tag-marker outlier" style="left: 80%; top: 27%;">
+                <div class="ring"></div>
+                <div class="core"></div>
+                <div class="label">T-04 · Headphones</div>
+              </div>
+
+              <div class="map-legend">
+                <div class="legend-item"><div class="legend-dot" style="background: var(--green)"></div>Fresh</div>
+                <div class="legend-item"><div class="legend-dot" style="background: var(--blue)"></div>Recent</div>
+                <div class="legend-item"><div class="legend-dot" style="background: var(--amber)"></div>Stale</div>
+                <div class="legend-item"><div class="legend-dot" style="background: var(--red)"></div>Outlier</div>
+              </div>
+            </div>
+
+            <div class="diameter-row">
+              <div class="diameter-num">122<span class="unit">m</span></div>
+              <div>
+                <div class="diameter-bar">
+                  <div class="diameter-bar-fill"></div>
+                  <div class="threshold-mark"></div>
+                </div>
+                <div style="margin-top: 24px; font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em;">
+                  Group spread · pairwise max distance
+                </div>
+              </div>
+              <div class="diameter-info">
+                <div style="font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em;">Status</div>
+                <div class="diameter-state">Breaching · 22m over</div>
+              </div>
+            </div>
+
+            <table class="tag-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Tag</th>
+                  <th class="text-right">Last Seen</th>
+                  <th class="text-right">Distance</th>
+                  <th class="text-right">Role</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="tag-id">T-01</span></td>
+                  <td>
+                    <div class="tag-name">Passport</div>
+                    <div class="tag-coords">51.3621° N, 0.1956° W</div>
+                  </td>
+                  <td class="text-right"><span class="freshness-badge fresh"><i class="fa-solid fa-circle" style="font-size:6px"></i> 42s ago</span></td>
+                  <td class="text-right" style="color: var(--text-tertiary)">centre</td>
+                  <td class="text-right"><span class="role-tag">core</span></td>
+                </tr>
+                <tr>
+                  <td><span class="tag-id">T-02</span></td>
+                  <td>
+                    <div class="tag-name">Wallet</div>
+                    <div class="tag-coords">51.3622° N, 0.1955° W</div>
+                  </td>
+                  <td class="text-right"><span class="freshness-badge fresh"><i class="fa-solid fa-circle" style="font-size:6px"></i> 1m 14s</span></td>
+                  <td class="text-right">14m</td>
+                  <td class="text-right"><span class="role-tag">core</span></td>
+                </tr>
+                <tr>
+                  <td><span class="tag-id">T-03</span></td>
+                  <td>
+                    <div class="tag-name">Camera</div>
+                    <div class="tag-coords">51.3620° N, 0.1958° W</div>
+                  </td>
+                  <td class="text-right"><span class="freshness-badge recent"><i class="fa-solid fa-circle" style="font-size:6px"></i> 7m 02s</span></td>
+                  <td class="text-right">22m</td>
+                  <td class="text-right"><span class="role-tag">core</span></td>
+                </tr>
+                <tr class="outlier-row">
+                  <td><span class="tag-id" style="color: var(--red)">T-04</span></td>
+                  <td>
+                    <div class="tag-name">Headphones</div>
+                    <div class="tag-coords">51.3635° N, 0.1939° W</div>
+                  </td>
+                  <td class="text-right"><span class="freshness-badge fresh"><i class="fa-solid fa-circle" style="font-size:6px"></i> 2m 11s</span></td>
+                  <td class="text-right" style="color: var(--red); font-weight: 600;">122m</td>
+                  <td class="text-right"><span class="role-tag outlier"><i class="fa-solid fa-triangle-exclamation"></i> outlier</span></td>
+                </tr>
+                <tr>
+                  <td><span class="tag-id">T-05</span></td>
+                  <td>
+                    <div class="tag-name">Charger</div>
+                    <div class="tag-coords">51.3623° N, 0.1957° W</div>
+                  </td>
+                  <td class="text-right"><span class="freshness-badge fresh"><i class="fa-solid fa-circle" style="font-size:6px"></i> 38s ago</span></td>
+                  <td class="text-right">18m</td>
+                  <td class="text-right"><span class="role-tag">core</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Side column -->
+        <div>
+
+          <div class="alert-banner">
+            <div class="alert-banner-head">
+              <div class="alert-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+              <div class="alert-banner-title">Confirmed Breach</div>
+            </div>
+            <div class="alert-banner-body">
+              <b style="color: var(--red)">Headphones (T-04)</b> has separated from the group. Currently 122m from the nearest member, exceeding the 100m threshold.
+            </div>
+            <div class="alert-banner-meta">
+              <span><i class="fa-regular fa-clock"></i>Raised 4m ago</span>
+              <span><i class="fa-solid fa-check-double"></i>Confirmed by 2 reports</span>
+            </div>
+          </div>
+
+          <div class="panel" style="margin-bottom: 16px;">
+            <div class="panel-head">
+              <div class="panel-title"><i class="fa-solid fa-sliders"></i> Configuration</div>
+              <div class="panel-meta">v3 · current</div>
+            </div>
+            <div class="panel-body">
+              <div class="config-grid">
+                <div class="config-item">
+                  <div class="config-key"><i class="fa-solid fa-route"></i> Mobility Profile</div>
+                  <div class="config-value">Mobile</div>
+                </div>
+                <div class="config-item">
+                  <div class="config-key"><i class="fa-solid fa-ruler-horizontal"></i> Distance Threshold</div>
+                  <div class="config-value">100<span class="unit"> m</span></div>
+                </div>
+                <div class="config-item">
+                  <div class="config-key"><i class="fa-regular fa-clock"></i> Fresh Window</div>
+                  <div class="config-value">5<span class="unit"> min</span></div>
+                </div>
+                <div class="config-item">
+                  <div class="config-key"><i class="fa-solid fa-signal"></i> Lost Threshold</div>
+                  <div class="config-value">2<span class="unit"> hr</span></div>
+                </div>
+                <div class="config-item">
+                  <div class="config-key"><i class="fa-solid fa-wave-square"></i> Hysteresis Clear</div>
+                  <div class="config-value">80<span class="unit">%</span></div>
+                </div>
+                <div class="config-item">
+                  <div class="config-key"><i class="fa-solid fa-check-double"></i> Confirmation</div>
+                  <div class="config-value">2 reports</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel" style="margin-bottom: 16px;">
+            <div class="panel-head">
+              <div class="panel-title"><i class="fa-solid fa-hourglass-half"></i> Lifecycle</div>
+              <div class="panel-meta">60-day clock</div>
+            </div>
+            <div class="panel-body">
+              <div class="lifecycle-num">
+                <div class="num">12</div>
+                <div class="label">Days Remaining</div>
+              </div>
+              <div class="lifecycle-bar">
+                <div class="lifecycle-bar-fill"></div>
+              </div>
+              <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 14px;">
+                Expires <b style="color: var(--text-primary)">11 May 2026</b>. Recreate now to maintain continuous tracking — current configuration and tags will be carried over.
+              </div>
+              <button class="btn" style="width: 100%; justify-content: center;">
+                <i class="fa-solid fa-rotate-right"></i> Recreate Hive
+              </button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-title"><i class="fa-solid fa-clock-rotate-left"></i> Recent Activity</div>
+              <div class="panel-meta">last 24h</div>
+            </div>
+            <div class="panel-body">
+              <div class="timeline">
+                <div class="tl-item">
+                  <div class="tl-time">14:32</div>
+                  <div class="tl-marker red"></div>
+                  <div>
+                    <div class="tl-text"><b class="alert">Breach confirmed</b> · T-04 separated</div>
+                    <div class="tl-detail">Diameter 122m · Outlier identified after 2 reports</div>
+                  </div>
+                </div>
+                <div class="tl-item">
+                  <div class="tl-time">14:28</div>
+                  <div class="tl-marker amber"></div>
+                  <div>
+                    <div class="tl-text">Suspected breach · awaiting confirmation</div>
+                    <div class="tl-detail">First fresh report · T-04 at 118m</div>
+                  </div>
+                </div>
+                <div class="tl-item">
+                  <div class="tl-time">12:04</div>
+                  <div class="tl-marker blue"></div>
+                  <div>
+                    <div class="tl-text">Position update · 23 reports received</div>
+                    <div class="tl-detail">All tags fresh · diameter stable at 18m</div>
+                  </div>
+                </div>
+                <div class="tl-item">
+                  <div class="tl-time">09:17</div>
+                  <div class="tl-marker green"></div>
+                  <div>
+                    <div class="tl-text">Hive evaluation · OK</div>
+                    <div class="tl-detail">Diameter 14m · within threshold</div>
+                  </div>
+                </div>
+                <div class="tl-item">
+                  <div class="tl-time">08:42</div>
+                  <div class="tl-marker"></div>
+                  <div>
+                    <div class="tl-text">Settling period ended</div>
+                    <div class="tl-detail">Alert evaluation enabled</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SCREEN 3: WIZARD                             -->
+    <!-- ============================================ -->
+    <div class="screen" id="screen-wizard" style="display:none">
+
+      <div class="page-header">
+        <div class="page-title">
+          <i class="fa-solid fa-plus"></i>
+          Create New Hive
+        </div>
+      </div>
+
+      <div class="wizard">
+
+        <div class="express-card">
+          <div class="express-tag">High Confidence</div>
+          <div class="express-title">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+            We've picked sensible settings for you
+          </div>
+          <div class="express-desc">
+            Based on how your selected tags have moved over the last 23 days, we suggest the following configuration. You can review and adjust each setting, or skip ahead and use these defaults.
+          </div>
+          <div class="express-summary">
+            <div class="express-summary-item">
+              <div class="express-summary-label">Mobility</div>
+              <div class="express-summary-value">Mobile</div>
+            </div>
+            <div class="express-summary-item">
+              <div class="express-summary-label">Threshold</div>
+              <div class="express-summary-value">100 m</div>
+            </div>
+            <div class="express-summary-item">
+              <div class="express-summary-label">Tags</div>
+              <div class="express-summary-value">5 selected</div>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn"><i class="fa-solid fa-bolt"></i> Use Suggested Settings</button>
+            <button class="btn ghost">Review Settings</button>
+          </div>
+        </div>
+
+        <div class="wizard-progress">
+          <div class="wizard-step-bar done"></div>
+          <div class="wizard-step-bar current"></div>
+          <div class="wizard-step-bar"></div>
+        </div>
+        <div class="wizard-step-meta">
+          <span>Step 02 of 03</span>
+          <span>Movement Profile</span>
+        </div>
+
+        <div class="wizard-q">How much do these items move?</div>
+        <div class="wizard-help">
+          Tell us about the assets you're tracking. We'll use this to set freshness windows, confirmation rules, and alert sensitivity. You can change this later — it'll only affect future evaluations.
+        </div>
+
+        <div class="options">
+          <div class="option">
+            <div class="option-radio"></div>
+            <div class="option-body">
+              <div class="option-title">They stay put</div>
+              <div class="option-desc">Items that shouldn't normally move from where you've placed them. Tools in a workshop, equipment in a yard, instruments in a lab.</div>
+            </div>
+          </div>
+          <div class="option">
+            <div class="option-radio"></div>
+            <div class="option-body">
+              <div class="option-title">They move occasionally</div>
+              <div class="option-desc">Items that move sometimes, slowly. Livestock, parked vehicles, mobility aids, luggage during a trip.</div>
+            </div>
+          </div>
+          <div class="option selected">
+            <div class="option-radio"></div>
+            <div class="option-body">
+              <div class="option-title">They move regularly <span class="badge">Suggested</span></div>
+              <div class="option-desc">Items carried or moved day-to-day. Personal belongings, shared equipment, items being delivered. <em>— based on movement patterns over the last 23 days</em></div>
+            </div>
+          </div>
+          <div class="option">
+            <div class="option-radio"></div>
+            <div class="option-body">
+              <div class="option-title">They're usually in transit</div>
+              <div class="option-desc">Items actively being moved most of the time. Couriered packages, vehicles on the road, items being actively carried.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wizard-foot">
+          <button class="btn ghost"><i class="fa-solid fa-arrow-left"></i> Back</button>
+          <button class="btn">Continue <i class="fa-solid fa-arrow-right"></i></button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SCREEN 4: ARCHIVE                            -->
+    <!-- ============================================ -->
+    <div class="screen" id="screen-archive" style="display:none">
+
+      <div class="page-header">
+        <div class="page-title">
+          <i class="fa-solid fa-box-archive"></i>
+          Archive
+        </div>
+        <div class="search-box">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" placeholder="Search archived hives...">
+        </div>
+      </div>
+
+      <div class="info-strip">
+        <i class="fa-solid fa-circle-info"></i>
+        <div>
+          <b>Heads up</b> — archived hives are read-only. Tags from these hives have been released and are available for new hives. Permanently delete any time to remove all data immediately.
+        </div>
+      </div>
+
+      <div class="hive-grid">
+
+        <div class="hive-card" style="border-top-color: var(--text-muted); opacity: 0.92">
+          <div class="card-head">
+            <div class="card-head-left">
+              <i class="fa-solid fa-box-archive card-head-icon" style="color: var(--text-muted)"></i>
+              <div>
+                <div class="card-name" style="color: var(--text-secondary)">Holiday Trip — Italy</div>
+                <div class="card-sub" style="color: var(--text-tertiary)">Archived · User Deleted</div>
+              </div>
+            </div>
+            <div class="status-dot muted"></div>
+          </div>
+          <div class="card-body">
+            <div class="card-row"><span class="row-label">Hive ID</span><span class="row-value">HV-1F44</span></div>
+            <div class="card-row"><span class="row-label">Lifetime</span><span class="row-value">8 days</span></div>
+            <div class="card-row"><span class="row-label">Total Alerts</span><span class="row-value">3</span></div>
+            <div class="card-row"><span class="row-label">Tags</span><span class="row-value">5</span></div>
+            <div class="card-row"><span class="row-label">Profile</span><span class="row-value">Mobile</span></div>
+          </div>
+          <div class="expiry-block">
+            <i class="fa-solid fa-trash-can"></i>
+            Archived 12 Apr
+            <span class="days">Purges in 48d</span>
+          </div>
+          <div class="card-actions" style="grid-template-columns: 1fr 1fr 1fr;">
+            <button><i class="fa-solid fa-rotate-right"></i> Recreate</button>
+            <button><i class="fa-solid fa-clock-rotate-left"></i> History</button>
+            <button class="delete"><i class="fa-solid fa-trash"></i> Purge</button>
+          </div>
+        </div>
+
+        <div class="hive-card" style="border-top-color: var(--text-muted); opacity: 0.92">
+          <div class="card-head">
+            <div class="card-head-left">
+              <i class="fa-solid fa-box-archive card-head-icon" style="color: var(--text-muted)"></i>
+              <div>
+                <div class="card-name" style="color: var(--text-secondary)">Garden Set</div>
+                <div class="card-sub" style="color: var(--text-tertiary)">Archived · Expired</div>
+              </div>
+            </div>
+            <div class="status-dot muted"></div>
+          </div>
+          <div class="card-body">
+            <div class="card-row"><span class="row-label">Hive ID</span><span class="row-value">HV-2A88</span></div>
+            <div class="card-row"><span class="row-label">Lifetime</span><span class="row-value">60 days</span></div>
+            <div class="card-row"><span class="row-label">Total Alerts</span><span class="row-value">0</span></div>
+            <div class="card-row"><span class="row-label">Tags</span><span class="row-value">3</span></div>
+            <div class="card-row"><span class="row-label">Profile</span><span class="row-value">Stationary</span></div>
+          </div>
+          <div class="expiry-block urgent">
+            <i class="fa-solid fa-trash-can"></i>
+            Expired 03 Apr
+            <span class="days">Purges in 6d</span>
+          </div>
+          <div class="card-actions" style="grid-template-columns: 1fr 1fr 1fr;">
+            <button><i class="fa-solid fa-rotate-right"></i> Recreate</button>
+            <button><i class="fa-solid fa-clock-rotate-left"></i> History</button>
+            <button class="delete"><i class="fa-solid fa-trash"></i> Purge</button>
+          </div>
+        </div>
+
+        <div class="hive-card" style="border-top-color: var(--text-muted); opacity: 0.92">
+          <div class="card-head">
+            <div class="card-head-left">
+              <i class="fa-solid fa-box-archive card-head-icon" style="color: var(--text-muted)"></i>
+              <div>
+                <div class="card-name" style="color: var(--text-secondary)">Conference Kit</div>
+                <div class="card-sub" style="color: var(--text-tertiary)">Archived · User Deleted</div>
+              </div>
+            </div>
+            <div class="status-dot muted"></div>
+          </div>
+          <div class="card-body">
+            <div class="card-row"><span class="row-label">Hive ID</span><span class="row-value">HV-6E13</span></div>
+            <div class="card-row"><span class="row-label">Lifetime</span><span class="row-value">14 days</span></div>
+            <div class="card-row"><span class="row-label">Total Alerts</span><span class="row-value">7</span></div>
+            <div class="card-row"><span class="row-label">Tags</span><span class="row-value">4</span></div>
+            <div class="card-row"><span class="row-label">Profile</span><span class="row-value">Mobile</span></div>
+          </div>
+          <div class="expiry-block">
+            <i class="fa-solid fa-trash-can"></i>
+            Archived 22 Mar
+            <span class="days">Purges in 23d</span>
+          </div>
+          <div class="card-actions" style="grid-template-columns: 1fr 1fr 1fr;">
+            <button><i class="fa-solid fa-rotate-right"></i> Recreate</button>
+            <button><i class="fa-solid fa-clock-rotate-left"></i> History</button>
+            <button class="delete"><i class="fa-solid fa-trash"></i> Purge</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => {
+      s.classList.remove('active');
+      s.style.display = 'none';
+    });
+    const target = document.getElementById('screen-' + id);
+    target.classList.add('active');
+    target.style.display = 'block';
+
+    const titles = {
+      'list': 'HIVE Tracking',
+      'detail': 'HIVE Detail',
+      'wizard': 'New Hive',
+      'archive': 'Archive'
+    };
+    document.getElementById('page-title').textContent = titles[id] || 'HIVE';
+
+    document.querySelectorAll('[data-screen]').forEach(b => {
+      if (b.dataset.screen === id) b.classList.add('active');
+      else b.classList.remove('active');
+    });
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  document.querySelectorAll('[data-screen]').forEach(btn => {
+    btn.addEventListener('click', () => showScreen(btn.dataset.screen));
+  });
+  document.querySelectorAll('.option').forEach(opt => {
+    opt.addEventListener('click', () => {
+      opt.parentElement.querySelectorAll('.option').forEach(o => o.classList.remove('selected'));
+      opt.classList.add('selected');
+    });
+  });
+</script>
+
+</body>
+</html>

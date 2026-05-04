@@ -648,6 +648,7 @@ class NotificationPrefsOut(BaseModel):
     notify_geofence_exit: bool
     notify_battery_low: bool
     notify_offline: bool
+    notify_hive_breach: bool = True
     notify_via_email: bool
     notification_emails: Optional[List[str]] = None   # extra notification addresses
     # SMS
@@ -656,6 +657,7 @@ class NotificationPrefsOut(BaseModel):
     notify_geofence_sms: bool = True
     notify_battery_sms: bool = True
     notify_offline_sms: bool = True
+    notify_hive_breach_sms: bool = True
     # Whether the group has SMS enabled (read-only, for UI gating)
     group_sms_enabled: bool = False
 
@@ -668,6 +670,7 @@ class NotificationPrefsUpdate(BaseModel):
     notify_geofence_exit: Optional[bool] = None
     notify_battery_low: Optional[bool] = None
     notify_offline: Optional[bool] = None
+    notify_hive_breach: Optional[bool] = None
     notify_via_email: Optional[bool] = None
     notification_emails: Optional[List[str]] = None   # None = do not change; [] = clear all extra
     # SMS
@@ -676,6 +679,7 @@ class NotificationPrefsUpdate(BaseModel):
     notify_geofence_sms: Optional[bool] = None
     notify_battery_sms: Optional[bool] = None
     notify_offline_sms: Optional[bool] = None
+    notify_hive_breach_sms: Optional[bool] = None
 
 
 @router.get("/notifications", response_model=NotificationPrefsOut)
@@ -704,6 +708,8 @@ def update_notification_prefs(
         me.notify_battery_low = data.notify_battery_low
     if data.notify_offline is not None:
         me.notify_offline = data.notify_offline
+    if data.notify_hive_breach is not None:
+        me.notify_hive_breach = data.notify_hive_breach
     if data.notify_via_email is not None:
         me.notify_via_email = data.notify_via_email
     if data.notification_emails is not None:
@@ -731,6 +737,8 @@ def update_notification_prefs(
         me.notify_battery_sms = data.notify_battery_sms
     if data.notify_offline_sms is not None:
         me.notify_offline_sms = data.notify_offline_sms
+    if data.notify_hive_breach_sms is not None:
+        me.notify_hive_breach_sms = data.notify_hive_breach_sms
     db.commit()
     db.refresh(me)
     group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()

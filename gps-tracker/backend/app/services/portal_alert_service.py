@@ -115,8 +115,8 @@ _SMS_FLAG = {
     "geofence_entry":        "notify_geofence_sms",
     "geofence_exit":         "notify_geofence_sms",
     "gdpr_deletion_warning": "sms_enabled",
-    "hive_breach":           "sms_enabled",
-    "hive_breach_cleared":   "sms_enabled",
+    "hive_breach":           "notify_hive_breach_sms",
+    "hive_breach_cleared":   "notify_hive_breach_sms",
 }
 
 # ── Notify flag per alert type ────────────────────────────────────────────────
@@ -126,8 +126,8 @@ _NOTIFY_FLAG = {
     "geofence_entry":        "notify_geofence_exit",   # same preference covers both directions
     "geofence_exit":         "notify_geofence_exit",
     "gdpr_deletion_warning": "alerts_enabled",         # always send if alerts are on
-    "hive_breach":           "alerts_enabled",
-    "hive_breach_cleared":   "alerts_enabled",
+    "hive_breach":           "notify_hive_breach",
+    "hive_breach_cleared":   "notify_hive_breach",
 }
 
 
