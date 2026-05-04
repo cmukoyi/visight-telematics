@@ -10273,10 +10273,11 @@ function hiveDrawMap(d) {
 
     // Markers
     pts.forEach(t => {
-        const fc = t.is_outlier ? 'hive-outlier' :
-                   t.freshness === 'fresh' ? 'hive-fresh' :
-                   t.freshness === 'recent' ? 'hive-recent' :
-                   t.freshness === 'stale' ? 'hive-stale' : 'hive-lost';
+        // Live Position rule: every tag is GREEN unless it is the outlier in
+        // breach, in which case it is RED. Freshness is still shown in the
+        // tag table below via the freshness badge — the map itself uses a
+        // simple two-state palette so a breach is unmistakable at a glance.
+        const fc = t.is_outlier ? 'hive-outlier' : 'hive-fresh';
         const initials = (t.label || t.tag_id || '').substring(0,2).toUpperCase();
         const div = document.createElement('div');
         div.className = `hive-tag-marker ${fc}`;
