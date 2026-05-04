@@ -3017,16 +3017,6 @@
                   </div>
                 </div>
 
-                <!-- alert banner -->
-                <div id="hive-alert-banner" class="hive-alert-banner" style="display:none">
-                  <div class="hive-alert-banner-head">
-                    <div class="hive-alert-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                    <div id="hive-alert-banner-title" class="hive-alert-banner-title"></div>
-                  </div>
-                  <div id="hive-alert-banner-body" class="hive-alert-banner-body"></div>
-                  <div id="hive-alert-banner-meta" class="hive-alert-banner-meta"></div>
-                </div>
-
                 <div class="hive-detail">
                   <!-- left column: map + table -->
                   <div>
@@ -3092,6 +3082,15 @@
 
                   <!-- right column: alert + config + lifecycle + timeline -->
                   <div>
+                    <!-- alert banner -->
+                    <div id="hive-alert-banner" class="hive-alert-banner" style="display:none">
+                      <div class="hive-alert-banner-head">
+                        <div class="hive-alert-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                        <div id="hive-alert-banner-title" class="hive-alert-banner-title"></div>
+                      </div>
+                      <div id="hive-alert-banner-body" class="hive-alert-banner-body"></div>
+                      <div id="hive-alert-banner-meta" class="hive-alert-banner-meta"></div>
+                    </div>
                     <div class="hive-panel" style="margin-bottom:16px">
                       <div class="hive-panel-head">
                         <div class="hive-panel-title"><i class="fa-solid fa-sliders"></i> Configuration</div>
@@ -3119,7 +3118,7 @@
                     <div class="hive-panel">
                       <div class="hive-panel-head">
                         <div class="hive-panel-title"><i class="fa-solid fa-clock-rotate-left"></i> Recent Activity</div>
-                        <div class="hive-panel-meta">last 24h</div>
+                        <div class="hive-panel-meta">last 7 days</div>
                       </div>
                       <div class="hive-panel-body"><div id="hive-timeline" class="hive-timeline"></div></div>
                     </div>
@@ -10115,13 +10114,15 @@ function hiveDrawMap(d) {
     const pxPct = p => (50 + p.mx * scale / W * 100);
     const pyPct = p => (50 + p.my * scale / H * 100);
 
-    // Threshold circle
-    const circlePx = threshold * scale / Math.min(W, H) * 100;
-    circleEl.style.width = (circlePx * 2) + '%';
-    circleEl.style.height = 'auto';
-    circleEl.style.aspectRatio = '1';
+    // Threshold circle (centred on canvas centroid; diameter in real px)
+    const diamPx = Math.max(20, 2 * threshold * scale);
+    circleEl.style.width  = diamPx + 'px';
+    circleEl.style.height = diamPx + 'px';
+    circleEl.style.aspectRatio = '';
     circleEl.style.display = '';
     labelEl.textContent = `Threshold · ${threshold}m`;
+    // Place label above the circle (slightly outside the top edge)
+    labelEl.style.transform = `translate(-50%, calc(-50% - ${diamPx/2 + 14}px))`;
     labelEl.style.display = '';
 
     // SVG lines
@@ -10222,7 +10223,10 @@ function hiveOpenConfigModal() {
     const cfg = _hiveLastDetail.config || {};
     document.getElementById('hive-cfg-profile').value = cfg.mobility_profile || 'mobile';
     const thr = cfg.distance_threshold_m || 100;
-    document.getElementById('hive-cfg-threshold').value = thr;
+    const slider = document.getElementById('hive-cfg-threshold');
+    // Allow slider to accommodate existing larger thresholds
+    slider.max = Math.max(2000, thr * 2);
+    slider.value = thr;
     document.getElementById('hive-cfg-threshold-val').textContent = thr;
     document.getElementById('hive-cfg-err').style.display = 'none';
     document.getElementById('hiveConfigModal').classList.add('active');

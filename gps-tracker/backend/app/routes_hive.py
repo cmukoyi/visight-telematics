@@ -548,8 +548,8 @@ def get_hive(hive_id: str, request: Request, db: Session = Depends(get_db)):
             if tid in tag_max_dist:
                 td["distance_from_centre_m"] = round(tag_max_dist[tid], 1)
 
-    # Recent events (last 24 h)
-    cutoff = datetime.now(UTC) - timedelta(hours=24)
+    # Recent events (last 7 days)
+    cutoff = datetime.now(UTC) - timedelta(days=7)
     recent_events = (
         db.query(HiveEvent)
         .filter(HiveEvent.hive_id == hive_id, HiveEvent.occurred_at >= cutoff)
