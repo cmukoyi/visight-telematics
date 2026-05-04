@@ -38,6 +38,11 @@ log = logging.getLogger(__name__)
 
 UTC = timezone.utc
 
+# Re-notify the group every N hours while a hive remains in BREACHING state.
+# Default 24h. Override with env HIVE_BREACH_RENOTIFY_HOURS.
+import os as _os
+HIVE_BREACH_RENOTIFY_HOURS = float(_os.getenv("HIVE_BREACH_RENOTIFY_HOURS", "24"))
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Geometry helpers
 # ──────────────────────────────────────────────────────────────────────────────
@@ -264,11 +269,33 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
 
     db.commit()
 
+    # Fire alerts on state edge AND re-notify if hive remains BREACHING for
+    # more than HIVE_BREACH_RENOTIFY_HOURS without a delivered notification.
+    # The latter guards against the original alert failing silently.
+    should_alert = state_changed
+    if not state_changed and new_state == "BREACHING":
+        last_alert = getattr(live, "last_alert_at", None)
+        if last_alert is None:
+            should_alert = True  # never delivered an alert for this breach
+        else:
+            try:
+                hours = (now - last_alert).total_seconds() / 3600.0
+            except Exception:
+                hours = 0
+            if hours >= HIVE_BREACH_RENOTIFY_HOURS:
+                should_alert = True
+
     if state_changed:
         log.info("HIVE %s state transition: %s → %s (diameter=%.0fm)",
                  hive_id, prev_state, new_state, diameter_m or 0)
-        _maybe_send_hive_alert(hive, new_state, prev_state, diameter_m,
-                                outlier_id, cfg, db)
+
+    if should_alert:
+        delivered = _maybe_send_hive_alert(hive, new_state, prev_state, diameter_m,
+                                           outlier_id, cfg, db,
+                                           force_renotify=not state_changed)
+        if delivered:
+            live.last_alert_at = now
+            db.commit()
 
     return new_state
 
@@ -288,12 +315,13 @@ def _describe_tag(tag_id, db: Session):
 def _maybe_send_hive_alert(hive: Hive, new_state: str, prev_state: str,
                             diameter_m: Optional[float],
                             outlier_tag_id,
-                            cfg, db: Session) -> None:
+                            cfg, db: Session,
+                            force_renotify: bool = False) -> bool:
     """Fire a portal alert + email/SMS when a hive enters or clears a breach.
 
-    Includes the outlier tag (the one that left the cluster) in the title,
-    message body and meta so notifications identify *which* IMEI triggered
-    the breach.
+    Returns True if a notification was actually dispatched (so the caller can
+    persist last_alert_at). force_renotify=True bypasses the state-edge guard
+    and is used by the periodic 'still in breach' reminder.
     """
     from app.services import portal_alert_service as _pas
 
@@ -311,7 +339,8 @@ def _maybe_send_hive_alert(hive: Hive, new_state: str, prev_state: str,
 
     if new_state == "BREACHING":
         alert_type = "hive_breach"
-        title      = f"🔴 HIVE Breach: {hive.name}{outlier_suffix}"
+        prefix = "🔴 HIVE Breach" if not force_renotify else "🔴 HIVE Still in Breach"
+        title      = f"{prefix}: {hive.name}{outlier_suffix}"
         if outlier_label:
             message = (
                 f"Tag {outlier_label}"
@@ -332,7 +361,7 @@ def _maybe_send_hive_alert(hive: Hive, new_state: str, prev_state: str,
             f"Current spread: {km}."
         )
     else:
-        return  # BREACH_PENDING / RESOLVING don't warrant alerts
+        return False  # BREACH_PENDING / RESOLVING don't warrant alerts
 
     meta_data = {
         "hive_id": str(hive.id),
@@ -350,8 +379,12 @@ def _maybe_send_hive_alert(hive: Hive, new_state: str, prev_state: str,
         _pas._notify_group_by_email(db, gid, alert_type, title, message,
                                     meta_data=meta_data)
         _pas._notify_group_by_sms(db, gid, alert_type, title, message)
+        return True
     except Exception as exc:
-        log.error("Failed to send hive alert for %s: %s", hive.id, exc)
+        import traceback as _tb
+        log.error("Failed to send hive alert for %s: %s\n%s",
+                  hive.id, exc, _tb.format_exc())
+        return False
 
 
 def _current_config(hive_id: str, db: Session) -> Optional[HiveConfigVersion]:

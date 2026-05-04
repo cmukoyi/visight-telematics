@@ -665,5 +665,9 @@ class HiveLiveState(Base):
     pending_breach_since  = Column(DateTime(timezone=True), nullable=True)
     pending_clear_since   = Column(DateTime(timezone=True), nullable=True)
     consecutive_confirms  = Column(Integer, nullable=False, default=0)
+    # Most recent time a hive_breach alert was actually dispatched. Used to
+    # re-notify if a hive stays in BREACHING for a long time without a state
+    # change (e.g. when the original notification failed silently).
+    last_alert_at         = Column(DateTime(timezone=True), nullable=True)
 
     hive = relationship("Hive", back_populates="live_state")
