@@ -867,15 +867,15 @@
     0 0 24px color-mix(in srgb,var(--hive-green) 18%,transparent);
 }
 #tab-hive .hive-threshold-circle.hive-threshold-breaching {
-  border-color: color-mix(in srgb,var(--hive-red) 65%,transparent);
+  border-color: color-mix(in srgb,var(--hive-red) 75%,transparent);
   background:
     radial-gradient(circle,
-      color-mix(in srgb,var(--hive-red) 8%,transparent) 0%,
-      color-mix(in srgb,var(--hive-red) 4%,transparent) 60%,
-      transparent 100%);
+      color-mix(in srgb,var(--hive-red) 18%,transparent) 0%,
+      color-mix(in srgb,var(--hive-red) 10%,transparent) 60%,
+      color-mix(in srgb,var(--hive-red) 4%,transparent) 100%);
   box-shadow:
-    inset 0 0 30px color-mix(in srgb,var(--hive-red) 14%,transparent),
-    0 0 28px color-mix(in srgb,var(--hive-red) 22%,transparent);
+    inset 0 0 40px color-mix(in srgb,var(--hive-red) 22%,transparent),
+    0 0 32px color-mix(in srgb,var(--hive-red) 28%,transparent);
 }
 #tab-hive .hive-threshold-label {
   position:absolute;top:50%;left:50%;transform:translate(-50%,-210%);
@@ -1017,16 +1017,18 @@ input.hive-range::-moz-range-track {
 }
 #tab-hive .hive-diameter-num  { font-size:40px;font-weight:700;line-height:1;letter-spacing:-.02em;color:var(--hive-red); }
 #tab-hive .hive-diameter-unit { font-size:15px;color:var(--hive-text3);font-weight:400;margin-left:2px; }
-#tab-hive .hive-diameter-bar  { height:8px;background:var(--hive-card);border-radius:4px;position:relative;overflow:visible;margin-bottom:2px; }
-#tab-hive .hive-diameter-bar-fill { height:100%;background:linear-gradient(90deg,var(--hive-green),var(--hive-red));border-radius:4px; }
+#tab-hive .hive-diameter-bar  { height:8px;background:var(--hive-card);border-radius:4px;position:relative;overflow:visible;margin:18px 0 8px; }
+#tab-hive .hive-diameter-bar-fill { height:100%;background:linear-gradient(90deg,var(--hive-green),var(--hive-amber) 70%,var(--hive-red));border-radius:4px;transition:width .3s ease; }
+#tab-hive .hive-diameter-bar-fill.hive-bar-breaching { background:var(--hive-red); }
 #tab-hive .hive-threshold-mark {
-  position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--hive-green);
+  position:absolute;top:-5px;bottom:-5px;width:3px;background:var(--hive-blue);border-radius:2px;
+  box-shadow:0 0 8px color-mix(in srgb,var(--hive-blue) 60%,transparent);
 }
 #tab-hive .hive-threshold-mark::after {
-  content:attr(data-label);position:absolute;top:-16px;left:50%;transform:translateX(-50%);
-  font-size:9px;color:var(--hive-green);font-weight:600;white-space:nowrap;letter-spacing:.06em;
+  content:attr(data-label);position:absolute;top:-20px;left:50%;transform:translateX(-50%);
+  font-size:10px;color:var(--hive-blue);font-weight:600;white-space:nowrap;letter-spacing:.06em;
 }
-#tab-hive .hive-diameter-state { font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--hive-text2); }
+#tab-hive .hive-diameter-state { font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--hive-text2); }
 
 /* tag table */
 #tab-hive .hive-tag-table { width:100%;border-collapse:collapse; }
@@ -10074,14 +10076,38 @@ function hiveRenderDetail(d) {
     const diamEl = document.getElementById('hive-diameter-num');
     diamEl.textContent = diam != null ? Math.round(diam) : '—';
     diamEl.style.color = isAlert ? 'var(--hive-red)' : 'var(--hive-green)';
+    // Bar fill: shows diameter relative to threshold. Caps at 100% (the
+    // threshold marker conveys position when in breach).
     const pct = diam != null ? Math.min(100, Math.round(diam / threshold * 100)) : 0;
-    document.getElementById('hive-diameter-bar').style.width = pct + '%';
-    const thresholdPct = Math.min(95, Math.max(5, Math.round(threshold / Math.max(threshold, diam||threshold) * 100)));
+    const barEl = document.getElementById('hive-diameter-bar');
+    barEl.style.width = pct + '%';
+    barEl.classList.toggle('hive-bar-breaching', isAlert);
+    // Threshold marker position on bar (always visible). When diameter exceeds
+    // threshold, the marker sits to the left of the fill end (showing how far
+    // over we are); when under, it sits to the right.
+    const barMax = Math.max(threshold, diam || threshold);
+    const thresholdPct = Math.min(95, Math.max(5, Math.round(threshold / barMax * 100)));
     const tmEl = document.getElementById('hive-threshold-mark');
-    if (tmEl) { tmEl.style.left = thresholdPct + '%'; tmEl.style.display = ''; tmEl.setAttribute('data-label', `THRESHOLD ${threshold}m`); }
+    if (tmEl) { tmEl.style.left = thresholdPct + '%'; tmEl.style.display = ''; tmEl.setAttribute('data-label', `THRESHOLD ${threshold}M`); }
     const stateEl = document.getElementById('hive-diameter-state');
-    stateEl.textContent = state === 'BREACHING' ? `Breaching · ${diam ? Math.round(diam - threshold) : '?'}m over` : state === 'OK' ? 'Together' : state;
-    stateEl.style.color = state === 'BREACHING' ? 'var(--hive-red)' : state === 'OK' ? 'var(--hive-green)' : 'var(--hive-amber)';
+    if (state === 'BREACHING') {
+        const over = diam ? Math.round(diam - threshold) : '?';
+        stateEl.textContent = `BREACHING · ${over}M OVER`;
+        stateEl.style.color = 'var(--hive-red)';
+    } else if (state === 'BREACH_PENDING') {
+        const over = diam ? Math.round(diam - threshold) : '?';
+        stateEl.textContent = `SUSPECTED BREACH · ${over}M OVER`;
+        stateEl.style.color = 'var(--hive-amber)';
+    } else if (state === 'OK') {
+        stateEl.textContent = 'TOGETHER';
+        stateEl.style.color = 'var(--hive-green)';
+    } else if (state === 'RESOLVING') {
+        stateEl.textContent = 'CLEARING';
+        stateEl.style.color = 'var(--hive-amber)';
+    } else {
+        stateEl.textContent = state || '—';
+        stateEl.style.color = 'var(--hive-text2)';
+    }
 
     // updated timestamp
     document.getElementById('hive-detail-updated').textContent = d.last_evaluated_at ? 'Updated ' + _hiveRelTime(d.last_evaluated_at) : '';
