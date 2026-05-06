@@ -2161,9 +2161,14 @@ def get_sendgrid_stats(
     import os, httpx
     from datetime import date
 
-    api_key = os.getenv("SENDGRID_API_KEY", "")
+    api_key = (
+        os.getenv("TWILIO_API_KEY", "") or
+        os.getenv("TWILIO_API_SECRET", "") or
+        os.getenv("TWILIO_AUTH_TOKEN", "") or
+        os.getenv("SENDGRID_API_KEY", "")
+    )
     if not api_key:
-        raise HTTPException(status_code=503, detail="SENDGRID_API_KEY not configured")
+        raise HTTPException(status_code=503, detail="Email API key not configured")
 
     end_date = date.today().isoformat()
     url = (

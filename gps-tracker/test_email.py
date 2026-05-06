@@ -13,12 +13,16 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend"))
 
 # --- Config ---
 to_email = sys.argv[1] if len(sys.argv) > 1 else "test@example.com"
-api_key  = sys.argv[2] if len(sys.argv) > 2 else os.getenv("SENDGRID_API_KEY", "")
+api_key  = sys.argv[2] if len(sys.argv) > 2 else (
+    os.getenv("TWILIO_API_KEY") or
+    os.getenv("TWILIO_AUTH_TOKEN") or
+    os.getenv("SENDGRID_API_KEY", "")
+)
 
 if not api_key:
-    print("❌  No SendGrid API key supplied.\n"
+    print("❌  No email API key supplied.\n"
           "    Usage: python test_email.py <to_email> <api_key>\n"
-          "    Or set SENDGRID_API_KEY in your environment.")
+          "    Or set TWILIO_API_KEY, TWILIO_AUTH_TOKEN, or SENDGRID_API_KEY in your environment.")
     sys.exit(1)
 
 os.environ["SENDGRID_API_KEY"] = api_key

@@ -16,9 +16,21 @@ except ImportError:
 
 class EmailService:
     def __init__(self):
-        # SendGrid configuration (preferred for production)
+        # Email API configuration (Twilio SendGrid-compatible credentials)
+        self.twilio_api_key = os.getenv("TWILIO_API_KEY", "")
+        self.twilio_api_secret = os.getenv("TWILIO_API_SECRET", "")
+        self.twilio_auth_token = os.getenv("TWILIO_AUTH_TOKEN", "")
         self.sendgrid_api_key = os.getenv("SENDGRID_API_KEY", "")
-        self.use_sendgrid = bool(self.sendgrid_api_key) and SENDGRID_AVAILABLE
+
+        # Prefer new Twilio email credentials first, then fall back to existing SendGrid key.
+        self.email_api_key = (
+            self.twilio_api_key or
+            self.twilio_api_secret or
+            self.twilio_auth_token or
+            self.sendgrid_api_key
+        )
+        self.use_sendgrid = bool(self.email_api_key) and SENDGRID_AVAILABLE
+        self.email_provider = "Twilio" if self.twilio_api_key or self.twilio_api_secret or self.twilio_auth_token else "SendGrid"
         
         # SMTP configuration (fallback or development)
         self.smtp_host = os.getenv("SMTP_HOST", "mailhog")
@@ -30,7 +42,7 @@ class EmailService:
         
         # Log email service configuration
         if self.use_sendgrid:
-            print("📧 Email Service: Using SendGrid API")
+            print(f"📧 Email Service: Using {self.email_provider} API")
         else:
             print(f"📧 Email Service: Using SMTP ({self.smtp_host}:{self.smtp_port})")
         
@@ -582,19 +594,19 @@ Pinplot Team
             tracking_settings.click_tracking = ClickTracking(enable=False, enable_text=False)
             message.tracking_settings = tracking_settings
             
-            sg = SendGridAPIClient(self.sendgrid_api_key)
+            sg = SendGridAPIClient(self.email_api_key)
             response = sg.send(message)
             
             if response.status_code >= 200 and response.status_code < 300:
-                print(f"✅ Email sent via SendGrid to {to_email} (Status: {response.status_code})")
+                print(f"✅ Email sent via {self.email_provider} to {to_email} (Status: {response.status_code})")
                 return True
             else:
-                print(f"⚠️  SendGrid returned status {response.status_code}")
+                print(f"⚠️  {self.email_provider} returned status {response.status_code}")
                 return False
                 
         except Exception as e:
-            print(f"❌ Error sending email via SendGrid: {e}")
-            # Print SendGrid response body for diagnosis
+            print(f"❌ Error sending email via {self.email_provider}: {e}")
+            # Print response body for diagnosis
             if hasattr(e, 'body'):
                 print(f"❌ SendGrid error body: {e.body}")
             if hasattr(e, 'status_code'):
