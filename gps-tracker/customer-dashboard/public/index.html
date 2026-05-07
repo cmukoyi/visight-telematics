@@ -4057,11 +4057,40 @@ function addPinplotBasemap(map) {
     _ppMapTilerLayers.push({ map, layer });
     return layer;
 }
+// Swap basemap by removing the old tile layer and adding a fresh one.
+// Using setUrl() alone leaves the old tiles cached visually until the next
+// zoom/pan, which manifests as a "blank map" after the theme toggle. A clean
+// remove+add forces Leaflet to fetch and paint the new style immediately.
 function _ppRefreshAllBasemaps() {
+    const newAttribution = '&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors';
     const newUrl = _ppMapTilerUrl();
+    const refreshed = [];
     _ppMapTilerLayers.forEach(entry => {
-        try { entry.layer.setUrl(newUrl); } catch (_) {}
+        const { map, layer } = entry;
+        try {
+            // Replace the layer entirely so tiles are redrawn even when the
+            // map view hasn't changed (Leaflet won't repaint same-zoom tiles
+            // after a setUrl unless the view is invalidated).
+            map.removeLayer(layer);
+            const fresh = L.tileLayer(newUrl, {
+                maxZoom: 20,
+                tileSize: 512,
+                zoomOffset: -1,
+                crossOrigin: true,
+                attribution: newAttribution
+            }).addTo(map);
+            // Force Leaflet to recompute container size + redraw immediately.
+            map.invalidateSize({ animate: false });
+            refreshed.push({ map, layer: fresh });
+        } catch (_) {
+            // If swap failed for any reason, keep the original entry so we
+            // don't lose the registry mapping.
+            refreshed.push(entry);
+        }
     });
+    // Replace registry contents in-place
+    _ppMapTilerLayers.length = 0;
+    refreshed.forEach(e => _ppMapTilerLayers.push(e));
 }
 
 function applyTheme(theme) {
