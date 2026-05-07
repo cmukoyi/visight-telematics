@@ -514,18 +514,21 @@ input, select, textarea { font-family: var(--font); }
 .asset-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
+  gap: 10px;
+  padding: 10px 12px;
   cursor: pointer;
-  transition: var(--transition);
-  border: 1px solid transparent;
-  margin-bottom: 2px;
+  transition: background .15s ease, border-color .15s ease;
+  border-left: 3px solid transparent;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-1);
+  border-radius: 0;
+  margin: 0;
 }
+#lm-asset-list .asset-row:last-child { border-bottom: none; }
 .asset-row:hover { background: var(--bg-3); }
 .asset-row.selected {
   background: var(--bg-4);
-  border-color: var(--primary);
+  border-left-color: var(--primary);
 }
 
 .asset-row-icon {
@@ -1407,6 +1410,27 @@ tbody tr:hover { background: var(--bg-3); }
 }
 .leaflet-popup-tip { background: var(--bg-2) !important; }
 .leaflet-popup-content { margin: 12px !important; font-size: .82rem; line-height: 1.5; }
+
+/* Permanent POI / geofence name labels on the map */
+.leaflet-tooltip.poi-label {
+  background: rgba(17, 24, 39, .82);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .2px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.25);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.leaflet-tooltip.poi-label::before { display: none; }
+[data-theme="light"] .leaflet-tooltip.poi-label {
+  background: rgba(255, 255, 255, .92);
+  color: #1f2937;
+  border: 1px solid rgba(0,0,0,.08);
+}
 
 /* ── Empty state ───────────────────────────────────────────── */
 .empty-list {

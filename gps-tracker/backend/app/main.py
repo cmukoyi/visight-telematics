@@ -1595,9 +1595,20 @@ def update_tag_attributes(
         # Persist device_name if provided alongside attributes
         new_device_name = attributes_data.get('device_name')
         if new_device_name is not None:
-            tag.device_name = new_device_name.strip() or None
+            cleaned = new_device_name.strip() or None
+            tag.device_name = cleaned
+            # Keep portal `description` in sync with Flutter `device_name` so both UIs
+            # show the same custom label. Also mark `_user_named` so background pollers
+            # never overwrite this name with vendor-API values.
+            tag.description = cleaned
+            attrs_meta = dict(tag.attributes or {})
+            if cleaned:
+                attrs_meta['_user_named'] = True
+            else:
+                attrs_meta.pop('_user_named', None)
+            tag.attributes = attrs_meta
             if debug:
-                print(f"✏️  Updating device_name to: {tag.device_name}")
+                print(f"✏️  Updating device_name & description to: {cleaned}")
         
         # Validate structure - each attribute should have value and show_on_map
         for attr_name, attr_value in attrs.items():

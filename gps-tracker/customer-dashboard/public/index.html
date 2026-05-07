@@ -8740,9 +8740,56 @@ function _lmRenderPOIs() {
         if (!layer) return;
         const armedTxt = armed ? `<br><span style="color:#10B981;font-weight:600">Armed: ${gf.armed_count} tag${gf.armed_count>1?'s':''}</span>` : '<br><span style="color:var(--text-3)">Not armed</span>';
         layer.bindPopup(`<strong>${esc(gf.name||'Geofence')}</strong>${gf.address?'<br><small>'+esc(gf.address)+'</small>':''}${armedTxt}`);
+        // Permanent name label so users can identify each POI at a glance
+        const labelLatLng = (typeof layer.getBounds === 'function')
+            ? layer.getBounds().getCenter()
+            : (typeof layer.getLatLng === 'function' ? layer.getLatLng() : null);
+        if (labelLatLng) {
+            layer.bindTooltip(esc(gf.name || 'Geofence'), {
+                permanent: true,
+                direction: 'center',
+                className: 'poi-label',
+                opacity: 0.95
+            });
+        }
         layer.addTo(_liveMap);
         _lmPOILayers.push(layer);
     });
+    // After drawing, intelligently frame the map so POIs are visible.
+    _lmFrameAfterPOIToggle();
+}
+
+// Fit the map so that visible tags + POIs are framed, OR zoom to the
+// POI nearest the currently-selected tag if one is selected.
+function _lmFrameAfterPOIToggle() {
+    if (!_liveMap || !_lmPOILayers.length) return;
+    const poiBounds = L.featureGroup(_lmPOILayers).getBounds();
+    if (!poiBounds.isValid()) return;
+
+    // If a tag is selected and has GPS, fly to the nearest POI's centre.
+    if (_lmSelected && _lmMarkers[_lmSelected]) {
+        const selLL = _lmMarkers[_lmSelected].getLatLng();
+        let nearest = null, nearestDist = Infinity;
+        _lmPOILayers.forEach(ly => {
+            const c = (typeof ly.getBounds === 'function')
+                ? ly.getBounds().getCenter()
+                : (typeof ly.getLatLng === 'function' ? ly.getLatLng() : null);
+            if (!c) return;
+            const d = selLL.distanceTo(c);
+            if (d < nearestDist) { nearestDist = d; nearest = c; }
+        });
+        if (nearest) {
+            const combinedBounds = L.latLngBounds([selLL, nearest]);
+            _liveMap.flyToBounds(combinedBounds, { padding: [60,60], maxZoom: 16, duration: 0.6 });
+            return;
+        }
+    }
+    // Otherwise: fit to all tags + POIs so user sees the full picture.
+    const tagLLs = Object.values(_lmMarkers).map(m => m.getLatLng());
+    const allBounds = tagLLs.length
+        ? L.latLngBounds(tagLLs).extend(poiBounds)
+        : poiBounds;
+    _liveMap.flyToBounds(allBounds, { padding: [40,40], maxZoom: 16, duration: 0.6 });
 }
 
 function _lmMarkerIcon(tag) {
@@ -8765,8 +8812,28 @@ function _lmMarkerIcon(tag) {
 async function initLiveMap() {
     // Init Leaflet map once
     if (!_lmMapReady) {
-        _liveMap = L.map('liveMap', { zoomControl: true }).setView([-25.7479, 28.2293], 12);
+        _liveMap = L.map('liveMap', {
+            zoomControl: true,
+            zoomSnap: 0.25,
+            zoomDelta: 0.5,
+            wheelPxPerZoomLevel: 80,   // smoother scroll-wheel zoom
+            scrollWheelZoom: true,     // already default — wheel zooms toward cursor
+            doubleClickZoom: true
+        }).setView([-25.7479, 28.2293], 12);
         addPinplotBasemap(_liveMap);
+        // Keep the currently-selected tag/POI centered when using +/- zoom buttons
+        // (scroll-wheel already zooms toward cursor; this fixes button-zoom UX).
+        _liveMap.on('zoomstart', () => {
+            if (_lmSelected && _lmMarkers[_lmSelected]) {
+                _liveMap.options._ppKeepCentre = _lmMarkers[_lmSelected].getLatLng();
+            } else {
+                _liveMap.options._ppKeepCentre = null;
+            }
+        });
+        _liveMap.on('zoomend', () => {
+            const ll = _liveMap.options._ppKeepCentre;
+            if (ll) _liveMap.panTo(ll, { animate: true, duration: 0.25 });
+        });
         _lmMapReady = true;
         // Force Leaflet to recalculate container size in case the tile was
         // painted before layout was fully computed (e.g. on first login).
@@ -8904,6 +8971,9 @@ function lmShareTag(imei, ev) {
 function _lmRenderList(query) {
     query = (query || document.getElementById('lm-search')?.value || '').toLowerCase();
     const list = _lmTags.filter(t => {
+        // Skip rows with no IMEI — they cannot be tracked or actioned and would
+        // appear as visually-blank rows in the Live Assets list.
+        if (!t.imei) return false;
         if (_lmCatFilter !== 'all' && t.category_id !== _lmCatFilter) return false;
         if (_lmStatusFilter !== 'all' && _lmStatusClass(t) !== _lmStatusFilter) return false;
         if (!query) return true;
@@ -8917,7 +8987,9 @@ function _lmRenderList(query) {
     }
     container.innerHTML = list.map(t => {
         const status = _lmStatusClass(t);
-        const label  = esc(t.description || t.device_name || t.imei);
+        // Custom name comes from either field (kept in sync by the backend)
+        const customName = t.description || t.device_name || '';
+        const label  = esc(customName || t.imei);
         const hasGPS = !!(t.latitude && t.longitude);
         const cls    = _lmSelected === t.imei ? ' selected' : '';
         const statusColors = { active: 'var(--success)', inactive: 'var(--danger)', stock: 'var(--text-3)' };
@@ -8934,7 +9006,7 @@ function _lmRenderList(query) {
             </div>
             <div class="asset-row-info">
                 <span class="asset-row-name">${label}</span>
-                <span class="asset-row-tag">${esc(t.imei)}</span>
+                <span class="asset-row-tag mono">${esc(t.imei)}</span>
             </div>
             <div class="asset-row-right">
                 <span class="status-dot status-${status}"></span>

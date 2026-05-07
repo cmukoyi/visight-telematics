@@ -1259,11 +1259,15 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
         raise HTTPException(status_code=404, detail="Tag not found in your group")
 
     if data.description is not None:
-        tag.description = data.description or None
+        cleaned = data.description or None
+        tag.description = cleaned
+        # Keep Flutter `device_name` in sync with portal `description` so both UIs
+        # show the same custom label.
+        tag.device_name = cleaned
         # Track whether the user has explicitly named this tag so the poller
         # never overwrites it with whatever the vendor API returns.
         attrs = dict(tag.attributes or {})
-        if data.description:
+        if cleaned:
             attrs['_user_named'] = True   # user has set a custom name
         else:
             attrs.pop('_user_named', None)  # cleared name — allow API to fill it again
