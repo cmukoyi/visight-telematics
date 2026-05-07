@@ -1390,8 +1390,9 @@ tbody tr:hover { background: var(--bg-3); }
 }
 
 /* ── Leaflet overrides ─────────────────────────────────────── */
-.leaflet-container { background: #0F1117; }
-.leaflet-tile { filter: brightness(.85) saturate(.7) hue-rotate(200deg); }
+.leaflet-container { background: #aadaff; }
+[data-theme="dark"] .leaflet-container { background: #0F1117; }
+/* No hue-rotate filter — MapTiler provides proper light & dark basemaps */
 .leaflet-control-zoom a {
   background: var(--bg-2) !important;
   color: var(--text) !important;

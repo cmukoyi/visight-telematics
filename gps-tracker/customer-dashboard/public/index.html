@@ -4034,6 +4034,36 @@ function showDashboard(user, group, effectiveFeatures) {
 // ══════════════════════════════════════════
 // Theme (light / dark)
 // ══════════════════════════════════════════
+
+// ── MapTiler basemap helper (used by all Leaflet maps) ────────────────────
+const MAPTILER_KEY = 'dGpcH37X0pIcdJ0V5aOy';
+const _ppMapTilerLayers = []; // { map, layer } registry so we can swap on theme change
+function _ppMapTilerStyle() {
+    return document.documentElement.getAttribute('data-theme') === 'dark'
+        ? 'streets-v2-dark'
+        : 'streets-v2';
+}
+function _ppMapTilerUrl(style) {
+    return `https://api.maptiler.com/maps/${style || _ppMapTilerStyle()}/{z}/{x}/{y}{r}.png?key=${MAPTILER_KEY}`;
+}
+function addPinplotBasemap(map) {
+    const layer = L.tileLayer(_ppMapTilerUrl(), {
+        maxZoom: 20,
+        tileSize: 512,
+        zoomOffset: -1,
+        crossOrigin: true,
+        attribution: '&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors'
+    }).addTo(map);
+    _ppMapTilerLayers.push({ map, layer });
+    return layer;
+}
+function _ppRefreshAllBasemaps() {
+    const newUrl = _ppMapTilerUrl();
+    _ppMapTilerLayers.forEach(entry => {
+        try { entry.layer.setUrl(newUrl); } catch (_) {}
+    });
+}
+
 function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('pp-theme', theme);
@@ -4045,6 +4075,8 @@ function applyTheme(theme) {
     if (typeof FP !== 'undefined' && FP.drawAll) FP.drawAll();
     // Re-render QR preview (corner-colour contrast may change)
     if (typeof QRG !== 'undefined' && QRG.generate) QRG.generate();
+    // Swap MapTiler basemap style on all registered Leaflet maps
+    _ppRefreshAllBasemaps();
     // Re-apply logo variant for the new theme (dark vs light logo)
     try {
         const stored = JSON.parse(localStorage.getItem('pinplot_branding') || 'null');
@@ -6240,11 +6272,7 @@ function locInitMap(){
     _locMap = L.map('locMap', { zoomControl:true, attributionControl:true })
         .setView([53.5, -2.38], 12);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        maxZoom:19,
-        subdomains:'abcd',
-        attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-    }).addTo(_locMap);
+    addPinplotBasemap(_locMap);
 
     _locGeoLayer = L.featureGroup().addTo(_locMap);
 
@@ -7755,11 +7783,7 @@ const GPS_STYLE_SEARCH = { radius:14, fillColor:'#10b981', color:'#065f46', weig
 function initGPSMap() {
     if (_mapInitialized) { renderGPSTags(); return; }
     _map = L.map('gpsMap').setView([-25.7479, 28.2293], 12);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 19,
-    }).addTo(_map);
+    addPinplotBasemap(_map);
     _mapInitialized = true;
     renderGPSTags();
 }
@@ -8742,10 +8766,7 @@ async function initLiveMap() {
     // Init Leaflet map once
     if (!_lmMapReady) {
         _liveMap = L.map('liveMap', { zoomControl: true }).setView([-25.7479, 28.2293], 12);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>',
-            maxZoom: 19
-        }).addTo(_liveMap);
+        addPinplotBasemap(_liveMap);
         _lmMapReady = true;
         // Force Leaflet to recalculate container size in case the tile was
         // painted before layout was fully computed (e.g. on first login).
@@ -9243,9 +9264,7 @@ async function initHistoryTab() {
     // Init map once
     if (!_histMapReady) {
         _histMap = L.map('hist-map', { zoomControl: true }).setView([-25.7479, 28.2293], 11);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>', maxZoom: 19
-        }).addTo(_histMap);
+        addPinplotBasemap(_histMap);
         _histMapReady = true;
     } else {
         _histMap.invalidateSize();
