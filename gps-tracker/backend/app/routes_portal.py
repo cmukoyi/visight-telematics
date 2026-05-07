@@ -37,6 +37,63 @@ PORTAL_TOKEN_EXPIRE_HOURS = 12
 
 
 # ---------------------------------------------------------------------------
+# Login rate limiter (in-process; per-IP)
+# ---------------------------------------------------------------------------
+# Simple sliding-window limiter to slow down credential-stuffing / brute-force
+# against /api/portal/login. Counters live in-memory only — fine for a single
+# backend container; if we ever scale horizontally this should move to Redis.
+_LOGIN_MAX_ATTEMPTS = int(os.getenv("PORTAL_LOGIN_MAX_ATTEMPTS", "5"))
+_LOGIN_WINDOW_SECONDS = int(os.getenv("PORTAL_LOGIN_WINDOW_SECONDS", "60"))
+_LOGIN_LOCKOUT_SECONDS = int(os.getenv("PORTAL_LOGIN_LOCKOUT_SECONDS", "900"))  # 15 min
+_login_attempts: dict = {}   # ip -> list[float] (timestamps of recent failures)
+_login_lockouts: dict = {}   # ip -> float (unix ts when lockout ends)
+
+
+def _client_ip(request: "Request") -> str:
+    """Best-effort client IP, honouring X-Forwarded-For from the nginx proxy."""
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    try:
+        return request.client.host  # type: ignore[union-attr]
+    except Exception:
+        return "unknown"
+
+
+def _login_check_rate(ip: str) -> None:
+    """Raise HTTP 429 if the caller is currently locked out."""
+    import time
+    now = time.time()
+    until = _login_lockouts.get(ip)
+    if until and until > now:
+        retry = int(until - now)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many failed login attempts. Try again in {retry} seconds.",
+            headers={"Retry-After": str(retry)},
+        )
+
+
+def _login_record_failure(ip: str) -> None:
+    import time
+    now = time.time()
+    window_start = now - _LOGIN_WINDOW_SECONDS
+    bucket = [t for t in _login_attempts.get(ip, []) if t >= window_start]
+    bucket.append(now)
+    _login_attempts[ip] = bucket
+    if len(bucket) >= _LOGIN_MAX_ATTEMPTS:
+        _login_lockouts[ip] = now + _LOGIN_LOCKOUT_SECONDS
+        _login_attempts.pop(ip, None)
+        logger.warning("portal-login: locking out %s for %ds after %d failures", ip, _LOGIN_LOCKOUT_SECONDS, len(bucket))
+
+
+def _login_record_success(ip: str) -> None:
+    _login_attempts.pop(ip, None)
+    _login_lockouts.pop(ip, None)
+
+
+
+# ---------------------------------------------------------------------------
 # Feature / role constants
 # ---------------------------------------------------------------------------
 
@@ -165,14 +222,18 @@ def get_portal_user_from_request(request: Request, db: Session) -> PortalUser:
 # ---------------------------------------------------------------------------
 
 @router.post("/login", response_model=PortalTokenResponse)
-def portal_login(data: PortalLoginRequest, db: Session = Depends(get_db)):
+def portal_login(data: PortalLoginRequest, request: Request, db: Session = Depends(get_db)):
     """Log in as a portal user. Returns a JWT scoped to the user's UserGroup."""
+    ip = _client_ip(request)
+    _login_check_rate(ip)
+
     user = db.query(PortalUser).filter(
         PortalUser.email == data.email.lower().strip(),
         PortalUser.is_active == True,
     ).first()
 
     if not user or not verify_password(user.hashed_password, data.password):
+        _login_record_failure(ip)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail="Invalid email or password")
 
@@ -191,6 +252,7 @@ def portal_login(data: PortalLoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="User group is inactive or not found")
 
+    _login_record_success(ip)
     token = _create_portal_token(str(user.id), str(user.usergroup_id))
     effective = _compute_effective_features(user, group)
     return {

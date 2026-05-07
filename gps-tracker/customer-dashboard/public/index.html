@@ -320,7 +320,7 @@
                         <h2><i class="fa-solid fa-satellite-dish" style="color:var(--primary);margin-right:6px"></i> Live Assets</h2>
                         <div class="search-input-wrap">
                             <i class="fa-solid fa-magnifying-glass"></i>
-                            <input id="lm-search" class="search-input" type="text" placeholder="Search assets or tags…" oninput="lmFilterList()">
+                            <input id="lm-search" class="search-input" type="text" placeholder="Search assets or tags…" oninput="_lmFilterListD()">
                         </div>
                     </div>
 
@@ -378,7 +378,7 @@
                     <h2><i class="fa-solid fa-list" style="color:var(--primary);margin-right:8px"></i>Asset List</h2>
                     <div class="search-input-wrap" style="flex:1;max-width:300px">
                         <i class="fa-solid fa-magnifying-glass"></i>
-                        <input id="al-search" class="search-input" type="text" placeholder="Search name, IMEI…" oninput="alRenderTable()">
+                        <input id="al-search" class="search-input" type="text" placeholder="Search name, IMEI…" oninput="_alRenderTableD()">
                     </div>
                 </div>
 
@@ -493,7 +493,7 @@
                     <h2><i class="fa-solid fa-tags" style="color:var(--primary);margin-right:8px"></i>Asset Management</h2>
                     <div class="search-input-wrap" style="flex:1;max-width:280px">
                         <i class="fa-solid fa-magnifying-glass"></i>
-                        <input id="am-search" class="search-input" type="text" placeholder="Search IMEI, name…" oninput="amRenderCards()">
+                        <input id="am-search" class="search-input" type="text" placeholder="Search IMEI, name…" oninput="_amRenderCardsD()">
                     </div>
                     <button class="btn btn-primary btn-sm" onclick="openAddTagModal()">
                         <i class="fa-solid fa-plus"></i> Add Tag
@@ -1908,7 +1908,7 @@ input.hive-range::-moz-range-track {
                         <div class="fp-panel-header">
                             <div class="fp-search-bar">
                                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6.5" cy="6.5" r="4.5"/><path d="M10 10L14 14"/></svg>
-                                <input type="text" id="fp-search-input" placeholder="Search assets or tags…" oninput="FP.filterAssets(this.value)">
+                                <input type="text" id="fp-search-input" placeholder="Search assets or tags…" oninput="_fpFilterAssetsD(this.value)">
                             </div>
                             <div class="fp-status-grid">
                                 <div class="fp-status-card fp-active" id="fp-sc-all"     onclick="FP.filterByStatus('all',this)">    <div class="fp-count" id="fp-count-total">0</div>   <div class="fp-slabel">Total</div></div>
@@ -2446,7 +2446,7 @@ input.hive-range::-moz-range-track {
                             <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-3);font-size:.85rem;pointer-events:none"></i>
                             <input id="endUsersSearch" type="text" placeholder="Search by name or email…"
                                 style="width:100%;padding:7px 10px 7px 32px;border:1px solid var(--border);border-radius:6px;background:var(--bg-2);color:var(--text-1);font-size:.88rem;box-sizing:border-box"
-                                oninput="_euFilter(this.value)">
+                                oninput="_euFilterD(this.value)">
                         </div>
                     </div>
                     <div class="table-wrapper" style="margin-top:10px">
@@ -2716,7 +2716,7 @@ input.hive-range::-moz-range-track {
                     <div class="search-input-wrap" style="flex:1;max-width:280px">
                         <i class="fa-solid fa-magnifying-glass search-icon"></i>
                         <input type="text" class="search-input" id="rpt-sub-search" placeholder="Search tag, user or package…"
-                               oninput="rptSubFilter()">
+                               oninput="_rptSubFilterD()">
                     </div>
                     <select id="rpt-sub-pkg-filter" onchange="rptSubFilter()" style="min-width:160px">
                         <option value="">All packages</option>
@@ -2785,7 +2785,7 @@ input.hive-range::-moz-range-track {
                 <div class="rpt-toolbar">
                     <div class="search-input-wrap" style="flex:1;max-width:280px">
                         <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                        <input type="text" class="search-input" id="rpt-act-search" placeholder="Search tag, user, category…" oninput="rptActFilter()">
+                        <input type="text" class="search-input" id="rpt-act-search" placeholder="Search tag, user, category…" oninput="_rptActFilterD()">
                     </div>
                     <select id="rpt-act-cat-filter" onchange="rptActFilter()" style="min-width:160px">
                         <option value="">All categories</option>
@@ -3067,7 +3067,7 @@ input.hive-range::-moz-range-track {
                   <div class="hive-page-title"><i class="fa-solid fa-shield-halved"></i> HIVE Tracking</div>
                   <div class="hive-search-box">
                     <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" placeholder="Search hives, tag IDs, names…" oninput="hiveFilterCards(this.value)">
+                    <input type="text" placeholder="Search hives, tag IDs, names…" oninput="_hiveFilterCardsD(this.value)">
                   </div>
                 </div>
                 <div class="hive-stats-row">
@@ -3260,7 +3260,7 @@ input.hive-range::-moz-range-track {
                   <div class="hive-page-title"><i class="fa-solid fa-box-archive"></i> Archive</div>
                   <div class="hive-search-box">
                     <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" placeholder="Search archived hives…" oninput="hiveFilterArchive(this.value)">
+                    <input type="text" placeholder="Search archived hives…" oninput="_hiveFilterArchiveD(this.value)">
                   </div>
                 </div>
                 <div class="hive-info-strip">
@@ -3752,6 +3752,31 @@ function getSession() {
     };
 }
 
+// ── Input debounce helpers ─────────────────────────────────────────
+// Wrap any function so it only fires after the user stops typing for `ms`.
+// `_ppDebFn(name, ms)` returns a wrapper that looks up the real function on
+// window at call-time, which lets us bind oninput= attributes for handlers
+// that haven't been defined yet by the time the input is parsed.
+function _ppDebounce(fn, ms) {
+    let t;
+    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+function _ppDebFn(name, ms = 175) {
+    return _ppDebounce((...args) => { const f = window[name]; if (typeof f === 'function') f(...args); }, ms);
+}
+// Pre-bound debounced versions for every list/search input that re-renders
+// large DOM trees on each keystroke. Kept on `window` so inline `oninput=`
+// attributes can reach them.
+window._lmFilterListD       = _ppDebFn('lmFilterList');
+window._alRenderTableD      = _ppDebFn('alRenderTable');
+window._amRenderCardsD      = _ppDebFn('amRenderCards');
+window._fpFilterAssetsD     = _ppDebounce((v) => { try { window.FP && FP.filterAssets(v); } catch (_) {} }, 175);
+window._euFilterD           = _ppDebFn('_euFilter');
+window._rptSubFilterD       = _ppDebFn('rptSubFilter');
+window._rptActFilterD       = _ppDebFn('rptActFilter');
+window._hiveFilterCardsD    = _ppDebFn('hiveFilterCards');
+window._hiveFilterArchiveD  = _ppDebFn('hiveFilterArchive');
+
 function authHeaders() {
     return { 'Authorization': `Bearer ${getSession().token}`, 'Content-Type': 'application/json' };
 }
@@ -3959,13 +3984,69 @@ document.addEventListener('click', function(e) {
 });
 
 function handleLogout() {
-    if (!confirm('Are you sure you want to sign out?')) return;
-    closeAvatarMenu();
-    _stopBackgroundPollers();
-    clearSession();
-    // Full page reload so no stale JS state, cached API data, or old role/feature
-    // permissions persist into the next login session.
-    window.location.reload();
+    _ppConfirm({
+        title: 'Sign out?',
+        message: 'Are you sure you want to sign out of PinPlot?',
+        okLabel: 'Sign out',
+        cancelLabel: 'Stay',
+        danger: true,
+    }).then(ok => {
+        if (!ok) return;
+        closeAvatarMenu();
+        _stopBackgroundPollers();
+        clearSession();
+        // Full page reload so no stale JS state, cached API data, or old role/feature
+        // permissions persist into the next login session.
+        window.location.reload();
+    });
+}
+
+// ── Custom confirm modal ──────────────────────────────────
+// Promise-based replacement for window.confirm() that uses the portal's own
+// modal styling so it doesn't break the polished look of the dashboard and
+// works inside iframes where native confirm() may be blocked.
+function _ppConfirm({ title = 'Are you sure?', message = '', okLabel = 'Confirm', cancelLabel = 'Cancel', danger = false } = {}) {
+    return new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.style.display = 'flex';
+        overlay.style.zIndex = '10000';
+        overlay.innerHTML = `
+            <div class="modal-box" style="max-width:420px">
+                <div class="modal-header">
+                    <span class="modal-title"></span>
+                </div>
+                <div class="modal-body">
+                    <p style="margin:0;line-height:1.5"></p>
+                </div>
+                <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end">
+                    <button type="button" class="btn btn-secondary" data-pp-cancel></button>
+                    <button type="button" class="btn ${danger ? 'btn-danger' : 'btn-primary'}" data-pp-ok></button>
+                </div>
+            </div>`;
+        // Set text content safely (no HTML injection from caller-supplied strings)
+        overlay.querySelector('.modal-title').textContent = title;
+        overlay.querySelector('.modal-body p').textContent = message;
+        overlay.querySelector('[data-pp-cancel]').textContent = cancelLabel;
+        overlay.querySelector('[data-pp-ok]').textContent = okLabel;
+
+        const cleanup = (val) => {
+            document.removeEventListener('keydown', onKey);
+            overlay.remove();
+            resolve(val);
+        };
+        const onKey = (e) => {
+            if (e.key === 'Escape') cleanup(false);
+            else if (e.key === 'Enter') cleanup(true);
+        };
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) cleanup(false); });
+        overlay.querySelector('[data-pp-cancel]').addEventListener('click', () => cleanup(false));
+        overlay.querySelector('[data-pp-ok]').addEventListener('click', () => cleanup(true));
+        document.addEventListener('keydown', onKey);
+        document.body.appendChild(overlay);
+        // Focus the primary button so Enter/Space confirms
+        setTimeout(() => overlay.querySelector('[data-pp-ok]').focus(), 0);
+    });
 }
 
 // Stop every background interval/connection that might keep firing API calls
@@ -7759,8 +7840,7 @@ function handleParetoMessage(data) {
 
     // Only render marker if tag is on the currently displayed floor (or floor unknown)
     if (floorId && floorId !== _activeFloor) {
-        document.getElementById('bStats_tags').textContent = Object.keys(_tagMeta).length;
-        renderTagTable();
+        _scheduleIndoorRender();
         return;
     }
 
@@ -7775,8 +7855,23 @@ function handleParetoMessage(data) {
         `${deviceId}${rssi != null ? '<br>RSSI: '+rssi+' dBm':''}`
     );
 
-    document.getElementById('bStats_tags').textContent = Object.keys(_tagMeta).length;
-    renderTagTable();
+    _scheduleIndoorRender();
+}
+
+// Coalesce high-frequency MQTT-driven re-renders into one update per animation
+// frame. Without this, every incoming raddec/spatem message synchronously
+// rebuilds the entire tag table and re-reads `bStats_tags` — fine at low
+// rates, jittery once we get many tags or fast position updates.
+let _indoorRenderScheduled = false;
+function _scheduleIndoorRender() {
+    if (_indoorRenderScheduled) return;
+    _indoorRenderScheduled = true;
+    requestAnimationFrame(() => {
+        _indoorRenderScheduled = false;
+        const stats = document.getElementById('bStats_tags');
+        if (stats) stats.textContent = Object.keys(_tagMeta).length;
+        renderTagTable();
+    });
 }
 
 function renderTagTable() {
