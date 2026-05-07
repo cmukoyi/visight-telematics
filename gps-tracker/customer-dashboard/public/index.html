@@ -595,7 +595,7 @@
             .loc-detail-actions { display:flex; gap:5px; flex-wrap:wrap; }
             /* Map area */
             .loc-map-area { position:relative; overflow:hidden; min-height:0; }
-            #locMap { width:100%; height:100%; min-height:400px; background:var(--bg); }
+            #locMap { width:100%; height:100%; min-height:400px; background:#aadaff; }
             /* Map toolbar */
             .loc-map-toolbar { position:absolute; top:12px; left:50%; transform:translateX(-50%); z-index:500; display:flex; gap:3px; background:var(--bg-2); border:1px solid var(--border); border-radius:9px; padding:3px; box-shadow:0 2px 12px rgba(0,0,0,.2); }
             .loc-tool-btn { padding:7px 11px; background:transparent; border:none; border-radius:6px; color:var(--text-2); font-size:12px; font-weight:500; display:inline-flex; align-items:center; gap:5px; cursor:pointer; transition:all .15s; }
@@ -616,7 +616,11 @@
             /* Leaflet popup theming for location map */
             #tab-locations .leaflet-container,
             #gpsMap.leaflet-container,
-            #gpsMap .leaflet-container { background:#aadaff !important; }
+            #gpsMap .leaflet-container,
+            #locMap.leaflet-container,
+            #locMap .leaflet-container,
+            .leaflet-container { background:#aadaff !important; }
+            #locMap, #gpsMap { background:#aadaff !important; }
             #tab-locations .leaflet-popup-content-wrapper { background:var(--bg-2) !important; color:var(--text-1) !important; border:1px solid var(--border); border-radius:8px !important; box-shadow:0 4px 16px rgba(0,0,0,.2) !important; }
             #tab-locations .leaflet-popup-tip { background:var(--bg-2) !important; }
             #tab-locations .leaflet-control-zoom a { background:var(--bg-2) !important; color:var(--text-1) !important; border:1px solid var(--border) !important; }
