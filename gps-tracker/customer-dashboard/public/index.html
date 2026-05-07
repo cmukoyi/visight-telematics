@@ -6950,11 +6950,13 @@ async function _locDoSearch(q){
                 if(r.ok){ const j=await r.json(); if(j.result) results.push({ label:j.result.postcode, detail:[j.result.admin_ward,j.result.admin_district,j.result.country].filter(Boolean).join(', '), lat:j.result.latitude, lng:j.result.longitude }); }
             } catch(e){}
         }
-        // 2. Nominatim
+        // 2. Nominatim — worldwide address search (no country filter).
+        // We keep the UK postcode shortcut above because postcodes.io gives
+        // far better hits for UK postcodes than free-text Nominatim does.
         if(!results.length){
             try {
-                const url=`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=gb,ie&q=${encodeURIComponent(q)}`;
-                const r2=await fetch(url,{headers:{'Accept-Language':'en-GB'}});
+                const url=`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=8&q=${encodeURIComponent(q)}`;
+                const r2=await fetch(url,{headers:{'Accept-Language':navigator.language||'en'}});
                 if(r2.ok){ const arr=await r2.json(); arr.forEach(it=>results.push({ label:it.display_name.split(',').slice(0,2).join(',').trim(), detail:it.display_name, lat:parseFloat(it.lat), lng:parseFloat(it.lon) })); }
             } catch(e){}
         }
