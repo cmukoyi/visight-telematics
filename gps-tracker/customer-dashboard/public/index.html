@@ -88,7 +88,7 @@
 </div>
 
 <!-- ══════════════════ FORGOT PASSWORD OVERLAY ══════════════════ -->
-<div id="forgotPasswordOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:none;align-items:center;justify-content:center">
+<div id="forgotPasswordOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center">
     <div style="background:var(--bg,#fff);border-radius:12px;padding:32px;width:100%;max-width:380px;box-shadow:0 8px 40px rgba(0,0,0,.25);position:relative">
         <button onclick="hideForgotPassword()" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--text-3)">&times;</button>
         <!-- Step 1: enter email -->
@@ -3760,12 +3760,16 @@ async function apiFetch(path, options = {}) {
     const res = await fetch(path, { ...options, headers: { ...authHeaders(), ...(options.headers || {}) } });
     if (res.status === 401) {
         _sessionExpiredLogout();
+        // Return a sealed 401 so callers that try to .json() the body don't
+        // accidentally process the real response while the page reloads.
+        return new Response(null, { status: 401, statusText: 'Unauthorized' });
     }
     return res;
 }
 
 // Show session-expired notice and return to login
 function _sessionExpiredLogout() {
+    try { _stopBackgroundPollers(); } catch (_) {}
     clearSession();
     // Store the message in sessionStorage so the login page can show it after reload
     sessionStorage.setItem('pp_session_msg', 'Your session has expired. Please sign in again.');
@@ -3957,10 +3961,18 @@ document.addEventListener('click', function(e) {
 function handleLogout() {
     if (!confirm('Are you sure you want to sign out?')) return;
     closeAvatarMenu();
+    _stopBackgroundPollers();
     clearSession();
     // Full page reload so no stale JS state, cached API data, or old role/feature
     // permissions persist into the next login session.
     window.location.reload();
+}
+
+// Stop every background interval/connection that might keep firing API calls
+// after the user signs out (or after a 401-triggered session expiry).
+function _stopBackgroundPollers() {
+    try { if (window._bellAlertPollTimer) { clearInterval(window._bellAlertPollTimer); window._bellAlertPollTimer = null; } } catch (_) {}
+    try { if (typeof disconnectMQTT === 'function') disconnectMQTT(); } catch (_) {}
 }
 
 // ══════════════════════════════════════════
@@ -6186,8 +6198,10 @@ async function rptAlertsMarkAllRead() {
     _updateBellBadge();
 }
 
-// Poll for new alerts every 2 minutes while the page is open
-setInterval(_fetchBellAlerts, 120_000);
+// Poll for new alerts every 2 minutes while the page is open.
+// Stored on `window` so handleLogout() / _sessionExpiredLogout() can clear it
+// and prevent ghost API calls + 401s after the user signs out.
+window._bellAlertPollTimer = setInterval(_fetchBellAlerts, 120_000);
 
 // ══════════════════════════════════════════
 // LOCATIONS  — map-based geofence manager
