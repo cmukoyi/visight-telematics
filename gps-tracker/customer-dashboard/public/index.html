@@ -8,6 +8,30 @@
     <meta name="theme-color" content="#0F1117">
     <meta name="robots" content="noindex, nofollow">
 
+    <!-- Tenant branding bootstrap — fetches /api/branding and applies title,
+         theme-color, and --brand-primary CSS variable. PinPlot defaults are
+         baked into the static markup above so the page works even if /api is
+         briefly unreachable; the API call upgrades them once it returns. -->
+    <script>
+      (function(){
+        try {
+          fetch('/api/branding', { cache: 'no-store' })
+            .then(r => r.ok ? r.json() : null)
+            .then(b => {
+              if (!b) return;
+              window.APP_BRANDING = b;
+              if (b.product) document.title = b.product;
+              const tc = document.querySelector('meta[name="theme-color"]');
+              if (tc && b.themeColor) tc.setAttribute('content', b.themeColor);
+              const md = document.querySelector('meta[name="description"]');
+              if (md && b.product && b.tagline) md.setAttribute('content', b.product + ' — ' + b.tagline);
+              if (b.primaryColor) document.documentElement.style.setProperty('--brand-primary', b.primaryColor);
+            })
+            .catch(() => {});
+        } catch (_) {}
+      })();
+    </script>
+
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

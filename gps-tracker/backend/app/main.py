@@ -436,6 +436,27 @@ def api_health_check():
         "timestamp": datetime.utcnow().isoformat()
     }
 
+@app.get("/api/branding")
+def branding():
+    """Public branding endpoint — drives per-tenant white-label theming.
+
+    All values come from BRAND_* environment variables so the same code can be
+    deployed to PinPlot, BeaconTelematics, etc. without touching source. The
+    frontend reads this at boot and overrides <title>, theme-color, header
+    text, primary colour, etc. PinPlot defaults are kept for back-compat when
+    no env vars are set."""
+    return {
+        "name":         os.getenv("BRAND_NAME", "PinPlot"),
+        "product":      os.getenv("BRAND_PRODUCT", "PinPlot Customer Portal"),
+        "domain":       os.getenv("BRAND_DOMAIN", "pinplot.me"),
+        "supportEmail": os.getenv("BRAND_SUPPORT_EMAIL", "support@pinplot.me"),
+        "fromEmail":    os.getenv("BRAND_FROM_EMAIL", "noreply@pinplot.me"),
+        "primaryColor": os.getenv("BRAND_PRIMARY_COLOR", "#3B82F6"),
+        "themeColor":   os.getenv("BRAND_THEME_COLOR", "#0F1117"),
+        "tagline":      os.getenv("BRAND_TAGLINE", "Live asset tracking, geofencing, and reporting."),
+    }
+
+
 @app.get("/api/manifest")
 def manifest():
     """Deployment manifest endpoint - lists API capabilities and version info"""
