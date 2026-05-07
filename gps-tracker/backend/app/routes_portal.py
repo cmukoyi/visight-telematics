@@ -108,24 +108,51 @@ SECTION_FEATURES: dict = {
 ALL_SECTIONS = list(SECTION_FEATURES.keys())
 
 
+# Tenant-level feature kill-switch (env-driven). Comma-separated list of
+# feature keys that should be hidden from the portal *and* refused at the API
+# boundary, regardless of role/group config. Used to ship the same code to
+# multiple tenants while keeping certain features dark on some of them.
+# Example:  TENANT_DISABLED_FEATURES=hive,floorplan
+_DISABLED_FEATURES: set = {
+    f.strip() for f in os.getenv("TENANT_DISABLED_FEATURES", "").split(",") if f.strip()
+}
+if _DISABLED_FEATURES:
+    logger.warning("portal: tenant feature kill-switch active for: %s", ", ".join(sorted(_DISABLED_FEATURES)))
+
+
+def require_feature_enabled(feature: str):
+    """FastAPI dependency factory. Use as `dependencies=[Depends(require_feature_enabled('hive'))]`
+    on a router to make every endpoint in it return 404 when the tenant has
+    disabled that feature. We return 404 rather than 403 so the API doesn't
+    even leak that the feature exists."""
+    def _dep():
+        if feature in _DISABLED_FEATURES:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    return _dep
+
+
 def _compute_effective_features(user: "PortalUser", group: "UserGroup") -> list:
     """Return the list of tab keys the user can access, given their role and
-    the usergroup's allowed sections."""
+    the usergroup's allowed sections. Tenant-disabled features are stripped
+    last so the kill-switch always wins."""
     allowed_sections = group.allowed_sections or ALL_SECTIONS
     group_features = [f for s in allowed_sections for f in SECTION_FEATURES.get(s, [])]
 
     role = user.role or "admin"
     if role in ("admin", "system_admin"):
-        return group_features
+        result = group_features
     elif role == "manager":
         role_features = SECTION_FEATURES["tracking"] + SECTION_FEATURES["management"]
-        return [f for f in role_features if f in group_features]
+        result = [f for f in role_features if f in group_features]
     elif role == "reporter":
-        return [f for f in SECTION_FEATURES["reports"] if f in group_features]
+        result = [f for f in SECTION_FEATURES["reports"] if f in group_features]
     elif role == "custom":
         custom = user.custom_features or []
-        return [f for f in custom if f in group_features]
-    return group_features
+        result = [f for f in custom if f in group_features]
+    else:
+        result = group_features
+    # Apply the tenant kill-switch *last* so it overrides every other layer.
+    return [f for f in result if f not in _DISABLED_FEATURES]
 
 
 # ---------------------------------------------------------------------------

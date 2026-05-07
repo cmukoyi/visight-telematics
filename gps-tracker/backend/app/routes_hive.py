@@ -30,10 +30,18 @@ from app.models import (
     User,
     UserGroup,
 )
-from app.routes_portal import get_portal_user_from_request   # reuse auth helper
+from app.routes_portal import get_portal_user_from_request, require_feature_enabled   # reuse auth helper + feature kill-switch
 from app.services import hive_service
 
-router = APIRouter(prefix="/api/portal/hive", tags=["hive"])
+# Apply the tenant feature kill-switch at router level. When
+# TENANT_DISABLED_FEATURES contains "hive", every endpoint below returns 404,
+# even to authenticated users — so the feature truly disappears from the API,
+# not just the UI.
+router = APIRouter(
+    prefix="/api/portal/hive",
+    tags=["hive"],
+    dependencies=[Depends(require_feature_enabled("hive"))],
+)
 
 UTC = timezone.utc
 
