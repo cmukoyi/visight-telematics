@@ -614,6 +614,9 @@
             .loc-editor-footer { padding:12px 16px; border-top:1px solid var(--border); display:flex; gap:7px; background:var(--bg-2); flex-shrink:0; }
             .loc-editor-footer .btn { flex:1; }
             /* Leaflet popup theming for location map */
+            #tab-locations .leaflet-container,
+            #gpsMap.leaflet-container,
+            #gpsMap .leaflet-container { background:#aadaff !important; }
             #tab-locations .leaflet-popup-content-wrapper { background:var(--bg-2) !important; color:var(--text-1) !important; border:1px solid var(--border); border-radius:8px !important; box-shadow:0 4px 16px rgba(0,0,0,.2) !important; }
             #tab-locations .leaflet-popup-tip { background:var(--bg-2) !important; }
             #tab-locations .leaflet-control-zoom a { background:var(--bg-2) !important; color:var(--text-1) !important; border:1px solid var(--border) !important; }
@@ -6237,9 +6240,10 @@ function locInitMap(){
     _locMap = L.map('locMap', { zoomControl:true, attributionControl:true })
         .setView([53.5, -2.38], 12);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         maxZoom:19,
-        attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        subdomains:'abcd',
+        attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
     }).addTo(_locMap);
 
     _locGeoLayer = L.featureGroup().addTo(_locMap);
@@ -7751,8 +7755,9 @@ const GPS_STYLE_SEARCH = { radius:14, fillColor:'#10b981', color:'#065f46', weig
 function initGPSMap() {
     if (_mapInitialized) { renderGPSTags(); return; }
     _map = L.map('gpsMap').setView([-25.7479, 28.2293], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>',
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
         maxZoom: 19,
     }).addTo(_map);
     _mapInitialized = true;
