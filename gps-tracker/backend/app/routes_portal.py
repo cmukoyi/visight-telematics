@@ -102,8 +102,7 @@ SECTION_FEATURES: dict = {
     "management": ["asset-mgmt", "users", "qr", "building", "locations", "settings"],
     "reports":    [
         "reports-subscriptions", "reports-activity", "reports-trips",
-        "reports-battery", "reports-alerts",
-        # reports-geofence is not yet released — excluded so it never appears in the nav
+        "reports-battery", "reports-alerts", "reports-geofence",
     ],
 }
 ALL_SECTIONS = list(SECTION_FEATURES.keys())
