@@ -4035,30 +4035,28 @@ function showDashboard(user, group, effectiveFeatures) {
 // Theme (light / dark)
 // ══════════════════════════════════════════
 
-// ── MapTiler basemap helper (used by all Leaflet maps) ────────────────────
-const MAPTILER_KEY = 'dGpcH37X0pIcdJ0V5aOy';
+// ── Basemap helper (CARTO — free, no API key, light + dark variants) ──────
 const _ppMapTilerLayers = []; // { map, layer } registry so we can swap on theme change
-function _ppMapTilerStyle() {
+function _ppBasemapStyle() {
     return document.documentElement.getAttribute('data-theme') === 'dark'
-        ? 'streets-v2-dark'
-        : 'streets-v2';
+        ? 'dark_all'        // CARTO DarkMatter — perfect for telematics dark mode
+        : 'voyager';        // CARTO Voyager  — clean modern look, blue oceans
 }
-function _ppMapTilerUrl(style) {
-    return `https://api.maptiler.com/maps/${style || _ppMapTilerStyle()}/{z}/{x}/{y}{r}.png?key=${MAPTILER_KEY}`;
+function _ppBasemapUrl(style) {
+    return `https://{s}.basemaps.cartocdn.com/rastertiles/${style || _ppBasemapStyle()}/{z}/{x}/{y}{r}.png`;
 }
 function addPinplotBasemap(map) {
-    const layer = L.tileLayer(_ppMapTilerUrl(), {
+    const layer = L.tileLayer(_ppBasemapUrl(), {
         maxZoom: 20,
-        tileSize: 512,
-        zoomOffset: -1,
+        subdomains: 'abcd',
         crossOrigin: true,
-        attribution: '&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors'
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions" target="_blank">CARTO</a>'
     }).addTo(map);
     _ppMapTilerLayers.push({ map, layer });
     return layer;
 }
 function _ppRefreshAllBasemaps() {
-    const newUrl = _ppMapTilerUrl();
+    const newUrl = _ppBasemapUrl();
     _ppMapTilerLayers.forEach(entry => {
         try { entry.layer.setUrl(newUrl); } catch (_) {}
     });
@@ -4075,7 +4073,7 @@ function applyTheme(theme) {
     if (typeof FP !== 'undefined' && FP.drawAll) FP.drawAll();
     // Re-render QR preview (corner-colour contrast may change)
     if (typeof QRG !== 'undefined' && QRG.generate) QRG.generate();
-    // Swap MapTiler basemap style on all registered Leaflet maps
+    // Swap basemap style (CARTO Voyager / DarkMatter) on all registered Leaflet maps
     _ppRefreshAllBasemaps();
     // Re-apply logo variant for the new theme (dark vs light logo)
     try {
