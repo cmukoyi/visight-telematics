@@ -2109,6 +2109,46 @@ input:focus, select:focus, textarea:focus {
 input::placeholder, textarea::placeholder { color: var(--text-3); }
 select option { background: var(--bg-3); }
 
+/* Range slider — explicit cross-browser styles so the thumb / track are
+   always visible against dark and light backgrounds (native defaults
+   render dark-on-dark in some Chrome/Firefox versions, which made the
+   hive Distance Threshold slider effectively invisible). */
+input[type="range"], .hive-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: var(--border);
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+  margin: 6px 0;
+}
+input[type="range"]::-webkit-slider-thumb,
+.hive-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 0 1px var(--primary), 0 0 8px var(--primary-glow);
+  cursor: pointer;
+}
+input[type="range"]::-moz-range-thumb,
+.hive-range::-moz-range-thumb {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 0 1px var(--primary), 0 0 8px var(--primary-glow);
+  cursor: pointer;
+}
+input[type="range"]::-moz-range-track,
+.hive-range::-moz-range-track {
+  height: 6px; background: var(--border); border-radius: 999px;
+}
+
 /* Btn portal sizes */
 .btn-full { width: 100%; }
 .btn-small { padding: 6px 12px; font-size: 12px; }

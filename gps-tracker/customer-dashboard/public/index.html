@@ -5996,7 +5996,7 @@ function _rptGeoRenderRows(rows) {
             ? '<span class="rpt-badge rpt-badge-active"><i class="fa-solid fa-arrow-right-to-bracket" style="margin-right:4px;font-size:10px"></i>Entry</span>'
             : '<span class="rpt-badge rpt-badge-expiring"><i class="fa-solid fa-arrow-right-from-bracket" style="margin-right:4px;font-size:10px"></i>Exit</span>';
         return `<tr>
-            <td style="white-space:nowrap;font-size:12px">${e.created_at ? _rptFmtDate(e.created_at) : '—'}</td>
+            <td style="white-space:nowrap;font-size:12px">${e.created_at ? _rptFmtDateTime(e.created_at) : '—'}</td>
             <td>${esc(e.tag_label)}<br><span style="font-size:11px;color:var(--text-3);font-family:monospace">${esc(e.tag_imei)}</span></td>
             <td><i class="fa-solid fa-draw-polygon" style="color:var(--warning);margin-right:6px;font-size:11px"></i>${esc(e.poi_name)}</td>
             <td>${evBadge}</td>
@@ -6483,7 +6483,7 @@ function locInitMap(){
     // Note: _locMapInit is set to true at the END so that if initialisation
     // throws (e.g. leaflet-draw CDN failed to load), the next tab visit retries.
 
-    _locMap = L.map('locMap', { zoomControl:true, attributionControl:true })
+    _locMap = L.map('locMap', { zoomControl:true, attributionControl:false })
         .setView([53.5, -2.38], 12);
 
     addPinplotBasemap(_locMap);
@@ -7461,6 +7461,21 @@ function _rptFmtDate(iso) {
     if (!iso) return '—';
     try {
         return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch (_) { return iso; }
+}
+
+// Date + time variant — used for event/timestamp columns where the
+// hour:minute matters (Geofence Events, Alerts, etc.). Falls back to
+// the raw ISO string if the browser refuses to parse.
+function _rptFmtDateTime(iso) {
+    if (!iso) return '—';
+    try {
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return iso;
+        return d.toLocaleString(undefined, {
+            year: 'numeric', month: 'short', day: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+        });
     } catch (_) { return iso; }
 }
 
@@ -9593,7 +9608,7 @@ async function initHistoryTab() {
     }
     // Init map once
     if (!_histMapReady) {
-        _histMap = L.map('hist-map', { zoomControl: true }).setView([-25.7479, 28.2293], 11);
+        _histMap = L.map('hist-map', { zoomControl: true, attributionControl: false }).setView([51.5074, -0.1278], 11);
         addPinplotBasemap(_histMap);
         _histMapReady = true;
     } else {
