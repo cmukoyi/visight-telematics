@@ -6484,7 +6484,7 @@ function locInitMap(){
     // throws (e.g. leaflet-draw CDN failed to load), the next tab visit retries.
 
     _locMap = L.map('locMap', { zoomControl:true, attributionControl:false })
-        .setView([53.5, -2.38], 12);
+        .setView([51.5074, -0.1278], 11);   // London — neutral default for new tenants; auto-fits to existing geofences in locationsLoad()
 
     addPinplotBasemap(_locMap);
 
