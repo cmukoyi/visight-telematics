@@ -7127,11 +7127,15 @@ function _locInitBulkDropzone(){
 }
 
 function _locDownloadTemplate(){
+    // Simplified template — type is always 'circle' and status is always
+    // 'active', so those columns were removed (they were causing user
+    // confusion). Provide either an address (geocoded server-side) OR a
+    // lat/lng pair, never both required.
     const csv=[
-        'name,type,address,lat,lng,radius,status',
-        'Depot North,circle,M28 2WG,,,150,active',
-        'City HQ,circle,Piccadilly Gardens Manchester,,,250,active',
-        'East Hub,circle,,53.5067,-2.3793,300,draft',
+        'name,address,lat,lng,radius',
+        'Depot North,M28 2WG,,,150',
+        'City HQ,Piccadilly Gardens Manchester,,,250',
+        'East Hub,,53.5067,-2.3793,300',
     ].join('\n');
     const a=document.createElement('a');
     a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
@@ -7185,23 +7189,30 @@ function _locValidateBulkPreview(rows){
     let validCount=0;
     rows.forEach((row,idx)=>{
         const name=String(row.name||row.Name||'').trim();
-        const type=String(row.type||row.Type||'circle').trim().toLowerCase();
+        // type and status columns are intentionally ignored — every bulk
+        // upload becomes an active circle. Preview still shows 'circle'
+        // / 'active' so the user knows what will be created.
         const lat=parseFloat(row.lat||row.latitude||row.Lat||'');
         const lng=parseFloat(row.lng||row.lon||row.longitude||row.Lng||'');
         const address=String(row.address||row.Address||row.postcode||row.Postcode||'').trim();
-        const radius=parseInt(row.radius||row.Radius||'300');
+        const radius=parseInt(row.radius||row.Radius||'150');
+        const hasCoords = !isNaN(lat) && !isNaN(lng);
         const errs=[];
         if(!name) errs.push('missing name');
-        if(!isNaN(lat)&&!isNaN(lng)&&!address&&!name) errs.push('no location data');
-        if(!address&&(isNaN(lat)||isNaN(lng))) errs.push('need address or lat/lng');
+        // Either address OR lat/lng is acceptable. If both are present
+        // we silently prefer lat/lng (no error).
+        if(!address && !hasCoords) errs.push('need address or lat/lng');
         const valid=errs.length===0;
         if(valid) validCount++;
-        _locBulkPreview.push({name,type,lat,lng,address,radius,valid,errs});
+        _locBulkPreview.push({name,type:'circle',lat,lng,address,radius,valid,errs});
         const tr=document.createElement('tr');
         if(!valid) tr.classList.add('invalid');
-        tr.innerHTML=`<td>${idx+1}</td><td>${_locHtml(name||'—')}</td><td>${_locHtml(type)}</td>`+
-            `<td>${!isNaN(lat)&&!isNaN(lng)?`${lat.toFixed(4)}, ${lng.toFixed(4)}`:_locHtml(address||'—')}</td>`+
-            `<td>${type==='circle'?radius+'m':'—'}</td>`+
+        const locCell = hasCoords
+            ? `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+            : (address ? _locHtml(address) : '—');
+        tr.innerHTML=`<td>${idx+1}</td><td>${_locHtml(name||'—')}</td><td>circle</td>`+
+            `<td>${locCell}</td>`+
+            `<td>${radius}m</td>`+
             `<td>${valid?'<span class="loc-row-ok">● ready</span>':`<span class="loc-row-err" title="${_locHtml(errs.join(', '))}">● ${_locHtml(errs[0])}</span>`}</td>`;
         tbody.appendChild(tr);
     });
@@ -7211,7 +7222,6 @@ function _locValidateBulkPreview(rows){
 }
 
 async function locDoBulkUpload(){
-    const fileInput=document.getElementById('loc-bulk-file');
     const resultEl=document.getElementById('loc-bulk-result');
     const uploadBtn=document.getElementById('loc-bulk-upload-btn');
     const progressRow=document.getElementById('loc-bulk-progress');
@@ -7220,22 +7230,37 @@ async function locDoBulkUpload(){
     const count=document.getElementById('loc-progress-count');
 
     resultEl.style.display='none';
-    if(!fileInput.files.length) return;
+    // Send the already-validated preview rows as JSON — the backend
+    // creates each as an active circle, geocoding any address-only rows.
+    const validRows = _locBulkPreview.filter(r => r.valid);
+    if(!validRows.length) return;
     uploadBtn.disabled=true;
     progressRow.classList.add('open');
-    fill.style.width='0%'; label.textContent='Uploading…'; count.textContent='';
+    fill.style.width='10%'; label.textContent=`Importing ${validRows.length} location${validRows.length===1?'':'s'}…`; count.textContent='';
 
     try {
-        const fd=new FormData(); fd.append('file', fileInput.files[0]);
+        const payload = {
+            rows: validRows.map(r => ({
+                name:    r.name,
+                address: r.address || null,
+                lat:     isNaN(r.lat) ? null : r.lat,
+                lng:     isNaN(r.lng) ? null : r.lng,
+                radius:  r.radius || 150,
+            })),
+        };
         fill.style.width='40%';
-        const res=await apiFetch('/api/portal/locations/bulk-upload',{method:'POST',body:fd});
+        const res=await apiFetch('/api/portal/locations/bulk-upload',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(payload),
+        });
         fill.style.width='100%';
         progressRow.classList.remove('open');
         if(!res.ok) throw new Error(await safeJsonDetail(res,'Upload failed'));
         const data=await res.json();
         const failHtml=data.details?.failed?.length
-            ?`<details style="margin-top:8px;font-size:.82rem"><summary style="cursor:pointer;color:var(--warning)">${data.details.failed.length} failed rows</summary><ul style="margin:6px 0 0 16px;padding:0">${data.details.failed.map(f=>`<li>Row ${f.row}: ${esc(f.postcode||'')} — ${esc(f.reason)}</li>`).join('')}</ul></details>`:'';
-        resultEl.innerHTML=`<div class="alert alert-${data.failed===0?'success':'warning'}" style="display:flex;flex-direction:column"><strong>${data.created} location${data.created!==1?'s':''} created</strong>${data.failed>0?`<span>${data.failed} row${data.failed!==1?'s':''} could not be geocoded</span>`:''}${failHtml}</div>`;
+            ?`<details style="margin-top:8px;font-size:.82rem"><summary style="cursor:pointer;color:var(--warning)">${data.details.failed.length} failed rows</summary><ul style="margin:6px 0 0 16px;padding:0">${data.details.failed.map(f=>`<li>Row ${f.row}: ${esc(f.name||f.address||'')} — ${esc(f.reason)}</li>`).join('')}</ul></details>`:'';
+        resultEl.innerHTML=`<div class="alert alert-${data.failed===0?'success':'warning'}" style="display:flex;flex-direction:column"><strong>${data.created} location${data.created!==1?'s':''} created</strong>${data.failed>0?`<span>${data.failed} row${data.failed!==1?'s':''} could not be imported</span>`:''}${failHtml}</div>`;
         resultEl.style.display='';
         uploadBtn.textContent='Done';
         await locationsLoad();

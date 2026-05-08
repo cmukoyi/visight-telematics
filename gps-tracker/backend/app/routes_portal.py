@@ -2427,76 +2427,99 @@ def download_locations_template():
     )
 
 
+class BulkUploadRow(BaseModel):
+    name: str
+    address: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    radius: Optional[float] = 150.0
+
+
+class BulkUploadRequest(BaseModel):
+    rows: List[BulkUploadRow]
+
+
 @router.post("/locations/bulk-upload")
 async def bulk_upload_locations(
-    file: UploadFile = File(...),
-    request: Request = None,
+    payload: BulkUploadRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """
-    Upload an Excel file with columns: Postcode, Name, Description, Radius.
-    Geocodes each row and creates a POI. Returns a summary of successes/failures.
+    Bulk-create geofences from rows already validated client-side.
+
+    Each row needs `name` plus EITHER (lat, lng) OR `address`. Address-only
+    rows are geocoded server-side via Nominatim (1 req/s). Every created
+    POI is an active circle — type/status are no longer per-row options.
     """
-    if not _HAS_OPENPYXL:
-        raise HTTPException(status_code=501, detail="openpyxl not installed")
     me = get_portal_user_from_request(request, db)
     if not me.is_group_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
 
+    if not payload.rows:
+        raise HTTPException(status_code=422, detail="No rows to import")
+
     import asyncio as _asyncio
-
-    contents = await file.read()
-    try:
-        wb = _openpyxl.load_workbook(filename=_io.BytesIO(contents), read_only=True, data_only=True)
-        ws = wb.active
-    except Exception:
-        raise HTTPException(status_code=422, detail="Could not read Excel file. Please use the provided template.")
-
-    rows = list(ws.iter_rows(min_row=2, values_only=True))
-    if not rows:
-        raise HTTPException(status_code=422, detail="No data rows found (row 1 is the header)")
 
     results = {"created": [], "failed": []}
 
-    for i, row in enumerate(rows, start=2):
-        postcode = str(row[0]).strip() if row[0] else ""
-        name     = str(row[1]).strip() if row[1] else ""
-        desc     = str(row[2]).strip() if len(row) > 2 and row[2] else None
-        try:
-            radius = float(row[3]) if len(row) > 3 and row[3] else 150.0
-            radius = max(50.0, min(radius, 50000.0))
-        except (TypeError, ValueError):
-            radius = 150.0
-
-        if not postcode or not name:
-            results["failed"].append({"row": i, "reason": "Postcode and Name are required"})
+    for i, row in enumerate(payload.rows, start=1):
+        name = (row.name or "").strip()
+        if not name:
+            results["failed"].append({"row": i, "reason": "Name is required"})
             continue
 
         try:
-            geo = await _geocode_postcode(postcode)
+            radius = max(50.0, min(float(row.radius or 150.0), 50000.0))
+        except (TypeError, ValueError):
+            radius = 150.0
+
+        lat = row.lat
+        lng = row.lng
+        address = (row.address or "").strip() or None
+        display_addr = address
+
+        # If no coords, geocode the address (rate-limited).
+        if (lat is None or lng is None) and address:
+            try:
+                geo = await _geocode_postcode(address)
+                lat, lng = geo["lat"], geo["lon"]
+                display_addr = geo.get("display") or address
+            except HTTPException as exc:
+                results["failed"].append({"row": i, "name": name, "address": address, "reason": exc.detail})
+                await _asyncio.sleep(1.1)
+                continue
+            await _asyncio.sleep(1.1)
+
+        if lat is None or lng is None:
+            results["failed"].append({"row": i, "name": name, "reason": "Missing coordinates and address"})
+            continue
+
+        try:
             poi = POI(
                 usergroup_id=str(me.usergroup_id),
                 user_id=None,
                 name=name,
-                description=desc,
+                description=None,
                 poi_type="single",
-                latitude=geo["lat"],
-                longitude=geo["lon"],
+                latitude=lat,
+                longitude=lng,
                 radius=radius,
-                address=geo["display"],
+                address=display_addr,
                 is_active=True,
             )
+            if hasattr(poi, "shape_type"):
+                poi.shape_type = "circle"
             db.add(poi)
             db.flush()
-            results["created"].append({"row": i, "name": name, "postcode": postcode, "id": str(poi.id)})
-        except HTTPException as exc:
-            results["failed"].append({"row": i, "name": name, "postcode": postcode, "reason": exc.detail})
-        # Nominatim rate-limit: 1 req/s
-        await _asyncio.sleep(1.1)
+            results["created"].append({"row": i, "name": name, "id": str(poi.id)})
+        except Exception as exc:
+            db.rollback()
+            results["failed"].append({"row": i, "name": name, "reason": str(exc)})
 
     db.commit()
     return {
-        "total":   len(rows),
+        "total":   len(payload.rows),
         "created": len(results["created"]),
         "failed":  len(results["failed"]),
         "details": results,
