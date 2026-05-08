@@ -5146,7 +5146,7 @@ function applyBranding(theme) {
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
         const logoSrc = (isDark && theme.logo_dark_data) ? theme.logo_dark_data : theme.logo_data;
         if (logoSrc) {
-            logoWrap.innerHTML = `<img src="${logoSrc}" alt="Logo" style="height:32px;max-width:140px;object-fit:contain">`;
+            logoWrap.innerHTML = `<img src="${logoSrc}" alt="Logo" style="height:46px;max-width:220px;object-fit:contain">`;
         } else {
             const _bn = (window.APP_BRANDING && window.APP_BRANDING.name) || 'PinPlot';
             // textContent insertion to avoid injecting brand name as HTML
