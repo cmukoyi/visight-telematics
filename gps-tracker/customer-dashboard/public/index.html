@@ -4198,7 +4198,11 @@ function showDashboard(user, group, effectiveFeatures) {
 // ══════════════════════════════════════════
 
 // ── MapTiler basemap helper (used by all Leaflet maps) ────────────────────
-const MAPTILER_KEY = 'dGpcH37X0pIcdJ0V5aOy';
+// Tenant MapTiler key from /api/branding. Returns null if not configured —
+// _ppMapTilerUrl() callers must check and skip basemap creation in that case.
+function _ppMaptilerKey() {
+    return (window.APP_BRANDING && window.APP_BRANDING.maptilerKey) || null;
+}
 const _ppMapTilerLayers = []; // { map, layer } registry so we can swap on theme change
 // User preference: when true, always use the light basemap regardless of the
 // page theme. Stored in localStorage so it persists across reloads. Toggled

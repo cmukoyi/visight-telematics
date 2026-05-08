@@ -454,9 +454,9 @@ def branding():
         "primaryColor": os.getenv("BRAND_PRIMARY_COLOR", "#3B82F6"),
         "themeColor":   os.getenv("BRAND_THEME_COLOR", "#0F1117"),
         "tagline":      os.getenv("BRAND_TAGLINE", "Live asset tracking, geofencing, and reporting."),
-        # Per-tenant MapTiler key. Each tenant must use its own key because
-        # MapTiler restricts free-tier keys by HTTP referrer/origin.
-        "maptilerKey":  os.getenv("MAPTILER_KEY", "dGpcH37X0pIcdJ0V5aOy"),
+        # Per-tenant MapTiler key. No default — each tenant MUST set
+        # MAPTILER_KEY in backend/.env (free-tier keys are origin-restricted).
+        "maptilerKey":  os.getenv("MAPTILER_KEY") or None,
     }
 
 
