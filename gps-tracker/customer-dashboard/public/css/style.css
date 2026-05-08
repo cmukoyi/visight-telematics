@@ -1756,10 +1756,15 @@ tbody tr:hover { background: var(--bg-3); }
 .login-container {
   display: flex;
   min-height: 100vh;
-  align-items: center;
+  /* `safe center` keeps centering when the box fits, but pins the box
+     to the top (and lets the page scroll) when it doesn't — prevents
+     the top of the form being clipped on short laptops / landscape
+     phones. Falls back to plain centering on older browsers. */
+  align-items: safe center;
   justify-content: center;
   background: linear-gradient(135deg, var(--bg) 0%, var(--bg-2) 100%);
   padding: 20px;
+  overflow-y: auto;
 }
 
 .login-box {
@@ -1785,6 +1790,21 @@ tbody tr:hover { background: var(--bg-3); }
   font-size: 2.4rem;
   color: #fff;
   box-shadow: 0 0 20px var(--primary-glow);
+}
+
+/* Compact login form on short or narrow viewports so it doesn't get
+   clipped on laptops, tablets in landscape, or phones. */
+@media (max-height: 760px) {
+  .login-box     { padding: 28px 32px; }
+  .login-header  { margin-bottom: 20px; }
+  .login-logo    { min-height: 96px; margin-bottom: 12px; }
+  .logo-image    { height: 84px; max-height: 96px; }
+  .login-logo-fallback { width: 64px; height: 64px; font-size: 1.6rem; border-radius: 14px; }
+}
+@media (max-width: 480px) {
+  .login-container { padding: 12px; }
+  .login-box       { padding: 24px 20px; }
+  .login-title     { font-size: 19px; }
 }
 
 .login-error {

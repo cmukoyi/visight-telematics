@@ -133,8 +133,10 @@
 </div>
 
 <!-- ══════════════════ FORGOT PASSWORD OVERLAY ══════════════════ -->
-<div id="forgotPasswordOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center">
-    <div style="background:var(--bg,#fff);border-radius:12px;padding:32px;width:100%;max-width:380px;box-shadow:0 8px 40px rgba(0,0,0,.25);position:relative">
+<!-- safe-center + overflow:auto so the modal scrolls instead of being
+     clipped on short viewports (laptops, landscape phones). -->
+<div id="forgotPasswordOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:safe center;justify-content:center;overflow-y:auto;padding:20px">
+    <div style="background:var(--bg,#fff);border-radius:12px;padding:32px;width:100%;max-width:380px;box-shadow:0 8px 40px rgba(0,0,0,.25);position:relative;margin:auto">
         <button onclick="hideForgotPassword()" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--text-3)">&times;</button>
         <!-- Step 1: enter email -->
         <div id="fpStep1">
