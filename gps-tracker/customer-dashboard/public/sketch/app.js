@@ -1223,33 +1223,46 @@ wrapper.addEventListener('drop', async e => {
 function showTextModal() {
   const modal = document.getElementById('textModal');
   const input = document.getElementById('textInput');
+  if (!modal || !input) return;
   modal.style.display = 'flex';
   input.value = '';
   setTimeout(() => input.focus(), 50);
 }
 
-document.getElementById('textConfirm').addEventListener('click', () => {
-  const val = document.getElementById('textInput').value.trim();
-  if (val && state.textPending) {
-    pushHistory();
-    const el = buildElement('text', state.textPending, state.textPending);
-    el.label = val;
-    state.floors[state.currentFloor].elements.push(el);
-    state.selected = el.id;
-    showProperties(el);
-    updateStats(); render();
-  }
-  document.getElementById('textModal').style.display = 'none';
-  state.textPending = null;
-});
-document.getElementById('textCancel').addEventListener('click', () => {
-  document.getElementById('textModal').style.display = 'none';
-  state.textPending = null;
-});
-document.getElementById('textInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('textConfirm').click();
-  if (e.key === 'Escape') document.getElementById('textCancel').click();
-});
+// Guard: the text-tool modal lives in sketch/index.html only. When sketch/app.js
+// is loaded inside the main customer dashboard (which embeds the sketch tool
+// without that modal), these getElementById calls return null and the script
+// halts at top-level — silently breaking everything that follows it (floor
+// management, import/export, save). Skip the wiring when the modal is absent.
+const _txtConfirmBtn = document.getElementById('textConfirm');
+const _txtCancelBtn  = document.getElementById('textCancel');
+const _txtInputEl    = document.getElementById('textInput');
+if (_txtConfirmBtn && _txtCancelBtn && _txtInputEl) {
+  _txtConfirmBtn.addEventListener('click', () => {
+    const val = _txtInputEl.value.trim();
+    if (val && state.textPending) {
+      pushHistory();
+      const el = buildElement('text', state.textPending, state.textPending);
+      el.label = val;
+      state.floors[state.currentFloor].elements.push(el);
+      state.selected = el.id;
+      showProperties(el);
+      updateStats(); render();
+    }
+    const m = document.getElementById('textModal');
+    if (m) m.style.display = 'none';
+    state.textPending = null;
+  });
+  _txtCancelBtn.addEventListener('click', () => {
+    const m = document.getElementById('textModal');
+    if (m) m.style.display = 'none';
+    state.textPending = null;
+  });
+  _txtInputEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  _txtConfirmBtn.click();
+    if (e.key === 'Escape') _txtCancelBtn.click();
+  });
+}
 
 // ─── Floors ───────────────────────────────────────────────────────────────────
 function updateFloorList() {
