@@ -4217,7 +4217,7 @@ function _ppMapTilerStyle() {
         : 'streets-v2';
 }
 function _ppMapTilerUrl(style) {
-    return `https://api.maptiler.com/maps/${style || _ppMapTilerStyle()}/{z}/{x}/{y}{r}.png?key=${MAPTILER_KEY}`;
+    return `https://api.maptiler.com/maps/${style || _ppMapTilerStyle()}/{z}/{x}/{y}{r}.png?key=${_ppMaptilerKey()}`;
 }
 function addPinplotBasemap(map) {
     const layer = L.tileLayer(_ppMapTilerUrl(), {
