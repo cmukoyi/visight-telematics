@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PinPlot — Customer Portal</title>
+    <title>PinPlot HPS — Customer Portal</title>
     <meta name="description" content="PinPlot Customer Portal — live asset tracking, geofencing, and reporting for your fleet of GPS and BLE-tagged assets.">
     <meta name="theme-color" content="#0F1117">
     <meta name="robots" content="noindex, nofollow">
@@ -2291,8 +2291,8 @@ input.hive-range::-moz-range-track {
                                 </p>
                                 <div class="settings-row">
                                     <div>
-                                        <div class="settings-row-label"><i class="fa-solid fa-draw-polygon" style="margin-right:6px;color:var(--warning)"></i>Leaves a zone (geofence)</div>
-                                        <div class="settings-row-hint">Alert when an asset exits a defined geofence area.</div>
+                                        <div class="settings-row-label"><i class="fa-solid fa-draw-polygon" style="margin-right:6px;color:var(--warning)"></i>Geofence entry / exit</div>
+                                        <div class="settings-row-hint">Alert when an asset enters or exits a defined geofence area.</div>
                                     </div>
                                     <label class="toggle-switch">
                                         <input type="checkbox" id="notif-geofence" onchange="settingsSaveNotifications()">
@@ -2391,7 +2391,7 @@ input.hive-range::-moz-range-track {
                                         <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-3);padding:10px 0 6px">SMS alert types</p>
                                         <div class="settings-row">
                                             <div>
-                                                <div class="settings-row-label"><i class="fa-solid fa-draw-polygon" style="margin-right:6px;color:var(--warning)"></i>Geofence alerts</div>
+                                                <div class="settings-row-label"><i class="fa-solid fa-draw-polygon" style="margin-right:6px;color:var(--warning)"></i>Geofence entry / exit alerts</div>
                                             </div>
                                             <label class="toggle-switch">
                                                 <input type="checkbox" id="notif-sms-geofence" onchange="settingsSaveNotifications()">
@@ -3862,7 +3862,22 @@ async function safeJsonDetail(res, fallback) {
             return fallback;
         }
         const data = JSON.parse(text);
-        return data.detail || fallback;
+        const d = data.detail;
+        if (typeof d === 'string') return d;
+        if (Array.isArray(d)) {
+            // FastAPI/Pydantic ValidationError list — each item is
+            // {loc:[...], msg:'...', type:'...'}. Join the human-readable
+            // msg fields so users don't see "[object Object]".
+            return d.map(e => {
+                if (typeof e === 'string') return e;
+                const where = Array.isArray(e?.loc) ? e.loc.filter(p => p !== 'body').join('.') : '';
+                return where ? `${where}: ${e.msg || JSON.stringify(e)}` : (e.msg || JSON.stringify(e));
+            }).join('; ') || fallback;
+        }
+        if (d && typeof d === 'object') {
+            return d.msg || d.message || JSON.stringify(d);
+        }
+        return fallback;
     } catch (_) {
         return fallback;
     }
@@ -7995,7 +8010,7 @@ const GPS_STYLE_SEARCH = { radius:14, fillColor:'#10b981', color:'#065f46', weig
 
 function initGPSMap() {
     if (_mapInitialized) { renderGPSTags(); return; }
-    _map = L.map('gpsMap').setView([-25.7479, 28.2293], 12);
+    _map = L.map('gpsMap').setView([51.5074, -0.1278], 12);
     addPinplotBasemap(_map);
     _mapInitialized = true;
     renderGPSTags();
@@ -8941,16 +8956,26 @@ function _lmRenderPOIs() {
         const opts  = { color, weight: 2, fillColor: color, fillOpacity: 0.12, interactive: true };
         let layer = null;
         const type = (gf.shape_type || gf.type || '').toLowerCase();
+        // Polygon/rectangle vertices come back as `coordinates` from
+        // /api/portal/locations (see backend _serialize_poi). Older code
+        // used `polygon_points`; accept both for forward/backward compat.
+        const verts = gf.coordinates || gf.polygon_points;
         try {
-            if (type === 'polygon' && Array.isArray(gf.polygon_points)) {
-                layer = L.polygon(gf.polygon_points, opts);
-            } else if (type === 'rectangle' && Array.isArray(gf.polygon_points)) {
-                layer = L.rectangle(gf.polygon_points, opts);
-            } else if (gf.latitude && gf.longitude) {
+            if (type === 'polygon' && Array.isArray(verts) && verts.length >= 3) {
+                layer = L.polygon(verts, opts);
+            } else if (type === 'rectangle' && Array.isArray(verts) && verts.length >= 2) {
+                layer = L.rectangle(verts, opts);
+            } else if (gf.latitude != null && gf.longitude != null) {
                 layer = L.circle([gf.latitude, gf.longitude], { ...opts, radius: gf.radius || 150 });
             }
-        } catch (e) { return; }
-        if (!layer) return;
+        } catch (e) {
+            console.warn('[geofence] failed to build layer for', gf?.name, e);
+            return;
+        }
+        if (!layer) {
+            console.warn('[geofence] no renderable shape for', gf?.name, gf);
+            return;
+        }
         const armedTxt = armed ? `<br><span style="color:#10B981;font-weight:600">Armed: ${gf.armed_count} tag${gf.armed_count>1?'s':''}</span>` : '<br><span style="color:var(--text-3)">Not armed</span>';
         layer.bindPopup(`<strong>${esc(gf.name||'Geofence')}</strong>${gf.address?'<br><small>'+esc(gf.address)+'</small>':''}${armedTxt}`);
         // Permanent name label so users can identify each POI at a glance
@@ -9032,7 +9057,7 @@ async function initLiveMap() {
             wheelPxPerZoomLevel: 80,   // smoother scroll-wheel zoom
             scrollWheelZoom: true,     // already default — wheel zooms toward cursor
             doubleClickZoom: true
-        }).setView([-25.7479, 28.2293], 12);
+        }).setView([51.5074, -0.1278], 12);
         addPinplotBasemap(_liveMap);
         // Keep the currently-selected tag/POI centered when using +/- zoom buttons
         // (scroll-wheel already zooms toward cursor; this fixes button-zoom UX).
@@ -9661,7 +9686,7 @@ function _histRenderTripsList() {
         const startStr = start ? start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
         const endStr   = end   ? end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })   : '—';
         const dateStr  = start ? start.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }) : '';
-        const distKm   = trip.distance ? (trip.distance * 1.60934).toFixed(1) : null;  // miles → km
+        const distMi   = trip.distance ? Number(trip.distance).toFixed(1) : null;  // backend already returns miles
         const durMins  = trip.duration ? Math.round(trip.duration / 60) : null;
         const from = trip.startLocationDescription || '—';
         const to   = trip.endLocationDescription   || '—';
@@ -9673,7 +9698,7 @@ function _histRenderTripsList() {
                 <div class="htrip-route"><i class="fa-solid fa-location-dot" style="color:#10B981"></i> ${esc(from)}</div>
                 <div class="htrip-route"><i class="fa-solid fa-flag-checkered" style="color:#EF4444"></i> ${esc(to)}</div>
                 <div class="htrip-meta">
-                    ${distKm  ? `<span><i class="fa-solid fa-road"></i> ${distKm} km</span>` : ''}
+                    ${distMi  ? `<span><i class="fa-solid fa-road"></i> ${distMi} mi</span>` : ''}
                     ${durMins ? `<span><i class="fa-regular fa-clock"></i> ${durMins} min</span>` : ''}
                 </div>
             </div>

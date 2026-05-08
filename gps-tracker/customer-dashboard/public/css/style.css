@@ -1292,9 +1292,13 @@ tbody tr:hover { background: var(--bg-3); }
   margin-top: 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  overflow: hidden;
+  /* Allow both axes to scroll — wide tables (e.g. tag bulk upload
+     with IMEI + email + description + type + status columns) overflow
+     horizontally on narrow viewports. Previously `overflow:hidden`
+     was clamping the X-axis even though `overflow-y:auto` enabled
+     vertical scroll. */
+  overflow: auto;
   max-height: 260px;
-  overflow-y: auto;
   display: none;
 }
 .loc-preview-wrap.open { display: block; }
