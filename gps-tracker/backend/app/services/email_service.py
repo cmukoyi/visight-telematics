@@ -39,6 +39,14 @@ class EmailService:
         self.smtp_password = os.getenv("SMTP_PASSWORD", "")
         self.from_email = os.getenv("FROM_EMAIL", "noreply@pinplot.me")
         self.debug = os.getenv("DEBUG", "False").lower() == "true"
+
+        # Tenant branding (env-driven so the same code runs for PinPlot,
+        # BeaconTelematics, etc. without source diffs). Used in subjects /
+        # bodies / footer links of every templated email below.
+        self.brand_name    = os.getenv("BRAND_NAME", "Pinplot")
+        self.brand_domain  = os.getenv("BRAND_DOMAIN", "pinplot.me")
+        self.brand_url     = os.getenv("FRONTEND_URL", f"https://{self.brand_domain}")
+        self.brand_support = os.getenv("BRAND_SUPPORT_EMAIL", f"support@{self.brand_domain}")
         
         # Log email service configuration
         if self.use_sendgrid:
@@ -61,7 +69,7 @@ class EmailService:
                 print(f"{'='*60}\n")
             
             msg = MIMEMultipart('alternative')
-            msg['Subject'] = 'Your Pinplot Verification Code'
+            msg['Subject'] = f'Your {self.brand_name} Verification Code'
             msg['From'] = self.from_email
             msg['To'] = to_email
             
@@ -74,7 +82,7 @@ class EmailService:
             If you didn't request this code, please ignore this email.
             
             Best regards,
-            Pinplot Team
+            {self.brand_name} Team
             """
             
             # HTML version
@@ -82,7 +90,7 @@ class EmailService:
             <html>
               <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
                 <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                  <h2 style="color: #173C64;">Pinplot Verification</h2>
+                  <h2 style="color: #173C64;">{self.brand_name} Verification</h2>
                   <p>Your verification code is:</p>
                   <div style="background-color: #f4f4f4; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
                     <h1 style="color: #173C64; font-size: 36px; letter-spacing: 8px; margin: 0;">{pin}</h1>
@@ -90,7 +98,7 @@ class EmailService:
                   <p style="color: #666;">This code will expire in <strong>10 minutes</strong>.</p>
                   <p style="color: #666;">If you didn't request this code, please ignore this email.</p>
                   <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
-                  <p style="color: #999; font-size: 12px;">Best regards,<br>Pinplot Team</p>
+                  <p style="color: #999; font-size: 12px;">Best regards,<br>{self.brand_name} Team</p>
                 </div>
               </body>
             </html>
@@ -100,7 +108,7 @@ class EmailService:
             if self.use_sendgrid:
                 return self._send_via_sendgrid(
                     to_email=to_email,
-                    subject='Your Pinplot Verification Code',
+                    subject=f'Your {self.brand_name} Verification Code',
                     text_content=text,
                     html_content=html
                 )
@@ -136,7 +144,7 @@ class EmailService:
             text = f"""
 Hi {name},
 
-You requested a password reset for your Pinplot portal account.
+You requested a password reset for your {self.brand_name} portal account.
 
 Your reset PIN is:  {pin}
 
@@ -146,7 +154,7 @@ This PIN expires in 15 minutes.
 If you did not request a password reset, you can safely ignore this email.
 
 Best regards,
-Pinplot Team
+{self.brand_name} Team
 """
 
             html = f"""
@@ -158,7 +166,7 @@ Pinplot Team
       </div>
       <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px; padding: 32px;">
         <p style="font-size: 15px; margin-top: 0;">Hi {name},</p>
-        <p style="font-size: 15px;">We received a request to reset your Pinplot portal password.
+        <p style="font-size: 15px;">We received a request to reset your {self.brand_name} portal password.
            Use the PIN below on the reset screen:</p>
         <div style="background: #fff; border: 2px dashed #173C64; border-radius: 10px;
                     text-align: center; padding: 24px; margin: 24px 0;">
@@ -172,7 +180,7 @@ Pinplot Team
         </p>
       </div>
       <p style="font-size: 11px; color: #9ca3af; text-align: center; margin-top: 20px;">
-        Pinplot &middot; <a href="https://pinplot.me" style="color:#9ca3af">pinplot.me</a>
+        {self.brand_name} &middot; <a href="{self.brand_url}" style="color:#9ca3af">{self.brand_domain}</a>
       </p>
     </div>
   </body>
@@ -182,13 +190,13 @@ Pinplot Team
             if self.use_sendgrid:
                 return self._send_via_sendgrid(
                     to_email=to_email,
-                    subject='Your Pinplot Portal Password Reset PIN',
+                    subject=f'Your {self.brand_name} Portal Password Reset PIN',
                     text_content=text,
                     html_content=html,
                 )
             else:
                 msg = MIMEMultipart('alternative')
-                msg['Subject'] = 'Your Pinplot Portal Password Reset PIN'
+                msg['Subject'] = f'Your {self.brand_name} Portal Password Reset PIN'
                 msg['From'] = self.from_email
                 msg['To'] = to_email
                 msg.attach(MIMEText(text, 'plain'))
@@ -207,7 +215,7 @@ Pinplot Team
         """Send welcome email after successful registration"""
         try:
             msg = MIMEMultipart('alternative')
-            msg['Subject'] = 'Welcome to Pinplot'
+            msg['Subject'] = f'Welcome to {self.brand_name}'
             msg['From'] = self.from_email
             msg['To'] = to_email
             
@@ -217,12 +225,12 @@ Pinplot Team
             <html>
               <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
                 <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                  <h2 style="color: #173C64;">Welcome to Pinplot!</h2>
+                  <h2 style="color: #173C64;">Welcome to {self.brand_name}!</h2>
                   <p>Hi {name},</p>
-                  <p>Thank you for joining BLE Tracker. Your account has been successfully created.</p>
-                  <p>You can now start adding and tracking your BLE devices.</p>
+                  <p>Thank you for joining {self.brand_name}. Your account has been successfully created.</p>
+                  <p>You can now start adding and tracking your devices.</p>
                   <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
-                  <p style="color: #999; font-size: 12px;">Best regards,<br>Pinplot Team</p>
+                  <p style="color: #999; font-size: 12px;">Best regards,<br>{self.brand_name} Team</p>
                 </div>
               </body>
             </html>
@@ -232,8 +240,8 @@ Pinplot Team
             if self.use_sendgrid:
                 return self._send_via_sendgrid(
                     to_email=to_email,
-                    subject='Welcome to Pinplot',
-                    text_content="Welcome to BLE Tracker!",
+                    subject=f'Welcome to {self.brand_name}',
+                    text_content=f"Welcome to {self.brand_name}!",
                     html_content=html
                 )
             else:
@@ -300,7 +308,7 @@ Pinplot Team
             View location on map: https://www.google.com/maps?q={latitude},{longitude}
             
             Best regards,
-            Pinplot Team
+            {self.brand_name} Team
             """
             
             # HTML version
@@ -358,7 +366,7 @@ Pinplot Team
                     </p>
                   </div>
                   <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
-                  <p style="color: #999; font-size: 12px;">Best regards,<br>Pinplot Team</p>
+                  <p style="color: #999; font-size: 12px;">Best regards,<br>{self.brand_name} Team</p>
                 </div>
               </body>
             </html>
@@ -394,7 +402,7 @@ Pinplot Team
         """Send password reset email with reset link"""
         try:
             # Get base URL from environment or default
-            base_url = os.getenv("FRONTEND_URL", "https://pinplot.me")
+            base_url = os.getenv("FRONTEND_URL", self.brand_url)
             reset_link = f"{base_url}?reset_token={reset_token}"
             
             # Development mode - print to console (but still send email)
@@ -408,7 +416,7 @@ Pinplot Team
             name = first_name if first_name else "there"
             
             msg = MIMEMultipart('alternative')
-            msg['Subject'] = 'Reset Your Pinplot Password'
+            msg['Subject'] = f'Reset Your {self.brand_name} Password'
             msg['From'] = self.from_email
             msg['To'] = to_email
             
@@ -418,7 +426,7 @@ Pinplot Team
             
             Hi {name},
             
-            You requested to reset your password for your Pinplot account.
+            You requested to reset your password for your {self.brand_name} account.
             
             Click the link below to reset your password:
             {reset_link}
@@ -428,7 +436,7 @@ Pinplot Team
             If you didn't request a password reset, please ignore this email and your password will remain unchanged.
             
             Best regards,
-            Pinplot Team
+            {self.brand_name} Team
             """
             
             # HTML version
@@ -442,7 +450,7 @@ Pinplot Team
                   <div style="background-color: #f4f4f4; padding: 30px; border-radius: 0 0 8px 8px;">
                     <p style="font-size: 16px;">Hi {name},</p>
                     <p style="font-size: 16px;">
-                      You requested to reset your password for your Pinplot account.
+                      You requested to reset your password for your {self.brand_name} account.
                     </p>
                     <p style="color: #666; font-size: 14px;">
                       Click the link below to reset your password:
@@ -459,7 +467,7 @@ Pinplot Team
                     </p>
                   </div>
                   <p style="color: #999; font-size: 12px; margin-top: 20px; text-align: center;">
-                    Best regards,<br>Pinplot Team
+                    Best regards,<br>{self.brand_name} Team
                   </p>
                 </div>
               </body>
@@ -470,7 +478,7 @@ Pinplot Team
             if self.use_sendgrid:
                 return self._send_via_sendgrid(
                     to_email=to_email,
-                    subject='Reset Your Pinplot Password',
+                    subject=f'Reset Your {self.brand_name} Password',
                     text_content=text,
                     html_content=html
                 )
@@ -527,7 +535,7 @@ Pinplot Team
                 detail_rows += f"<tr><td style='padding:6px 12px;color:#666'>Scheduled deletion</td><td style='padding:6px 12px'><strong>{meta_data['delete_on']}</strong></td></tr>"
 
             subject = f"{s['emoji']} {title}"
-            text_content = f"{title}\n\n{message}\n\nPinplot Alerts"
+            text_content = f"{title}\n\n{message}\n\n{self.brand_name} Alerts"
             html_content = f"""
             <html>
               <body style="margin:0;padding:0;background:#f9fafb;font-family:Arial,sans-serif;">
@@ -543,15 +551,15 @@ Pinplot Team
                     <h2 style="margin:0 0 12px;color:#111;font-size:17px">{title}</h2>
                     <p style="margin:0 0 20px;color:#444;font-size:14px;line-height:1.6">{message}</p>
                     {f'<table style="width:100%;border-collapse:collapse;background:{s["bg"]};border-radius:8px;margin-bottom:20px">{detail_rows}</table>' if detail_rows else ''}
-                    <a href="https://pinplot.me/#/map"
+                    <a href="{self.brand_url}/#/map"
                        style="display:inline-block;background:#173C64;color:#fff;text-decoration:none;
                               padding:11px 24px;border-radius:6px;font-size:14px;font-weight:600">
-                      Open Pinplot →
+                      Open {self.brand_name} →
                     </a>
                   </div>
                   <div style="padding:16px 28px;border-top:1px solid #f0f0f0;background:#fafafa">
                     <p style="margin:0;color:#999;font-size:11px">
-                      You are receiving this because you have alert notifications enabled in Pinplot.
+                      You are receiving this because you have alert notifications enabled in {self.brand_name}.
                       To change your preferences, visit Settings inside the portal.
                     </p>
                   </div>

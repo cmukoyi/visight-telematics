@@ -95,6 +95,13 @@ services:
     environment:
       - BACKEND_URL=http://backend:8000/api/v1
       - NODE_ENV=production
+    volumes:
+      # Per-tenant branding (logo, favicon, etc.). Bind-mounted read-only so
+      # `git pull` never overwrites the tenant's logo and a sister repo sync
+      # cannot leak one tenant's assets into another. Drop files into
+      # ./customer-dashboard/tenant-assets/ on the host; served by nginx at
+      # /customer/tenant-assets/.
+      - ./customer-dashboard/tenant-assets:/app/public/tenant-assets:ro
     depends_on:
       - backend
     networks:

@@ -46,3 +46,8 @@ __pycache__/
 # Database dumps
 pinplot_dump.sql
 *.dump
+
+# Per-tenant branding assets — drop logos here on each server, never sync
+gps-tracker/customer-dashboard/tenant-assets/*
+!gps-tracker/customer-dashboard/tenant-assets/.gitkeep
+!gps-tracker/customer-dashboard/tenant-assets/README.md

@@ -9,26 +9,40 @@
     <meta name="robots" content="noindex, nofollow">
 
     <!-- Tenant branding bootstrap — fetches /api/branding and applies title,
-         theme-color, and --brand-primary CSS variable. PinPlot defaults are
-         baked into the static markup above so the page works even if /api is
+         theme-color, --brand-primary CSS variable, and any element marked
+         with data-brand="name|product|tagline|domain". PinPlot defaults are
+         baked into the static markup so the page works even if /api is
          briefly unreachable; the API call upgrades them once it returns. -->
     <script>
       (function(){
+        function _ppApplyBrand(b){
+          if (!b) return;
+          window.APP_BRANDING = b;
+          if (b.product) document.title = b.product;
+          const tc = document.querySelector('meta[name="theme-color"]');
+          if (tc && b.themeColor) tc.setAttribute('content', b.themeColor);
+          const md = document.querySelector('meta[name="description"]');
+          if (md && b.product && b.tagline) md.setAttribute('content', b.product + ' — ' + b.tagline);
+          if (b.primaryColor) document.documentElement.style.setProperty('--brand-primary', b.primaryColor);
+          // Replace any element marked with data-brand="<key>" with the
+          // corresponding branding value. Uses textContent to avoid HTML
+          // injection from the (server-controlled but still untrusted) values.
+          document.querySelectorAll('[data-brand]').forEach(function(el){
+            const key = el.getAttribute('data-brand');
+            if (b[key]) el.textContent = b[key];
+          });
+        }
+        window._ppApplyBrand = _ppApplyBrand;
         try {
           fetch('/api/branding', { cache: 'no-store' })
             .then(r => r.ok ? r.json() : null)
-            .then(b => {
-              if (!b) return;
-              window.APP_BRANDING = b;
-              if (b.product) document.title = b.product;
-              const tc = document.querySelector('meta[name="theme-color"]');
-              if (tc && b.themeColor) tc.setAttribute('content', b.themeColor);
-              const md = document.querySelector('meta[name="description"]');
-              if (md && b.product && b.tagline) md.setAttribute('content', b.product + ' — ' + b.tagline);
-              if (b.primaryColor) document.documentElement.style.setProperty('--brand-primary', b.primaryColor);
-            })
+            .then(_ppApplyBrand)
             .catch(() => {});
         } catch (_) {}
+        // Re-apply after DOMContentLoaded in case markup parsed after the fetch returned.
+        document.addEventListener('DOMContentLoaded', function(){
+          if (window.APP_BRANDING) _ppApplyBrand(window.APP_BRANDING);
+        });
       })();
     </script>
 
@@ -71,14 +85,18 @@
     <div class="login-box">
         <div class="login-header">
             <div class="login-logo">
-                <img src="/customer/assets/logo.png" alt="Pinplot" class="logo-image"
-                     onerror="this.style.display='none';document.getElementById('logoFallback').style.display='flex'">
+                <!-- Tenant-overridable logo: tries /customer/tenant-assets/logo.png
+                     first (bind-mounted volume, gitignored, per-server). Falls back
+                     to the committed default logo if the override is missing, then
+                     to a font-awesome icon if both are unavailable. -->
+                <img src="/customer/tenant-assets/logo.png" alt="Logo" class="logo-image"
+                     onerror="this.onerror=function(){this.style.display='none';document.getElementById('logoFallback').style.display='flex'};this.src='/customer/assets/logo.png'">
                 <div id="logoFallback" class="login-logo-fallback" style="display:none">
                     <i class="fa-solid fa-location-dot"></i>
                 </div>
             </div>
-            <h1 class="login-title">Customer Portal</h1>
-            <p class="login-subtitle">Sign in to manage your assets</p>
+            <h1 class="login-title" data-brand="product">Customer Portal</h1>
+            <p class="login-subtitle" data-brand="tagline">Sign in to manage your assets</p>
         </div>
 
         <div class="login-error" id="loginError"></div>
@@ -180,7 +198,7 @@
         <div class="logo-wrap">
             <div class="logo-icon"><i class="fa-solid fa-location-dot"></i></div>
             <div>
-                PinPlot
+                <span data-brand="name">PinPlot</span>
                 <span class="logo-sub">Customer Portal</span>
             </div>
         </div>
@@ -4011,9 +4029,10 @@ document.addEventListener('click', function(e) {
 });
 
 function handleLogout() {
+    const brandName = (window.APP_BRANDING && window.APP_BRANDING.name) || 'PinPlot';
     _ppConfirm({
         title: 'Sign out?',
-        message: 'Are you sure you want to sign out of PinPlot?',
+        message: `Are you sure you want to sign out of ${brandName}?`,
         okLabel: 'Sign out',
         cancelLabel: 'Stay',
         danger: true,
@@ -5128,7 +5147,11 @@ function applyBranding(theme) {
         if (logoSrc) {
             logoWrap.innerHTML = `<img src="${logoSrc}" alt="Logo" style="height:32px;max-width:140px;object-fit:contain">`;
         } else {
-            logoWrap.innerHTML = `<div class="logo-icon"><i class="fa-solid fa-location-dot"></i></div><div>PinPlot<span class="logo-sub">Customer Portal</span></div>`;
+            const _bn = (window.APP_BRANDING && window.APP_BRANDING.name) || 'PinPlot';
+            // textContent insertion to avoid injecting brand name as HTML
+            logoWrap.innerHTML = `<div class="logo-icon"><i class="fa-solid fa-location-dot"></i></div><div><span class="brand-name-txt"></span><span class="logo-sub">Customer Portal</span></div>`;
+            const bnEl = logoWrap.querySelector('.brand-name-txt');
+            if (bnEl) bnEl.textContent = _bn;
         }
     }
     // Persist to localStorage for next page load (include both logo variants)
