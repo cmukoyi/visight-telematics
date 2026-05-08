@@ -1875,26 +1875,31 @@ import urllib.parse
 
 DOCKER_SOCK = "/var/run/docker.sock"
 
+# Per-tenant container prefix — keep PinPlot back-compat default. Override
+# in deployments where compose uses a different project name (e.g. Beacon
+# Telematics uses 'beacon_telematics_').
+_OPS_PREFIX = os.getenv("ADMIN_OPS_CONTAINER_PREFIX", "pinplot_")
+
 _KNOWN_CONTAINERS = [
-    "pinplot_nginx",
-    "pinplot_backend",
-    "pinplot_customer",
-    "pinplot_admin",
-    "pinplot_db",
-    "pinplot_mosquitto",
-    "pinplot_mqtt_bridge",
-    "pinplot_flutter_web",
+    f"{_OPS_PREFIX}nginx",
+    f"{_OPS_PREFIX}backend",
+    f"{_OPS_PREFIX}customer",
+    f"{_OPS_PREFIX}admin",
+    f"{_OPS_PREFIX}db",
+    f"{_OPS_PREFIX}mosquitto",
+    f"{_OPS_PREFIX}mqtt_bridge",
+    f"{_OPS_PREFIX}flutter_web",
 ]
 
 _FRIENDLY = {
-    "pinplot_nginx":        "Nginx",
-    "pinplot_backend":      "Backend API",
-    "pinplot_customer":     "Customer Portal",
-    "pinplot_admin":        "Admin Portal",
-    "pinplot_db":           "PostgreSQL",
-    "pinplot_mosquitto":    "MQTT Broker",
-    "pinplot_mqtt_bridge":  "MQTT Bridge",
-    "pinplot_flutter_web":  "Flutter Web",
+    f"{_OPS_PREFIX}nginx":        "Nginx",
+    f"{_OPS_PREFIX}backend":      "Backend API",
+    f"{_OPS_PREFIX}customer":     "Customer Portal",
+    f"{_OPS_PREFIX}admin":        "Admin Portal",
+    f"{_OPS_PREFIX}db":           "PostgreSQL",
+    f"{_OPS_PREFIX}mosquitto":    "MQTT Broker",
+    f"{_OPS_PREFIX}mqtt_bridge":  "MQTT Bridge",
+    f"{_OPS_PREFIX}flutter_web":  "Flutter Web",
 }
 
 

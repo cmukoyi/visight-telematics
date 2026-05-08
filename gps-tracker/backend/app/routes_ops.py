@@ -17,8 +17,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin/ops", tags=["admin-ops"])
 
-# Safety guard — only containers with this prefix may be touched
-ALLOWED_PREFIX = "pinplot_"
+# Safety guard — only containers with this prefix may be touched.
+# Per-tenant override via ADMIN_OPS_CONTAINER_PREFIX (e.g. 'beacon_telematics_'
+# or 'pinplot_'). Default keeps PinPlot back-compat.
+import os as _os
+ALLOWED_PREFIX = _os.getenv("ADMIN_OPS_CONTAINER_PREFIX", "pinplot_")
 
 
 def _client():
