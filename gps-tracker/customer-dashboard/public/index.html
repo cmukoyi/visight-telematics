@@ -8981,21 +8981,34 @@ function _lmRenderPOIs() {
             console.warn('[geofence] no renderable shape for', gf?.name, gf);
             return;
         }
+        // Add to map FIRST — Leaflet needs the layer attached before
+        // computing tooltip/popup positions, otherwise binding a
+        // permanent center-anchored tooltip throws
+        // "Cannot read properties of undefined (reading 'layerPointToLatLng')".
+        try {
+            layer.addTo(_liveMap);
+        } catch (e) {
+            console.warn('[geofence] addTo failed for', gf?.name, e);
+            return;
+        }
         const armedTxt = armed ? `<br><span style="color:#10B981;font-weight:600">Armed: ${gf.armed_count} tag${gf.armed_count>1?'s':''}</span>` : '<br><span style="color:var(--text-3)">Not armed</span>';
-        layer.bindPopup(`<strong>${esc(gf.name||'Geofence')}</strong>${gf.address?'<br><small>'+esc(gf.address)+'</small>':''}${armedTxt}`);
+        try {
+            layer.bindPopup(`<strong>${esc(gf.name||'Geofence')}</strong>${gf.address?'<br><small>'+esc(gf.address)+'</small>':''}${armedTxt}`);
+        } catch (e) { /* non-fatal */ }
         // Permanent name label so users can identify each POI at a glance
         const labelLatLng = (typeof layer.getBounds === 'function')
             ? layer.getBounds().getCenter()
             : (typeof layer.getLatLng === 'function' ? layer.getLatLng() : null);
         if (labelLatLng) {
-            layer.bindTooltip(esc(gf.name || 'Geofence'), {
-                permanent: true,
-                direction: 'center',
-                className: 'poi-label',
-                opacity: 0.95
-            });
+            try {
+                layer.bindTooltip(esc(gf.name || 'Geofence'), {
+                    permanent: true,
+                    direction: 'center',
+                    className: 'poi-label',
+                    opacity: 0.95
+                });
+            } catch (e) { /* non-fatal — keep the shape visible */ }
         }
-        layer.addTo(_liveMap);
         _lmPOILayers.push(layer);
     });
     // After drawing, intelligently frame the map so POIs are visible.
