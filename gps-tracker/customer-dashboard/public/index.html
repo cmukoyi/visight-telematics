@@ -4073,20 +4073,25 @@ function handleLogout() {
 function _ppConfirm({ title = 'Are you sure?', message = '', okLabel = 'Confirm', cancelLabel = 'Cancel', danger = false } = {}) {
     return new Promise(resolve => {
         const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay';
-        overlay.style.display = 'flex';
-        overlay.style.zIndex = '10000';
+        overlay.className = 'modal-overlay pp-confirm-overlay';
+        // Inline positioning so this works even when the page's .modal-overlay
+        // CSS doesn't provide fixed positioning / backdrop. Without this the
+        // modal lands at the bottom of <body> as an invisible empty block,
+        // the user can't click anything, and the Promise never resolves
+        // (handleLogout silently hangs on `pending`).
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);' +
+            'display:flex;align-items:center;justify-content:center;z-index:10000;';
         overlay.innerHTML = `
-            <div class="modal-box" style="max-width:420px">
-                <div class="modal-header">
-                    <span class="modal-title"></span>
+            <div class="modal-box" style="background:var(--bg,#fff);color:var(--text,#111);border-radius:10px;padding:24px;max-width:420px;width:90%;box-shadow:0 12px 48px rgba(0,0,0,.35);">
+                <div class="modal-header" style="margin-bottom:12px">
+                    <span class="modal-title" style="font-size:1.1rem;font-weight:600"></span>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body" style="margin-bottom:20px">
                     <p style="margin:0;line-height:1.5"></p>
                 </div>
                 <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end">
-                    <button type="button" class="btn btn-secondary" data-pp-cancel></button>
-                    <button type="button" class="btn ${danger ? 'btn-danger' : 'btn-primary'}" data-pp-ok></button>
+                    <button type="button" class="btn btn-secondary" data-pp-cancel style="padding:8px 16px;border-radius:6px;border:1px solid var(--border,#ccc);background:var(--bg-2,#f5f5f5);color:var(--text,#111);cursor:pointer"></button>
+                    <button type="button" class="btn ${danger ? 'btn-danger' : 'btn-primary'}" data-pp-ok style="padding:8px 16px;border-radius:6px;border:none;background:${danger ? '#ef4444' : 'var(--primary,#173C64)'};color:#fff;cursor:pointer;font-weight:600"></button>
                 </div>
             </div>`;
         // Set text content safely (no HTML injection from caller-supplied strings)
