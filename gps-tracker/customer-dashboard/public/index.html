@@ -8959,7 +8959,12 @@ function _lmRenderPOIs() {
         // Polygon/rectangle vertices come back as `coordinates` from
         // /api/portal/locations (see backend _serialize_poi). Older code
         // used `polygon_points`; accept both for forward/backward compat.
-        const verts = gf.coordinates || gf.polygon_points;
+        // NOTE: backend stores coordinates as a JSON *string* in TEXT
+        // column — parse it if needed before Array.isArray check.
+        let verts = gf.coordinates || gf.polygon_points;
+        if (typeof verts === 'string') {
+            try { verts = JSON.parse(verts); } catch (_) { verts = null; }
+        }
         try {
             if (type === 'polygon' && Array.isArray(verts) && verts.length >= 3) {
                 layer = L.polygon(verts, opts);
