@@ -238,6 +238,11 @@
                     <button class="avatar-menu-item" onclick="closeAvatarMenu(); switchTab('settings')">
                         <i class="fa-solid fa-gear"></i> Settings
                     </button>
+                    <label class="avatar-menu-item" style="display:flex;align-items:center;gap:8px;cursor:pointer" title="Always show maps with the light style, even in dark mode">
+                        <i class="fa-solid fa-map-location-dot" style="width:16px"></i>
+                        <span style="flex:1">Light maps</span>
+                        <input type="checkbox" id="lightMapsToggle" onchange="_ppToggleLightMaps(this.checked)" style="margin:0">
+                    </label>
                     <button class="avatar-menu-item avatar-menu-item-danger" onclick="closeAvatarMenu(); handleLogout()">
                         <i class="fa-solid fa-right-from-bracket"></i> Sign Out
                     </button>
@@ -4178,7 +4183,18 @@ function showDashboard(user, group, effectiveFeatures) {
 // ── MapTiler basemap helper (used by all Leaflet maps) ────────────────────
 const MAPTILER_KEY = 'dGpcH37X0pIcdJ0V5aOy';
 const _ppMapTilerLayers = []; // { map, layer } registry so we can swap on theme change
+// User preference: when true, always use the light basemap regardless of the
+// page theme. Stored in localStorage so it persists across reloads. Toggled
+// from the avatar-dropdown "Light maps" checkbox. Defaults to false.
+function _ppLightMapsAlways() {
+    try { return localStorage.getItem('pp-light-maps') === '1'; } catch (_) { return false; }
+}
+function _ppToggleLightMaps(on) {
+    try { localStorage.setItem('pp-light-maps', on ? '1' : '0'); } catch (_) {}
+    if (typeof _ppRefreshAllBasemaps === 'function') _ppRefreshAllBasemaps();
+}
 function _ppMapTilerStyle() {
+    if (_ppLightMapsAlways()) return 'streets-v2';
     return document.documentElement.getAttribute('data-theme') === 'dark'
         ? 'streets-v2-dark'
         : 'streets-v2';
@@ -4258,6 +4274,12 @@ function toggleTheme() {
 }
 // Apply saved theme immediately (before login check)
 applyTheme(localStorage.getItem('pp-theme') || 'dark');
+
+// Reflect saved "Light maps" preference in the dropdown checkbox once the DOM is ready.
+document.addEventListener('DOMContentLoaded', () => {
+    const cb = document.getElementById('lightMapsToggle');
+    if (cb) cb.checked = _ppLightMapsAlways();
+});
 
 // ══════════════════════════════════════════
 // Responsive sidebar + panel helpers
