@@ -4029,21 +4029,40 @@ document.addEventListener('click', function(e) {
 });
 
 function handleLogout() {
+    console.log('[logout] handleLogout invoked');
     const brandName = (window.APP_BRANDING && window.APP_BRANDING.name) || 'PinPlot';
-    _ppConfirm({
-        title: 'Sign out?',
-        message: `Are you sure you want to sign out of ${brandName}?`,
-        okLabel: 'Sign out',
-        cancelLabel: 'Stay',
-        danger: true,
-    }).then(ok => {
+    let p;
+    try {
+        p = _ppConfirm({
+            title: 'Sign out?',
+            message: `Are you sure you want to sign out of ${brandName}?`,
+            okLabel: 'Sign out',
+            cancelLabel: 'Stay',
+            danger: true,
+        });
+        console.log('[logout] _ppConfirm returned', p);
+    } catch (err) {
+        console.error('[logout] _ppConfirm threw — falling back to native confirm', err);
+        const ok = window.confirm(`Are you sure you want to sign out of ${brandName}?`);
         if (!ok) return;
-        closeAvatarMenu();
-        _stopBackgroundPollers();
-        clearSession();
+        try { closeAvatarMenu(); } catch (_) {}
+        try { _stopBackgroundPollers(); } catch (_) {}
+        try { clearSession(); } catch (_) {}
+        window.location.reload();
+        return;
+    }
+    p.then(ok => {
+        console.log('[logout] confirm resolved with', ok);
+        if (!ok) return;
+        try { closeAvatarMenu(); } catch (e) { console.warn('[logout] closeAvatarMenu failed', e); }
+        try { _stopBackgroundPollers(); } catch (e) { console.warn('[logout] _stopBackgroundPollers failed', e); }
+        try { clearSession(); } catch (e) { console.warn('[logout] clearSession failed', e); }
+        console.log('[logout] reloading…');
         // Full page reload so no stale JS state, cached API data, or old role/feature
         // permissions persist into the next login session.
         window.location.reload();
+    }).catch(err => {
+        console.error('[logout] confirm promise rejected', err);
     });
 }
 
