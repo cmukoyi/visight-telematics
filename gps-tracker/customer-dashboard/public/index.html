@@ -1386,6 +1386,12 @@ input.hive-range::-moz-range-track {
                     <button class="loc-stab" data-lshape="rectangle">Rectangles</button>
                   </div>
 
+                  <!-- Search the geofence list (filters by name / address / notes) -->
+                  <div class="loc-search-wrap" style="margin:8px 10px 4px;position:relative">
+                    <svg class="loc-search-ico" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                    <input id="locListSearchInput" class="loc-search-input" placeholder="Search geofences…" autocomplete="off" oninput="_locListSearch(this.value)"/>
+                  </div>
+
                   <div class="loc-list" id="locGfList"></div>
 
                   <!-- Detail panel at bottom of sidebar -->
@@ -2107,6 +2113,27 @@ input.hive-range::-moz-range-track {
                                 <button class="btn btn-secondary btn-small" onclick="settingsToggleForm('pwForm')">Cancel</button>
                             </div>
                             <div class="alert" id="pw-alert" style="display:none"><span id="pw-alert-text"></span></div>
+                        </div>
+                    </div>
+
+                    <!-- ─── Preferences (per-browser) ─── -->
+                    <div class="card">
+                        <div class="settings-section-header">
+                            <i class="fa-solid fa-ruler" style="color:var(--primary)"></i>
+                            <div>
+                                <h3>Preferences</h3>
+                                <p>Display preferences for this browser. Speeds, distances and areas are converted on display only — stored data is unchanged.</p>
+                            </div>
+                        </div>
+                        <div class="settings-row">
+                            <div>
+                                <div class="settings-row-label">Unit of measurement</div>
+                                <div class="settings-row-hint">Metric: km / km/h / m². Imperial: mi / mph / ft².</div>
+                            </div>
+                            <select id="pref-units" class="form-input" style="max-width:180px" onchange="settingsSaveUnits(this.value)">
+                                <option value="metric">Metric (km, km/h)</option>
+                                <option value="imperial">Imperial (mi, mph)</option>
+                            </select>
                         </div>
                     </div>
 
@@ -3610,6 +3637,7 @@ input.hive-range::-moz-range-track {
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="users" class="au-feat"> User Accounts</label>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="qr" class="au-feat"> QR / NFC Tags</label>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="building" class="au-feat"> Floor Plan Sketch</label>
+                    <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="locations" class="au-feat"> Geofences</label>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="settings" class="au-feat"> Settings</label>
                     <p style="margin:4px 0 4px;font-size:12px;color:var(--text-secondary)">Reports</p>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="reports-subscriptions" class="au-feat"> Tag Subscriptions</label>
@@ -3740,6 +3768,7 @@ input.hive-range::-moz-range-track {
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="users" class="er-feat"> User Accounts</label>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="qr" class="er-feat"> QR / NFC Tags</label>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="building" class="er-feat"> Floor Plan Sketch</label>
+                <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="locations" class="er-feat"> Geofences</label>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="settings" class="er-feat"> Settings</label>
                 <p style="margin:4px 0 4px;font-size:12px;color:var(--text-secondary)">Reports</p>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="reports-subscriptions" class="er-feat"> Tag Subscriptions</label>
@@ -4917,6 +4946,48 @@ async function submitTagForm(e) {
 // SETTINGS
 // ══════════════════════════════════════════
 
+// ── Unit-of-measurement preference (per browser, no DB) ──────────────
+// Stored backend data is always SI (km/h for speed, metres for distance).
+// These helpers convert at the display boundary only.
+function getUnits(){ try { return localStorage.getItem('pp_units') || 'metric'; } catch(e){ return 'metric'; } }
+function setUnits(u){ try { localStorage.setItem('pp_units', u==='imperial'?'imperial':'metric'); } catch(e){} }
+// speed: input always km/h; output formatted string with unit suffix
+function fmtSpeed(kmh){
+    if(kmh==null || isNaN(kmh)) return '';
+    if(getUnits()==='imperial') return `${(kmh*0.621371).toFixed(0)} mph`;
+    return `${kmh} km/h`;
+}
+function speedUnit(){ return getUnits()==='imperial' ? 'mph' : 'km/h'; }
+// distance: input always metres
+function fmtDistance(m){
+    if(m==null || isNaN(m)) return '';
+    if(getUnits()==='imperial'){
+        const ft = m*3.28084;
+        return ft >= 5280 ? `${(ft/5280).toFixed(2)} mi` : `${Math.round(ft)} ft`;
+    }
+    return m >= 1000 ? `${(m/1000).toFixed(1)} km` : `${Math.round(m)} m`;
+}
+// area: input always m²
+function fmtArea(m2){
+    if(m2==null || isNaN(m2)) return '';
+    if(getUnits()==='imperial'){
+        const ft2 = m2*10.7639;
+        if(ft2 >= 27_878_400) return `${(ft2/27_878_400).toFixed(2)} mi²`;
+        if(ft2 >= 43_560)     return `${(ft2/43_560).toFixed(2)} ac`;
+        return `${Math.round(ft2)} ft²`;
+    }
+    if(m2 > 1_000_000) return `${(m2/1_000_000).toFixed(2)} km²`;
+    if(m2 > 10_000)    return `${(m2/10_000).toFixed(2)} ha`;
+    return `${Math.round(m2)} m²`;
+}
+function settingsSaveUnits(value){
+    setUnits(value);
+    // Re-render any visible views that care about units
+    try { if(typeof locRenderAll==='function') locRenderAll(); } catch(e){}
+    try { if(typeof renderHistoryDetail==='function') renderHistoryDetail(); } catch(e){}
+    showToast && showToast(`Units set to ${value}`);
+}
+
 let _settingsCache   = null;   // /api/portal/settings (email_domain etc.)
 let _themeCache      = null;   // /api/portal/theme
 let _notifCache      = null;   // /api/portal/notifications
@@ -4925,6 +4996,10 @@ let _logoDarkDataPending = undefined; // same semantics for dark-mode logo
 
 async function loadSettings() {
     const isAdmin = getSession().user?.is_group_admin;
+
+    // Hydrate per-browser preferences
+    const unitsSel = document.getElementById('pref-units');
+    if(unitsSel) unitsSel.value = getUnits();
 
     // Load in parallel — non-critical sections show their own spinners
     await Promise.allSettled([
@@ -6394,6 +6469,7 @@ let _locEditingId    = null;      // id being edited (null = new)
 let _locEditSnap     = null;      // snapshot for cancel-revert on edit
 let _locStatusFilter = 'all';     // 'all'|'active'|'draft'|'armed'
 let _locShapeFilter  = 'all';     // 'all'|'circle'|'polygon'|'rectangle'
+let _locTextFilter   = '';        // free-text filter on name/address/notes
 let _locAddrTimer    = null;
 let _locSearchMarker = null;      // temporary pin from address search
 let _locMapInit      = false;     // has map been initialized yet
@@ -6422,6 +6498,12 @@ function _locShowAlert(msg, type='error'){
 }
 function _locHideAlert(){ const el=document.getElementById('loc-alert'); if(el) el.style.display='none'; }
 
+// Free-text search over the geofence list (name / address / notes).
+function _locListSearch(q){
+    _locTextFilter = (q||'').trim().toLowerCase();
+    locRenderList();
+}
+
 function _locShapeIcon(type){
     if(type==='polygon')   return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2 22 8.5 18 20H6L2 8.5z"/></svg>`;
     if(type==='rectangle') return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="1"/></svg>`;
@@ -6430,7 +6512,7 @@ function _locShapeIcon(type){
 function _locDescribeShape(gf){
     if(gf.shape_type==='circle'||!gf.shape_type){
         const r=gf.radius||150;
-        return r>=1000?`Circle · ${(r/1000).toFixed(1)} km radius`:`Circle · ${r}m radius`;
+        return `Circle · ${fmtDistance(r)} radius`;
     }
     return _locCap(gf.shape_type);
 }
@@ -6445,15 +6527,13 @@ function _locApproxArea(layer){
     return Math.abs(a/2);
 }
 function _locFmtArea(m2){
-    if(m2>1_000_000) return `${(m2/1_000_000).toFixed(2)} km²`;
-    if(m2>10_000)    return `${(m2/10_000).toFixed(2)} ha`;
-    return `${Math.round(m2)} m²`;
+    return fmtArea(m2);
 }
 function _locPopupHtml(gf){
     return `<div style="font-weight:600;margin-bottom:3px">${_locHtml(gf.name)}</div>
 <div style="font-size:11px;color:var(--text-3);margin-bottom:6px">${_locHtml(gf.address||'')}</div>
 <div style="font-size:11px;color:var(--text-2)">
-  ${_locCap(gf.shape_type||'circle')} · ${gf.shape_type==='circle'||!gf.shape_type?gf.radius+'m radius':''}<br>
+  ${_locCap(gf.shape_type||'circle')} · ${gf.shape_type==='circle'||!gf.shape_type?fmtDistance(gf.radius)+' radius':''}<br>
   Status: ${_locCap(gf.is_active?'active':'inactive')}${gf.armed_count?' · '+gf.armed_count+' armed':''}
 </div>`;
 }
@@ -6926,9 +7006,16 @@ function locRenderList(){
     else if(_locStatusFilter==='draft') items=items.filter(g=>!g.is_active);
     else if(_locStatusFilter==='armed') items=items.filter(g=>(g.armed_count||0)>0);
     if(_locShapeFilter!=='all') items=items.filter(g=>(g.shape_type||'circle')===_locShapeFilter);
+    if(_locTextFilter){
+        const q=_locTextFilter;
+        items=items.filter(g=>{
+            const hay=`${g.name||''} ${g.address||''} ${g.notes||''} ${g.description||''}`.toLowerCase();
+            return hay.includes(q);
+        });
+    }
 
     if(!items.length){
-        const filt=_locStatusFilter!=='all'||_locShapeFilter!=='all';
+        const filt=_locStatusFilter!=='all'||_locShapeFilter!=='all'||!!_locTextFilter;
         el.innerHTML=`<div class="loc-gf-empty">
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".3"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
             <div>${filt?'No locations match this filter':'No locations yet'}</div>
@@ -9854,7 +9941,7 @@ function _histRenderWaypoints() {
             <div>
                 <strong>${esc(p.event || (isFirst ? 'Start' : isLast ? 'End' : 'Waypoint'))}</strong><br>
                 <small>${ts ? new Date(ts).toLocaleString() : ''}</small><br>
-                ${p.speed != null ? `<small><i class='fa-solid fa-gauge'></i> ${p.speed} km/h</small>` : ''}
+                ${p.speed != null ? `<small><i class='fa-solid fa-gauge'></i> ${fmtSpeed(p.speed)}</small>` : ''}
             </div>
         </div>`, { maxWidth: 260 });
         m.on('click', () => _histHighlightMarker(i + 1));
@@ -9876,7 +9963,7 @@ function _histRenderWaypoints() {
             <div class="tl-body">
                 <div class="tl-event">${esc(label)}</div>
                 ${ts ? `<div class="tl-meta"><span><i class="fa-regular fa-clock"></i> ${new Date(ts).toLocaleString()}</span></div>` : ''}
-                ${p.speed != null ? `<div class="tl-meta"><span><i class="fa-solid fa-gauge"></i> ${p.speed} km/h</span></div>` : ''}
+                ${p.speed != null ? `<div class="tl-meta"><span><i class="fa-solid fa-gauge"></i> ${fmtSpeed(p.speed)}</span></div>` : ''}
             </div>
         </div>`;
     }).join('');
@@ -9921,7 +10008,7 @@ function histExport() {
 
 function histExportXLSX() {
     if (!_histTrack.length) return;
-    const cols = ['#', 'Lat', 'Lng', 'Timestamp', 'Speed (km/h)', 'Event'];
+    const cols = ['#', 'Lat', 'Lng', 'Timestamp', `Speed (${speedUnit()})`, 'Event'];
     const rows = _histTrack.map((p, i) => [
         i + 1, p.lat || '', p.lng || '', p.timestamp || '', p.speed || '', p.event || ''
     ]);
