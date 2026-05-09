@@ -155,6 +155,35 @@ def _compute_effective_features(user: "PortalUser", group: "UserGroup") -> list:
     return [f for f in result if f not in _DISABLED_FEATURES]
 
 
+def _user_can_manage(me, feature: str) -> bool:
+    """True if `me` is allowed to perform write actions on `feature`.
+
+    Background: the legacy gate `me.is_group_admin` is True ONLY for the
+    bootstrap user created when the usergroup was provisioned via the
+    system-admin API. Sub-users created through the portal are always
+    is_group_admin=False even when their role is 'admin' or 'manager',
+    which silently blocked them from saving geofences, users, etc. even
+    though the UI showed they had the feature.
+
+    This helper closes that gap by honoring `role` (and `custom_features`
+    for custom roles) while still respecting the tenant kill-switch.
+    """
+    if feature in _DISABLED_FEATURES:
+        return False
+    if getattr(me, "is_group_admin", False):
+        return True
+    role = (getattr(me, "role", None) or "").lower()
+    if role in ("admin", "system_admin"):
+        return True
+    if role == "manager":
+        manager_features = SECTION_FEATURES["tracking"] + SECTION_FEATURES["management"]
+        return feature in manager_features
+    if role == "custom":
+        return feature in (getattr(me, "custom_features", None) or [])
+    # 'reporter' and unknown roles → no write access
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Pydantic schemas
 # ---------------------------------------------------------------------------
@@ -344,9 +373,9 @@ def create_portal_user(
 ):
     """Create a new portal user in the same UserGroup (group admin only)."""
     me = get_portal_user_from_request(request, db)
-    if not me.is_group_admin:
+    if not _user_can_manage(me, "users"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail="Only group admins can create users")
+                            detail="You don't have permission to create users")
 
     email = data.email.lower().strip()
     if db.query(PortalUser).filter(PortalUser.email == email).first():
@@ -414,8 +443,8 @@ def patch_portal_user(
 ):
     """Update is_active and/or expires_at for a portal user (group admin only)."""
     me = get_portal_user_from_request(request, db)
-    if not me.is_group_admin:
-        raise HTTPException(status_code=403, detail="Only group admins can modify users")
+    if not _user_can_manage(me, "users"):
+        raise HTTPException(status_code=403, detail="You don't have permission to modify users")
 
     target = db.query(PortalUser).filter(
         PortalUser.id == str(user_id),
@@ -612,9 +641,9 @@ def update_settings(
 ):
     """Update UserGroup settings (group admin only)."""
     me = get_portal_user_from_request(request, db)
-    if not me.is_group_admin:
+    if not _user_can_manage(me, "settings"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail="Only group admins can update settings")
+                            detail="You don't have permission to update settings")
 
     group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
     if not group:
@@ -687,8 +716,8 @@ def update_theme(
 ):
     """Update branding/theme (group admin only)."""
     me = get_portal_user_from_request(request, db)
-    if not me.is_group_admin:
-        raise HTTPException(status_code=403, detail="Only group admins can update branding")
+    if not _user_can_manage(me, "settings"):
+        raise HTTPException(status_code=403, detail="You don't have permission to update branding")
     group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="User group not found")
@@ -1333,8 +1362,8 @@ class PortalTagUpdate(BaseModel):
 def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session = Depends(get_db)):
     """Update a BLE tag's description, type, or assigned user (group admin only)."""
     me = get_portal_user_from_request(request, db)
-    if not me.is_group_admin:
-        raise HTTPException(status_code=403, detail="Only group admins can edit tags")
+    if not _user_can_manage(me, "asset-mgmt"):
+        raise HTTPException(status_code=403, detail="You don't have permission to edit tags")
     group = _get_group_and_assert_domain(me, db)
 
     tag = (
@@ -1420,8 +1449,8 @@ async def validate_tag_portal(
     """Validate a tag IMEI against its vendor platform (portal auth required).
     Returns {is_valid, message} without persisting anything."""
     me = get_portal_user_from_request(request, db)
-    if not me.is_group_admin:
-        raise HTTPException(status_code=403, detail="Only group admins can validate tags")
+    if not _user_can_manage(me, "asset-mgmt"):
+        raise HTTPException(status_code=403, detail="You don't have permission to validate tags")
 
     tag_type = _TAG_TYPE_ALIAS.get(data.tag_type.lower(), data.tag_type.lower())
     try:
@@ -1437,8 +1466,8 @@ async def validate_tag_portal(
 async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depends(get_db)):
     """Create a new BLE tag and assign it directly to a mobile-app user (group admin only)."""
     me = get_portal_user_from_request(request, db)
-    if not me.is_group_admin:
-        raise HTTPException(status_code=403, detail="Only group admins can add tags")
+    if not _user_can_manage(me, "asset-mgmt"):
+        raise HTTPException(status_code=403, detail="You don't have permission to add tags")
     group = _get_group_and_assert_domain(me, db)
 
     target_user = db.query(User).filter(User.id == str(data.user_id)).first()
@@ -1489,8 +1518,8 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
 def assign_tag(tag_id: str, data: PortalTagAssign, request: Request, db: Session = Depends(get_db)):
     """Reassign an existing BLE tag to a different mobile-app user (group admin only)."""
     me = get_portal_user_from_request(request, db)
-    if not me.is_group_admin:
-        raise HTTPException(status_code=403, detail="Only group admins can assign tags")
+    if not _user_can_manage(me, "asset-mgmt"):
+        raise HTTPException(status_code=403, detail="You don't have permission to assign tags")
     group = _get_group_and_assert_domain(me, db)
 
     # Tag must belong to a user already in this group's domain
@@ -1517,8 +1546,8 @@ def delete_tags(data: PortalTagDelete, request: Request, db: Session = Depends(g
     """Permanently delete one or more BLE tags (group admin only).
     Tags must belong to a user in the group's configured email domain."""
     me = get_portal_user_from_request(request, db)
-    if not me.is_group_admin:
-        raise HTTPException(status_code=403, detail="Only group admins can delete tags")
+    if not _user_can_manage(me, "asset-mgmt"):
+        raise HTTPException(status_code=403, detail="You don't have permission to delete tags")
     group = _get_group_and_assert_domain(me, db)
 
     for tag_id in data.tag_ids:
@@ -1538,8 +1567,8 @@ def delete_tags(data: PortalTagDelete, request: Request, db: Session = Depends(g
 def delete_tag_single(tag_id: str, request: Request, db: Session = Depends(get_db)):
     """Permanently delete a single BLE tag by its ID (group admin only)."""
     me = get_portal_user_from_request(request, db)
-    if not me.is_group_admin:
-        raise HTTPException(status_code=403, detail="Only group admins can delete tags")
+    if not _user_can_manage(me, "asset-mgmt"):
+        raise HTTPException(status_code=403, detail="You don't have permission to delete tags")
     group = _get_group_and_assert_domain(me, db)
 
     tag = (
@@ -1575,8 +1604,8 @@ def bulk_create_tags(rows: List[BulkTagRow], request: Request, db: Session = Dep
     if the group has no default package configured."""
     import uuid as _uuid
     me = get_portal_user_from_request(request, db)
-    if not me.is_group_admin:
-        raise HTTPException(status_code=403, detail="Only group admins can add tags")
+    if not _user_can_manage(me, "asset-mgmt"):
+        raise HTTPException(status_code=403, detail="You don't have permission to add tags")
     group = _get_group_and_assert_domain(me, db)
 
     # Require a default package on the group
@@ -1868,8 +1897,8 @@ def list_categories(request: Request, db: Session = Depends(get_db)):
 def create_category(data: CategoryCreate, request: Request, db: Session = Depends(get_db)):
     """Create a new category (group admin only)."""
     me = get_portal_user_from_request(request, db)
-    if not me.is_group_admin:
-        raise HTTPException(status_code=403, detail="Only group admins can manage categories")
+    if not _user_can_manage(me, "asset-mgmt"):
+        raise HTTPException(status_code=403, detail="You don't have permission to manage categories")
     name = data.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="Category name is required")
@@ -1896,8 +1925,8 @@ def create_category(data: CategoryCreate, request: Request, db: Session = Depend
 def update_category(cat_id: str, data: CategoryUpdate, request: Request, db: Session = Depends(get_db)):
     """Rename or deactivate a category (group admin only)."""
     me = get_portal_user_from_request(request, db)
-    if not me.is_group_admin:
-        raise HTTPException(status_code=403, detail="Only group admins can manage categories")
+    if not _user_can_manage(me, "asset-mgmt"):
+        raise HTTPException(status_code=403, detail="You don't have permission to manage categories")
     cat = db.query(TagCategory).filter(
         TagCategory.id == cat_id,
         TagCategory.usergroup_id == str(me.usergroup_id),
@@ -1924,8 +1953,8 @@ def update_category(cat_id: str, data: CategoryUpdate, request: Request, db: Ses
 def delete_category(cat_id: str, request: Request, db: Session = Depends(get_db)):
     """Soft-delete a category by marking it inactive (group admin only)."""
     me = get_portal_user_from_request(request, db)
-    if not me.is_group_admin:
-        raise HTTPException(status_code=403, detail="Only group admins can manage categories")
+    if not _user_can_manage(me, "asset-mgmt"):
+        raise HTTPException(status_code=403, detail="You don't have permission to manage categories")
     cat = db.query(TagCategory).filter(
         TagCategory.id == cat_id,
         TagCategory.usergroup_id == str(me.usergroup_id),
@@ -2236,8 +2265,8 @@ class LocationCreate(BaseModel):
 @router.post("/locations", status_code=201)
 async def create_location(data: LocationCreate, request: Request, db: Session = Depends(get_db)):
     me = get_portal_user_from_request(request, db)
-    if not me.is_group_admin:
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if not _user_can_manage(me, "locations"):
+        raise HTTPException(status_code=403, detail="You don't have permission to manage geofences")
 
     # Resolve coordinates: either from direct input or by geocoding a postcode
     if data.latitude is not None and data.longitude is not None:
@@ -2298,8 +2327,8 @@ def update_location(
     request: Request, db: Session = Depends(get_db),
 ):
     me = get_portal_user_from_request(request, db)
-    if not me.is_group_admin:
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if not _user_can_manage(me, "locations"):
+        raise HTTPException(status_code=403, detail="You don't have permission to manage geofences")
     poi = _get_group_poi(location_id, str(me.usergroup_id), db)
     if data.name is not None:
         poi.name = data.name.strip()
@@ -2333,8 +2362,8 @@ def delete_location(
     location_id: str, request: Request, db: Session = Depends(get_db),
 ):
     me = get_portal_user_from_request(request, db)
-    if not me.is_group_admin:
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if not _user_can_manage(me, "locations"):
+        raise HTTPException(status_code=403, detail="You don't have permission to manage geofences")
     poi = _get_group_poi(location_id, str(me.usergroup_id), db)
     # Remove arm links (so geofence checks stop)
     db.query(POITrackerLink).filter(POITrackerLink.poi_id == location_id).delete()
@@ -2351,8 +2380,8 @@ def arm_location(
     request: Request, db: Session = Depends(get_db),
 ):
     me = get_portal_user_from_request(request, db)
-    if not me.is_group_admin:
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if not _user_can_manage(me, "locations"):
+        raise HTTPException(status_code=403, detail="You don't have permission to manage geofences")
     poi = _get_group_poi(location_id, str(me.usergroup_id), db)
     # Verify tag belongs to this group
     tag = _resolve_group_tag(tag_id, str(me.usergroup_id), db)
@@ -2385,8 +2414,8 @@ def disarm_location(
     request: Request, db: Session = Depends(get_db),
 ):
     me = get_portal_user_from_request(request, db)
-    if not me.is_group_admin:
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if not _user_can_manage(me, "locations"):
+        raise HTTPException(status_code=403, detail="You don't have permission to manage geofences")
     _get_group_poi(location_id, str(me.usergroup_id), db)
     link = db.query(POITrackerLink).filter(
         POITrackerLink.poi_id == location_id,
@@ -2453,8 +2482,8 @@ async def bulk_upload_locations(
     POI is an active circle — type/status are no longer per-row options.
     """
     me = get_portal_user_from_request(request, db)
-    if not me.is_group_admin:
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if not _user_can_manage(me, "locations"):
+        raise HTTPException(status_code=403, detail="You don't have permission to manage geofences")
 
     if not payload.rows:
         raise HTTPException(status_code=422, detail="No rows to import")
