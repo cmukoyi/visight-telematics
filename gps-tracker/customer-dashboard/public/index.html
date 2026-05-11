@@ -662,7 +662,16 @@
             .loc-editor-badge.editing { background:rgba(245,158,11,.12); color:#f59e0b; border-color:rgba(245,158,11,.4); }
             .loc-editor-title { font-size:14px; font-weight:600; color:var(--text-1); }
             .loc-editor-sub { font-size:11px; color:var(--text-3); margin-top:2px; }
-            .loc-editor-body { flex:1; overflow-y:auto; padding:16px; }
+            .loc-editor-body { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; }
+            .loc-notes-row { flex:1; display:flex; flex-direction:column; min-height:120px; }
+            .loc-notes-area { flex:1; min-height:100px; resize:vertical; font-family:inherit; }
+            .loc-help-tip { position:relative; display:inline-flex; align-items:center; justify-content:center; color:var(--text-3); cursor:help; opacity:.8; font-size:13px; }
+            .loc-help-tip:hover, .loc-help-tip:focus { color:var(--primary); opacity:1; outline:none; }
+            .loc-help-bubble { visibility:hidden; opacity:0; position:absolute; top:calc(100% + 8px); left:0; width:280px; padding:10px 12px; background:var(--bg-2); color:var(--text-1); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.25); font-size:12px; line-height:1.45; font-weight:400; z-index:700; transition:opacity .15s; pointer-events:none; }
+            .loc-help-bubble strong { display:block; margin-bottom:6px; font-size:12px; color:var(--primary); }
+            .loc-help-bubble ol { margin:0; padding-left:18px; }
+            .loc-help-bubble ol li { margin-bottom:4px; }
+            .loc-help-tip:hover .loc-help-bubble, .loc-help-tip:focus .loc-help-bubble { visibility:visible; opacity:1; }
             .loc-editor-footer { padding:12px 16px; border-top:1px solid var(--border); display:flex; gap:7px; background:var(--bg-2); flex-shrink:0; }
             .loc-editor-footer .btn { flex:1; }
             /* Leaflet popup theming for location map */
@@ -1455,7 +1464,21 @@ input.hive-range::-moz-range-track {
                       <div style="display:flex;align-items:center;gap:10px;min-width:0">
                         <span class="loc-editor-badge" id="locEditorBadge">New</span>
                         <div>
-                          <div class="loc-editor-title" id="locEditorTitle">New geofence</div>
+                          <div class="loc-editor-title" id="locEditorTitle" style="display:flex;align-items:center;gap:6px">
+                            <span id="locEditorTitleText">New geofence</span>
+                            <span class="loc-help-tip" id="locHelpTip" tabindex="0" role="button" aria-label="Help: Creating a Geofence">
+                              <i class="fa-solid fa-circle-question"></i>
+                              <span class="loc-help-bubble">
+                                <strong>Creating a Geofence</strong>
+                                <ol>
+                                  <li>Position the geofence by clicking and dragging the center marker to your desired location.</li>
+                                  <li>Set the coverage area using the radius slider.</li>
+                                  <li>(Optional) Choose an alternative shape from the shape selector at the top of the map.</li>
+                                  <li>Enter a name for your geofence and click Save.</li>
+                                </ol>
+                              </span>
+                            </span>
+                          </div>
                           <div class="loc-editor-sub" id="locEditorSub">Adjust shape on the map</div>
                         </div>
                       </div>
@@ -1491,13 +1514,14 @@ input.hive-range::-moz-range-track {
                         </div>
                         <div style="font-size:11px;color:var(--text-3);margin-top:4px">Drag the marker on the map to reposition.</div>
                       </div>
-                      <div class="form-row">
-                        <label class="form-label">Address / Notes</label>
-                        <input class="form-input" id="locGfAddress" placeholder="Optional address or note" maxlength="500"/>
-                      </div>
+                      <input type="hidden" id="locGfAddress" value=""/>
                       <div class="form-row">
                         <label class="form-label">Coordinates</label>
                         <div id="locCoordDisp" style="padding:8px 12px;background:var(--bg-3,var(--bg));border:1px solid var(--border);border-radius:8px;font-family:monospace;font-size:11px;color:var(--text-2)">—</div>
+                      </div>
+                      <div class="form-row loc-notes-row">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-input loc-notes-area" id="locGfNotes" placeholder="Optional notes about this location…" maxlength="500"></textarea>
                       </div>
                     </div>
                     <div class="loc-editor-footer">
@@ -6590,12 +6614,40 @@ function locInitMap(){
         }
         _locCancelDrawMode();
         _locEnableDrag(_locPendingShape, type);
-        locOpenEditor({ mode:'new', type, lat, lng, radius, address:'' });
+        // If editor is already open (shape-switch flow), preserve the user's
+        // in-progress name and notes rather than wiping them.
+        const editorOpen = document.getElementById('locEditorPanel').classList.contains('open');
+        const keptName  = editorOpen ? (document.getElementById('locGfName')?.value || '') : '';
+        const keptNotes = editorOpen ? (document.getElementById('locGfNotes')?.value || '') : '';
+        locOpenEditor({ mode:'new', type, lat, lng, radius, address:'', name:keptName, notes:keptNotes });
     });
 
-    // Wire toolbar draw buttons
+    // Wire toolbar draw buttons.
+    // If a NEW (unsaved) geofence is in progress, switching shapes removes the
+    // old shape and lets the user draw the new one from scratch.
     document.querySelectorAll('[data-loctool]').forEach(btn=>{
-        btn.addEventListener('click', ()=>_locStartDraw(btn.dataset.loctool));
+        btn.addEventListener('click', ()=>{
+            const tool = btn.dataset.loctool;
+            const editorOpen = document.getElementById('locEditorPanel').classList.contains('open');
+            if(_locPendingShape && editorOpen && !_locEditingId){
+                _locDisableDrag(_locPendingShape);
+                _locGeoLayer.removeLayer(_locPendingShape);
+                if(_locPendingShape._dragMarker) _locMap.removeLayer(_locPendingShape._dragMarker);
+                _locPendingShape = null;
+                const typeEl = document.getElementById('locGfType');
+                if(typeEl) typeEl.value = tool;
+                document.getElementById('locRadiusRow').style.display = (tool==='circle') ? '' : 'none';
+                _locStartDraw(tool);
+                return;
+            }
+            if(_locPendingShape && editorOpen && _locEditingId){
+                _locSwapShape(tool);
+                const typeEl = document.getElementById('locGfType');
+                if(typeEl) typeEl.value = tool;
+                return;
+            }
+            _locStartDraw(tool);
+        });
     });
     document.getElementById('locToolCancel')?.addEventListener('click', _locCancelDraw);
 
@@ -6830,7 +6882,10 @@ function locOpenEditor({ mode='new', id=null, name='', type='circle', status='ac
     const title = document.getElementById('locEditorTitle');
     const sub   = document.getElementById('locEditorSub');
     if(badge){ badge.textContent=mode==='edit'?'Editing':'New'; badge.classList.toggle('editing', mode==='edit'); }
-    if(title) title.textContent=mode==='edit'?(name||'Geofence'):'New geofence';
+    if(title){
+        const titleText=document.getElementById('locEditorTitleText');
+        if(titleText) titleText.textContent=mode==='edit'?(name||'Geofence'):'New geofence';
+    }
     if(sub)   sub.textContent=mode==='edit'?'Drag the shape on the map to reposition':'Adjust the shape on the map as you go';
 
     const nameEl=document.getElementById('locGfName');
@@ -6839,17 +6894,30 @@ function locOpenEditor({ mode='new', id=null, name='', type='circle', status='ac
     const radEl =document.getElementById('locGfRadius');
     const radDsp=document.getElementById('locRadiusDisp');
     const addrEl=document.getElementById('locGfAddress');
+    const notesEl=document.getElementById('locGfNotes');
     if(nameEl) nameEl.value=name;
     if(typeEl) typeEl.value=type;
     if(statEl) statEl.value=status;
     if(radEl)  radEl.value=radius;
     if(radDsp) radDsp.textContent=radius+' m';
     if(addrEl) addrEl.value=address;
+    if(notesEl) notesEl.value=notes||'';
     document.getElementById('locRadiusRow').style.display=type==='circle'?'':'none';
     _locUpdateCoordDisp({ lat, lng });
 
     document.getElementById('locEditorPanel').classList.add('open');
     setTimeout(()=>{ if(nameEl) nameEl.focus(); if(_locMap) _locMap.invalidateSize(); }, 280);
+    // Auto-zoom to the pending shape so the area is comfortably visible
+    if(_locPendingShape) _locZoomToShape(_locPendingShape);
+}
+
+/* Zoom the map so the given shape is comfortably visible. */
+function _locZoomToShape(layer){
+    if(!layer || !_locMap) return;
+    try {
+        if(layer.getBounds) _locMap.fitBounds(layer.getBounds(), { padding:[60,60], maxZoom:17 });
+        else if(layer.getLatLng) _locMap.setView(layer.getLatLng(), 16, { animate:true });
+    } catch(e){}
 }
 
 function locCloseEditor(){
@@ -6860,12 +6928,14 @@ function locCloseEditor(){
         if(_locPendingShape) _locDisableDrag(_locPendingShape);
         _locPendingShape=null; _locEditSnap=null;
     } else if(_locPendingShape){
-        // New shape — remove it
+        // New (unsaved) shape — fully tear down drag handles AND remove the layer
+        _locDisableDrag(_locPendingShape);
         _locGeoLayer.removeLayer(_locPendingShape);
         if(_locPendingShape._dragMarker) _locMap.removeLayer(_locPendingShape._dragMarker);
         _locPendingShape=null;
     }
     _locEditingId=null;
+    _locCancelDraw();
     document.querySelectorAll('[data-loctool]').forEach(b=>b.classList.remove('loc-tool-active'));
     setTimeout(()=>{ if(_locMap) _locMap.invalidateSize(); }, 300);
 }
@@ -6880,6 +6950,7 @@ async function locSaveEditor(){
     const status = document.getElementById('locGfStatus')?.value || 'active';
     const radius = parseInt(document.getElementById('locGfRadius')?.value)||300;
     const address= document.getElementById('locGfAddress')?.value.trim()||'';
+    const notes  = document.getElementById('locGfNotes')?.value.trim()||'';
 
     const saveBtn = document.getElementById('locBtnSave');
     if(saveBtn){ saveBtn.disabled=true; saveBtn.textContent='Saving…'; }
@@ -6911,7 +6982,7 @@ async function locSaveEditor(){
             latitude:lat, longitude:lng,
             radius:type==='circle'?radius:150,
             address:address||null,
-            shape_type:type, coordinates, notes:'',
+            shape_type:type, coordinates, notes:notes||'',
             status
         };
 
