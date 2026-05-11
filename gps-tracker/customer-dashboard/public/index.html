@@ -6594,6 +6594,10 @@ function locInitMap(){
 
     // Draw shape created
     _locMap.on(L.Draw.Event.CREATED, (e)=>{
+        // Discard any prior unsaved pending shape so we don't leave stale
+        // shapes on the map when the user redraws/changes shape mid-flow.
+        if(!_locEditingId) _locDiscardPendingShape();
+
         const layer = e.layer;
         _locGeoLayer.addLayer(layer);
         _locPendingShape = layer;
@@ -6624,10 +6628,7 @@ function locInitMap(){
             const tool = btn.dataset.loctool;
             const editorOpen = document.getElementById('locEditorPanel').classList.contains('open');
             if(_locPendingShape && editorOpen && !_locEditingId){
-                _locDisableDrag(_locPendingShape);
-                _locGeoLayer.removeLayer(_locPendingShape);
-                if(_locPendingShape._dragMarker) _locMap.removeLayer(_locPendingShape._dragMarker);
-                _locPendingShape = null;
+                _locDiscardPendingShape();
                 const typeEl = document.getElementById('locGfType');
                 if(typeEl) typeEl.value = tool;
                 document.getElementById('locRadiusRow').style.display = (tool==='circle') ? '' : 'none';
@@ -6647,6 +6648,8 @@ function locInitMap(){
 
     // Wire sidebar buttons
     document.getElementById('locBtnNew')?.addEventListener('click', ()=>{
+        // Always discard any unsaved pending shape before starting a fresh one
+        if(!_locEditingId) _locDiscardPendingShape();
         const c = _locMap.getCenter();
         const layer = L.circle(c, {
             radius:300, color:_locCss('--primary'), weight:2,
@@ -6812,6 +6815,18 @@ function _locDisableDrag(layer){
     if(layer._dragMarker){ _locMap.removeLayer(layer._dragMarker); layer._dragMarker=null; }
     if(layer.editing&&layer.editing.disable) layer.editing.disable();
 }
+
+/* Fully discard any in-progress (unsaved) pending shape: drag handles, layer
+   from the geo group, and any orphan drag marker. Safe to call repeatedly. */
+function _locDiscardPendingShape(){
+    if(!_locPendingShape) return;
+    _locDisableDrag(_locPendingShape);
+    try { _locGeoLayer.removeLayer(_locPendingShape); } catch(e){}
+    if(_locPendingShape._dragMarker){
+        try { _locMap.removeLayer(_locPendingShape._dragMarker); } catch(e){}
+    }
+    _locPendingShape=null;
+}
 function _locSnapshot(layer, type){
     return {
         latlng: type==='circle'&&layer.getLatLng ? {...layer.getLatLng()} : null,
@@ -6921,12 +6936,9 @@ function locCloseEditor(){
         if(_locPendingShape && _locEditSnap) _locRevertSnap(_locPendingShape, _locEditSnap);
         if(_locPendingShape) _locDisableDrag(_locPendingShape);
         _locPendingShape=null; _locEditSnap=null;
-    } else if(_locPendingShape){
-        // New (unsaved) shape — fully tear down drag handles AND remove the layer
-        _locDisableDrag(_locPendingShape);
-        _locGeoLayer.removeLayer(_locPendingShape);
-        if(_locPendingShape._dragMarker) _locMap.removeLayer(_locPendingShape._dragMarker);
-        _locPendingShape=null;
+    } else {
+        // New (unsaved) — fully tear down any pending shape
+        _locDiscardPendingShape();
     }
     _locEditingId=null;
     _locCancelDraw();
@@ -7227,6 +7239,8 @@ function _locRenderSearchResults(results, q){
 function _locPickAddress(r){
     if(!_locMap) return;
     if(_locSearchMarker){ _locMap.removeLayer(_locSearchMarker); _locSearchMarker=null; }
+    // Always discard any prior unsaved pending shape before starting a new one
+    if(!_locEditingId) _locDiscardPendingShape();
     _locMap.flyTo([r.lat,r.lng], 16, {duration:0.6});
     // Drop temporary circle + open editor
     const layer=L.circle([r.lat,r.lng],{
