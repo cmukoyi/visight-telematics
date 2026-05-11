@@ -4374,6 +4374,21 @@ function closeSidebarDrawer() {
     document.getElementById('sidebar-backdrop').classList.remove('visible');
 }
 
+/* Collapse the sidebar to give the active workspace (e.g. geofence map)
+   maximum room. On mobile this closes the drawer; on desktop it collapses
+   to the icon-only rail. Idempotent. */
+function collapseSidebarForWorkspace() {
+    const sidebar = document.getElementById('sidebar');
+    const app     = document.getElementById('app');
+    if (!sidebar || !app) return;
+    if (_isMobileLayout()) {
+        closeSidebarDrawer();
+    } else if (!sidebar.classList.contains('collapsed')) {
+        sidebar.classList.add('collapsed');
+        app.classList.add('sidebar-collapsed');
+    }
+}
+
 // Close sidebar drawer when a nav item is tapped on mobile
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('#sidebar .nav-item').forEach(function(btn) {
@@ -6597,6 +6612,8 @@ function locInitMap(){
         // Discard any prior unsaved pending shape so we don't leave stale
         // shapes on the map when the user redraws/changes shape mid-flow.
         if(!_locEditingId) _locDiscardPendingShape();
+        // Collapse the main menu so the map has more room
+        collapseSidebarForWorkspace();
 
         const layer = e.layer;
         _locGeoLayer.addLayer(layer);
@@ -6650,6 +6667,8 @@ function locInitMap(){
     document.getElementById('locBtnNew')?.addEventListener('click', ()=>{
         // Always discard any unsaved pending shape before starting a fresh one
         if(!_locEditingId) _locDiscardPendingShape();
+        // Collapse the main menu so the map has more room
+        collapseSidebarForWorkspace();
         const c = _locMap.getCenter();
         const layer = L.circle(c, {
             radius:300, color:_locCss('--primary'), weight:2,
@@ -7241,6 +7260,8 @@ function _locPickAddress(r){
     if(_locSearchMarker){ _locMap.removeLayer(_locSearchMarker); _locSearchMarker=null; }
     // Always discard any prior unsaved pending shape before starting a new one
     if(!_locEditingId) _locDiscardPendingShape();
+    // Collapse the main menu so the map has more room
+    collapseSidebarForWorkspace();
     _locMap.flyTo([r.lat,r.lng], 16, {duration:0.6});
     // Drop temporary circle + open editor
     const layer=L.circle([r.lat,r.lng],{
