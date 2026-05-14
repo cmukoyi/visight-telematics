@@ -149,6 +149,7 @@ jobs:
             "gps-tracker/customer-dashboard/public/assets/logo.png"
             "gps-tracker/nginx/nginx.conf"
             "gps-tracker/mobile-app/ble_tracker_app/web/favicon.ico"
+            "gps-tracker/docker-compose.yml"
           )
           missing=0
           for f in "${required[@]}"; do
@@ -157,6 +158,12 @@ jobs:
               missing=1
             fi
           done
+          # Compose template must have rendered cleanly — no placeholders left
+          if grep -q "__TENANT_" gps-tracker/docker-compose.yml 2>/dev/null; then
+            echo "❌ unsubstituted placeholders in gps-tracker/docker-compose.yml"
+            grep -n "__TENANT_" gps-tracker/docker-compose.yml
+            missing=1
+          fi
           [ $missing -eq 0 ] && echo "✅ tenant overlay verified: ${TENANT}"
           exit $missing
 

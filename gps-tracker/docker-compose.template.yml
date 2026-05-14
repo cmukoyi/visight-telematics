@@ -1,8 +1,17 @@
 
-
-# Production Docker Compose — Pinplot
+# Production Docker Compose — TEMPLATE
 # Deployed via GitHub Actions CI/CD
 # Secrets injected from backend/.env (written by pipeline from GitHub Secrets)
+#
+# This file is the single source of truth for production compose across all
+# tenants. scripts/build.sh substitutes per-tenant values from
+# tenants/<tenant>/tenant.env and writes gps-tracker/docker-compose.yml
+# (gitignored, build output).
+#
+# CRITICAL: the tenant prefix is also the docker volume name prefix.
+# Renaming a tenant's prefix orphans its postgres data volume. Do NOT
+# change a tenant's prefix after first deploy without a planned data
+# migration.
 
 x-logging: &default-logging
   driver: "json-file"
@@ -13,21 +22,21 @@ x-logging: &default-logging
 services:
   db:
     image: postgres:15-alpine
-    container_name: pinplot_db
+    container_name: __TENANT_PREFIX___db
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-pinplot_db_user}
+      POSTGRES_USER: ${POSTGRES_USER:-__TENANT_DB_USER__}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-pinplot_db}
+      POSTGRES_DB: ${POSTGRES_DB:-__TENANT_DB_NAME__}
     volumes:
-      - pinplot_postgres_data:/var/lib/postgresql/data
+      - __TENANT_PREFIX___postgres_data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
     networks:
-      - pinplot_network
+      - __TENANT_PREFIX___network
     restart: unless-stopped
     logging: *default-logging
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pinplot_db_user} -d ${POSTGRES_DB:-pinplot_db}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-__TENANT_DB_USER__} -d ${POSTGRES_DB:-__TENANT_DB_NAME__}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -36,7 +45,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: pinplot_backend
+    container_name: __TENANT_PREFIX___backend
     env_file:
       - ./backend/.env
     ports:
@@ -45,7 +54,7 @@ services:
       db:
         condition: service_healthy
     networks:
-      - pinplot_network
+      - __TENANT_PREFIX___network
     restart: unless-stopped
     logging: *default-logging
     healthcheck:
@@ -61,7 +70,8 @@ services:
     environment:
       - DEBUG=False
       - ENVIRONMENT=production
-      - FROM_EMAIL=noreply@pinplot.me
+      # FROM_EMAIL/BRAND_* are loaded from backend/.env — keep tenant-specific
+      # values out of the committed compose file.
     # One worker — the background location poller must not run in multiple processes
     # (multiple workers each start their own poller → duplicate alerts).
     # The poller is async/I-O-bound; a single worker event loop handles it well.
@@ -71,13 +81,19 @@ services:
     build:
       context: ./admin-portal
       dockerfile: Dockerfile
-    container_name: pinplot_admin
+    container_name: __TENANT_PREFIX___admin
     ports:
       - "3010:80"
+    volumes:
+      # Shared per-tenant branding dir (same source as the customer portal)
+      # so admin/login and customer/login render the same tenant logo. Drop
+      # logo.png into ./customer-dashboard/tenant-assets/ on the host; served
+      # at /admin/tenant-assets/ via the outer nginx.
+      - ./customer-dashboard/tenant-assets:/usr/share/nginx/html/tenant-assets:ro
     depends_on:
       - backend
     networks:
-      - pinplot_network
+      - __TENANT_PREFIX___network
     restart: unless-stopped
     logging: *default-logging
     healthcheck:
@@ -90,7 +106,7 @@ services:
     build:
       context: ./customer-dashboard
       dockerfile: Dockerfile
-    container_name: pinplot_customer
+    container_name: __TENANT_PREFIX___customer
     ports:
       - "3011:3001"
     environment:
@@ -106,7 +122,7 @@ services:
     depends_on:
       - backend
     networks:
-      - pinplot_network
+      - __TENANT_PREFIX___network
     restart: unless-stopped
     logging: *default-logging
 
@@ -114,24 +130,24 @@ services:
     build:
       context: ./mobile-app
       dockerfile: Dockerfile
-    container_name: pinplot_flutter_web
+    container_name: __TENANT_PREFIX___flutter_web
     ports:
       - "3012:80"
     depends_on:
       - backend
     networks:
-      - pinplot_network
+      - __TENANT_PREFIX___network
     restart: unless-stopped
     logging: *default-logging
 
   mosquitto:
     image: eclipse-mosquitto:2.0
-    container_name: pinplot_mosquitto
+    container_name: __TENANT_PREFIX___mosquitto
     volumes:
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - mosquitto_data:/mosquitto/data
     networks:
-      - pinplot_network
+      - __TENANT_PREFIX___network
     restart: unless-stopped
     logging: *default-logging
 
@@ -139,7 +155,7 @@ services:
     build:
       context: ./mqtt-bridge
       dockerfile: Dockerfile
-    container_name: pinplot_mqtt_bridge
+    container_name: __TENANT_PREFIX___mqtt_bridge
     environment:
       # URL of the Pareto Anywhere Socket.IO server (container must be on this network)
       - PARETO_URL=http://pareto-anywhere:3001
@@ -154,13 +170,13 @@ services:
     depends_on:
       - mosquitto
     networks:
-      - pinplot_network
+      - __TENANT_PREFIX___network
     restart: unless-stopped
     logging: *default-logging
 
   nginx:
     image: nginx:alpine
-    container_name: pinplot_nginx
+    container_name: __TENANT_PREFIX___nginx
     ports:
       - "80:80"
       - "443:443"
@@ -175,12 +191,12 @@ services:
       - flutter-web
       - mosquitto
     networks:
-      - pinplot_network
+      - __TENANT_PREFIX___network
     restart: unless-stopped
     logging: *default-logging
 
 volumes:
-  pinplot_postgres_data:
+  __TENANT_PREFIX___postgres_data:
     driver: local
   nginx_logs:
     driver: local
@@ -188,6 +204,6 @@ volumes:
     driver: local
 
 networks:
-  pinplot_network:
-    name: pinplot_network   # explicit name prevents docker-compose project prefix
+  __TENANT_PREFIX___network:
+    name: __TENANT_PREFIX___network   # explicit name prevents docker-compose project prefix
     driver: bridge

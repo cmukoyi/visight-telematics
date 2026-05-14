@@ -3,12 +3,9 @@
 Brand and infrastructure files for the **Beacon Telematics** tenant
 (beacontelematics.co.uk). Mirrors `tenants/pinplot/` in shape.
 
-**Status:** Phase 3.1 — data captured, not yet wired into a deployment
-pipeline. See `MULTI_TENANT_MIGRATION.md` for roadmap.
-
 ## Source → destination mapping
 
-`scripts/build.sh beacon` (once Phase 3.2 wires it up) will copy:
+`scripts/build.sh beacon` copies these files into `gps-tracker/`:
 
 | Tenant source | gps-tracker destination |
 |---|---|
@@ -24,23 +21,26 @@ pipeline. See `MULTI_TENANT_MIGRATION.md` for roadmap.
 | `mobile/web/android-chrome-192x192.png` | `mobile-app/ble_tracker_app/web/android-chrome-192x192.png` |
 | `mobile/web/android-chrome-512x512.png` | `mobile-app/ble_tracker_app/web/android-chrome-512x512.png` |
 | `infra/nginx.conf` | `nginx/nginx.conf` |
-| `infra/docker-compose.yml` | (Phase 3.2 — special handling, see below) |
 
-## docker-compose.yml special handling
+Plus, from `tenant.env`, the tenant prefix and DB defaults are
+substituted into `gps-tracker/docker-compose.template.yml` to render
+`gps-tracker/docker-compose.yml`.
 
-Beacon uses `beacon_telematics_*` for container, volume and network
-names (vs pinplot's `pinplot_*`). For Phase 3.1 we keep beacon's
-existing compose file as a per-tenant copy. Phase 3.2 will decide
-whether to:
+## tenant.env
 
-1. Keep per-tenant compose files (simple, slight duplication), or
-2. Templatise the shared `gps-tracker/docker-compose.yml` with a
-   `__TENANT_PREFIX__` placeholder (DRY, slightly more magic).
+| Variable | Beacon value | Used for |
+|---|---|---|
+| `TENANT_PREFIX` | `beacon_telematics` | Container, volume, and network names |
+| `TENANT_DB_USER` | `beacon_user` | `POSTGRES_USER` default |
+| `TENANT_DB_NAME` | `beacon_telematics` | `POSTGRES_DB` default |
 
-Either way, beacon's existing volume `beacon_telematics_postgres_data`
-**must not be renamed** — it would orphan production data. Any
-templating must produce that exact volume name.
+**CRITICAL:** beacon's existing production volume is
+`beacon_telematics_postgres_data`. Renaming `TENANT_PREFIX` orphans
+production data. Do NOT change.
 
 ## Required env vars (server-side `backend/.env`)
 
-See `.env.template` in this directory for the full list.
+See `.env.template` in this directory for the full list. Real values
+are set manually on beacon's DigitalOcean box and are never written by
+the deploy pipeline.
+

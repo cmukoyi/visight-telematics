@@ -19,19 +19,25 @@ matching `gps-tracker/` runtime locations before image build / rsync.
 | `mobile/web/android-chrome-512x512.png`        | `mobile-app/ble_tracker_app/web/android-chrome-512x512.png`              |
 | `infra/nginx.conf`                             | `nginx/nginx.conf`                                                       |
 
-## Phase 1.1 status
+Plus, from `tenant.env`, the tenant prefix and DB defaults are
+substituted into `gps-tracker/docker-compose.template.yml` to render
+`gps-tracker/docker-compose.yml`.
 
-These files are currently **copies** of what already lives under `gps-tracker/`.
-That redundancy is intentional during Phase 1.1 — it lets us prove
-`scripts/build.sh pinplot` is correct (idempotent: running it must produce
-zero `git diff`) before Phase 1.3 deletes the originals.
+## tenant.env
+
+| Variable | PinPlot value | Used for |
+|---|---|---|
+| `TENANT_PREFIX` | `pinplot` | Container, volume, and network names |
+| `TENANT_DB_USER` | `pinplot_db_user` | `POSTGRES_USER` default |
+| `TENANT_DB_NAME` | `pinplot_db` | `POSTGRES_DB` default |
+
+**CRITICAL:** PinPlot's existing production volume is
+`pinplot_postgres_data`. Renaming `TENANT_PREFIX` orphans production
+data. Do NOT change.
 
 ## Not included here (handled separately)
 
 - **Runtime logo override** — `gps-tracker/customer-dashboard/tenant-assets/`
   remains the per-server drop-in path for live logo swaps. It overrides the
   build-time default shipped by this directory.
-- **Docker compose tenant bits** (container names, DB defaults, FROM_EMAIL) —
-  will be extracted into `tenants/pinplot/docker-compose.override.yml` in
-  Phase 1.2 / 1.3, not yet.
 - **Mobile app theme/colors** — Phase "Future" (Flutter brand abstraction).

@@ -76,5 +76,63 @@ done
 echo
 echo "✅ tenant '$TENANT' assembled — $copied changed, $skipped_missing missing in tenant tree"
 
+# ─── Render docker-compose.yml from template ──────────────────────────────────
+# Substitutes __TENANT_PREFIX__, __TENANT_DB_USER__, __TENANT_DB_NAME__ from
+# tenants/<tenant>/tenant.env into gps-tracker/docker-compose.template.yml and
+# writes gps-tracker/docker-compose.yml (gitignored, build output).
+TENANT_ENV="$SRC/tenant.env"
+TEMPLATE="$DST/docker-compose.template.yml"
+COMPOSE_OUT="$DST/docker-compose.yml"
+
+if [[ ! -f "$TENANT_ENV" ]]; then
+  echo "❌ missing $TENANT_ENV — required for compose templating" >&2
+  exit 1
+fi
+if [[ ! -f "$TEMPLATE" ]]; then
+  echo "❌ missing $TEMPLATE — required for compose templating" >&2
+  exit 1
+fi
+
+# Source tenant.env in a subshell to avoid leaking vars
+set -a
+# shellcheck disable=SC1090
+. "$TENANT_ENV"
+set +a
+
+: "${TENANT_PREFIX:?tenant.env must define TENANT_PREFIX}"
+: "${TENANT_DB_USER:?tenant.env must define TENANT_DB_USER}"
+: "${TENANT_DB_NAME:?tenant.env must define TENANT_DB_NAME}"
+
+# Reject placeholder values that look like template noise
+for v in TENANT_PREFIX TENANT_DB_USER TENANT_DB_NAME; do
+  val="${!v}"
+  if [[ "$val" == *"__"* || -z "$val" ]]; then
+    echo "❌ $v in tenant.env has invalid value: '$val'" >&2
+    exit 1
+  fi
+done
+
+tmp_out="$(mktemp)"
+sed \
+  -e "s|__TENANT_PREFIX__|${TENANT_PREFIX}|g" \
+  -e "s|__TENANT_DB_USER__|${TENANT_DB_USER}|g" \
+  -e "s|__TENANT_DB_NAME__|${TENANT_DB_NAME}|g" \
+  "$TEMPLATE" > "$tmp_out"
+
+# Fail loudly if any placeholder leaked through
+if grep -q "__TENANT_" "$tmp_out"; then
+  echo "❌ unsubstituted placeholders remain in compose output:" >&2
+  grep -n "__TENANT_" "$tmp_out" >&2
+  rm -f "$tmp_out"
+  exit 1
+fi
+
+if ! cmp -s "$tmp_out" "$COMPOSE_OUT" 2>/dev/null; then
+  mv "$tmp_out" "$COMPOSE_OUT"
+  echo "  ✓ rendered: docker-compose.yml (TENANT_PREFIX=$TENANT_PREFIX)"
+else
+  rm -f "$tmp_out"
+fi
+
 # Stamp the build so deploy can verify what was shipped
 echo "$TENANT" > "$DST/.tenant"

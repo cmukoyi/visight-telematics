@@ -83,3 +83,5 @@ mobile-app/ble_tracker_app/web/android-chrome-192x192.png
 mobile-app/ble_tracker_app/web/android-chrome-512x512.png
 nginx/nginx.conf
 .tenant
+# Rendered from docker-compose.template.yml + tenants/<tenant>/tenant.env
+docker-compose.yml
