@@ -51,3 +51,4 @@ pinplot_dump.sql
 gps-tracker/customer-dashboard/tenant-assets/*
 !gps-tracker/customer-dashboard/tenant-assets/.gitkeep
 !gps-tracker/customer-dashboard/tenant-assets/README.md
+MULTI_TENANT_MIGRATION.md
