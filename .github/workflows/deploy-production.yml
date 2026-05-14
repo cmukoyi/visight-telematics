@@ -98,6 +98,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-flutter
     environment: production
+    # Tenant slug controls which tenants/<TENANT>/ overlay is assembled
+    # into gps-tracker/ before rsync. Single source of truth for the job.
+    # When a second tenant is added (Phase 4), replace the literal with
+    # a branch- or environment-conditional expression, e.g.
+    #   TENANT: ${{ vars.TENANT || (github.ref_name == 'prod/beacon' && 'beacon' || 'pinplot') }}
+    env:
+      TENANT: pinplot
 
     steps:
       - uses: actions/checkout@v4
@@ -115,6 +122,43 @@ jobs:
             exit 1
           fi
           echo "✅ Flutter artifacts ready"
+
+      # ── Assemble per-tenant overlay into gps-tracker/ ────────────
+      # Copies tenants/${TENANT}/** into matching gps-tracker/ paths
+      # (logos, favicons, nginx.conf). Idempotent. After Phase 1.3 the
+      # originals will live ONLY in tenants/, so this step is what
+      # makes the rsync payload complete.
+      - name: Assemble tenant overlay
+        run: |
+          if [ ! -d "tenants/${TENANT}" ]; then
+            echo "❌ tenants/${TENANT} not found in repo"
+            exit 1
+          fi
+          bash scripts/build.sh "${TENANT}"
+
+      - name: Verify tenant overlay
+        run: |
+          # Marker exists and matches expected tenant
+          if [ ! -f "gps-tracker/.tenant" ] || ! grep -qx "${TENANT}" gps-tracker/.tenant; then
+            echo "❌ tenant marker missing or mismatched (expected ${TENANT})"
+            exit 1
+          fi
+          # Critical assets present after assembly (fail loud, not at runtime)
+          required=(
+            "gps-tracker/admin-portal/assets/logo.png"
+            "gps-tracker/customer-dashboard/public/assets/logo.png"
+            "gps-tracker/nginx/nginx.conf"
+            "gps-tracker/mobile-app/ble_tracker_app/web/favicon.ico"
+          )
+          missing=0
+          for f in "${required[@]}"; do
+            if [ ! -f "$f" ]; then
+              echo "❌ missing after overlay: $f"
+              missing=1
+            fi
+          done
+          [ $missing -eq 0 ] && echo "✅ tenant overlay verified: ${TENANT}"
+          exit $missing
 
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.8.0
