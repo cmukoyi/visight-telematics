@@ -3851,6 +3851,18 @@ function getSession() {
     };
 }
 
+// True for users the backend treats as full admins. The legacy is_group_admin
+// flag is only set on the bootstrap user created when a tenant is provisioned;
+// portal-created sub-users with role='admin' get the same backend privileges
+// (see _user_can_manage in routes_portal.py) so the UI must honor both.
+function _isAdminLikeUser(u) {
+    if (!u) return false;
+    if (u.is_group_admin) return true;
+    const r = (u.role || '').toLowerCase();
+    return r === 'admin' || r === 'system_admin';
+}
+function _isAdminLike() { return _isAdminLikeUser(getSession().user); }
+
 // ── Input debounce helpers ─────────────────────────────────────────
 // Wrap any function so it only fires after the user stops typing for `ms`.
 // `_ppDebFn(name, ms)` returns a wrapper that looks up the real function on
@@ -4506,7 +4518,7 @@ function showTabAlert(prefix, msg, type) {
 async function loadGroupTags() {
     const tb      = document.getElementById('tagsTableBody');
     const hint    = document.getElementById('tagsDomainHint');
-    const isAdmin = getSession().user?.is_group_admin;
+    const isAdmin = _isAdminLike();
     const colSpan = isAdmin ? 13 : 11;
 
     // Show/hide admin-only controls
@@ -4780,7 +4792,7 @@ async function openTagMgmtModal(mode, imei) {
     document.getElementById('tagMgmtPackageGroup').querySelector('label').textContent = 'Package';
     document.getElementById('tagMgmtPackage').removeAttribute('required');
     // Non-admins cannot assign or reassign a package — only Admin portal users can
-    const _isAdmin = getSession().user?.is_group_admin;
+    const _isAdmin = _isAdminLike();
     if (!_isAdmin) {
         document.getElementById('tagMgmtPackage').disabled = true;
         const _pkgLabel = document.getElementById('tagMgmtPackageGroup').querySelector('label');
@@ -5028,7 +5040,7 @@ let _logoDataPending     = undefined; // undefined = unchanged; null = remove; s
 let _logoDarkDataPending = undefined; // same semantics for dark-mode logo
 
 async function loadSettings() {
-    const isAdmin = getSession().user?.is_group_admin;
+    const isAdmin = _isAdminLike();
 
     // Hydrate per-browser preferences
     const unitsSel = document.getElementById('pref-units');
@@ -5242,7 +5254,7 @@ async function settingsSaveAppearance() {
 function settingsCancelAppearance() {
     // Revert live preview
     applyBranding(_themeCache || {});
-    _loadSettingsTheme(getSession().user?.is_group_admin);
+    _loadSettingsTheme(_isAdminLike());
 }
 
 // Apply branding to document — called after login and after save
@@ -8671,7 +8683,7 @@ async function loadUsers() {
                 const isSelf = me && me.id === u.id;
                 const isSystemAdmin = u.role === 'system_admin';
                 const targetIsAdmin = u.is_group_admin || u.role === 'admin';
-                const meIsAdmin = me?.is_group_admin;
+                const meIsAdmin = _isAdminLikeUser(me);
                 const meIsSysAdmin = me?.role === 'system_admin';
                 const canModifyAdmin = meIsAdmin || !targetIsAdmin;
                 const resetBtn = (meIsSysAdmin && !isSelf) ? `<button class="btn btn-ghost btn-sm" onclick="sysAdminResetPassword('${esc(u.id)}','${esc(u.email)}','${esc(name)}')" title="Reset this user's password">
@@ -9626,7 +9638,7 @@ let _alCatFilter = 'all'; // 'all' | category UUID from _categoriesCache
 
 async function initAssetList() {
     // Show/hide admin-only controls
-    const _alIsAdmin = getSession().user?.is_group_admin;
+    const _alIsAdmin = _isAdminLike();
     document.querySelectorAll('#tab-assets .btn-primary, #tab-assets .btn-ghost').forEach(btn => {
         if (btn.textContent.includes('Add Tag')) btn.style.display = _alIsAdmin ? '' : 'none';
     });
@@ -10120,7 +10132,7 @@ function histExportXLSX() {
 // ══════════════════════════════════════════
 async function initAssetMgmt() {
     // Show/hide admin-only controls
-    const _amIsAdmin = getSession().user?.is_group_admin;
+    const _amIsAdmin = _isAdminLike();
     document.querySelectorAll('#tab-asset-mgmt .btn-primary, #tab-asset-mgmt .btn-ghost').forEach(btn => {
         if (btn.textContent.includes('Add Tag') || btn.textContent.includes('Bulk Upload')) btn.style.display = _amIsAdmin ? '' : 'none';
     });
