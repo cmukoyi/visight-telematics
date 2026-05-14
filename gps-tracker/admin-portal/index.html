@@ -3,7 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PinPlot-HPS Admin</title>
+    <title>Admin Console</title>
+    <!-- Favicon: served by the outer nginx via `location = /favicon.ico` which
+         proxies to the flutter-web container's /fav.ico (tenant-branded). -->
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+    <!-- Tenant branding bootstrap — fetches /api/branding (same endpoint
+         the customer portal uses) and overrides title + brand text to
+         match BRAND_NAME / BRAND_PRODUCT in backend env. Falls back to
+         the static text above if /api/branding fails. -->
+    <script>
+      (function(){
+        function applyBrand(b){
+          if (!b) return;
+          const product = b.product || (b.name ? b.name + ' Admin' : null);
+          if (product) document.title = product;
+          // Replace any element with data-brand="name|product"
+          document.querySelectorAll('[data-brand]').forEach(el => {
+            const k = el.getAttribute('data-brand');
+            if (k === 'name'    && b.name)    el.textContent = b.name;
+            if (k === 'product' && product)   el.textContent = product;
+          });
+        }
+        try {
+          fetch('/api/branding', { cache: 'no-store' })
+            .then(r => r.ok ? r.json() : null)
+            .then(applyBrand)
+            .catch(()=>{});
+        } catch (_) {}
+      })();
+    </script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -771,10 +800,14 @@
         <div class="login-box">
             <div class="login-header">
                 <div class="login-logo">
-                    <img src="assets/logo.png" alt="PinPlot-HPS Logo" class="logo-image">
+                    <!-- Tenant-overridable logo: tries /admin/tenant-assets/logo.png
+                         (host-mounted, shared with customer portal), falls back
+                         to the committed default. -->
+                    <img src="tenant-assets/logo.png" alt="Admin Logo" class="logo-image"
+                         onerror="this.onerror=null;this.src='assets/logo.png'">
                 </div>
                 <h1 class="login-title">Admin Portal</h1>
-                <p class="login-subtitle">PinPlot-HPS Management</p>
+                <p class="login-subtitle"><span data-brand="product">PinPlot-HPS</span> Management</p>
             </div>
 
             <form id="loginForm" onsubmit="handleLogin(event)">
@@ -890,7 +923,7 @@
                 <div class="top-bar">
                     <div>
                         <h1 class="page-title" id="pageTitle">Dashboard</h1>
-                        <p class="page-subtitle" id="pageSubtitle">Welcome to PinPlot-HPS Admin</p>
+                        <p class="page-subtitle" id="pageSubtitle">Welcome to <span data-brand="product">PinPlot-HPS</span> Admin</p>
                     </div>
                     <div class="user-info">
                         <button id="admin-theme-toggle" title="Toggle light / dark mode" onclick="toggleAdminTheme()">

@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PinPlot HPS — Customer Portal</title>
+    <!-- Favicon: served by the outer nginx via `location = /favicon.ico` which
+         proxies to the flutter-web container's /fav.ico (tenant-branded). -->
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
     <meta name="description" content="PinPlot Customer Portal — live asset tracking, geofencing, and reporting for your fleet of GPS and BLE-tagged assets.">
     <meta name="theme-color" content="#0F1117">
     <meta name="robots" content="noindex, nofollow">
@@ -31,6 +35,12 @@
             const key = el.getAttribute('data-brand');
             if (b[key]) el.textContent = b[key];
           });
+          // Reload basemap tiles if maps were initialised before /api/branding
+          // returned — they would otherwise still show tiles fetched with the
+          // stale (default) MapTiler key.
+          if (typeof window._ppRefreshAllBasemaps === 'function') {
+            try { window._ppRefreshAllBasemaps(); } catch (_) {}
+          }
         }
         window._ppApplyBrand = _ppApplyBrand;
         try {
@@ -4328,6 +4338,10 @@ function _ppRefreshAllBasemaps() {
     _ppMapTilerLayers.length = 0;
     refreshed.forEach(e => _ppMapTilerLayers.push(e));
 }
+// Expose so the /api/branding bootstrap (defined in <head>) can call this
+// after the tenant maptiler key arrives — otherwise tiles initialised before
+// the API responded keep using the default key and 401 from MapTiler.
+window._ppRefreshAllBasemaps = _ppRefreshAllBasemaps;
 
 function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
