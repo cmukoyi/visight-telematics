@@ -10,10 +10,9 @@
 # Idempotent: running it twice produces zero diff. Safe to run before any
 # `docker compose build` or rsync to the deploy host.
 #
-# Phase 1.1: originals still exist in gps-tracker/ and are byte-identical to
-# the tenant copies, so this script is currently a no-op verifier. From
-# Phase 1.3 onward the originals are removed and this script becomes
-# load-bearing.
+# Load-bearing as of Phase 1.3: the destination paths are gitignored under
+# gps-tracker/.gitignore, so the assembled files exist ONLY after this
+# script runs (locally for dev, on the CI runner for production deploys).
 
 set -euo pipefail
 
