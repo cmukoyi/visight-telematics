@@ -81,6 +81,13 @@ mobile-app/ble_tracker_app/web/favicon-32x32.png
 mobile-app/ble_tracker_app/web/apple-touch-icon.png
 mobile-app/ble_tracker_app/web/android-chrome-192x192.png
 mobile-app/ble_tracker_app/web/android-chrome-512x512.png
+# Tenant-overlayed Flutter source (per-tenant brand divergence)
+mobile-app/ble_tracker_app/lib/theme/app_theme.dart
+mobile-app/ble_tracker_app/lib/config/environment.dart
+mobile-app/ble_tracker_app/lib/main.dart
+mobile-app/ble_tracker_app/lib/screens/scan_screen.dart
+mobile-app/ble_tracker_app/web/index.html
+mobile-app/ble_tracker_app/ios/Runner/Info.plist
 nginx/nginx.conf
 .tenant
 # Rendered from docker-compose.template.yml + tenants/<tenant>/tenant.env

@@ -48,6 +48,12 @@ MAP=(
   "mobile/web/apple-touch-icon.png:mobile-app/ble_tracker_app/web/apple-touch-icon.png"
   "mobile/web/android-chrome-192x192.png:mobile-app/ble_tracker_app/web/android-chrome-192x192.png"
   "mobile/web/android-chrome-512x512.png:mobile-app/ble_tracker_app/web/android-chrome-512x512.png"
+  "mobile/web/index.html:mobile-app/ble_tracker_app/web/index.html"
+  "mobile/lib/theme/app_theme.dart:mobile-app/ble_tracker_app/lib/theme/app_theme.dart"
+  "mobile/lib/config/environment.dart:mobile-app/ble_tracker_app/lib/config/environment.dart"
+  "mobile/lib/main.dart:mobile-app/ble_tracker_app/lib/main.dart"
+  "mobile/lib/screens/scan_screen.dart:mobile-app/ble_tracker_app/lib/screens/scan_screen.dart"
+  "mobile/ios/Runner/Info.plist:mobile-app/ble_tracker_app/ios/Runner/Info.plist"
   "infra/nginx.conf:nginx/nginx.conf"
 )
 
