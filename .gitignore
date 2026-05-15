@@ -53,4 +53,5 @@ gps-tracker/customer-dashboard/tenant-assets/*
 !gps-tracker/customer-dashboard/tenant-assets/README.md
 MULTI_TENANT_MIGRATION.md
 HIVE_Architecture_Specification.md
+DEPLOY_RUNBOOK.md
 gps-tracker/.tenant
