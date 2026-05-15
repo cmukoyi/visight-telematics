@@ -65,6 +65,18 @@ for entry in "${MAP[@]}"; do
   src_file="$SRC/$rel_src"
   dst_file="$DST/$rel_dst"
 
+  # Hard guard: NEVER copy .env files via the overlay. Server .env files are
+  # managed manually and must not be touched by build/deploy. If a future
+  # contributor adds an .env entry to MAP, fail loud here instead of shipping
+  # secrets or overwriting a hand-tuned production .env.
+  case "$rel_dst" in
+    *.env|.env|.env.*|*/.env|*/.env.*|*/*.env)
+      echo "❌ refusing to copy .env via overlay: $rel_dst" >&2
+      echo "   .env files must be managed manually on the server." >&2
+      exit 1
+      ;;
+  esac
+
   if [[ ! -f "$src_file" ]]; then
     echo "  ⚠ skip (not in tenant): $rel_src"
     skipped_missing=$((skipped_missing + 1))
