@@ -2662,18 +2662,22 @@ def get_trips_v1(
             logger.info(f"📍 Fetching trips for vehicle {vehicle_id}")
             logger.info(f"📅 Date range: {utc_start} to {utc_end}")
         
-        # Get OAuth token for MZone API using correct password grant flow
-        token_url = "https://login.mzoneweb.net/connect/token"
+        # Get OAuth token for MZone API using correct password grant flow.
+        # NOTE: this duplicates services/mzone_service.py:get_oauth_token —
+        # a follow-up should consolidate. Until then we read the same env
+        # vars and refuse to fall back to literals (was leaking credentials
+        # into public git history). See .github/copilot-instructions.md.
+        token_url = os.getenv("MZONE_TOKEN_URL", "https://login.mzoneweb.net/connect/token")
         token_response = requests.post(
             token_url,
             headers={'Content-Type': 'application/x-www-form-urlencoded'},
             data={
-                "client_id": os.getenv("MZONE_CLIENT_ID", "mz-scopeuk"),
-                "client_secret": os.getenv("MZONE_CLIENT_SECRET", "g_SkQ.B.z3TeBU$g#hVeP#c2"),
-                "username": os.getenv("MZONE_USERNAME", "ScopeUKAPI"),
-                "password": os.getenv("MZONE_PASSWORD", "ScopeUKAPI01!"),
-                "scope": "mz6-api.all mz_username",
-                "grant_type": "password",
+                "client_id": os.environ["MZONE_CLIENT_ID"],
+                "client_secret": os.environ["MZONE_CLIENT_SECRET"],
+                "username": os.environ["MZONE_USERNAME"],
+                "password": os.environ["MZONE_PASSWORD"],
+                "scope": os.getenv("MZONE_SCOPE", "mz6-api.all mz_username"),
+                "grant_type": os.getenv("MZONE_GRANT_TYPE", "password"),
                 "response_type": "code id_token"
             },
             timeout=10

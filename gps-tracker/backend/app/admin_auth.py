@@ -10,7 +10,11 @@ import os
 from functools import lru_cache
 
 # Admin JWT Configuration
-ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY", "your-secret-admin-key-change-in-production")
+# Required — must be set in gps-tracker/backend/.env. Raises KeyError at
+# import if unset (intentional: better to fail container start than to sign
+# admin JWTs with the public literal we used to fall back to). See
+# .github/copilot-instructions.md.
+ADMIN_SECRET_KEY = os.environ["ADMIN_SECRET_KEY"]
 ADMIN_ALGORITHM = "HS256"
 ADMIN_ACCESS_TOKEN_EXPIRE_HOURS = 24
 

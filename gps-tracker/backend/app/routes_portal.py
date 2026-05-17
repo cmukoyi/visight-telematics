@@ -31,7 +31,11 @@ _TAG_TYPE_ALIAS = {"series1": "scope", "series2": "tracksolid"}
 router = APIRouter(prefix="/api/portal", tags=["portal"])
 logger = logging.getLogger(__name__)
 
-PORTAL_SECRET_KEY = os.getenv("PORTAL_SECRET_KEY", os.getenv("ADMIN_SECRET_KEY", "portal-secret-key-change-me"))
+# Required — falls back to ADMIN_SECRET_KEY for tenants that historically
+# co-signed portal and admin tokens, but the literal final fallback
+# ("portal-secret-key-change-me") is gone. Raises KeyError at import if
+# neither is set. See .github/copilot-instructions.md.
+PORTAL_SECRET_KEY = os.environ.get("PORTAL_SECRET_KEY") or os.environ["ADMIN_SECRET_KEY"]
 PORTAL_ALGORITHM = "HS256"
 PORTAL_TOKEN_EXPIRE_HOURS = 12
 
@@ -573,7 +577,10 @@ def get_building(building_id: str, request: Request, db: Session = Depends(get_d
 # Gateway lookup — used by the mqtt-bridge to fetch positions without a user token
 # ---------------------------------------------------------------------------
 
-BRIDGE_API_KEY = os.getenv("BRIDGE_API_KEY", "bridge-key-change-me")
+# Required — used by the mqtt-bridge container to authenticate to backend.
+# Raises KeyError at import if unset (intentional: was falling back to the
+# public literal "bridge-key-change-me"). See .github/copilot-instructions.md.
+BRIDGE_API_KEY = os.environ["BRIDGE_API_KEY"]
 
 
 @router.get("/gateways")

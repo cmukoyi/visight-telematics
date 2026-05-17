@@ -7,26 +7,49 @@ import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
+
+def _required_env(name: str) -> str:
+    """Fetch a required env var or raise a clear startup error.
+
+    Used for secrets and tenant-bound config. NEVER fall back to a literal
+    default for credentials — that mask the missing config in prod and
+    accidentally ships the literal as a real credential. The CI lint guard
+    in .github/workflows/deploy-production.yml blocks the
+    ``os.getenv(X) or 'literal'`` anti-pattern that this helper replaces.
+    """
+    val = os.getenv(name)
+    if not val:
+        raise RuntimeError(
+            f"{name} is required but not set. Add it to "
+            f"gps-tracker/backend/.env on the server."
+        )
+    return val
+
+
 class MZoneService:
     def __init__(self):
+        # Non-secret endpoints — defaults are public URLs, safe to ship.
         self.token_url = os.getenv('MZONE_TOKEN_URL', 'https://login.mzoneweb.net/connect/token')
-        self.client_id = os.getenv('MZONE_CLIENT_ID') or 'mz-scopeuk'
-        self.client_secret = 'g_SkQ.B.z3TeBU$g#hVeP#c2'
-        self.username = os.getenv('MZONE_USERNAME') or 'ScopeUKAPI'
-        self.password = os.getenv('MZONE_PASSWORD') or 'ScopeUKAPI01!'
+        self.api_base = os.getenv('MZONE_API_BASE', 'https://live.mzoneweb.net/mzone62.api')
         self.scope = os.getenv('MZONE_SCOPE', 'mz6-api.all mz_username')
         self.grant_type = os.getenv('MZONE_GRANT_TYPE', 'password')
-        self.api_base = os.getenv('MZONE_API_BASE', 'https://live.mzoneweb.net/mzone62.api')
-        self.vehicle_group_id = os.getenv('MZONE_VEHICLE_GROUP_ID')
-        # Trips may belong to a different group than vehicles (can be overridden via env)
+
+        # Secrets and tenant-bound IDs — must come from .env. Container will
+        # fail to start with a clear error if any of these are missing.
+        self.client_id = _required_env('MZONE_CLIENT_ID')
+        self.client_secret = _required_env('MZONE_CLIENT_SECRET')
+        self.username = _required_env('MZONE_USERNAME')
+        self.password = _required_env('MZONE_PASSWORD')
+        self.vehicle_group_id = _required_env('MZONE_VEHICLE_GROUP_ID')
+        # Trips may belong to a different group than vehicles (optional override).
         self.trips_group_id = os.getenv('MZONE_TRIPS_GROUP_ID', self.vehicle_group_id)
-        
+
         # Token cache
         self.token_cache = {
             'token': None,
             'expires_at': None
         }
-        
+
         self.debug = os.getenv('DEBUG', 'False').lower() == 'true'
     
     def get_oauth_token(self) -> Optional[str]:

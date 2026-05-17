@@ -4,7 +4,12 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 import os
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-this")
+# Required — must be set in gps-tracker/backend/.env on every server.
+# Module-level os.environ raises KeyError at import time if missing, which
+# fails the container start with a clear error instead of silently signing
+# every portal JWT with the public-git-history literal we used to fall back
+# to ("your-secret-key-change-this"). See .github/copilot-instructions.md.
+SECRET_KEY = os.environ["JWT_SECRET_KEY"]
 ALGORITHM = "HS256"
 # Read from environment variable, default to 30 minutes if not set
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
