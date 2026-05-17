@@ -153,23 +153,25 @@ jobs:
       - name: No hardcoded secrets / env-fallback literals in backend code
         run: |
           # Blocks two anti-patterns in gps-tracker/backend/**.py:
-          #   1. self.<password|secret|token|api_key> = '<literal>'
+          #   1. self.<...password|...secret|...token|...api_key> = '<literal>'
           #        — raw credential committed to git (what mzone_service.py
           #          had until phase-4-secrets-fix, eg
           #          self.client_secret = 'g_SkQ.B...').
-          #   2. os.getenv('*PASSWORD|*SECRET|*TOKEN|*KEY', '<literal>')
-          #      os.getenv('*PASSWORD|*SECRET|*TOKEN|*KEY') or '<literal>'
+          #   2. os.getenv('<...>PASSWORD|<...>SECRET|<...>TOKEN|<...>KEY', '<literal>')
+          #      os.getenv('<...>PASSWORD|<...>SECRET|<...>TOKEN|<...>KEY') or '<literal>'
           #        — env "fallback" that silently substitutes a literal in
           #          prod when the env var is missing.
-          # For required secrets use os.environ['VAR'] (raises KeyError) or
-          # the _required_env() helper. Endpoints/URLs (non-secrets) MAY have
-          # defaults via os.getenv('VAR', 'https://...').
+          # The secret-keyword must appear at the END of the var name, so
+          # MZONE_TOKEN_URL / MZONE_KEY_HOST etc are correctly NOT flagged
+          # (they're endpoints, not secrets). For required secrets use
+          # os.environ['VAR'] (raises KeyError) or the _required_env() helper.
+          # Endpoints/URLs MAY have defaults via os.getenv('VAR_URL', 'https://...').
           set -e
           violations=$(
             git ls-files 'gps-tracker/backend/**/*.py' \
               | grep -v -E '(^|/)(test_|.*_test\.py$|tests/|conftest\.py$)' \
               | xargs -I{} grep -EnH \
-                  "(self\.[a-z_]*(password|secret|token|api_?key)[a-z_]*\s*=\s*['\"][^'\"$]{4,})|(os\.getenv\(['\"][A-Z_]*(PASSWORD|SECRET|TOKEN|KEY)[A-Z_]*['\"]\s*,\s*['\"][^'\"]{4,}['\"])|(os\.getenv\(['\"][A-Z_]*(PASSWORD|SECRET|TOKEN|KEY)[A-Z_]*['\"]\)\s*or\s*['\"][^'\"]{4,}['\"])" \
+                  "(self\.[a-z_]*(password|secret|token|api_?key)\s*=\s*['\"][^'\"$]{4,})|(os\.getenv\(['\"][A-Z_]*(PASSWORD|SECRET|TOKEN|KEY)['\"]\s*,\s*['\"][^'\"]{4,}['\"])|(os\.getenv\(['\"][A-Z_]*(PASSWORD|SECRET|TOKEN|KEY)['\"]\)\s*or\s*['\"][^'\"]{4,}['\"])" \
                   {} 2>/dev/null \
               || true
           )
