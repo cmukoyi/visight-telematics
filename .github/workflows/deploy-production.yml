@@ -148,6 +148,43 @@ jobs:
           fi
           echo "✅ Tenant brand-string ratchet OK"
 
+      - name: No hardcoded secrets / env-fallback literals in backend code
+        run: |
+          # Blocks two anti-patterns in gps-tracker/backend/**.py:
+          #   1. self.<password|secret|token|api_key> = '<literal>'
+          #        — raw credential committed to git (what mzone_service.py
+          #          had until phase-4-secrets-fix, eg
+          #          self.client_secret = 'g_SkQ.B...').
+          #   2. os.getenv('*PASSWORD|*SECRET|*TOKEN|*KEY', '<literal>')
+          #      os.getenv('*PASSWORD|*SECRET|*TOKEN|*KEY') or '<literal>'
+          #        — env "fallback" that silently substitutes a literal in
+          #          prod when the env var is missing.
+          # For required secrets use os.environ['VAR'] (raises KeyError) or
+          # the _required_env() helper. Endpoints/URLs (non-secrets) MAY have
+          # defaults via os.getenv('VAR', 'https://...').
+          set -e
+          violations=$(
+            git ls-files 'gps-tracker/backend/**/*.py' \
+              | grep -v -E '(^|/)(test_|.*_test\.py$|tests/|conftest\.py$)' \
+              | xargs -I{} grep -EnH \
+                  "(self\.[a-z_]*(password|secret|token|api_?key)[a-z_]*\s*=\s*['\"][^'\"$]{4,})|(os\.getenv\(['\"][A-Z_]*(PASSWORD|SECRET|TOKEN|KEY)[A-Z_]*['\"]\s*,\s*['\"][^'\"]{4,}['\"])|(os\.getenv\(['\"][A-Z_]*(PASSWORD|SECRET|TOKEN|KEY)[A-Z_]*['\"]\)\s*or\s*['\"][^'\"]{4,}['\"])" \
+                  {} 2>/dev/null \
+              || true
+          )
+          if [ -n "$violations" ]; then
+            echo "❌ Hardcoded credential or env-fallback literal in backend code:"
+            echo "$violations"
+            echo ""
+            echo "  Replace with: os.environ['VAR_NAME']  (raises KeyError if unset)"
+            echo "  or:           _required_env('VAR_NAME')   (clear startup error)"
+            echo "  Never use:    os.getenv('X', 'literal')  or  os.getenv('X') or 'literal'"
+            echo ""
+            echo "  See gps-tracker/backend/app/services/mzone_service.py for the"
+            echo "  reference pattern (post phase-4-secrets-fix)."
+            exit 1
+          fi
+          echo "✅ No hardcoded secrets / env-fallback literals in backend code"
+
   # ─────────────────────────────────────────────────────────────────
   # JOB 1 — Test Backend
   # ─────────────────────────────────────────────────────────────────
