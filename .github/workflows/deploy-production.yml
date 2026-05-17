@@ -190,38 +190,19 @@ jobs:
           echo "✅ No hardcoded secrets / env-fallback literals in backend code"
 
   # ─────────────────────────────────────────────────────────────────
-  # JOB 1 — Test Backend
-  # ─────────────────────────────────────────────────────────────────
-  test-backend:
-    name: Test Backend
-    runs-on: ubuntu-latest
-    needs: lint-workflow
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: |
-          cd gps-tracker/backend
-          pip install -r requirements.txt -r requirements-dev.txt
-
-      - name: Run tests
-        run: |
-          cd gps-tracker/backend
-          pytest tests/ -v --tb=short
-        continue-on-error: false
-
-  # ─────────────────────────────────────────────────────────────────
-  # JOB 2 — Build Flutter Web (per-tenant overlay)
+  # JOB 1 — Build Flutter Web (per-tenant overlay)
+  #
+  # NOTE: backend unit tests (tests/test_admin_auth.py) were deliberately
+  # removed. They tested PyJWT/hashlib round-trips, not our code, and
+  # were green throughout the months-long period when beacon was signing
+  # JWTs with the public-git literal 'your-secret-key-change-this'.
+  # To be replaced by a post-deploy smoke test that hits the live
+  # container's auth endpoint.
   # ─────────────────────────────────────────────────────────────────
   build-flutter:
     name: Build Flutter Web (${{ github.ref_name == 'prod/beacon' && 'beacon' || 'pinplot' }})
     runs-on: ubuntu-latest
-    needs: test-backend
+    needs: lint-workflow
     steps:
       - uses: actions/checkout@v4
 
