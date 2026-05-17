@@ -119,46 +119,76 @@ class MZoneService:
                 print(f"❌ Error in get_all_vehicles: {str(e)}")
             return None
     
+    # MZone's OData layer caps the parsed filter tree at 100 nodes
+    # (error: "The node count limit of '100' has been exceeded").
+    # Each `vehicle_Id eq <guid>` clause contributes ~3 nodes (binary op +
+    # property ref + literal), plus 1 OR node between clauses, so the
+    # ceiling lands around ~25 IDs per request. We chunk at 20 for headroom.
+    _LOCATIONS_CHUNK_SIZE = 20
+
     def get_vehicle_locations(self, vehicle_ids: List[str]) -> Optional[Dict]:
-        """Fetch locations for specific vehicles"""
+        """Fetch locations for specific vehicles.
+
+        Chunks the ``$filter`` clause so we never exceed MZone's OData
+        node-count limit. Returns a single merged ``{"value": [...]}`` dict
+        (the same shape MZone returns for a single call) so callers don't
+        need to know batching happened. Returns ``None`` only if the OAuth
+        token itself can't be obtained; partial chunk failures are logged
+        and skipped so one bad chunk doesn't drop every tracker.
+        """
         try:
             token = self.get_oauth_token()
             if not token:
                 return None
-            
+
+            if not vehicle_ids:
+                return {'value': []}
+
             url = f"{self.api_base}/LastKnownPositions"
             headers = {
                 'Authorization': f'Bearer {token}',
                 'Accept': 'application/json'
             }
-            
-            # Build filter for multiple vehicle IDs (no guid wrapper needed)
-            filters = [f"vehicle_Id eq {vid}" for vid in vehicle_ids]
-            filter_str = ' or '.join(filters)
-            
-            params = {
-                '$filter': filter_str
-            }
-            
+
+            merged: List[Dict] = []
+            chunk_size = self._LOCATIONS_CHUNK_SIZE
+            total_chunks = (len(vehicle_ids) + chunk_size - 1) // chunk_size
+
             if self.debug:
-                print(f"📍 Fetching locations for {len(vehicle_ids)} vehicles...")
-            
-            response = requests.get(url, headers=headers, params=params, timeout=30)
-            
-            if response.status_code == 200:
-                data = response.json()
+                print(f"📍 Fetching locations for {len(vehicle_ids)} vehicles "
+                      f"in {total_chunks} chunk(s) of up to {chunk_size}...")
+
+            for chunk_idx in range(total_chunks):
+                chunk = vehicle_ids[chunk_idx * chunk_size:(chunk_idx + 1) * chunk_size]
+                # Build filter for this chunk (no guid wrapper needed)
+                filter_str = ' or '.join(f"vehicle_Id eq {vid}" for vid in chunk)
+                params = {'$filter': filter_str}
+
+                try:
+                    response = requests.get(url, headers=headers, params=params, timeout=30)
+                except requests.RequestException as exc:
+                    print(f"❌ get_vehicle_locations: chunk {chunk_idx + 1}/{total_chunks} "
+                          f"({len(chunk)} ids) request failed: {exc}")
+                    continue
+
+                if response.status_code != 200:
+                    print(f"❌ get_vehicle_locations: chunk {chunk_idx + 1}/{total_chunks} "
+                          f"({len(chunk)} ids) HTTP {response.status_code}: "
+                          f"{response.text[:200]}")
+                    continue
+
+                chunk_values = response.json().get('value', [])
+                merged.extend(chunk_values)
                 if self.debug:
-                    location_count = len(data.get('value', []))
-                    print(f"✅ Fetched {location_count} locations")
-                return data
-            else:
-                if self.debug:
-                    print(f"❌ Error fetching locations: {response.status_code}")
-                return None
-        
+                    print(f"   ✅ chunk {chunk_idx + 1}/{total_chunks}: "
+                          f"{len(chunk_values)} locations from {len(chunk)} ids")
+
+            if self.debug:
+                print(f"✅ Fetched {len(merged)} locations across {total_chunks} chunk(s)")
+            return {'value': merged}
+
         except Exception as e:
-            if self.debug:
-                print(f"❌ Error in get_vehicle_locations: {str(e)}")
+            print(f"❌ Error in get_vehicle_locations: {str(e)}")
             return None
     
     def get_vehicles_with_locations(self, user_imeis: List[str]) -> List[Dict]:
