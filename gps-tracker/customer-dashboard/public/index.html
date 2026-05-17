@@ -3163,7 +3163,8 @@ input.hive-range::-moz-range-track {
               <div id="hive-subnav" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
                 <button class="hive-btn hive-btn-ghost hive-subnav-btn" data-hscreen="list" onclick="hiveShowScreen('list')"><i class="fa-solid fa-grip"></i> Hive List</button>
                 <button class="hive-btn hive-btn-ghost hive-subnav-btn" data-hscreen="archive" onclick="hiveShowScreen('archive')"><i class="fa-solid fa-box-archive"></i> Archive</button>
-                <button class="hive-btn" style="margin-left:auto" onclick="hiveShowWizard()"><i class="fa-solid fa-plus"></i> New Hive</button>
+                <button class="hive-btn hive-btn-ghost" style="margin-left:auto" onclick="hiveOpenHelp()" title="Open the HIVE user manual in a new tab"><i class="fa-solid fa-circle-question"></i> How To</button>
+                <button class="hive-btn" onclick="hiveShowWizard()"><i class="fa-solid fa-plus"></i> New Hive</button>
               </div>
 
               <!-- ════════════════════════════════════════
@@ -11284,6 +11285,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const archBtn = document.querySelector('#hive-subnav [data-hscreen="archive"]');
     if (archBtn) archBtn.addEventListener('click', () => { hiveShowScreen('archive'); hiveLoadArchive(); });
 });
+
+// Open the HIVE user manual in a new tab, propagating the current theme.
+function hiveOpenHelp() {
+    const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+    window.open('/customer/help/HIVE_User_Manual.html?theme=' + encodeURIComponent(theme),
+                '_blank', 'noopener,noreferrer');
+}
 </script>
 
 <!-- Sub-app JS — must come after their DOM is in place -->
