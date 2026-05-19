@@ -486,6 +486,38 @@ class BeaconSighting(Base):
     user = relationship("User", back_populates="beacon_sightings")
 
 
+class TagIndoorPosition(Base):
+    """Latest known indoor position of a BLE tag, derived from the nearest
+    XIAO gateway that heard it via Pareto Anywhere.
+
+    One row per tag id (BLE MAC, normalised to lowercase no-colons). The
+    row is upserted on every raddec event by `app.services.pareto_bridge`;
+    floor_id / x / y / zone are copied from the strongest gateway in the
+    raddec's rssiSignature.
+
+    Separate from `beacon_sightings` (mobile-phone GPS crowdsourcing) —
+    different write path, different tenant scope, no shared fields.
+    See features_dev/Pinplot floorplan spec.md §6.
+    """
+    __tablename__ = "tag_indoor_positions"
+
+    tag_id       = Column(String(64), primary_key=True)
+    floor_id     = get_uuid_fk("floors.id")
+    gateway_id   = Column(ForeignKey("indoor_gateways.id", ondelete="SET NULL"),
+                          nullable=True)
+    usergroup_id = get_uuid_fk("user_groups.id")
+    x            = Column(Float, nullable=False)
+    y            = Column(Float, nullable=False)
+    zone         = Column(String(100), nullable=True)
+    rssi         = Column(Integer, nullable=True)
+    battery      = Column(Integer, nullable=True)
+    status       = Column(String(20), nullable=False, default="offline")
+    last_seen    = Column(DateTime(timezone=True), nullable=True)
+
+    floor   = relationship("Floor")
+    gateway = relationship("IndoorGateway")
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # HIVE TRACKING — proximity group monitoring
 # ═══════════════════════════════════════════════════════════════════════════════

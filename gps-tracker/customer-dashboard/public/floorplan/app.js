@@ -146,7 +146,16 @@ window.FP = (() => {
     },
   };
 
-  const ASSETS = [
+  // Live asset list. Populated by _fetchAssets() from the backend
+  // (/api/portal/floorplan/assets) every POLL_INTERVAL_MS while the
+  // floorplan tab is visible. Kept as `let` so the polling task can
+  // replace the array contents in-place; the demo seed below is left for
+  // local file:// previews where the API is unreachable, but it's wiped
+  // on the first successful fetch.
+  const POLL_INTERVAL_MS = 3000;
+  const API_BASE         = '/api/portal/floorplan';
+  const TOKEN_KEY        = 'pp_portal_token';
+  let   ASSETS = [
     // Ground floor
     {id:'a1', name:'Forklift #1',    type:'vehicle',   emoji:'🚛', floor:'G',  status:'online',  zone:'Main Warehouse',  x:400,y:200,lastSeen:'2s ago',  battery:91,  tagId:'BT:V001'},
     {id:'a2', name:'Forklift #2',    type:'vehicle',   emoji:'🚛', floor:'G',  status:'idle',    zone:'Staging Zone',    x:350,y:530,lastSeen:'48s ago', battery:73,  tagId:'BT:V002'},
@@ -732,22 +741,52 @@ window.FP = (() => {
   }
 
   // ═══════════════════════════════════════════════════════
-  // LIVE DEMO SIMULATION
+  // LIVE POLLING — fetch real asset positions from backend
   // ═══════════════════════════════════════════════════════
-  function _startLiveDemo() {
+  let _firstFetchDone = false;
+
+  function _authHeaders() {
+    const t = (() => { try { return localStorage.getItem(TOKEN_KEY); } catch (_) { return null; } })();
+    return t ? { 'Authorization': 'Bearer ' + t } : {};
+  }
+
+  async function _fetchAssets() {
+    try {
+      const r = await fetch(API_BASE + '/assets', { headers: _authHeaders(), cache: 'no-store' });
+      if (!r.ok) {
+        // 404 = floorplan feature disabled for this tenant; 401 = no session.
+        // Either way, stop polling silently.
+        if (r.status === 404 || r.status === 401) _stopLivePolling();
+        return;
+      }
+      const data = await r.json();
+      const next = Array.isArray(data.assets) ? data.assets : [];
+      // First successful fetch wipes the demo seed.
+      if (!_firstFetchDone) {
+        ASSETS.length = 0;
+        _firstFetchDone = true;
+      } else {
+        ASSETS.length = 0;
+      }
+      next.forEach(a => ASSETS.push(a));
+      _updateCounts(); _renderList(); _drawAll();
+    } catch (e) {
+      // Network error — keep polling, the next tick may succeed.
+    }
+  }
+
+  function _stopLivePolling() {
+    if (_liveTimer) { clearInterval(_liveTimer); _liveTimer = null; }
+  }
+
+  function _startLivePolling() {
     if (_liveTimer) return;
+    _fetchAssets();   // immediate first pull
     _liveTimer = setInterval(() => {
       const tab = document.getElementById('tab-floorplan');
-      if (!tab || tab.style.display === 'none') return;
-      ASSETS.forEach(a => {
-        if (a.status === 'online' && Math.random() < 0.3) {
-          a.x += (Math.random() - 0.5) * 4;
-          a.y += (Math.random() - 0.5) * 4;
-          a.lastSeen = Math.floor(Math.random() * 10) + 's ago';
-        }
-      });
-      _updateCounts(); _renderList(); _drawAll();
-    }, 4000);
+      if (!tab || tab.style.display === 'none') return;   // pause while hidden
+      _fetchAssets();
+    }, POLL_INTERVAL_MS);
   }
 
   // ═══════════════════════════════════════════════════════
@@ -803,7 +842,7 @@ window.FP = (() => {
     resetView();
     _updateCounts();
     _renderList();
-    _startLiveDemo();
+    _startLivePolling();
   }
 
   /** Call from switchTab('floorplan') — initialises on first show, resizes on subsequent. */
