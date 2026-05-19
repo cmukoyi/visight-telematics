@@ -109,9 +109,22 @@ def _hive_summary(hive: Hive, cfg: Optional[HiveConfigVersion],
     diameter_m = live.current_diameter_m if live else None
     threshold = cfg.distance_threshold_m if cfg else None
     profile = cfg.mobility_profile if cfg else None
+    motion_state = (live.motion_state if live else None) or "STATIONARY"
 
-    # Status label for card subtitle
-    if alert_state == "BREACHING":
+    # User-facing label for the motion lifecycle (spec v1.1 §11.2).
+    motion_labels = {
+        "STATIONARY":  "At Rest",
+        "PRE_TRANSIT": "Starting",
+        "IN_TRANSIT":  "In Transit",
+        "SETTLING":    "Stopping",
+    }
+    motion_label = motion_labels.get(motion_state, "At Rest")
+
+    # Status label for card subtitle — motion supersedes proximity readout
+    # since proximity alerts are suppressed during transit.
+    if motion_state != "STATIONARY":
+        status_label = motion_label
+    elif alert_state == "BREACHING":
         status_label = "In Breach"
     elif alert_state == "BREACH_PENDING":
         status_label = "Suspected Breach"
@@ -141,6 +154,14 @@ def _hive_summary(hive: Hive, cfg: Optional[HiveConfigVersion],
         "last_evaluated_at": _format_dt(live.last_evaluated_at) if live else None,
         "created_at": _format_dt(hive.created_at),
         "parent_hive_id": _str_id(hive.parent_hive_id),
+        # Motion awareness (Phase 3, spec v1.1)
+        "motion_state": motion_state,
+        "motion_label": motion_label,
+        "motion_state_since": _format_dt(live.motion_state_since) if live else None,
+        "centroid_lat": float(live.centroid_lat) if live and live.centroid_lat is not None else None,
+        "centroid_lng": float(live.centroid_lng) if live and live.centroid_lng is not None else None,
+        "centroid_speed_kmh": float(live.centroid_speed_kmh) if live and live.centroid_speed_kmh is not None else None,
+        "centroid_bearing_deg": float(live.centroid_bearing_deg) if live and live.centroid_bearing_deg is not None else None,
     }
 
 
@@ -469,6 +490,10 @@ def _create_hive_inner(
         meaningful_change_m=data.meaningful_change_m or preset["meaningful_change_m"],
         hysteresis_pct=data.hysteresis_pct or preset["hysteresis_pct"],
         confirmation_count=data.confirmation_count or preset["confirmation_count"],
+        motion_speed_threshold_kmh=preset.get("motion_speed_threshold_kmh"),
+        motion_settling_time_s=preset.get("motion_settling_time_s"),
+        coherence_speed_tol_kmh=preset.get("coherence_speed_tol_kmh"),
+        coherence_bearing_tol_deg=preset.get("coherence_bearing_tol_deg"),
         changed_by=me.id,
     )
     db.add(cfg)
@@ -705,6 +730,10 @@ def update_hive_config(
         meaningful_change_m=data.meaningful_change_m or preset["meaningful_change_m"],
         hysteresis_pct=data.hysteresis_pct or preset["hysteresis_pct"],
         confirmation_count=data.confirmation_count or preset["confirmation_count"],
+        motion_speed_threshold_kmh=preset.get("motion_speed_threshold_kmh"),
+        motion_settling_time_s=preset.get("motion_settling_time_s"),
+        coherence_speed_tol_kmh=preset.get("coherence_speed_tol_kmh"),
+        coherence_bearing_tol_deg=preset.get("coherence_bearing_tol_deg"),
         changed_by=str(me.id),
     )
     db.add(new_cfg)
@@ -834,6 +863,10 @@ def recreate_hive(
         meaningful_change_m=src_cfg.meaningful_change_m,
         hysteresis_pct=src_cfg.hysteresis_pct,
         confirmation_count=src_cfg.confirmation_count,
+        motion_speed_threshold_kmh=src_cfg.motion_speed_threshold_kmh,
+        motion_settling_time_s=src_cfg.motion_settling_time_s,
+        coherence_speed_tol_kmh=src_cfg.coherence_speed_tol_kmh,
+        coherence_bearing_tol_deg=src_cfg.coherence_bearing_tol_deg,
         changed_by=str(me.id),
     )
     db.add(new_cfg)

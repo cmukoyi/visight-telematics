@@ -503,6 +503,19 @@ class HiveAlertState(str, enum.Enum):
     RESOLVING       = "RESOLVING"
 
 
+class HiveMotionState(str, enum.Enum):
+    """Four-state motion machine per spec v1.1 §11.2.
+
+    User-facing labels: PRE_TRANSIT shows as "Starting", SETTLING as
+    "Stopping". Internal names are kept verbatim so engineers can grep
+    unambiguously.
+    """
+    STATIONARY  = "STATIONARY"
+    PRE_TRANSIT = "PRE_TRANSIT"
+    IN_TRANSIT  = "IN_TRANSIT"
+    SETTLING    = "SETTLING"
+
+
 class MobilityProfile(str, enum.Enum):
     STATIONARY = "stationary"
     SLOW       = "slow"
@@ -522,6 +535,12 @@ MOBILITY_PRESETS = {
         "distance_threshold_m": 50.0,
         "hysteresis_pct":    90.0,
         "confirmation_count": 1,
+        # Motion detection disabled — stationary hives shouldn't move; if they
+        # do, the user wants the alert (spec §2.3 / §11.5).
+        "motion_speed_threshold_kmh": None,
+        "motion_settling_time_s":     None,
+        "coherence_speed_tol_kmh":    None,
+        "coherence_bearing_tol_deg":  None,
     },
     "slow": {
         "fresh_window_s":    900,    # 15 min
@@ -532,6 +551,10 @@ MOBILITY_PRESETS = {
         "distance_threshold_m": 100.0,
         "hysteresis_pct":    85.0,
         "confirmation_count": 1,
+        "motion_speed_threshold_kmh": 10.0,
+        "motion_settling_time_s":     180,   # 3 min
+        "coherence_speed_tol_kmh":    5.0,
+        "coherence_bearing_tol_deg":  60.0,
     },
     "mobile": {
         "fresh_window_s":    300,    # 5 min
@@ -542,6 +565,10 @@ MOBILITY_PRESETS = {
         "distance_threshold_m": 200.0,
         "hysteresis_pct":    80.0,
         "confirmation_count": 2,
+        "motion_speed_threshold_kmh": 5.0,
+        "motion_settling_time_s":     300,   # 5 min
+        "coherence_speed_tol_kmh":    10.0,
+        "coherence_bearing_tol_deg":  45.0,
     },
     "fast": {
         "fresh_window_s":    120,    # 2 min
@@ -552,6 +579,10 @@ MOBILITY_PRESETS = {
         "distance_threshold_m": 500.0,
         "hysteresis_pct":    75.0,
         "confirmation_count": 2,
+        "motion_speed_threshold_kmh": 5.0,
+        "motion_settling_time_s":     300,   # 5 min
+        "coherence_speed_tol_kmh":    15.0,
+        "coherence_bearing_tol_deg":  30.0,
     },
 }
 
@@ -602,6 +633,13 @@ class HiveConfigVersion(Base):
     meaningful_change_m   = Column(Float, nullable=False)
     hysteresis_pct        = Column(Float, nullable=False)
     confirmation_count    = Column(Integer, nullable=False)
+    # Phase 3 motion-detection tuning (nullable; null = profile disables motion
+    # detection, e.g. Stationary profile). Persisted per config version so
+    # historical evaluations can be audited against the exact tuning.
+    motion_speed_threshold_kmh = Column(Float, nullable=True)
+    motion_settling_time_s     = Column(Integer, nullable=True)
+    coherence_speed_tol_kmh    = Column(Float, nullable=True)
+    coherence_bearing_tol_deg  = Column(Float, nullable=True)
     changed_by            = get_uuid_fk_nullable("portal_users.id")
 
     hive = relationship("Hive", back_populates="config_versions")
@@ -614,6 +652,15 @@ class HiveTagMembership(Base):
     hive_id   = get_uuid_fk("hives.id")
     joined_at = Column(DateTime(timezone=True), server_default=func.now())
     label     = Column(String(100), nullable=True)   # per-tag display label within hive
+    # Phase 3: per-tag velocity vector used by the group coherence check
+    # (spec §11.4). Derived from previous_* anchor → current tag position;
+    # the anchor is rolled forward each evaluation cycle.
+    velocity_speed_kmh   = Column(Float, nullable=True)
+    velocity_bearing_deg = Column(Float, nullable=True)
+    velocity_computed_at = Column(DateTime(timezone=True), nullable=True)
+    previous_lat         = Column(Float, nullable=True)
+    previous_lng         = Column(Float, nullable=True)
+    previous_seen_at     = Column(DateTime(timezone=True), nullable=True)
 
     hive = relationship("Hive", back_populates="memberships")
     tag  = relationship("BLETag")
@@ -632,6 +679,10 @@ class HiveEvaluation(Base):
     freshness_composition = Column(Text, nullable=True)   # JSON
     alert_state           = Column(String(30), nullable=False, default="OK")
     breach_confidence     = Column(String(10), nullable=True)  # high | low
+    # Phase 3: motion state active at evaluation time. Lets analysts
+    # distinguish a suppressed evaluation (in transit) from a real OK.
+    motion_state          = Column(String(20), nullable=True)
+    centroid_speed_kmh    = Column(Float, nullable=True)
 
     hive = relationship("Hive", back_populates="evaluations")
 
@@ -669,5 +720,22 @@ class HiveLiveState(Base):
     # re-notify if a hive stays in BREACHING for a long time without a state
     # change (e.g. when the original notification failed silently).
     last_alert_at         = Column(DateTime(timezone=True), nullable=True)
+
+    # ─── Phase 3: motion awareness ────────────────────────────────────────
+    # Four-state machine: STATIONARY ↔ PRE_TRANSIT ↔ IN_TRANSIT ↔ SETTLING.
+    # Proximity alerts are suppressed in any non-STATIONARY state.
+    motion_state                = Column(String(20), nullable=False, default="STATIONARY")
+    motion_state_since          = Column(DateTime(timezone=True), nullable=True)
+    pending_motion_change_since = Column(DateTime(timezone=True), nullable=True)
+    # Current centroid (geometric mean of Fresh-tier tag positions) and its
+    # derived velocity. centroid_anchor_* is the older snapshot we measure
+    # velocity against — rolled forward when older than ~5 min (spec §11.3).
+    centroid_lat            = Column(Float, nullable=True)
+    centroid_lng            = Column(Float, nullable=True)
+    centroid_speed_kmh      = Column(Float, nullable=True)
+    centroid_bearing_deg    = Column(Float, nullable=True)
+    centroid_anchor_lat     = Column(Float, nullable=True)
+    centroid_anchor_lng     = Column(Float, nullable=True)
+    centroid_anchor_at      = Column(DateTime(timezone=True), nullable=True)
 
     hive = relationship("Hive", back_populates="live_state")

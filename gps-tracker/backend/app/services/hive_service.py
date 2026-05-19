@@ -30,9 +30,11 @@ from app.models import (
     HiveEvaluation,
     HiveEvent,
     HiveLiveState,
+    HiveMotionState,
     HiveStatus,
     HiveTagMembership,
 )
+from app.services import hive_motion
 
 log = logging.getLogger(__name__)
 
@@ -180,14 +182,62 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
     if diameter_m is not None and diameter_m < cfg.meaningful_change_m:
         outlier_id = None
 
+    # ── Motion awareness (Phase 3, spec v1.1) ─────────────────────────
+    # Roll each tag's velocity vector forward, derive centroid velocity over
+    # the rolling anchor window, score group coherence, run the motion
+    # state machine. Result gates the proximity branch below.
+    tag_velocities: List[hive_motion.TagVelocity] = []
+    for m in memberships:
+        tag = db.query(BLETag).filter(BLETag.id == m.tag_id).first()
+        if not tag:
+            continue
+        cur_lat = float(tag.latitude) if tag.latitude else None
+        cur_lng = float(tag.longitude) if tag.longitude else None
+        tv = hive_motion.update_tag_velocity(m, cur_lat, cur_lng, tag.last_seen, now)
+        if tv is not None:
+            tag_velocities.append(tv)
+
+    centroid_now = hive_motion.compute_centroid(fresh_positions)
+    centroid_v = None
+    if centroid_now is not None:
+        centroid_v = hive_motion.compute_centroid_velocity(
+            centroid_now, now,
+            live.centroid_anchor_lat, live.centroid_anchor_lng, live.centroid_anchor_at,
+        )
+    coherence = hive_motion.coherence_score(tag_velocities, centroid_v, cfg, now) \
+        if centroid_v is not None else 0.0
+
+    motion_decision = hive_motion.evaluate_motion_state(live, cfg, centroid_v, coherence, now)
+    hive_motion.maybe_refresh_centroid_anchor(live, centroid_now, now)
+
     # ── Determine breach ──────────────────────────────────────────────
     threshold = cfg.distance_threshold_m
     prev_state = live.alert_state or "OK"
     new_state = prev_state
     confidence = None
+    # True iff this cycle should auto-resolve any active breach because the
+    # hive just entered the motion lifecycle (spec §11.6).
+    resolve_by_transit = (
+        motion_decision.changed
+        and motion_decision.state == HiveMotionState.PRE_TRANSIT.value
+        and prev_state in ("BREACH_PENDING", "BREACHING", "RESOLVING")
+    )
 
-    if settling or diameter_m is None:
-        # Not enough data / still settling — hold current OK / RESOLVING
+    if resolve_by_transit:
+        # Force-resolve: hive is on the move, proximity is meaningless.
+        new_state = "OK"
+        confidence = None
+        live.pending_breach_since = None
+        live.pending_clear_since = None
+        live.consecutive_confirms = 0
+    elif motion_decision.suppress_proximity:
+        # PRE_TRANSIT / IN_TRANSIT / SETTLING — hold current alert state,
+        # don't run the proximity machine. Note any active BREACHING from
+        # before motion-entry would have been resolved above.
+        pass
+    elif settling or diameter_m is None:
+        # Not enough data / still in creation-time settling window —
+        # hold current OK / RESOLVING.
         new_state = "OK" if prev_state in ("OK", "BREACH_PENDING") else prev_state
     else:
         is_breaching = diameter_m > threshold
@@ -249,11 +299,32 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
         freshness_composition=json.dumps(composition),
         alert_state=new_state,
         breach_confidence=confidence,
+        motion_state=motion_decision.state,
+        centroid_speed_kmh=(motion_decision.centroid.speed_kmh
+                            if motion_decision.centroid else None),
     )
     db.add(eval_rec)
 
-    # ── Emit event on state transition ────────────────────────────────
-    if state_changed:
+    # ── Emit events on state transitions ──────────────────────────────
+    if resolve_by_transit:
+        # The proximity state machine just collapsed to OK because motion
+        # was detected. Surface this explicitly so users know why their
+        # active breach went quiet.
+        db.add(HiveEvent(
+            id=str(uuid.uuid4()),
+            hive_id=hive_id,
+            occurred_at=now,
+            event_type="RESOLVED_BY_TRANSIT",
+            config_version_number=cfg.version_number,
+            from_state=prev_state,
+            to_state=new_state,
+            triggering_tag_id=outlier_id,
+            details=json.dumps({
+                "diameter_m": diameter_m,
+                "motion_state": motion_decision.state,
+            }),
+        ))
+    elif state_changed:
         event_type = _state_transition_event(prev_state, new_state)
         event = HiveEvent(
             id=str(uuid.uuid4()),
@@ -267,6 +338,22 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
             details=json.dumps({"diameter_m": diameter_m, "confidence": confidence}),
         )
         db.add(event)
+
+    if motion_decision.changed:
+        db.add(HiveEvent(
+            id=str(uuid.uuid4()),
+            hive_id=hive_id,
+            occurred_at=now,
+            event_type="MOTION_STATE_CHANGED",
+            config_version_number=cfg.version_number,
+            from_state=motion_decision.previous_state,
+            to_state=motion_decision.state,
+            details=json.dumps({
+                "centroid_speed_kmh": (motion_decision.centroid.speed_kmh
+                                       if motion_decision.centroid else None),
+                "coherence": motion_decision.coherence,
+            }),
+        ))
 
     # ── Update live state ─────────────────────────────────────────────
     live.alert_state = new_state
@@ -297,7 +384,18 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
         log.info("HIVE %s state transition: %s → %s (diameter=%.0fm)",
                  hive_id, prev_state, new_state, diameter_m or 0)
 
-    if should_alert:
+    if motion_decision.changed:
+        log.info("HIVE %s motion transition: %s → %s (centroid_speed=%.1f km/h, coherence=%.2f)",
+                 hive_id, motion_decision.previous_state, motion_decision.state,
+                 motion_decision.centroid.speed_kmh if motion_decision.centroid else 0.0,
+                 motion_decision.coherence)
+
+    if resolve_by_transit:
+        delivered = _send_resolved_by_transit_alert(hive, prev_state, db)
+        if delivered:
+            live.last_alert_at = now
+            db.commit()
+    elif should_alert:
         delivered = _maybe_send_hive_alert(hive, new_state, prev_state, diameter_m,
                                            outlier_id, cfg, db,
                                            force_renotify=not state_changed)
@@ -391,6 +489,40 @@ def _maybe_send_hive_alert(hive: Hive, new_state: str, prev_state: str,
     except Exception as exc:
         import traceback as _tb
         log.error("Failed to send hive alert for %s: %s\n%s",
+                  hive.id, exc, _tb.format_exc())
+        return False
+
+
+def _send_resolved_by_transit_alert(hive: Hive, prev_state: str, db: Session) -> bool:
+    """Notify users that an active breach was auto-resolved because the hive
+    entered the motion lifecycle (spec §11.7). Proximity is meaningless while
+    a group is travelling, so users get one consolidated "on the move" message
+    instead of a noisy "cleared" toast.
+    """
+    if prev_state not in ("BREACH_PENDING", "BREACHING", "RESOLVING"):
+        return False
+    from app.services import portal_alert_service as _pas
+    gid = str(hive.usergroup_id)
+    title = f"🚗 HIVE On the Move: {hive.name}"
+    message = (
+        f"The hive '{hive.name}' has started moving together. "
+        f"Proximity monitoring is paused until the group settles."
+    )
+    meta_data = {
+        "hive_id": str(hive.id),
+        "previous_alert_state": prev_state,
+        "reason": "RESOLVED_BY_TRANSIT",
+    }
+    try:
+        _pas.create_alert(db, gid, None, "hive_resolved_by_transit",
+                          title, message, meta_data=meta_data)
+        db.commit()
+        _pas._notify_group_by_email(db, gid, "hive_resolved_by_transit",
+                                    title, message, meta_data=meta_data)
+        return True
+    except Exception as exc:
+        import traceback as _tb
+        log.error("Failed to send resolved-by-transit alert for %s: %s\n%s",
                   hive.id, exc, _tb.format_exc())
         return False
 
