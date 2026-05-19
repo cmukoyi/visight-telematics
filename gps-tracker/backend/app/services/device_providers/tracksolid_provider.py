@@ -33,11 +33,6 @@ _BASE_URL = "https://eu.tracksolidpro.com"
 _LOGIN_URL = f"{_BASE_URL}/v3/new/homepage/login"
 _EQUIPMENT_URL = f"{_BASE_URL}/v3/new/newEquipment/queryEquipmentList"
 _TRACK_HISTORY_URL = f"{_BASE_URL}/v3/new/newTrackInfo/getPointList"
-
-# Open API — kept for signing helper, not used for location polling
-_OPEN_API_URL = "https://eu-open.tracksolidpro.com/route/rest"
-_OPEN_TOKEN_TTL_SECONDS = 7200    # expires_in requested from the API
-_OPEN_TOKEN_REFRESH_BUFFER = 120  # Refresh 2 min before expiry
 # V3 monitor endpoint — used for live location polling (Bearer JWT)
 _MONITOR_INFO_URL = f"{_BASE_URL}/v3/new/newMonitor/getMonitorInfo"
 
@@ -255,93 +250,12 @@ class TrackSolidTagProvider(DeviceTagProvider):
         )
 
 
-# ── TrackSolid Open API: credentials, signing, token ───────────────────────
-
-def _creds_open() -> tuple[str, str, str]:
-    """Return (account, app_key, app_secret) for the Open API from env vars."""
-    return (
-        os.environ["TRACKSOLID_ACCOUNT"],
-        os.environ["TRACKSOLID_APP_KEY"],
-        os.environ["TRACKSOLID_APP_SECRET"],
-    )
-
-
-def _open_api_signature(params: dict, secret: str) -> str:
-    """MD5 sign: secret + sorted(key+value pairs) + secret → uppercase hex."""
-    sign_str = secret
-    for key in sorted(params.keys()):
-        sign_str += key + str(params[key])
-    sign_str += secret
-    return hashlib.md5(sign_str.encode("utf-8")).hexdigest().upper()
-
-
-class TrackSolidOpenTokenManager:
-    """Singleton that caches the Open API access token (valid ~2 hours)."""
-
-    _instance: "TrackSolidOpenTokenManager | None" = None
-    _token: "str | None"
-    _expires_at: float
-    _lock: asyncio.Lock
-
-    def __new__(cls) -> "TrackSolidOpenTokenManager":
-        if cls._instance is None:
-            inst = object.__new__(cls)
-            inst._token = None
-            inst._expires_at = 0.0
-            inst._lock = asyncio.Lock()
-            cls._instance = inst
-        return cls._instance
-
-    async def get_token(self) -> str:
-        async with self._lock:
-            now = time.time()
-            if self._token and now < self._expires_at - _OPEN_TOKEN_REFRESH_BUFFER:
-                logger.info("♻️  TrackSolid Open API: reusing cached token")
-                return self._token
-
-            logger.info("🔄 TrackSolid Open API: fetching new access token")
-            self._token = await self._fetch_token()
-            self._expires_at = time.time() + _OPEN_TOKEN_TTL_SECONDS
-            logger.info("✅ TrackSolid Open API: token obtained, valid for ~2 hours")
-            return self._token
-
-    async def _fetch_token(self) -> str:
-        account, app_key, app_secret = _creds_open()
-        password = os.environ["TRACKSOLID_PASSWORD"]
-        pwd_md5 = hashlib.md5(password.encode("utf-8")).hexdigest().lower()
-        timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-
-        params: dict = {
-            "app_key": app_key,
-            "expires_in": "7200",
-            "format": "json",
-            "method": "jimi.oauth.token.get",
-            "sign_method": "md5",
-            "timestamp": timestamp,
-            "user_id": account,       # open API uses account name as user_id
-            "user_pwd_md5": pwd_md5,
-            "v": "1.0",
-        }
-        params["sign"] = _open_api_signature(params, app_secret)
-
-        async with httpx.AsyncClient(timeout=15) as client:
-            response = await client.post(_OPEN_API_URL, data=params)
-            response.raise_for_status()
-            data = response.json()
-
-        if data.get("code") != 0:
-            raise RuntimeError(
-                f"TrackSolid Open API token error: {data.get('message')} (code={data.get('code')})"
-            )
-        token = (data.get("result") or {}).get("accessToken")
-        if not token:
-            raise RuntimeError(
-                f"TrackSolid Open API: no accessToken in response: {list(data.keys())}"
-            )
-        return token
-
-
-_open_token_manager = TrackSolidOpenTokenManager()
+# Note: The legacy TrackSolid Open API (eu-open.tracksolidpro.com) used
+# app_key/app_secret signing. That code path was never invoked anywhere
+# in the backend — location polling uses the V3 Bearer-JWT _MONITOR_INFO_URL
+# below. The dead Open-API helpers were removed on 2026-05-19 along with
+# the latent KeyError landmine for the unset TRACKSOLID_APP_KEY /
+# TRACKSOLID_APP_SECRET env vars they referenced.
 
 
 # ── Location helpers (used by location poller) ──────────────────────────────

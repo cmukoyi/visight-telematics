@@ -7,23 +7,7 @@ import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
-
-def _required_env(name: str) -> str:
-    """Fetch a required env var or raise a clear startup error.
-
-    Used for secrets and tenant-bound config. NEVER fall back to a literal
-    default for credentials — that mask the missing config in prod and
-    accidentally ships the literal as a real credential. The CI lint guard
-    in .github/workflows/deploy-production.yml blocks the
-    ``os.getenv(X) or 'literal'`` anti-pattern that this helper replaces.
-    """
-    val = os.getenv(name)
-    if not val:
-        raise RuntimeError(
-            f"{name} is required but not set. Add it to "
-            f"gps-tracker/backend/.env on the server."
-        )
-    return val
+from app._env_guard import required_env as _required_env  # re-export for callers
 
 
 class MZoneService:
