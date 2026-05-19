@@ -12,22 +12,26 @@ variables so they are never hard-coded in source.
                           default: https://live.scopemp.net/Scope.MProfilerIa.WPI/api/v1
     SCOPE_AUTH_HEADER   — value of the Authorization header (Basic …)
                           Required. Set this in the server .env file — never commit a real
-                          token to source control.
+                          token to source control. Validated via ``required_env`` so
+                          unfilled placeholders (e.g. ``Basic <your-base64-credentials>``)
+                          crash the container at import rather than silently returning
+                          HTTP 401 from MProfiler on every tag validation.
 """
 import os
 import re
 
 import httpx
 
+from app._env_guard import required_env
 from .base_provider import DeviceTagProvider, TagValidationResult
 
 _SCOPE_API_BASE = os.getenv(
     "SCOPE_API_BASE_URL",
     "https://live.scopemp.net/Scope.MProfilerIa.WPI/api/v1",
 )
-# No default — must be set in .env on the server.
-# See gps-tracker/backend/.env.example for the variable name.
-_SCOPE_AUTH = os.getenv("SCOPE_AUTH_HEADER", "")
+# No default — must be set in .env on the server with a real Basic-auth value.
+# See gps-tracker/backend/.env.example for the variable name. Fail-fast at import.
+_SCOPE_AUTH = required_env("SCOPE_AUTH_HEADER")
 
 
 class ScopeTagProvider(DeviceTagProvider):
@@ -66,14 +70,9 @@ class ScopeTagProvider(DeviceTagProvider):
                 message="Invalid identifier. Please enter a 15-digit IMEI or a valid GUID.",
             )
 
-        # ── 2. Guard: require auth header configured ────────────────────────
-        if not _SCOPE_AUTH:
-            return TagValidationResult(
-                is_valid=False,
-                message="Scope validation is not configured on this server. Contact your administrator.",
-            )
-
-        # ── 3. Scope API — confirm the tag exists ───────────────────────────
+        # ── 2. Scope API — confirm the tag exists ───────────────────────────
+        # (auth header is validated at import via required_env, so no runtime
+        # "not configured" branch is needed here)
         url = f"{_SCOPE_API_BASE}/units/unitconnections/{imei_strip}"
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
