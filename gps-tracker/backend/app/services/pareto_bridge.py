@@ -234,7 +234,12 @@ async def _reconnect_loop():
         try:
             _sio = socketio.AsyncClient(reconnection=False, logger=False, engineio_logger=False)
             _register_handlers(_sio)
-            await _sio.connect(PARETO_URL, transports=["websocket", "polling"])
+            # Use default transport order (polling first, then upgrade to
+            # websocket) so the Engine.IO handshake gets a sid before the
+            # WS upgrade attempt. Passing ["websocket", ...] makes python-
+            # socketio skip the polling handshake and fail with
+            # "no OPEN packet" against Pareto's Engine.IO server.
+            await _sio.connect(PARETO_URL)
             await _sio.wait()
         except asyncio.CancelledError:
             raise
