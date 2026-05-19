@@ -146,79 +146,24 @@ window.FP = (() => {
     },
   };
 
-  // Live asset list. Populated by _fetchAssets() from the backend
-  // (/api/portal/floorplan/assets) every POLL_INTERVAL_MS while the
-  // floorplan tab is visible. Kept as `let` so the polling task can
-  // replace the array contents in-place; the demo seed below is left for
-  // local file:// previews where the API is unreachable, but it's wiped
-  // on the first successful fetch.
+  // Live asset list. Populated exclusively by _fetchAssets() from
+  // /api/portal/floorplan/assets every POLL_INTERVAL_MS while the
+  // floorplan tab is visible. NO mock/demo data — empty until the
+  // backend returns sightings from the Pareto bridge.
   const POLL_INTERVAL_MS = 3000;
   const API_BASE         = '/api/portal/floorplan';
   const TOKEN_KEY        = 'pp_portal_token';
-  let   ASSETS = [
-    // Ground floor
-    {id:'a1', name:'Forklift #1',    type:'vehicle',   emoji:'🚛', floor:'G',  status:'online',  zone:'Main Warehouse',  x:400,y:200,lastSeen:'2s ago',  battery:91,  tagId:'BT:V001'},
-    {id:'a2', name:'Forklift #2',    type:'vehicle',   emoji:'🚛', floor:'G',  status:'idle',    zone:'Staging Zone',    x:350,y:530,lastSeen:'48s ago', battery:73,  tagId:'BT:V002'},
-    {id:'a3', name:'Pallet Jack #1', type:'vehicle',   emoji:'🔧', floor:'G',  status:'online',  zone:'Receiving Bay',   x:130,y:130,lastSeen:'5s ago',  battery:55,  tagId:'BT:V003'},
-    {id:'a4', name:'Scanner A',      type:'equipment', emoji:'📷', floor:'G',  status:'online',  zone:'Goods-In Office', x:120,y:300,lastSeen:'1s ago',  battery:88,  tagId:'BT:E001'},
-    {id:'a5', name:'Scanner B',      type:'equipment', emoji:'📷', floor:'G',  status:'online',  zone:'Main Warehouse',  x:560,y:260,lastSeen:'3s ago',  battery:65,  tagId:'BT:E002'},
-    {id:'a6', name:'Weighing Scale', type:'equipment', emoji:'⚖️',  floor:'G',  status:'idle',    zone:'Dispatch',        x:120,y:490,lastSeen:'4m ago',  battery:44,  tagId:'BT:E003'},
-    {id:'a7', name:'Crate #44',      type:'container', emoji:'📦', floor:'G',  status:'idle',    zone:'Cold Storage',    x:830,y:130,lastSeen:'2m ago',  battery:null,tagId:'BT:C001'},
-    {id:'a8', name:'Crate #45',      type:'container', emoji:'📦', floor:'G',  status:'online',  zone:'Main Warehouse',  x:480,y:380,lastSeen:'10s ago', battery:null,tagId:'BT:C002'},
-    {id:'a9', name:'Pallet J-88',    type:'container', emoji:'📦', floor:'G',  status:'offline', zone:'Returns Area',    x:820,y:310,lastSeen:'12m ago', battery:null,tagId:'BT:C003'},
-    {id:'a10',name:'J. Mwangi',      type:'personnel', emoji:'🧑', floor:'G',  status:'online',  zone:'Main Warehouse',  x:620,y:180,lastSeen:'1s ago',  battery:78,  tagId:'BT:P001'},
-    {id:'a11',name:'S. Okafor',      type:'personnel', emoji:'🧑', floor:'G',  status:'online',  zone:'Dispatch',        x:130,y:450,lastSeen:'2s ago',  battery:62,  tagId:'BT:P002'},
-    // First floor
-    {id:'b1', name:'Laptop Cart',    type:'vehicle',   emoji:'🛒', floor:'1F', status:'idle',    zone:'Open Plan A',     x:200,y:200,lastSeen:'5m ago',  battery:40,  tagId:'BT:V010'},
-    {id:'b2', name:'Projector A',    type:'equipment', emoji:'📽', floor:'1F', status:'online',  zone:'Meeting Room 1',  x:130,y:360,lastSeen:'3s ago',  battery:null,tagId:'BT:E010'},
-    {id:'b3', name:'Projector B',    type:'equipment', emoji:'📽', floor:'1F', status:'offline', zone:'Meeting Room 2',  x:330,y:370,lastSeen:'2h ago',  battery:null,tagId:'BT:E011'},
-    {id:'b4', name:'Server Rack A',  type:'equipment', emoji:'🖥', floor:'1F', status:'online',  zone:'Server Room',     x:610,y:200,lastSeen:'1s ago',  battery:null,tagId:'BT:E012'},
-    {id:'b5', name:'T. Adeyemi',     type:'personnel', emoji:'🧑', floor:'1F', status:'online',  zone:'Finance',         x:610,y:360,lastSeen:'4s ago',  battery:90,  tagId:'BT:P010'},
-    {id:'b6', name:'K. Chen',        type:'personnel', emoji:'🧑', floor:'1F', status:'online',  zone:'Open Plan B',     x:200,y:540,lastSeen:'6s ago',  battery:71,  tagId:'BT:P011'},
-    {id:'b7', name:'Supply Crate',   type:'container', emoji:'📦', floor:'1F', status:'idle',    zone:'Open Plan A',     x:380,y:180,lastSeen:'30m ago', battery:null,tagId:'BT:C010'},
-    // Second floor
-    {id:'c1', name:'Stock Trolley',  type:'vehicle',   emoji:'🛒', floor:'2F', status:'online',  zone:'Stockroom',       x:760,y:210,lastSeen:'7s ago',  battery:66,  tagId:'BT:V020'},
-    {id:'c2', name:'Price Gun A',    type:'equipment', emoji:'🔫', floor:'2F', status:'online',  zone:'Sales Floor A',   x:180,y:280,lastSeen:'2s ago',  battery:55,  tagId:'BT:E020'},
-    {id:'c3', name:'Price Gun B',    type:'equipment', emoji:'🔫', floor:'2F', status:'idle',    zone:'Sales Floor B',   x:440,y:280,lastSeen:'90s ago', battery:33,  tagId:'BT:E021'},
-    {id:'c4', name:'Returns Box #9', type:'container', emoji:'📦', floor:'2F', status:'online',  zone:'Returns & Fitting',x:720,y:560,lastSeen:'15s ago',battery:null,tagId:'BT:C020'},
-    {id:'c5', name:'L. Fernandez',   type:'personnel', emoji:'🧑', floor:'2F', status:'online',  zone:'Sales Floor A',   x:150,y:370,lastSeen:'1s ago',  battery:85,  tagId:'BT:P020'},
-    {id:'c6', name:'M. Williams',    type:'personnel', emoji:'🧑', floor:'2F', status:'online',  zone:'Customer Svc',    x:300,y:560,lastSeen:'3s ago',  battery:77,  tagId:'BT:P021'},
-    {id:'c7', name:'Store Manager',  type:'personnel', emoji:'🧑', floor:'2F', status:'idle',    zone:'Manager Office',  x:870,y:380,lastSeen:'8m ago',  battery:58,  tagId:'BT:P022'},
-    // Third floor
-    {id:'d1', name:'Maintenance Kit',type:'container', emoji:'🧰', floor:'3F', status:'online',  zone:'Maintenance',     x:170,y:450,lastSeen:'11s ago', battery:null,tagId:'BT:C030'},
-    {id:'d2', name:'CCTV Monitor',   type:'equipment', emoji:'📺', floor:'3F', status:'online',  zone:'CCTV Hub',        x:820,y:400,lastSeen:'1s ago',  battery:null,tagId:'BT:E030'},
-    {id:'d3', name:'Archive Box A',  type:'container', emoji:'📦', floor:'3F', status:'idle',    zone:'Archive A',       x:170,y:240,lastSeen:'2h ago',  battery:null,tagId:'BT:C031'},
-    {id:'d4', name:'Archive Box B',  type:'container', emoji:'📦', floor:'3F', status:'idle',    zone:'Archive B',       x:470,y:240,lastSeen:'2h ago',  battery:null,tagId:'BT:C032'},
-    {id:'d5', name:'P. Nkemdirim',   type:'personnel', emoji:'🧑', floor:'3F', status:'online',  zone:'CCTV Hub',        x:830,y:370,lastSeen:'5s ago',  battery:88,  tagId:'BT:P030'},
-  ];
+  let   ASSETS = [];
 
-  const ZONES = {
-    'G': [
-      {label:'Dispatch',    rect:[40,390,200,190],  fill:'rgba(0,100,0,.15)',    stroke:'rgba(0,100,0,.6)'},
-      {label:'Cold Storage',rect:[720,40,240,200],  fill:'rgba(59,130,246,.13)',  stroke:'rgba(59,130,246,.5)'},
-      {label:'Alert Zone',  rect:[560,460,160,120], fill:'rgba(239,68,68,.15)',  stroke:'rgba(239,68,68,.55)'},
-      {label:'Staging',     rect:[240,480,340,100], fill:'rgba(245,158,11,.13)', stroke:'rgba(245,158,11,.5)'},
-    ],
-    '1F': [
-      {label:'Server Restricted',    rect:[520,120,200,160], fill:'rgba(59,130,246,.13)',  stroke:'rgba(59,130,246,.5)'},
-      {label:'Boardroom (Booked)',    rect:[520,460,200,180], fill:'rgba(245,158,11,.12)', stroke:'rgba(245,158,11,.45)'},
-    ],
-    '2F': [
-      {label:'Active Sales',  rect:[40,120,560,380],  fill:'rgba(0,100,0,.08)',    stroke:'rgba(0,100,0,.4)'},
-      {label:'Staff Only',    rect:[600,120,360,380], fill:'rgba(59,130,246,.11)', stroke:'rgba(59,130,246,.45)'},
-    ],
-    '3F': [
-      {label:'Secure Store',  rect:[700,120,260,400], fill:'rgba(239,68,68,.12)',  stroke:'rgba(239,68,68,.45)'},
-      {label:'Plant Access',  rect:[40,40,660,80],    fill:'rgba(245,158,11,.12)', stroke:'rgba(245,158,11,.4)'},
-    ],
-  };
+  // Zone overlay rectangles per floor. Will be populated from the
+  // floor-plan publish flow in a follow-up PR; empty until then so
+  // the "zones" layer toggle shows nothing rather than fake data.
+  const ZONES = {};
 
-  const BEACONS = {
-    'G':  [{x:200,y:140},{x:450,y:140},{x:700,y:140},{x:200,y:350},{x:450,y:350},{x:700,y:350},{x:350,y:530}],
-    '1F': [{x:200,y:80}, {x:500,y:80}, {x:750,y:80}, {x:200,y:400},{x:620,y:400},{x:800,y:400}],
-    '2F': [{x:180,y:80}, {x:460,y:80}, {x:760,y:80}, {x:180,y:450},{x:460,y:450},{x:760,y:450}],
-    '3F': [{x:200,y:80}, {x:500,y:80}, {x:200,y:480},{x:490,y:480}, {x:800,y:480}],
-  };
+  // Gateway positions per floor for the "beacons" layer overlay.
+  // Populated from /api/portal/floorplan/floors/{id} once a floor
+  // is selected; empty until then.
+  const BEACONS = {};
 
   // ═══════════════════════════════════════════════════════
   // STATE
@@ -743,7 +688,6 @@ window.FP = (() => {
   // ═══════════════════════════════════════════════════════
   // LIVE POLLING — fetch real asset positions from backend
   // ═══════════════════════════════════════════════════════
-  let _firstFetchDone = false;
 
   function _authHeaders() {
     const t = (() => { try { return localStorage.getItem(TOKEN_KEY); } catch (_) { return null; } })();
@@ -761,13 +705,7 @@ window.FP = (() => {
       }
       const data = await r.json();
       const next = Array.isArray(data.assets) ? data.assets : [];
-      // First successful fetch wipes the demo seed.
-      if (!_firstFetchDone) {
-        ASSETS.length = 0;
-        _firstFetchDone = true;
-      } else {
-        ASSETS.length = 0;
-      }
+      ASSETS.length = 0;
       next.forEach(a => ASSETS.push(a));
       _updateCounts(); _renderList(); _drawAll();
     } catch (e) {
