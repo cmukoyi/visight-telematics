@@ -190,6 +190,10 @@ app.include_router(ops_router)
 from app.routes_hive import router as hive_router  # noqa: E402
 app.include_router(hive_router)
 
+# Include Floor Plan router (BLE indoor tracking via Pareto Anywhere)
+from app.routes_floorplan import router as floorplan_router  # noqa: E402
+app.include_router(floorplan_router)
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -243,17 +247,25 @@ async def startup_event():
     _hive_svc.start_sweeper()
     print("🛡️  HIVE sweeper started (2-minute freshness sweep)")
 
+    # Start Pareto Anywhere bridge for floor-plan BLE indoor tracking
+    from app.services import pareto_bridge as _pareto
+    _pareto.start_bridge()
+    print(f"📡 Pareto bridge started (url={_pareto.PARETO_URL})")
+
     # Start GDPR cleanup task (runs daily)
     asyncio.create_task(_gdpr_cleanup_loop())
     print("📜 GDPR cleanup task started (runs every 24 h)")
 
 @app.on_event("shutdown")
-def shutdown_event():
+async def shutdown_event():
     location_poller.stop()
     from app.services import hive_service as _hive_svc
     _hive_svc.stop_sweeper()
+    from app.services import pareto_bridge as _pareto
+    await _pareto.stop_bridge()
     print("🛑 Location Poller Service stopped")
     print("🛑 HIVE sweeper stopped")
+    print("🛑 Pareto bridge stopped")
 
 
 # ---------------------------------------------------------------------------
