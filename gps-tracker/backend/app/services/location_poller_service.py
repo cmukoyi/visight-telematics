@@ -31,12 +31,25 @@ class LocationPollerService:
     def __init__(self):
         self.mzone_service = MZoneService()
         self.running = False
-        self.poll_interval = 10  # seconds
+        self.poll_interval = 10  # seconds (Series 1 / MZone cadence)
+        # TrackSolid (Series 2) is polled much less often:
+        # - Series 2 device hardware reports every ~5-10 min, so faster polling
+        #   yields no new data anyway.
+        # - TrackSolid's WAF will IP-ban hosts that hit its endpoints every
+        #   10s × N tags (~43k req/day for 5 tags). Once banned, every call
+        #   stalls until the connect timeout, eating workers + causing OOM.
+        # - The token itself is reused for ~59 min (see TrackSolidTokenManager)
+        #   so this only affects the per-tag getMonitorInfo calls.
+        self.series2_poll_interval = 600  # seconds (10 minutes)
+        self._last_series2_poll_at: datetime | None = None
         
     async def start(self):
         """Start the background polling service"""
         self.running = True
-        logger.info(f"🚀 Location Poller Service started - polling every {self.poll_interval} seconds")
+        logger.info(
+            f"🚀 Location Poller Service started — Series 1 every {self.poll_interval}s, "
+            f"Series 2 (TrackSolid) every {self.series2_poll_interval}s"
+        )
         
         while self.running:
             try:
@@ -112,8 +125,17 @@ class LocationPollerService:
 
             updated_count = 0
 
-            # ── Poll Series 2 tags ──────────────────────────────────────
-            if series2_trackers:
+            # ── Poll Series 2 tags (TrackSolid, every 10 min) ──────────────
+            # Throttled separately from the main loop to avoid hammering the
+            # TrackSolid API (see __init__ for rationale).
+            now_dt = datetime.utcnow()
+            series2_due = (
+                self._last_series2_poll_at is None
+                or (now_dt - self._last_series2_poll_at).total_seconds()
+                   >= self.series2_poll_interval
+            )
+            if series2_trackers and series2_due:
+                self._last_series2_poll_at = now_dt
                 # Parallel per-IMEI calls to getMonitorInfo (V3 Bearer JWT)
                 imeis = [t.imei for t in series2_trackers]
                 try:
