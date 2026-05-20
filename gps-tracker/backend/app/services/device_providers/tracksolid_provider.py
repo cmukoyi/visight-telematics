@@ -60,6 +60,16 @@ def _creds() -> tuple[str, str, int, str]:
 _TOKEN_TTL_SECONDS = 3600       # TrackSolid tokens last 1 hour
 _TOKEN_REFRESH_BUFFER = 60      # Refresh 60 s before expiry to be safe
 
+# ── Failure backoff ─────────────────────────────────────────────────────────
+# When a token fetch fails (network block, WAF ban, upstream down) we cache
+# the failure for an escalating cooldown so we don't hammer TrackSolid's
+# login endpoint. Hammering is what gets the source IP banned in the first
+# place, and once banned every poll would otherwise stall the backend for
+# the full connect timeout, eating workers and triggering OOM.
+_FAIL_BACKOFF_SCHEDULE = (30, 120, 600, 1800)  # seconds: 30s → 2m → 10m → 30m
+_CONNECT_TIMEOUT_SECONDS = 5     # fail fast on TCP block
+_READ_TIMEOUT_SECONDS = 15       # leave room for a real slow response
+
 
 # ── Singleton token manager ──────────────────────────────────────────────────
 class TrackSolidTokenManager:
@@ -76,6 +86,9 @@ class TrackSolidTokenManager:
     _token: "str | None"
     _expires_at: float
     _lock: asyncio.Lock
+    _last_failure_at: float
+    _failure_streak: int
+    _last_failure_msg: str
 
     def __new__(cls) -> "TrackSolidTokenManager":
         if cls._instance is None:
@@ -83,8 +96,15 @@ class TrackSolidTokenManager:
             inst._token = None
             inst._expires_at = 0.0
             inst._lock = asyncio.Lock()
+            inst._last_failure_at = 0.0
+            inst._failure_streak = 0
+            inst._last_failure_msg = ""
             cls._instance = inst
         return cls._instance
+
+    def _current_backoff(self) -> int:
+        idx = min(self._failure_streak - 1, len(_FAIL_BACKOFF_SCHEDULE) - 1)
+        return _FAIL_BACKOFF_SCHEDULE[max(idx, 0)]
 
     async def get_token(self) -> str:
         """Return a valid token, fetching a new one only when necessary."""
@@ -97,9 +117,37 @@ class TrackSolidTokenManager:
                 )
                 return self._token
 
+            # If a previous fetch failed recently, fail fast instead of
+            # re-hammering TrackSolid (which can get us IP-banned).
+            if self._failure_streak > 0:
+                wait = self._current_backoff() - (now - self._last_failure_at)
+                if wait > 0:
+                    logger.warning(
+                        "⏸️  TrackSolid: in backoff (%d failures, retry in %ds): %s",
+                        self._failure_streak, int(wait), self._last_failure_msg,
+                    )
+                    raise RuntimeError(
+                        f"TrackSolid unavailable (backoff {int(wait)}s): "
+                        f"{self._last_failure_msg}"
+                    )
+
             logger.info("🔄 TrackSolid: fetching new token (old token expired or absent)")
-            self._token = await self._fetch_token()
+            try:
+                token = await self._fetch_token()
+            except Exception as exc:
+                self._failure_streak += 1
+                self._last_failure_at = time.time()
+                self._last_failure_msg = f"{type(exc).__name__}: {exc}" or repr(exc)
+                logger.error(
+                    "❌ TrackSolid token fetch failed (streak=%d, next retry in %ds): %s",
+                    self._failure_streak, self._current_backoff(),
+                    self._last_failure_msg,
+                )
+                raise
+            self._token = token
             self._expires_at = time.time() + _TOKEN_TTL_SECONDS
+            self._failure_streak = 0
+            self._last_failure_msg = ""
             logger.info("✅ TrackSolid: new token obtained, valid for ~1 hour")
             return self._token
 
@@ -113,7 +161,8 @@ class TrackSolidTokenManager:
             "validCode": "",
             "nodeId": "",
         }
-        async with httpx.AsyncClient(timeout=15) as client:
+        timeout = httpx.Timeout(_READ_TIMEOUT_SECONDS, connect=_CONNECT_TIMEOUT_SECONDS)
+        async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(_LOGIN_URL, json=payload)
             response.raise_for_status()
             data = response.json()
