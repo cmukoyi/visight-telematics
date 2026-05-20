@@ -162,10 +162,23 @@ class TrackSolidTokenManager:
             "nodeId": "",
         }
         timeout = httpx.Timeout(_READ_TIMEOUT_SECONDS, connect=_CONNECT_TIMEOUT_SECONDS)
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.post(_LOGIN_URL, json=payload)
-            response.raise_for_status()
-            data = response.json()
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(_LOGIN_URL, json=payload)
+                response.raise_for_status()
+                data = response.json()
+        except (httpx.ConnectTimeout, httpx.ConnectError) as exc:
+            # TCP-level failure — almost always a WAF / IP block at TrackSolid.
+            raise RuntimeError(
+                f"🚫 TrackSolid WAF block suspected — cannot reach {_BASE_URL} "
+                f"({type(exc).__name__}). Source IP may be banned."
+            ) from exc
+        except httpx.HTTPStatusError as exc:
+            # WAF returning an explicit status (403/429/503) — also distinctive.
+            raise RuntimeError(
+                f"🚫 TrackSolid login HTTP {exc.response.status_code} "
+                f"— likely WAF/rate-limit block"
+            ) from exc
 
         # TrackSolid V3 API stores the JWT in one of several possible paths.
         # Try the most common ones in order.
@@ -441,6 +454,18 @@ async def fetch_all_tracksolid_locations(
     Returns a dict keyed by IMEI string. Missing entries mean no GPS fix.
     """
     if not imeis:
+        return {}
+
+    # Pre-flight: try to get a token ONCE. If TrackSolid is unreachable
+    # (WAF block, network outage, or we're in backoff), fail the whole batch
+    # with a single clear log line instead of 110× per-IMEI spam.
+    try:
+        await _token_manager.get_token()
+    except Exception as exc:
+        logger.error(
+            "🚫 TrackSolid batch skipped — %d IMEIs not polled this cycle: %s",
+            len(imeis), exc,
+        )
         return {}
 
     tasks = [_fetch_monitor_info_single(imei) for imei in imeis]

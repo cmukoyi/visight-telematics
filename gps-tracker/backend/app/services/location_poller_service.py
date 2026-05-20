@@ -144,6 +144,12 @@ class LocationPollerService:
                     logger.error("Series 2 location fetch failed: %s", exc)
                     ts_locations = {}
 
+                # If the whole batch was skipped (WAF block, backoff, outage)
+                # don't emit 110× per-IMEI WARN spam — the provider already
+                # logged a single batch-level error.
+                if not ts_locations:
+                    series2_trackers = []
+
                 for tracker in series2_trackers:
                     loc = ts_locations.get(tracker.imei.strip())
                     if not loc:
