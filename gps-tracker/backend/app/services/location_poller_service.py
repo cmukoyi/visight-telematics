@@ -34,8 +34,8 @@ class LocationPollerService:
         self.mzone_service = MZoneService()
         # Use FROM_EMAIL env var for tenant-aware contact, fallback to neutral default
         contact_email = os.getenv("FROM_EMAIL", "contact@pinplot.me")
+        # GeocodeService defaults to MapTiler (reads MAPTILER_API_KEY from env)
         self.geocode_service = GeocodeService(
-            provider="nominatim",
             threshold_metres=500,
             user_agent=f"PinPlot/1.0 ({contact_email})"
         )

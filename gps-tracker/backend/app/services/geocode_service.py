@@ -40,8 +40,20 @@ class GeocodeService:
 
     # --- Provider configs ---
     PROVIDERS = {
+        "maptiler": {
+            # MapTiler uses longitude,latitude order in the URL path
+            "url": "https://api.maptiler.com/geocoding/",
+            "build_url": lambda lat, lng: f"https://api.maptiler.com/geocoding/{lng},{lat}.json",
+            "parse": lambda r: (
+                r.json().get("features", [{}])[0].get("place_name", "Unknown")
+                if r.json().get("features")
+                else "Unknown"
+            ),
+            "rate_limit": 0.05,  # ~20 requests per second on paid tier
+        },
         "nominatim": {
             "url": "https://nominatim.openstreetmap.org/reverse",
+            "build_url": None,
             "params": lambda lat, lng: {
                 "lat": lat,
                 "lon": lng,
@@ -53,6 +65,7 @@ class GeocodeService:
         },
         "locationiq": {
             "url": "https://us1.locationiq.com/v1/reverse",
+            "build_url": None,
             "params": lambda lat, lng: {
                 "lat": lat,
                 "lon": lng,
@@ -64,6 +77,7 @@ class GeocodeService:
         },
         "bigdatacloud": {
             "url": "https://api.bigdatacloud.net/data/reverse-geocode-client",
+            "build_url": None,
             "params": lambda lat, lng: {
                 "latitude": lat,
                 "longitude": lng,
@@ -76,14 +90,14 @@ class GeocodeService:
 
     def __init__(
         self,
-        provider="nominatim",
+        provider="maptiler",
         threshold_metres=500,
         cache_file="/tmp/pinplot_geocode_cache.json",
         user_agent="PinPlot-GPS-Tracker/1.0 (contact@pinplot.me)",
     ):
         """
         Args:
-            provider:          Which geocoding provider to use.
+            provider:          Which geocoding provider to use (default: maptiler).
             threshold_metres:  Only re-geocode if device moved more than this distance.
             cache_file:        Path to persist the cache between restarts.
             user_agent:        Required by Nominatim. Set to your app/email.
@@ -92,6 +106,8 @@ class GeocodeService:
         self.threshold = threshold_metres
         self.cache_file = cache_file
         self.user_agent = user_agent
+        # Read MapTiler API key from environment if using that provider
+        self.api_key = os.environ.get("MAPTILER_API_KEY") if provider == "maptiler" else None
         self.cache = self._load_cache()
         self.last_request_time = 0
         self._lock = threading.Lock()
@@ -261,9 +277,17 @@ class GeocodeService:
                 time.sleep(wait)
 
             try:
+                # MapTiler uses coordinates in the URL path, others use query params
+                if self.provider.get("build_url"):
+                    url = self.provider["build_url"](lat, lng)
+                    params = {"key": self.api_key} if self.api_key else {}
+                else:
+                    url = self.provider["url"]
+                    params = self.provider["params"](lat, lng)
+
                 resp = requests.get(
-                    self.provider["url"],
-                    params=self.provider["params"](lat, lng),
+                    url,
+                    params=params,
                     headers={"User-Agent": self.user_agent},
                     timeout=10,
                 )
