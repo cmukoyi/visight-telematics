@@ -762,13 +762,13 @@ async def fetch_all_tracksolid_locations_open_api(
             continue
         
         # Parse battery
+        # TrackSolid Open API returns batteryPowerVal as a percentage already (e.g., "50.00" = 50%)
         battery_level: int | None = None
         battery_val = device.get("batteryPowerVal")
         if battery_val:
             try:
-                voltage = float(battery_val)
-                if voltage > 2.5:
-                    battery_level = min(100, max(0, int((voltage - 3.0) / 1.2 * 100)))
+                battery_level = int(float(battery_val))
+                battery_level = min(100, max(0, battery_level))  # Clamp to 0-100
             except (ValueError, TypeError):
                 pass
         
