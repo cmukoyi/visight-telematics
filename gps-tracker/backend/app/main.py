@@ -13,7 +13,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from app.database import get_db, init_db
-from app.models import User, VerificationPIN, BLETag, POI, POITrackerLink, GeofenceAlert, PasswordResetToken, GeofenceState, AppFeatures
+from app.models import User, VerificationPIN, BLETag, POI, POITrackerLink, GeofenceAlert, PasswordResetToken, GeofenceState, AppFeatures, PortalUser
 from app.models_admin import AdminUser, AppLog, AuditLog, BillingData, TagPackage
 from app.auth import verify_password, get_password_hash, create_access_token, decode_token
 from app.admin_auth import hash_password as admin_hash_password
@@ -1266,6 +1266,113 @@ def list_users_with_tags(db: Session = Depends(get_db)):
             "created_at": user.created_at,
             "tag_count": len(user.ble_tags),
             "tags": tags_list
+        })
+    
+    return result
+
+@app.get("/api/v1/admin/end-users")
+def list_end_users_with_tags(db: Session = Depends(get_db)):
+    """
+    List all end users with their tag assignments for Admin Portal "End Users" section
+    Returns: All users with expandable tag details including IMEI, package, expiry
+    """
+    users = db.query(User).order_by(User.created_at.desc()).all()
+    
+    result = []
+    for user in users:
+        full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+        if not full_name:
+            full_name = user.email.split('@')[0]
+        
+        # Get all tags for this user with package details
+        tags_list = []
+        for tag in user.ble_tags:
+            # Get package name if exists
+            package_name = None
+            if tag.package_id:
+                package = db.query(TagPackage).filter(TagPackage.id == tag.package_id).first()
+                if package:
+                    package_name = package.name
+            
+            tags_list.append({
+                "id": str(tag.id),
+                "imei": tag.imei,
+                "device_name": tag.device_name or tag.description or "Unknown",
+                "tag_type": tag.tag_type,
+                "is_active": tag.is_active,
+                "package_name": package_name,
+                "activation_date": tag.activation_date.isoformat() if tag.activation_date else None,
+                "expiry_date": tag.expiry_date.isoformat() if tag.expiry_date else None,
+                "last_seen": tag.last_seen.isoformat() if tag.last_seen else None,
+                "battery_level": tag.battery_level
+            })
+        
+        result.append({
+            "id": str(user.id),
+            "email": user.email,
+            "full_name": full_name,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "phone": user.phone,
+            "is_active": user.is_active,
+            "is_admin": user.is_admin,
+            "created_at": user.created_at.isoformat(),
+            "tag_count": len(user.ble_tags),
+            "tags": tags_list
+        })
+    
+    return result
+
+@app.get("/api/v1/admin/imei")
+def list_all_imei_details(db: Session = Depends(get_db)):
+    """
+    List all IMEI/tags with user, usergroup, expiry, package, and activation date
+    For Admin Portal "IMEI" section - comprehensive tag inventory
+    """
+    tags = db.query(BLETag).order_by(BLETag.added_at.desc()).all()
+    
+    result = []
+    for tag in tags:
+        # Get user details
+        user = db.query(User).filter(User.id == tag.user_id).first()
+        user_email = user.email if user else "N/A"
+        user_name = f"{user.first_name or ''} {user.last_name or ''}".strip() if user else "N/A"
+        if not user_name or user_name == " ":
+            user_name = user_email.split('@')[0] if user else "N/A"
+        
+        # Get package details
+        package_name = None
+        if tag.package_id:
+            package = db.query(TagPackage).filter(TagPackage.id == tag.package_id).first()
+            if package:
+                package_name = package.name
+        
+        # Get usergroup (from portal_users or user_group_members if implemented)
+        # For now, we'll look for any usergroup associations through buildings or other means
+        usergroup_name = None
+        # Try to find usergroup through portal users if this user is linked
+        portal_user = db.query(PortalUser).filter(PortalUser.email == user_email).first() if user else None
+        if portal_user and portal_user.usergroup:
+            usergroup_name = portal_user.usergroup.name
+        
+        result.append({
+            "id": str(tag.id),
+            "imei": tag.imei,
+            "device_name": tag.device_name or tag.description or "Unknown",
+            "device_model": tag.device_model,
+            "tag_type": tag.tag_type,
+            "is_active": tag.is_active,
+            "user_email": user_email,
+            "user_name": user_name,
+            "usergroup": usergroup_name or "N/A",
+            "package_name": package_name or "N/A",
+            "activation_date": tag.activation_date.isoformat() if tag.activation_date else "N/A",
+            "expiry_date": tag.expiry_date.isoformat() if tag.expiry_date else "N/A",
+            "added_at": tag.added_at.isoformat() if tag.added_at else None,
+            "last_seen": tag.last_seen.isoformat() if tag.last_seen else None,
+            "battery_level": tag.battery_level,
+            "latitude": tag.latitude,
+            "longitude": tag.longitude
         })
     
     return result

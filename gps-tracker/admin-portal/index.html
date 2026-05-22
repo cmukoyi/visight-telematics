@@ -877,6 +877,18 @@
                             <span>SendGrid</span>
                         </button>
                     </li>
+                    <li class="sidebar-item">
+                        <button class="sidebar-link" onclick="switchTab('endusers')">
+                            <span>👥</span>
+                            <span>End Users</span>
+                        </button>
+                    </li>
+                    <li class="sidebar-item">
+                        <button class="sidebar-link" onclick="switchTab('imei')">
+                            <span>📱</span>
+                            <span>IMEI</span>
+                        </button>
+                    </li>
                 </ul>
 
                 <div style="position: absolute; bottom: 24px; left: 24px; right: 24px;">
@@ -1912,6 +1924,78 @@
                     </div>
                     <!-- END SENDGRID TAB -->
 
+                    <!-- END USERS TAB -->
+                    <div id="endusers" class="tab-content">
+                        <div class="page-header">
+                            <h2 class="page-title">End Users</h2>
+                            <p class="page-subtitle">All users across the entire system with tag assignments</p>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">📋 User Directory</h3>
+                                <button class="btn btn-primary btn-small" onclick="loadEndUsers()">↻ Refresh</button>
+                            </div>
+                            <div class="table-wrapper">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 30px;"></th>
+                                            <th>Name</th>
+                                            <th>Email</th>
+                                            <th>Phone</th>
+                                            <th>Status</th>
+                                            <th>Admin</th>
+                                            <th>Tags</th>
+                                            <th>Created</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="endUsersTableBody">
+                                        <tr><td colspan="8" style="text-align:center;color:var(--gray);padding:2rem">Click ↻ Refresh to load data</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END END USERS TAB -->
+
+                    <!-- IMEI TAB -->
+                    <div id="imei" class="tab-content">
+                        <div class="page-header">
+                            <h2 class="page-title">IMEI / Tags</h2>
+                            <p class="page-subtitle">All tags with user, usergroup, expiry, package, and activation details</p>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">📱 Tag Inventory</h3>
+                                <button class="btn btn-primary btn-small" onclick="loadIMEI()">↻ Refresh</button>
+                            </div>
+                            <div class="table-wrapper">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>IMEI</th>
+                                            <th>Device Name</th>
+                                            <th>Type</th>
+                                            <th>User</th>
+                                            <th>Usergroup</th>
+                                            <th>Package</th>
+                                            <th>Activated</th>
+                                            <th>Expiry</th>
+                                            <th>Status</th>
+                                            <th>Last Seen</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="imeiTableBody">
+                                        <tr><td colspan="10" style="text-align:center;color:var(--gray);padding:2rem">Click ↻ Refresh to load data</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END IMEI TAB -->
+
                 </div>
             </div>
         </div>
@@ -2079,7 +2163,9 @@
                 'packages': 'Tag Packages',
                 'buildings': 'Buildings & Floor Plans',
                 'health': 'System Health',
-                'sendgrid': 'SendGrid Email Stats'
+                'sendgrid': 'SendGrid Email Stats',
+                'endusers': 'End Users',
+                'imei': 'IMEI / Tags'
             };
             document.getElementById('pageTitle').textContent = titles[tabName];
 
@@ -2094,6 +2180,8 @@
             if (tabName === 'buildings') { loadBuildings(); }
             if (tabName === 'health') { healthRefresh(); }
             if (tabName === 'sendgrid') { loadSendgridStats(); }
+            if (tabName === 'endusers') { loadEndUsers(); }
+            if (tabName === 'imei') { loadIMEI(); }
         }
 
         // DASHBOARD
@@ -3783,6 +3871,182 @@
         document.getElementById('sgLimitText').textContent = `${todaySent} / ${LIMIT} today`;
         document.getElementById('sgLimitCard').style.display = 'block';
     }
+
+    // ── END USERS ──────────────────────────────────────────────────────────
+    async function loadEndUsers() {
+        const tbody = document.getElementById('endUsersTableBody');
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem">Loading…</td></tr>';
+
+        try {
+            const res = await fetch(`${API_URL}/api/v1/admin/end-users`, {
+                headers: { 'Authorization': 'Bearer ' + authToken }
+            });
+            if (!res.ok) throw new Error(res.statusText);
+            const users = await res.json();
+            
+            if (!users || users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--gray);padding:2rem">No users found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = users.map(user => {
+                const userId = user.id.replace(/-/g, '');
+                const tagCount = user.tag_count || 0;
+                const statusBadge = user.is_active 
+                    ? '<span style="background:#22c55e;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">Active</span>'
+                    : '<span style="background:#ef4444;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">Inactive</span>';
+                const adminBadge = user.is_admin 
+                    ? '<span style="background:#3f51b5;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">Yes</span>'
+                    : '<span style="color:var(--gray)">No</span>';
+                const createdDate = user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A';
+
+                let mainRow = `<tr style="cursor:pointer" onclick="toggleUserTags('${userId}')">
+                    <td style="text-align:center">
+                        <span id="expand-icon-${userId}" style="display:inline-block;transform:rotate(0deg);transition:transform 0.2s">▶</span>
+                    </td>
+                    <td><strong>${escH(user.full_name)}</strong></td>
+                    <td>${escH(user.email)}</td>
+                    <td>${escH(user.phone || '-')}</td>
+                    <td>${statusBadge}</td>
+                    <td>${adminBadge}</td>
+                    <td><span style="background:var(--primary);color:white;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">${tagCount}</span></td>
+                    <td>${createdDate}</td>
+                </tr>`;
+
+                // Expandable row for tags
+                let tagsRow = `<tr id="tags-${userId}" style="display:none">
+                    <td colspan="8" style="padding:0;background:#f5f5f5">
+                        <div style="padding:16px 24px">
+                            <h4 style="margin:0 0 12px 0;font-size:14px;color:var(--primary)">📱 Tag Assignments (${tagCount})</h4>`;
+
+                if (tagCount === 0) {
+                    tagsRow += `<p style="color:var(--gray);font-style:italic">No tags assigned</p>`;
+                } else {
+                    tagsRow += `<table style="width:100%;margin:0;background:white;border-radius:6px;overflow:hidden">
+                        <thead>
+                            <tr style="background:#e8eaf6">
+                                <th style="padding:8px;font-size:12px">IMEI</th>
+                                <th style="padding:8px;font-size:12px">Device Name</th>
+                                <th style="padding:8px;font-size:12px">Type</th>
+                                <th style="padding:8px;font-size:12px">Package</th>
+                                <th style="padding:8px;font-size:12px">Activated</th>
+                                <th style="padding:8px;font-size:12px">Expiry</th>
+                                <th style="padding:8px;font-size:12px">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+                    
+                    user.tags.forEach(tag => {
+                        const activatedDate = tag.activation_date ? new Date(tag.activation_date).toLocaleDateString() : 'Not activated';
+                        const expiryDate = tag.expiry_date ? new Date(tag.expiry_date).toLocaleDateString() : 'N/A';
+                        const tagStatus = tag.is_active 
+                            ? '<span style="color:#22c55e;font-weight:600">●</span> Active'
+                            : '<span style="color:#ef4444;font-weight:600">●</span> Inactive';
+                        
+                        tagsRow += `<tr>
+                            <td style="padding:8px;font-size:12px;font-family:monospace">${escH(tag.imei)}</td>
+                            <td style="padding:8px;font-size:12px">${escH(tag.device_name)}</td>
+                            <td style="padding:8px;font-size:12px">${escH(tag.tag_type || 'series1')}</td>
+                            <td style="padding:8px;font-size:12px">${escH(tag.package_name || 'N/A')}</td>
+                            <td style="padding:8px;font-size:12px">${activatedDate}</td>
+                            <td style="padding:8px;font-size:12px">${expiryDate}</td>
+                            <td style="padding:8px;font-size:12px">${tagStatus}</td>
+                        </tr>`;
+                    });
+
+                    tagsRow += `</tbody></table>`;
+                }
+
+                tagsRow += `</div></td></tr>`;
+
+                return mainRow + tagsRow;
+            }).join('');
+
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#ef4444;padding:2rem">Error: ${escH(e.message)}</td></tr>`;
+        }
+    }
+
+    function toggleUserTags(userId) {
+        const tagsRow = document.getElementById(`tags-${userId}`);
+        const icon = document.getElementById(`expand-icon-${userId}`);
+        
+        if (tagsRow.style.display === 'none') {
+            tagsRow.style.display = 'table-row';
+            icon.style.transform = 'rotate(90deg)';
+        } else {
+            tagsRow.style.display = 'none';
+            icon.style.transform = 'rotate(0deg)';
+        }
+    }
+
+    // ── IMEI ───────────────────────────────────────────────────────────────
+    async function loadIMEI() {
+        const tbody = document.getElementById('imeiTableBody');
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem">Loading…</td></tr>';
+
+        try {
+            const res = await fetch(`${API_URL}/api/v1/admin/imei`, {
+                headers: { 'Authorization': 'Bearer ' + authToken }
+            });
+            if (!res.ok) throw new Error(res.statusText);
+            const tags = await res.json();
+            
+            if (!tags || tags.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--gray);padding:2rem">No tags found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = tags.map(tag => {
+                const activatedDate = tag.activation_date !== 'N/A' && tag.activation_date 
+                    ? new Date(tag.activation_date).toLocaleDateString() 
+                    : 'Not activated';
+                const expiryDate = tag.expiry_date !== 'N/A' && tag.expiry_date 
+                    ? new Date(tag.expiry_date).toLocaleDateString() 
+                    : 'N/A';
+                const lastSeenDate = tag.last_seen 
+                    ? new Date(tag.last_seen).toLocaleString() 
+                    : 'Never';
+                
+                const statusBadge = tag.is_active 
+                    ? '<span style="background:#22c55e;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">Active</span>'
+                    : '<span style="background:#ef4444;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">Inactive</span>';
+
+                // Color code expiry dates
+                let expiryStyle = '';
+                if (tag.expiry_date !== 'N/A' && tag.expiry_date) {
+                    const expiry = new Date(tag.expiry_date);
+                    const now = new Date();
+                    const daysLeft = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+                    
+                    if (daysLeft < 0) {
+                        expiryStyle = 'color:#ef4444;font-weight:600'; // Expired - red
+                    } else if (daysLeft <= 30) {
+                        expiryStyle = 'color:#f59e0b;font-weight:600'; // Expiring soon - orange
+                    } else {
+                        expiryStyle = 'color:#22c55e;font-weight:600'; // Valid - green
+                    }
+                }
+
+                return `<tr>
+                    <td style="font-family:monospace;font-size:13px">${escH(tag.imei)}</td>
+                    <td>${escH(tag.device_name)}</td>
+                    <td><span style="background:var(--surface-2);padding:2px 6px;border-radius:4px;font-size:11px">${escH(tag.tag_type || 'series1')}</span></td>
+                    <td title="${escH(tag.user_email)}">${escH(tag.user_name)}</td>
+                    <td>${escH(tag.usergroup)}</td>
+                    <td>${escH(tag.package_name)}</td>
+                    <td style="font-size:12px">${activatedDate}</td>
+                    <td style="font-size:12px;${expiryStyle}">${expiryDate}</td>
+                    <td>${statusBadge}</td>
+                    <td style="font-size:11px;color:var(--gray)">${lastSeenDate}</td>
+                </tr>`;
+            }).join('');
+
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:#ef4444;padding:2rem">Error: ${escH(e.message)}</td></tr>`;
+        }
+    }
+
     </script>
 </body>
 </html>
