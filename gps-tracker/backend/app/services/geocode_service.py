@@ -79,7 +79,7 @@ class GeocodeService:
         provider="nominatim",
         threshold_metres=500,
         cache_file="/tmp/pinplot_geocode_cache.json",
-        user_agent="PinPlot/1.0 (info@beacontelematics.co.uk)",
+        user_agent="PinPlot-GPS-Tracker/1.0 (contact@pinplot.me)",
     ):
         """
         Args:

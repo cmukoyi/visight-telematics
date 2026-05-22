@@ -14,6 +14,7 @@ API's lastKnownPosition cache is refreshed.
 
 import asyncio
 import logging
+import os
 from datetime import datetime, timedelta
 from typing import List
 from sqlalchemy.orm import Session
@@ -31,10 +32,12 @@ logger = logging.getLogger(__name__)
 class LocationPollerService:
     def __init__(self):
         self.mzone_service = MZoneService()
+        # Use FROM_EMAIL env var for tenant-aware contact, fallback to neutral default
+        contact_email = os.getenv("FROM_EMAIL", "contact@pinplot.me")
         self.geocode_service = GeocodeService(
             provider="nominatim",
             threshold_metres=500,
-            user_agent="PinPlot/1.0 (info@beacontelematics.co.uk)"
+            user_agent=f"PinPlot/1.0 ({contact_email})"
         )
         self.running = False
         self.poll_interval = 10  # seconds (Series 1 / MZone cadence)
