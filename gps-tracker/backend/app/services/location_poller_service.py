@@ -161,8 +161,9 @@ class LocationPollerService:
 
                     tracker.latitude = str(loc.latitude)
                     tracker.longitude = str(loc.longitude)
-                    if loc.address:
-                        tracker.location_description = loc.address
+                    # Always update location_description, even if null/empty
+                    # This clears stale addresses when TrackSolid stops providing them
+                    tracker.location_description = loc.address
                     # Use the actual GPS fix time from the device; fall back to
                     # poll time only if the API didn't return a timestamp.
                     tracker.last_seen = loc.gps_time or datetime.utcnow()

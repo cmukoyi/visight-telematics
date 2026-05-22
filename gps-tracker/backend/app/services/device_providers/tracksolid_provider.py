@@ -783,6 +783,10 @@ async def fetch_all_tracksolid_locations_open_api(
         
         address = device.get("locDesc") or None
         
+        # Debug log for missing addresses
+        if address is None:
+            logger.debug("📍 IMEI %s: locDesc is null from TrackSolid API", imei)
+        
         result_map[imei] = TrackSolidLocationInfo(
             latitude=lat,
             longitude=lng,
