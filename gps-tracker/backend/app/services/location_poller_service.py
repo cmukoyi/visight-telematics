@@ -22,7 +22,7 @@ from app.models import BLETag, User
 from app.models_admin import TagPackage
 from app.services.mzone_service import MZoneService
 from app.services.geofence_service import GeofenceService
-from app.services.device_providers.tracksolid_provider import fetch_all_tracksolid_locations
+from app.services.device_providers.tracksolid_provider import fetch_all_tracksolid_locations_open_api
 from app.services import portal_alert_service
 
 logger = logging.getLogger(__name__)
@@ -136,10 +136,10 @@ class LocationPollerService:
             )
             if series2_trackers and series2_due:
                 self._last_series2_poll_at = now_dt
-                # Parallel per-IMEI calls to getMonitorInfo (V3 Bearer JWT)
+                # ONE API call for all devices via jimi.user.device.location.list
                 imeis = [t.imei for t in series2_trackers]
                 try:
-                    ts_locations = await fetch_all_tracksolid_locations(imeis)
+                    ts_locations = await fetch_all_tracksolid_locations_open_api(imeis)
                 except Exception as exc:
                     logger.error("Series 2 location fetch failed: %s", exc)
                     ts_locations = {}

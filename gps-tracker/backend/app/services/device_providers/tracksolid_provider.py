@@ -565,3 +565,203 @@ async def fetch_tracksolid_journey_points(
         (track_data or {}).get("showUnit", ""),
     )
     return track_data
+
+
+# ── Open API Integration (jimi.user.device.location.list) ───────────────────
+# Uses the official Jimi IoT Open API with app_key/app_secret authentication.
+# One API call returns ALL devices under the account — replaces 110 parallel
+# calls to getMonitorInfo. Solves WAF blocking by staying within official
+# integration quotas (86,400 calls/day for location.list).
+
+_OPEN_API_BASE_URL = "https://eu-open.tracksolidpro.com"
+_OPEN_API_GATEWAY = f"{_OPEN_API_BASE_URL}/gateway/openapi"
+
+
+def _open_api_creds() -> tuple[str, str, str]:
+    """Return (account, app_key, app_secret) for Open API from environment."""
+    return (
+        os.environ["TRACKSOLID_ACCOUNT"],
+        os.environ["TRACKSOLID_APP_KEY"],
+        os.environ["TRACKSOLID_APP_SECRET"],
+    )
+
+
+def _generate_open_api_signature(
+    app_key: str,
+    app_secret: str,
+    timestamp: int,
+    access_token: str,
+    method: str,
+) -> str:
+    """
+    Generate MD5 signature for Jimi Open API request.
+    
+    Sign string format:
+        app_key={app_key}&timestamp={timestamp}&access_token={access_token}&method={method}&app_secret={app_secret}
+    
+    All values sorted alphabetically, then MD5 hashed.
+    """
+    sign_str = (
+        f"access_token={access_token}&"
+        f"app_key={app_key}&"
+        f"app_secret={app_secret}&"
+        f"method={method}&"
+        f"timestamp={timestamp}"
+    )
+    return hashlib.md5(sign_str.encode()).hexdigest().upper()
+
+
+async def fetch_all_tracksolid_locations_open_api(
+    imeis: "list[str] | None" = None,
+) -> "dict[str, TrackSolidLocationInfo]":
+    """
+    Fetch current locations for ALL TrackSolid devices using jimi.user.device.location.list.
+    
+    This is the official Open API integration method that replaces per-IMEI polling.
+    ONE API call returns all devices under the account, regardless of how many IMEIs
+    are requested. Much more efficient and WAF-friendly than the old approach.
+    
+    Args:
+        imeis: Optional list of IMEIs to filter. If None/empty, returns all devices.
+              The API returns everything anyway; this just filters the result dict.
+    
+    Returns:
+        Dict keyed by IMEI string. Missing entries mean no GPS fix or device offline.
+    """
+    if imeis is not None and len(imeis) == 0:
+        return {}
+    
+    account, app_key, app_secret = _open_api_creds()
+    
+    # Get OAuth access token (reuses the existing token manager for now)
+    # If the open API requires a different token flow, we'd implement that here
+    try:
+        access_token = await _token_manager.get_token()
+    except Exception as exc:
+        logger.error(
+            "🚫 TrackSolid Open API batch skipped — token unavailable: %s", exc
+        )
+        return {}
+    
+    timestamp = int(time.time())
+    method = "jimi.user.device.location.list"
+    
+    signature = _generate_open_api_signature(
+        app_key=app_key,
+        app_secret=app_secret,
+        timestamp=timestamp,
+        access_token=access_token,
+        method=method,
+    )
+    
+    payload = {
+        "app_key": app_key,
+        "timestamp": str(timestamp),
+        "sign": signature,
+        "method": method,
+        "access_token": access_token,
+        "target": account,
+        "map_type": "GOOGLE",  # Get Google-calibrated coordinates
+    }
+    
+    timeout = httpx.Timeout(_READ_TIMEOUT_SECONDS, connect=_CONNECT_TIMEOUT_SECONDS)
+    
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.post(_OPEN_API_GATEWAY, json=payload)
+            response.raise_for_status()
+            data = response.json()
+    except (httpx.ConnectTimeout, httpx.ConnectError) as exc:
+        logger.error(
+            "🚫 TrackSolid Open API connect failed — %d IMEIs not polled: %s",
+            len(imeis) if imeis else 0, exc
+        )
+        return {}
+    except httpx.HTTPStatusError as exc:
+        logger.error(
+            "🚫 TrackSolid Open API HTTP %d — %d IMEIs not polled",
+            exc.response.status_code, len(imeis) if imeis else 0
+        )
+        return {}
+    except Exception as exc:
+        logger.error(
+            "🚫 TrackSolid Open API error — %d IMEIs not polled: %s",
+            len(imeis) if imeis else 0, exc
+        )
+        return {}
+    
+    # Check response code
+    code = data.get("code")
+    if code != 0:
+        logger.error(
+            "🚫 TrackSolid Open API error code=%s message=%s",
+            code, data.get("message", "unknown")
+        )
+        return {}
+    
+    devices: list = data.get("result", [])
+    logger.info(
+        "📍 TrackSolid Open API: received %d devices from jimi.user.device.location.list",
+        len(devices)
+    )
+    
+    result_map: dict[str, TrackSolidLocationInfo] = {}
+    
+    for device in devices:
+        imei = str(device.get("imei", "")).strip()
+        if not imei:
+            continue
+        
+        # Filter to requested IMEIs if provided
+        if imeis is not None and imei not in imeis:
+            continue
+        
+        # Parse coordinates
+        lat = float(device.get("lat", 0))
+        lng = float(device.get("lng", 0))
+        
+        # Skip if no valid coordinates (device offline or expired)
+        if lat == 0 and lng == 0:
+            continue
+        
+        # Parse battery level from batteryPowerVal (internal voltage as string)
+        # Example: "0.06" or "3.7" — this is voltage, not percentage
+        # For now we'll store as-is and can add voltage->percentage mapping later
+        battery_level: int | None = None
+        battery_val = device.get("batteryPowerVal")
+        if battery_val:
+            try:
+                # Convert voltage to rough percentage (3.0V = 0%, 4.2V = 100%)
+                voltage = float(battery_val)
+                if voltage > 2.5:  # Sanity check
+                    battery_level = min(100, max(0, int((voltage - 3.0) / 1.2 * 100)))
+            except (ValueError, TypeError):
+                pass
+        
+        # Parse GPS time
+        gps_time: datetime | None = None
+        gps_time_str = device.get("gpsTime")
+        if gps_time_str:
+            try:
+                # Format: "2026-03-18 10:20:37"
+                gps_time = datetime.strptime(str(gps_time_str), "%Y-%m-%d %H:%M:%S")
+            except (ValueError, TypeError):
+                pass
+        
+        # Location description from locDesc field
+        address = device.get("locDesc") or None
+        
+        result_map[imei] = TrackSolidLocationInfo(
+            latitude=lat,
+            longitude=lng,
+            address=address,
+            battery_level=battery_level,
+            gps_time=gps_time,
+        )
+    
+    logger.info(
+        "📍 TrackSolid Open API: %d/%d devices had valid GPS fixes",
+        len(result_map), len(devices)
+    )
+    
+    return result_map
