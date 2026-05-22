@@ -57,7 +57,7 @@ class GeocodeService:
                 "lat": lat,
                 "lon": lng,
                 "format": "json",
-                "key": os.getenv("LOCATIONIQ_API_KEY", "YOUR_KEY_HERE"),
+                "key": os.environ["LOCATIONIQ_API_KEY"],  # Required if using this provider
             },
             "parse": lambda r: r.json().get("display_name", "Unknown"),
             "rate_limit": 0.5,  # 2 requests per second on free tier
