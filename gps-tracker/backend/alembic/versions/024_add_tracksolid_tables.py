@@ -1,7 +1,7 @@
 """add tracksolid_devices and tracksolid_locations tables
 
-Revision ID: 023
-Revises: 022
+Revision ID: 024
+Revises: 023
 Create Date: 2026-05-22
 
 Separates TrackSolid data into two tables:
@@ -14,8 +14,8 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy import text
 
-revision = "023"
-down_revision = "022"
+revision = "024"
+down_revision = "023"
 branch_labels = None
 depends_on = None
 
