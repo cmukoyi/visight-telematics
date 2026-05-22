@@ -139,7 +139,7 @@ class LocationPollerService:
                 # ONE API call for all devices via jimi.user.device.location.list
                 imeis = [t.imei for t in series2_trackers]
                 try:
-                    ts_locations = await fetch_all_tracksolid_locations_open_api(imeis)
+                    ts_locations = await fetch_all_tracksolid_locations_open_api(imeis, db_session=db)
                 except Exception as exc:
                     logger.error("Series 2 location fetch failed: %s", exc)
                     ts_locations = {}

@@ -128,6 +128,56 @@ class GeofenceEventType(enum.Enum):
     EXIT = "exit"
 
 
+class TrackSolidDevice(Base):
+    """Static metadata for TrackSolid devices (rarely changes)"""
+    __tablename__ = "tracksolid_devices"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    imei = Column(String(20), unique=True, nullable=False, index=True)
+    device_name = Column(String(100), nullable=True)
+    mc_type = Column(String(50), nullable=True)  # Model/device type
+    sim = Column(String(50), nullable=True)
+    vehicle_number = Column(String(50), nullable=True)
+    driver_name = Column(String(100), nullable=True)
+    driver_phone = Column(String(50), nullable=True)
+    activation_time = Column(DateTime(timezone=True), nullable=True)
+    expiration = Column(DateTime(timezone=True), nullable=True)
+    enabled_flag = Column(Integer, nullable=False, default=1)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class TrackSolidLocation(Base):
+    """Location history for TrackSolid devices (inserts every poll)"""
+    __tablename__ = "tracksolid_locations"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    imei = Column(String(20), nullable=False, index=True)
+    lat = Column(Float, nullable=True)
+    lng = Column(Float, nullable=True)
+    speed = Column(String(10), nullable=True)
+    acc_status = Column(String(5), nullable=True)
+    gps_time = Column(DateTime(timezone=True), nullable=True)
+    hb_time = Column(DateTime(timezone=True), nullable=True)
+    pos_type = Column(String(10), nullable=True)
+    battery = Column(String(10), nullable=True)
+    gps_signal = Column(String(5), nullable=True)
+    status = Column(String(5), nullable=True)
+    recorded_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class APIToken(Base):
+    """OAuth token cache for external APIs"""
+    __tablename__ = "api_tokens"
+    
+    id = Column(Integer, primary_key=True)
+    provider = Column(String(50), nullable=False, unique=True)  # e.g. 'tracksolid_open_api'
+    access_token = Column(String(200), nullable=True)
+    refresh_token = Column(String(200), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class GeofenceState(enum.Enum):
     """Tracks the last known state of a tracker relative to a geofence"""
     UNKNOWN = "unknown"  # Initial state - not yet determined
