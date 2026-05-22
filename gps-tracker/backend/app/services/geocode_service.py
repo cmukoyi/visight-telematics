@@ -107,7 +107,7 @@ class GeocodeService:
         self.cache_file = cache_file
         self.user_agent = user_agent
         # Read MapTiler API key from environment if using that provider
-        self.api_key = os.environ.get("MAPTILER_API_KEY") if provider == "maptiler" else None
+        self.api_key = os.environ.get("MAPTILER_KEY") if provider == "maptiler" else None
         self.cache = self._load_cache()
         self.last_request_time = 0
         self._lock = threading.Lock()
