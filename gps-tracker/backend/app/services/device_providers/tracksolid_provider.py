@@ -20,7 +20,7 @@ import logging
 import os
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import httpx
 
@@ -617,7 +617,7 @@ async def _get_cached_access_token(db_session) -> str | None:
         return None
     
     # Check if token is still valid (with buffer)
-    if token_row.expires_at and token_row.expires_at > datetime.utcnow() + timedelta(seconds=_TOKEN_REFRESH_BUFFER):
+    if token_row.expires_at and token_row.expires_at > datetime.now(timezone.utc) + timedelta(seconds=_TOKEN_REFRESH_BUFFER):
         return token_row.access_token
     
     return None
@@ -629,20 +629,20 @@ async def _save_access_token(db_session, access_token: str, expires_in: int):
     from sqlalchemy import select
     from sqlalchemy.dialects.postgresql import insert
     
-    expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
     
     # Use PostgreSQL UPSERT
     stmt = insert(APIToken).values(
         provider="tracksolid_open_api",
         access_token=access_token,
         expires_at=expires_at,
-        updated_at=datetime.utcnow()
+        updated_at=datetime.now(timezone.utc)
     ).on_conflict_do_update(
         index_elements=['provider'],
         set_={
             'access_token': access_token,
             'expires_at': expires_at,
-            'updated_at': datetime.utcnow()
+            'updated_at': datetime.now(timezone.utc)
         }
     )
     db_session.execute(stmt)
@@ -653,7 +653,7 @@ async def _fetch_open_api_access_token() -> str:
     """Fetch fresh OAuth access_token via jimi.oauth.token.get."""
     account, password, app_key, app_secret = _open_api_creds()
     password_md5 = hashlib.md5(password.encode()).hexdigest().lower()
-    timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
     
     token_params = {
         'app_key': app_key,
@@ -801,7 +801,7 @@ async def fetch_all_tracksolid_locations_open_api(
 
 async def _fetch_device_list(access_token: str, app_key: str, app_secret: str, account: str, timeout) -> list:
     """Call jimi.user.device.list to get device metadata."""
-    timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
     
     params = {
         'access_token': access_token,
@@ -830,7 +830,7 @@ async def _fetch_device_list(access_token: str, app_key: str, app_secret: str, a
 
 async def _fetch_device_locations(access_token: str, app_key: str, app_secret: str, account: str, timeout) -> list:
     """Call jimi.user.device.location.list to get location data."""
-    timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
     
     params = {
         'access_token': access_token,
@@ -879,7 +879,7 @@ async def _save_device_metadata(db_session, devices: list):
             activation_time=_parse_datetime(device.get("activationTime")),
             expiration=_parse_datetime(device.get("expiration")),
             enabled_flag=device.get("enabledFlag", 1),
-            updated_at=datetime.utcnow()
+            updated_at=datetime.now(timezone.utc)
         ).on_conflict_do_update(
             index_elements=['imei'],
             set_={
@@ -892,7 +892,7 @@ async def _save_device_metadata(db_session, devices: list):
                 'activation_time': _parse_datetime(device.get("activationTime")),
                 'expiration': _parse_datetime(device.get("expiration")),
                 'enabled_flag': device.get("enabledFlag", 1),
-                'updated_at': datetime.utcnow()
+                'updated_at': datetime.now(timezone.utc)
             }
         )
         db_session.execute(stmt)
@@ -922,7 +922,7 @@ async def _save_device_locations(db_session, devices: list):
             battery=device.get("batteryPowerVal"),
             gps_signal=device.get("gpsSignal"),
             status=device.get("status"),
-            recorded_at=datetime.utcnow()
+            recorded_at=datetime.now(timezone.utc)
         )
         db_session.add(location)
     
