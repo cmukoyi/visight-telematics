@@ -22,6 +22,7 @@ from app.models import BLETag, User
 from app.models_admin import TagPackage
 from app.services.mzone_service import MZoneService
 from app.services.geofence_service import GeofenceService
+from app.services.geocode_service import GeocodeService
 from app.services.device_providers.tracksolid_provider import fetch_all_tracksolid_locations_open_api
 from app.services import portal_alert_service
 
@@ -30,6 +31,11 @@ logger = logging.getLogger(__name__)
 class LocationPollerService:
     def __init__(self):
         self.mzone_service = MZoneService()
+        self.geocode_service = GeocodeService(
+            provider="nominatim",
+            threshold_metres=500,
+            user_agent="PinPlot/1.0 (info@beacontelematics.co.uk)"
+        )
         self.running = False
         self.poll_interval = 10  # seconds (Series 1 / MZone cadence)
         # TrackSolid (Series 2) is polled much less often:
@@ -164,6 +170,26 @@ class LocationPollerService:
                     # Always update location_description, even if null/empty
                     # This clears stale addresses when TrackSolid stops providing them
                     tracker.location_description = loc.address
+                    
+                    # If TrackSolid didn't provide an address, use reverse geocoding
+                    # (only makes API call if device moved >500m since last geocode)
+                    if not tracker.location_description:
+                        try:
+                            geo_result = self.geocode_service.reverse_geocode(
+                                device_imei=tracker.imei,
+                                lat=loc.latitude,
+                                lng=loc.longitude
+                            )
+                            tracker.location_description = geo_result["address"]
+                            if geo_result.get("cached"):
+                                logger.debug("📍 Series 2 IMEI %s: cached geocode (moved %.1fm)", 
+                                           tracker.imei, geo_result.get("distance_moved", 0))
+                            else:
+                                logger.info("🌍 Series 2 IMEI %s: reverse geocoded to '%s'", 
+                                          tracker.imei, geo_result["address"])
+                        except Exception as exc:
+                            logger.error("❌ Geocoding error for IMEI %s: %s", tracker.imei, exc)
+                    
                     # Use the actual GPS fix time from the device; fall back to
                     # poll time only if the API didn't return a timestamp.
                     tracker.last_seen = loc.gps_time or datetime.utcnow()
