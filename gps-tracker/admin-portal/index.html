@@ -229,14 +229,15 @@
         .sidebar {
             width: 280px;
             background: var(--sidebar-bg);
-            color: white;
+            color: var(--text-main);
             padding: 0;
             overflow-y: auto;
             position: fixed;
             height: 100vh;
             left: 0;
             top: 0;
-            box-shadow: 2px 0 8px rgba(0,0,0,0.15);
+            box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+            border-right: 1px solid var(--border);
         }
 
         .sidebar-logo {
@@ -246,14 +247,14 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            background: rgba(0,0,0,0.1);
+            border-bottom: 1px solid var(--border);
+            color: var(--primary);
             letter-spacing: 0.5px;
         }
 
         .sidebar-menu {
             list-style: none;
-            padding: 16px 0;
+            padding: 8px 0;
         }
 
         .sidebar-item {
@@ -264,8 +265,8 @@
             display: flex;
             align-items: center;
             gap: 16px;
-            padding: 14px 24px;
-            color: rgba(255, 255, 255, 0.9);
+            padding: 12px 24px;
+            color: var(--text-muted);
             text-decoration: none;
             cursor: pointer;
             transition: all 0.2s ease;
@@ -275,26 +276,28 @@
             background: none;
             width: 100%;
             text-align: left;
-            border-left: 4px solid transparent;
+            border-left: 3px solid transparent;
+            margin: 2px 0;
         }
 
         .sidebar-link:hover {
             background: var(--sidebar-hover);
-            color: white;
+            color: var(--text-main);
             border-left-color: var(--primary-light);
         }
 
         .sidebar-link.active {
-            background: var(--sidebar-hover);
-            color: white;
-            border-left-color: var(--primary-light);
+            background: var(--sidebar-active);
+            color: var(--primary);
+            border-left-color: var(--primary);
             font-weight: 600;
         }
 
         .sidebar-link i {
-            font-size: 18px;
+            font-size: 20px;
             width: 24px;
             text-align: center;
+            color: inherit;
         }
 
         /* Main Content */
