@@ -20,7 +20,7 @@ import logging
 import os
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import httpx
 
@@ -573,141 +573,180 @@ async def fetch_tracksolid_journey_points(
 # calls to getMonitorInfo. Solves WAF blocking by staying within official
 # integration quotas (86,400 calls/day for location.list).
 
-_OPEN_API_BASE_URL = "https://eu-open.tracksolidpro.com"
-_OPEN_API_GATEWAY = f"{_OPEN_API_BASE_URL}/gateway/openapi"
+_OPEN_API_URL = "https://eu-open.tracksolidpro.com/route/rest"
+_OPEN_API_TOKEN_TTL = 7200  # 2 hours per Jimi docs
+_TOKEN_REFRESH_BUFFER = 300  # Refresh 5 min before expiry
 
 
-def _open_api_creds() -> tuple[str, str, str]:
-    """Return (account, app_key, app_secret) for Open API from environment."""
+def _open_api_creds() -> tuple[str, str, str, str]:
+    """Return (account, password, app_key, app_secret) for Open API."""
     return (
         os.environ["TRACKSOLID_ACCOUNT"],
+        os.environ["TRACKSOLID_PASSWORD"],
         os.environ["TRACKSOLID_APP_KEY"],
         os.environ["TRACKSOLID_APP_SECRET"],
     )
 
 
-def _generate_open_api_signature(
-    app_key: str,
-    app_secret: str,
-    timestamp: int,
-    access_token: str,
-    method: str,
-) -> str:
+def _generate_open_api_signature(params: dict, app_secret: str) -> str:
     """
-    Generate MD5 signature for Jimi Open API request.
+    Generate MD5 signature for Jimi Open API per official algorithm.
     
-    Sign string format:
-        app_key={app_key}&timestamp={timestamp}&access_token={access_token}&method={method}&app_secret={app_secret}
-    
-    All values sorted alphabetically, then MD5 hashed.
+    Algorithm:
+    1. Sort all params (except 'sign') alphabetically by key
+    2. Concatenate as: key1value1key2value2...
+    3. Wrap with: app_secret + concat + app_secret
+    4. MD5 and uppercase
     """
-    sign_str = (
-        f"access_token={access_token}&"
-        f"app_key={app_key}&"
-        f"app_secret={app_secret}&"
-        f"method={method}&"
-        f"timestamp={timestamp}"
+    sorted_keys = sorted(params.keys())
+    concat = ''.join(k + params[k] for k in sorted_keys)
+    sign_string = app_secret + concat + app_secret
+    return hashlib.md5(sign_string.encode('utf-8')).hexdigest().upper()
+
+
+async def _get_cached_access_token(db_session) -> str | None:
+    """Get cached access_token from DB if still valid."""
+    from app.models import APIToken
+    from sqlalchemy import select
+    
+    token_row = db_session.execute(
+        select(APIToken).where(APIToken.provider == "tracksolid_open_api")
+    ).scalar_one_or_none()
+    
+    if not token_row:
+        return None
+    
+    # Check if token is still valid (with buffer)
+    if token_row.expires_at and token_row.expires_at > datetime.utcnow() + timedelta(seconds=_TOKEN_REFRESH_BUFFER):
+        return token_row.access_token
+    
+    return None
+
+
+async def _save_access_token(db_session, access_token: str, expires_in: int):
+    """Save access_token to DB with expiry time."""
+    from app.models import APIToken
+    from sqlalchemy import select
+    from sqlalchemy.dialects.postgresql import insert
+    
+    expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+    
+    # Use PostgreSQL UPSERT
+    stmt = insert(APIToken).values(
+        provider="tracksolid_open_api",
+        access_token=access_token,
+        expires_at=expires_at,
+        updated_at=datetime.utcnow()
+    ).on_conflict_do_update(
+        index_elements=['provider'],
+        set_={
+            'access_token': access_token,
+            'expires_at': expires_at,
+            'updated_at': datetime.utcnow()
+        }
     )
-    return hashlib.md5(sign_str.encode()).hexdigest().upper()
+    db_session.execute(stmt)
+    db_session.commit()
+
+
+async def _fetch_open_api_access_token() -> str:
+    """Fetch fresh OAuth access_token via jimi.oauth.token.get."""
+    account, password, app_key, app_secret = _open_api_creds()
+    password_md5 = hashlib.md5(password.encode()).hexdigest().lower()
+    timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    
+    token_params = {
+        'app_key': app_key,
+        'expires_in': str(_OPEN_API_TOKEN_TTL),
+        'format': 'json',
+        'method': 'jimi.oauth.token.get',
+        'sign_method': 'md5',
+        'timestamp': timestamp,
+        'user_id': account,
+        'user_pwd_md5': password_md5,
+        'v': '0.9',
+    }
+    token_params['sign'] = _generate_open_api_signature(token_params, app_secret)
+    
+    timeout = httpx.Timeout(_READ_TIMEOUT_SECONDS, connect=_CONNECT_TIMEOUT_SECONDS)
+    
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        resp = await client.post(_OPEN_API_URL, data=token_params)
+        resp.raise_for_status()
+        data = resp.json()
+        
+        if data.get('code') != 0:
+            raise Exception(f"OAuth error code={data.get('code')}: {data.get('message')}")
+        
+        access_token = data['result']['accessToken']
+        logger.info("✅ TrackSolid Open API: fetched new access_token")
+        return access_token
 
 
 async def fetch_all_tracksolid_locations_open_api(
     imeis: "list[str] | None" = None,
+    db_session=None,
 ) -> "dict[str, TrackSolidLocationInfo]":
     """
-    Fetch current locations for ALL TrackSolid devices using jimi.user.device.location.list.
+    Fetch and store ALL TrackSolid devices using official Open API.
     
-    This is the official Open API integration method that replaces per-IMEI polling.
-    ONE API call returns all devices under the account, regardless of how many IMEIs
-    are requested. Much more efficient and WAF-friendly than the old approach.
+    Calls TWO API endpoints:
+    1. jimi.user.device.list → metadata (stored in tracksolid_devices)
+    2. jimi.user.device.location.list → telemetry (stored in tracksolid_locations)
+    
+    Also updates ble_tags table for backwards compatibility with existing app logic.
     
     Args:
-        imeis: Optional list of IMEIs to filter. If None/empty, returns all devices.
-              The API returns everything anyway; this just filters the result dict.
+        imeis: Optional list of IMEIs to filter in the returned dict
+        db_session: SQLAlchemy session for DB operations
     
     Returns:
-        Dict keyed by IMEI string. Missing entries mean no GPS fix or device offline.
+        Dict keyed by IMEI string (filtered by imeis if provided)
     """
     if imeis is not None and len(imeis) == 0:
         return {}
     
-    account, app_key, app_secret = _open_api_creds()
-    
-    # Get OAuth access token (reuses the existing token manager for now)
-    # If the open API requires a different token flow, we'd implement that here
-    try:
-        access_token = await _token_manager.get_token()
-    except Exception as exc:
-        logger.error(
-            "🚫 TrackSolid Open API batch skipped — token unavailable: %s", exc
-        )
-        return {}
-    
-    timestamp = int(time.time())
-    method = "jimi.user.device.location.list"
-    
-    signature = _generate_open_api_signature(
-        app_key=app_key,
-        app_secret=app_secret,
-        timestamp=timestamp,
-        access_token=access_token,
-        method=method,
-    )
-    
-    payload = {
-        "app_key": app_key,
-        "timestamp": str(timestamp),
-        "sign": signature,
-        "method": method,
-        "access_token": access_token,
-        "target": account,
-        "map_type": "GOOGLE",  # Get Google-calibrated coordinates
-    }
-    
+    account, password, app_key, app_secret = _open_api_creds()
     timeout = httpx.Timeout(_READ_TIMEOUT_SECONDS, connect=_CONNECT_TIMEOUT_SECONDS)
     
+    # Step 1: Get or refresh OAuth access_token with caching
+    access_token = None
+    if db_session:
+        access_token = await _get_cached_access_token(db_session)
+    
+    if not access_token:
+        try:
+            access_token = await _fetch_open_api_access_token()
+            if db_session:
+                await _save_access_token(db_session, access_token, _OPEN_API_TOKEN_TTL)
+        except Exception as exc:
+            logger.error("🚫 TrackSolid Open API token fetch failed: %s", exc)
+            return {}
+    else:
+        logger.info("♻️  TrackSolid Open API: using cached access_token")
+    
+    # Step 2: Fetch device metadata via jimi.user.device.list
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.post(_OPEN_API_GATEWAY, json=payload)
-            response.raise_for_status()
-            data = response.json()
-    except (httpx.ConnectTimeout, httpx.ConnectError) as exc:
-        logger.error(
-            "🚫 TrackSolid Open API connect failed — %d IMEIs not polled: %s",
-            len(imeis) if imeis else 0, exc
-        )
-        return {}
-    except httpx.HTTPStatusError as exc:
-        logger.error(
-            "🚫 TrackSolid Open API HTTP %d — %d IMEIs not polled",
-            exc.response.status_code, len(imeis) if imeis else 0
-        )
-        return {}
+        device_metadata = await _fetch_device_list(access_token, app_key, app_secret, account, timeout)
+        if db_session:
+            await _save_device_metadata(db_session, device_metadata)
     except Exception as exc:
-        logger.error(
-            "🚫 TrackSolid Open API error — %d IMEIs not polled: %s",
-            len(imeis) if imeis else 0, exc
-        )
+        logger.error("🚫 TrackSolid device.list failed: %s", exc)
+        device_metadata = {}
+    
+    # Step 3: Fetch device locations via jimi.user.device.location.list
+    try:
+        locations = await _fetch_device_locations(access_token, app_key, app_secret, account, timeout)
+        if db_session:
+            await _save_device_locations(db_session, locations)
+    except Exception as exc:
+        logger.error("🚫 TrackSolid location.list failed: %s", exc)
         return {}
     
-    # Check response code
-    code = data.get("code")
-    if code != 0:
-        logger.error(
-            "🚫 TrackSolid Open API error code=%s message=%s",
-            code, data.get("message", "unknown")
-        )
-        return {}
-    
-    devices: list = data.get("result", [])
-    logger.info(
-        "📍 TrackSolid Open API: received %d devices from jimi.user.device.location.list",
-        len(devices)
-    )
-    
+    # Step 4: Parse into TrackSolidLocationInfo objects (filtered by imeis)
     result_map: dict[str, TrackSolidLocationInfo] = {}
     
-    for device in devices:
+    for device in locations:
         imei = str(device.get("imei", "")).strip()
         if not imei:
             continue
@@ -716,24 +755,19 @@ async def fetch_all_tracksolid_locations_open_api(
         if imeis is not None and imei not in imeis:
             continue
         
-        # Parse coordinates
         lat = float(device.get("lat", 0))
         lng = float(device.get("lng", 0))
         
-        # Skip if no valid coordinates (device offline or expired)
         if lat == 0 and lng == 0:
             continue
         
-        # Parse battery level from batteryPowerVal (internal voltage as string)
-        # Example: "0.06" or "3.7" — this is voltage, not percentage
-        # For now we'll store as-is and can add voltage->percentage mapping later
+        # Parse battery
         battery_level: int | None = None
         battery_val = device.get("batteryPowerVal")
         if battery_val:
             try:
-                # Convert voltage to rough percentage (3.0V = 0%, 4.2V = 100%)
                 voltage = float(battery_val)
-                if voltage > 2.5:  # Sanity check
+                if voltage > 2.5:
                     battery_level = min(100, max(0, int((voltage - 3.0) / 1.2 * 100)))
             except (ValueError, TypeError):
                 pass
@@ -743,12 +777,10 @@ async def fetch_all_tracksolid_locations_open_api(
         gps_time_str = device.get("gpsTime")
         if gps_time_str:
             try:
-                # Format: "2026-03-18 10:20:37"
                 gps_time = datetime.strptime(str(gps_time_str), "%Y-%m-%d %H:%M:%S")
             except (ValueError, TypeError):
                 pass
         
-        # Location description from locDesc field
         address = device.get("locDesc") or None
         
         result_map[imei] = TrackSolidLocationInfo(
@@ -761,7 +793,148 @@ async def fetch_all_tracksolid_locations_open_api(
     
     logger.info(
         "📍 TrackSolid Open API: %d/%d devices had valid GPS fixes",
-        len(result_map), len(devices)
+        len(result_map), len(locations)
     )
     
     return result_map
+
+
+async def _fetch_device_list(access_token: str, app_key: str, app_secret: str, account: str, timeout) -> list:
+    """Call jimi.user.device.list to get device metadata."""
+    timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    
+    params = {
+        'access_token': access_token,
+        'app_key': app_key,
+        'format': 'json',
+        'method': 'jimi.user.device.list',
+        'sign_method': 'md5',
+        'target': account,
+        'timestamp': timestamp,
+        'v': '0.9',
+    }
+    params['sign'] = _generate_open_api_signature(params, app_secret)
+    
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        resp = await client.post(_OPEN_API_URL, data=params)
+        resp.raise_for_status()
+        data = resp.json()
+        
+        if data.get('code') != 0:
+            raise Exception(f"device.list error code={data.get('code')}: {data.get('message')}")
+        
+        devices = data.get('result', [])
+        logger.info("📋 TrackSolid device.list: received %d devices", len(devices))
+        return devices
+
+
+async def _fetch_device_locations(access_token: str, app_key: str, app_secret: str, account: str, timeout) -> list:
+    """Call jimi.user.device.location.list to get location data."""
+    timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    
+    params = {
+        'access_token': access_token,
+        'app_key': app_key,
+        'format': 'json',
+        'map_type': 'GOOGLE',
+        'method': 'jimi.user.device.location.list',
+        'sign_method': 'md5',
+        'target': account,
+        'timestamp': timestamp,
+        'v': '0.9',
+    }
+    params['sign'] = _generate_open_api_signature(params, app_secret)
+    
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        resp = await client.post(_OPEN_API_URL, data=params)
+        resp.raise_for_status()
+        data = resp.json()
+        
+        if data.get('code') != 0:
+            raise Exception(f"location.list error code={data.get('code')}: {data.get('message')}")
+        
+        devices = data.get('result', [])
+        logger.info("📍 TrackSolid location.list: received %d devices", len(devices))
+        return devices
+
+
+async def _save_device_metadata(db_session, devices: list):
+    """Save device metadata to tracksolid_devices table (UPSERT)."""
+    from app.models import TrackSolidDevice
+    from sqlalchemy.dialects.postgresql import insert
+    
+    for device in devices:
+        imei = device.get("imei")
+        if not imei:
+            continue
+        
+        stmt = insert(TrackSolidDevice).values(
+            imei=imei,
+            device_name=device.get("deviceName"),
+            mc_type=device.get("mcType"),
+            sim=device.get("sim"),
+            vehicle_number=device.get("vehicleNumber"),
+            driver_name=device.get("driverName"),
+            driver_phone=device.get("driverPhone"),
+            activation_time=_parse_datetime(device.get("activationTime")),
+            expiration=_parse_datetime(device.get("expiration")),
+            enabled_flag=device.get("enabledFlag", 1),
+            updated_at=datetime.utcnow()
+        ).on_conflict_do_update(
+            index_elements=['imei'],
+            set_={
+                'device_name': device.get("deviceName"),
+                'mc_type': device.get("mcType"),
+                'sim': device.get("sim"),
+                'vehicle_number': device.get("vehicleNumber"),
+                'driver_name': device.get("driverName"),
+                'driver_phone': device.get("driverPhone"),
+                'activation_time': _parse_datetime(device.get("activationTime")),
+                'expiration': _parse_datetime(device.get("expiration")),
+                'enabled_flag': device.get("enabledFlag", 1),
+                'updated_at': datetime.utcnow()
+            }
+        )
+        db_session.execute(stmt)
+    
+    db_session.commit()
+    logger.info("💾 Saved %d device metadata rows", len(devices))
+
+
+async def _save_device_locations(db_session, devices: list):
+    """Save location telemetry to tracksolid_locations table (always INSERT)."""
+    from app.models import TrackSolidLocation
+    
+    for device in devices:
+        imei = device.get("imei")
+        if not imei:
+            continue
+        
+        location = TrackSolidLocation(
+            imei=imei,
+            lat=device.get("lat"),
+            lng=device.get("lng"),
+            speed=device.get("speed"),
+            acc_status=device.get("accStatus"),
+            gps_time=_parse_datetime(device.get("gpsTime")),
+            hb_time=_parse_datetime(device.get("hbTime")),
+            pos_type=device.get("posType"),
+            battery=device.get("batteryPowerVal"),
+            gps_signal=device.get("gpsSignal"),
+            status=device.get("status"),
+            recorded_at=datetime.utcnow()
+        )
+        db_session.add(location)
+    
+    db_session.commit()
+    logger.info("💾 Saved %d location history rows", len(devices))
+
+
+def _parse_datetime(value) -> datetime | None:
+    """Parse datetime string in format YYYY-MM-DD HH:MM:SS."""
+    if not value:
+        return None
+    try:
+        return datetime.strptime(str(value), "%Y-%m-%d %H:%M:%S")
+    except (ValueError, TypeError):
+        return None
