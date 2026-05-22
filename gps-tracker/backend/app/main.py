@@ -1284,6 +1284,13 @@ def list_end_users_with_tags(db: Session = Depends(get_db)):
         if not full_name:
             full_name = user.email.split('@')[0]
         
+        # Get usergroups for this user (via PortalUser association)
+        usergroups = []
+        portal_users = db.query(PortalUser).filter(PortalUser.email == user.email).all()
+        for portal_user in portal_users:
+            if portal_user.usergroup:
+                usergroups.append(portal_user.usergroup.name)
+        
         # Get all tags for this user with package details
         tags_list = []
         for tag in user.ble_tags:
@@ -1318,6 +1325,7 @@ def list_end_users_with_tags(db: Session = Depends(get_db)):
             "is_admin": user.is_admin,
             "created_at": user.created_at.isoformat(),
             "tag_count": len(user.ble_tags),
+            "usergroups": usergroups,  # List of usergroup names
             "tags": tags_list
         })
     

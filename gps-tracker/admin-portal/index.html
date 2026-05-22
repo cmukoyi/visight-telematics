@@ -59,7 +59,7 @@
             --light: #eceff1;              /* Material Blue Grey 50 */
             --gray: #607d8b;               /* Material Blue Grey 500 */
             --border: #cfd8dc;             /* Material Blue Grey 100 */
-            --sidebar-bg: #283593;         /* Material Indigo 800 */
+            --sidebar-bg: #2B445A;         /* Custom dark blue-grey - no gradient */
             --sidebar-hover: #3949ab;      /* Material Indigo 600 */
         }
 
@@ -1934,7 +1934,10 @@
                         <div class="card">
                             <div class="card-header">
                                 <h3 class="card-title">📋 User Directory</h3>
-                                <button class="btn btn-primary btn-small" onclick="loadEndUsers()">↻ Refresh</button>
+                                <div style="display:flex;gap:8px">
+                                    <button class="btn btn-secondary btn-small" onclick="exportEndUsersToExcel()">📊 Export to Excel</button>
+                                    <button class="btn btn-primary btn-small" onclick="loadEndUsers()">↻ Refresh</button>
+                                </div>
                             </div>
                             <div class="table-wrapper">
                                 <table>
@@ -1944,6 +1947,7 @@
                                             <th>Name</th>
                                             <th>Email</th>
                                             <th>Phone</th>
+                                            <th>Usergroups</th>
                                             <th>Status</th>
                                             <th>Admin</th>
                                             <th>Tags</th>
@@ -1951,7 +1955,7 @@
                                         </tr>
                                     </thead>
                                     <tbody id="endUsersTableBody">
-                                        <tr><td colspan="8" style="text-align:center;color:var(--gray);padding:2rem">Click ↻ Refresh to load data</td></tr>
+                                        <tr><td colspan="9" style="text-align:center;color:var(--gray);padding:2rem">Click ↻ Refresh to load data</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -1969,7 +1973,10 @@
                         <div class="card">
                             <div class="card-header">
                                 <h3 class="card-title">📱 Tag Inventory</h3>
-                                <button class="btn btn-primary btn-small" onclick="loadIMEI()">↻ Refresh</button>
+                                <div style="display:flex;gap:8px">
+                                    <button class="btn btn-secondary btn-small" onclick="exportIMEIToExcel()">📊 Export to Excel</button>
+                                    <button class="btn btn-primary btn-small" onclick="loadIMEI()">↻ Refresh</button>
+                                </div>
                             </div>
                             <div class="table-wrapper">
                                 <table>
@@ -3875,7 +3882,7 @@
     // ── END USERS ──────────────────────────────────────────────────────────
     async function loadEndUsers() {
         const tbody = document.getElementById('endUsersTableBody');
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem">Loading…</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:2rem">Loading…</td></tr>';
 
         try {
             const res = await fetch(`${API_URL}/api/v1/admin/end-users`, {
@@ -3885,7 +3892,7 @@
             const users = await res.json();
             
             if (!users || users.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--gray);padding:2rem">No users found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--gray);padding:2rem">No users found</td></tr>';
                 return;
             }
 
@@ -3899,6 +3906,9 @@
                     ? '<span style="background:#3f51b5;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">Yes</span>'
                     : '<span style="color:var(--gray)">No</span>';
                 const createdDate = user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A';
+                const usergroups = user.usergroups && user.usergroups.length > 0 
+                    ? user.usergroups.join(', ') 
+                    : '-';
 
                 let mainRow = `<tr style="cursor:pointer" onclick="toggleUserTags('${userId}')">
                     <td style="text-align:center">
@@ -3907,6 +3917,7 @@
                     <td><strong>${escH(user.full_name)}</strong></td>
                     <td>${escH(user.email)}</td>
                     <td>${escH(user.phone || '-')}</td>
+                    <td>${escH(usergroups)}</td>
                     <td>${statusBadge}</td>
                     <td>${adminBadge}</td>
                     <td><span style="background:var(--primary);color:white;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">${tagCount}</span></td>
@@ -3915,7 +3926,7 @@
 
                 // Expandable row for tags
                 let tagsRow = `<tr id="tags-${userId}" style="display:none">
-                    <td colspan="8" style="padding:0;background:#f5f5f5">
+                    <td colspan="9" style="padding:0;background:#f5f5f5">
                         <div style="padding:16px 24px">
                             <h4 style="margin:0 0 12px 0;font-size:14px;color:var(--primary)">📱 Tag Assignments (${tagCount})</h4>`;
 
@@ -4045,6 +4056,99 @@
         } catch (e) {
             tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:#ef4444;padding:2rem">Error: ${escH(e.message)}</td></tr>`;
         }
+    }
+
+    // ── EXPORT TO EXCEL ────────────────────────────────────────────────────
+    async function exportEndUsersToExcel() {
+        try {
+            const res = await fetch(`${API_URL}/api/v1/admin/end-users`, {
+                headers: { 'Authorization': 'Bearer ' + authToken }
+            });
+            if (!res.ok) throw new Error('Failed to fetch data');
+            const users = await res.json();
+            
+            if (!users || users.length === 0) {
+                alert('No data to export');
+                return;
+            }
+
+            // Prepare data for CSV export (CSV can be opened in Excel)
+            let csv = 'Name,Email,Phone,Usergroups,Status,Admin,Tag Count,Created,IMEI,Device Name,Tag Type,Package,Activated,Expiry,Tag Status\n';
+            
+            users.forEach(user => {
+                const usergroups = user.usergroups && user.usergroups.length > 0 ? user.usergroups.join('; ') : '-';
+                const status = user.is_active ? 'Active' : 'Inactive';
+                const admin = user.is_admin ? 'Yes' : 'No';
+                const created = user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A';
+                
+                if (!user.tags || user.tags.length === 0) {
+                    // User with no tags - single row
+                    csv += `"${escapeCSV(user.full_name)}","${escapeCSV(user.email)}","${escapeCSV(user.phone || '-')}","${escapeCSV(usergroups)}","${status}","${admin}","0","${created}","","","","","","",""\n`;
+                } else {
+                    // User with tags - one row per tag
+                    user.tags.forEach(tag => {
+                        const activatedDate = tag.activation_date ? new Date(tag.activation_date).toLocaleDateString() : 'Not activated';
+                        const expiryDate = tag.expiry_date ? new Date(tag.expiry_date).toLocaleDateString() : 'N/A';
+                        const tagStatus = tag.is_active ? 'Active' : 'Inactive';
+                        
+                        csv += `"${escapeCSV(user.full_name)}","${escapeCSV(user.email)}","${escapeCSV(user.phone || '-')}","${escapeCSV(usergroups)}","${status}","${admin}","${user.tag_count}","${created}","${escapeCSV(tag.imei)}","${escapeCSV(tag.device_name)}","${escapeCSV(tag.tag_type || 'series1')}","${escapeCSV(tag.package_name || 'N/A')}","${activatedDate}","${expiryDate}","${tagStatus}"\n`;
+                    });
+                }
+            });
+
+            downloadCSV(csv, 'end-users-export.csv');
+        } catch (e) {
+            alert('Error exporting data: ' + e.message);
+        }
+    }
+
+    async function exportIMEIToExcel() {
+        try {
+            const res = await fetch(`${API_URL}/api/v1/admin/imei`, {
+                headers: { 'Authorization': 'Bearer ' + authToken }
+            });
+            if (!res.ok) throw new Error('Failed to fetch data');
+            const tags = await res.json();
+            
+            if (!tags || tags.length === 0) {
+                alert('No data to export');
+                return;
+            }
+
+            // Prepare data for CSV export (CSV can be opened in Excel)
+            let csv = 'IMEI,Device Name,Type,User Name,User Email,Usergroup,Package,Activated,Expiry,Status,Last Seen,Battery %,Latitude,Longitude\n';
+            
+            tags.forEach(tag => {
+                const activatedDate = tag.activation_date !== 'N/A' && tag.activation_date ? new Date(tag.activation_date).toLocaleDateString() : 'Not activated';
+                const expiryDate = tag.expiry_date !== 'N/A' && tag.expiry_date ? new Date(tag.expiry_date).toLocaleDateString() : 'N/A';
+                const lastSeenDate = tag.last_seen ? new Date(tag.last_seen).toLocaleString() : 'Never';
+                const status = tag.is_active ? 'Active' : 'Inactive';
+                const battery = tag.battery_level !== null ? tag.battery_level : 'N/A';
+                
+                csv += `"${escapeCSV(tag.imei)}","${escapeCSV(tag.device_name)}","${escapeCSV(tag.tag_type || 'series1')}","${escapeCSV(tag.user_name)}","${escapeCSV(tag.user_email)}","${escapeCSV(tag.usergroup)}","${escapeCSV(tag.package_name)}","${activatedDate}","${expiryDate}","${status}","${lastSeenDate}","${battery}","${escapeCSV(tag.latitude || '')}","${escapeCSV(tag.longitude || '')}"\n`;
+            });
+
+            downloadCSV(csv, 'imei-export.csv');
+        } catch (e) {
+            alert('Error exporting data: ' + e.message);
+        }
+    }
+
+    function escapeCSV(str) {
+        if (str === null || str === undefined) return '';
+        return String(str).replace(/"/g, '""');
+    }
+
+    function downloadCSV(csv, filename) {
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 
     </script>
