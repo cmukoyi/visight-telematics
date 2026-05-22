@@ -18,17 +18,19 @@ Add these to `.env` files on BOTH droplets (pinplot and beacon):
 
 ```bash
 # TrackSolid Open API Credentials (jimi.user.device.location.list)
-TRACKSOLID_APP_KEY=8FB345B8693CCD00705B2242580910A0339A22A4105B6558
-TRACKSOLID_APP_SECRET=860d274a6c50445d86a93ed89de79278
+TRACKSOLID_APP_KEY=<provided_by_tracksolid_support>
+TRACKSOLID_APP_SECRET=<provided_by_tracksolid_support>
 ```
+
+**Get actual values from:** Team password manager or TrackSolid support ticket.
 
 ### Existing Variables (keep as-is)
 
 These are still needed for token authentication:
 
 ```bash
-TRACKSOLID_ACCOUNT=Beacontelematics
-TRACKSOLID_PASSWORD=95d16ce0247f42706fca9eb7691e53d8
+TRACKSOLID_ACCOUNT=<existing_value>
+TRACKSOLID_PASSWORD=<existing_value_md5_hash>
 TRACKSOLID_USER_ID=<existing_value>
 TRACKSOLID_ORG_ID=<existing_value>
 ```
@@ -47,9 +49,9 @@ ssh root@<pinplot_IP>
 cd /root/pinplot/gps-tracker/backend
 nano .env
 
-# Add these two lines:
-TRACKSOLID_APP_KEY=8FB345B8693CCD00705B2242580910A0339A22A4105B6558
-TRACKSOLID_APP_SECRET=860d274a6c50445d86a93ed89de79278
+# Add these two lines (get values from team password manager):
+TRACKSOLID_APP_KEY=<value_from_password_manager>
+TRACKSOLID_APP_SECRET=<value_from_password_manager>
 
 # Save and exit (Ctrl+X, Y, Enter)
 ```
@@ -64,9 +66,9 @@ ssh root@167.172.49.62
 cd /root/beacon-telematics/gps-tracker/backend
 nano .env
 
-# Add the same two lines:
-TRACKSOLID_APP_KEY=8FB345B8693CCD00705B2242580910A0339A22A4105B6558
-TRACKSOLID_APP_SECRET=860d274a6c50445d86a93ed89de79278
+# Add the same two lines (get values from team password manager):
+TRACKSOLID_APP_KEY=<value_from_password_manager>
+TRACKSOLID_APP_SECRET=<value_from_password_manager>
 
 # Save and exit
 ```
@@ -178,7 +180,7 @@ docker exec beacon_telematics_db psql -U beacon_user -d beacon_telematics -c \
    ```bash
    curl -X POST https://eu-open.tracksolidpro.com/gateway/openapi \
      -H "Content-Type: application/json" \
-     -d '{"app_key":"...","timestamp":"...","sign":"...","method":"jimi.user.device.location.list","access_token":"...","target":"Beacontelematics"}'
+     -d '{"app_key":"<your_app_key>","timestamp":"<current_timestamp>","sign":"<generated_md5>","method":"jimi.user.device.location.list","access_token":"<your_access_token>","target":"<your_account>"}'
    ```
 
 ### Error: `🚫 TrackSolid Open API HTTP 403`
