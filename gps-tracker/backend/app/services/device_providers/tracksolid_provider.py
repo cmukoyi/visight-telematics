@@ -646,7 +646,7 @@ async def _save_access_token(db_session, access_token: str, expires_in: int):
         }
     )
     db_session.execute(stmt)
-    db_session.commit()
+    # Commit handled by caller (location_poller_service)
 
 
 async def _fetch_open_api_access_token() -> str:
@@ -897,7 +897,7 @@ async def _save_device_metadata(db_session, devices: list):
         )
         db_session.execute(stmt)
     
-    db_session.commit()
+    # Commit handled by caller (location_poller_service)
     logger.info("💾 Saved %d device metadata rows", len(devices))
 
 
@@ -926,7 +926,7 @@ async def _save_device_locations(db_session, devices: list):
         )
         db_session.add(location)
     
-    db_session.commit()
+    # Commit handled by caller (location_poller_service)
     logger.info("💾 Saved %d location history rows", len(devices))
 
 
