@@ -6297,11 +6297,16 @@ function _saveAlertsRead() {
 // ─── Alert type config ────────────────────────────────────────────────────────
 function _alertMeta(type) {
     switch (type) {
-        case 'geofence_exit':  return { icon: 'fa-right-from-bracket', color: 'var(--danger)',  label: 'Geofence Exit'  };
-        case 'geofence_entry': return { icon: 'fa-right-to-bracket',   color: 'var(--success)', label: 'Geofence Entry' };
-        case 'battery_low':    return { icon: 'fa-battery-low',        color: 'var(--warning)', label: 'Low Battery'    };
-        case 'tag_offline':    return { icon: 'fa-wifi-slash',         color: 'var(--text-3)',  label: 'Tag Offline'    };
-        default:               return { icon: 'fa-bell',               color: 'var(--primary)', label: type             };
+        case 'geofence_exit':            return { icon: 'fa-right-from-bracket', color: 'var(--danger)',  label: 'Geofence Exit'  };
+        case 'geofence_entry':           return { icon: 'fa-right-to-bracket',   color: 'var(--success)', label: 'Geofence Entry' };
+        case 'battery_low':              return { icon: 'fa-battery-low',        color: 'var(--warning)', label: 'Low Battery'    };
+        case 'tag_offline':              return { icon: 'fa-wifi-slash',         color: 'var(--text-3)',  label: 'Tag Offline'    };
+        // Hive alerts — breach is red (matches the rest of the danger palette),
+        // cleared stays green, on-the-move is a neutral info colour.
+        case 'hive_breach':              return { icon: 'fa-triangle-exclamation', color: 'var(--danger)',  label: 'Hive Breach'    };
+        case 'hive_breach_cleared':      return { icon: 'fa-circle-check',         color: 'var(--success)', label: 'Hive Cleared'   };
+        case 'hive_resolved_by_transit': return { icon: 'fa-car-side',             color: 'var(--primary)', label: 'Hive On the Move' };
+        default:                         return { icon: 'fa-bell',                 color: 'var(--primary)', label: type             };
     }
 }
 
@@ -6357,13 +6362,17 @@ function _renderNotifPanel() {
         const isUnread = !a.is_read && !_alertsRead.has(a.id);
         const m    = _alertMeta(a.alert_type);
         const ago  = a.created_at ? _timeAgo(new Date(a.created_at)) : '\u2014';
+        // Hive alerts aren't tied to a single tag, so use the hive name from
+        // meta_data when there's no tag label/IMEI to fall back on.
+        const isHive = typeof a.alert_type === 'string' && a.alert_type.startsWith('hive_');
+        const subject = a.tag_label || a.tag_imei || (isHive ? a.meta_data?.hive_name : null) || '\u2014';
         const detail = a.meta_data?.poi_name
             ? (a.alert_type === 'geofence_exit' ? `Exited ${a.meta_data.poi_name}` : `Entered ${a.meta_data.poi_name}`)
             : a.message || '';
         return `<div class="notif-item${isUnread ? ' notif-unread' : ''}" onclick="notifItemClick('${esc(a.id)}',this)">
             <span class="notif-icon" style="color:${m.color}"><i class="fa-solid ${m.icon}"></i></span>
             <div style="flex:1;min-width:0">
-                <div style="font-weight:${isUnread?600:400};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.tag_label||a.tag_imei||'—')}</div>
+                <div style="font-weight:${isUnread?600:400};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(subject)}</div>
                 <div style="font-size:.78rem;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(detail)}</div>
             </div>
             <span class="notif-time">${ago}</span>
@@ -6447,9 +6456,18 @@ function _rptAlertsRender() {
         const isUnread = !a.is_read && !_alertsRead.has(a.id);
         const m        = _alertMeta(a.alert_type);
         const time     = a.created_at ? new Date(a.created_at).toLocaleString() : '\u2014';
+        // Hive alerts have no tag_label and (usually) no poi_name. Fall back to
+        // the hive name for the Asset column, and to the alert message for the
+        // Detail column so users see the human-readable breach description.
+        const isHive  = typeof a.alert_type === 'string' && a.alert_type.startsWith('hive_');
+        const subject = a.tag_label || a.tag_imei || (isHive ? a.meta_data?.hive_name : null) || '\u2014';
         const detail   = a.meta_data?.poi_name
             ? a.meta_data.poi_name
-            : (a.meta_data?.battery != null ? `${a.meta_data.battery}%` : (a.meta_data?.days_offline ? `${a.meta_data.days_offline} days offline` : ''));
+            : (a.meta_data?.battery != null
+                ? `${a.meta_data.battery}%`
+                : (a.meta_data?.days_offline
+                    ? `${a.meta_data.days_offline} days offline`
+                    : (a.message || '')));
         const dot = isUnread
             ? `<span style="width:8px;height:8px;border-radius:50%;background:var(--primary);display:inline-block;flex-shrink:0"></span>`
             : `<span style="width:8px;height:8px;display:inline-block"></span>`;
@@ -6458,7 +6476,7 @@ function _rptAlertsRender() {
             <td style="cursor:pointer" onclick="rptAlertMarkRead('${esc(a.id)}',this.closest('tr'))">
                 <span style="color:${m.color};white-space:nowrap"><i class="fa-solid ${m.icon}"></i> ${esc(m.label)}</span>
             </td>
-            <td style="cursor:pointer" onclick="rptAlertMarkRead('${esc(a.id)}',this.closest('tr'))">${esc(a.tag_label||a.tag_imei||'\u2014')}</td>
+            <td style="cursor:pointer" onclick="rptAlertMarkRead('${esc(a.id)}',this.closest('tr'))">${esc(subject)}</td>
             <td style="cursor:pointer;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="rptAlertMarkRead('${esc(a.id)}',this.closest('tr'))" title="${esc(a.message||'')}">${esc(detail||'\u2014')}</td>
             <td style="white-space:nowrap;color:var(--text-3);font-size:.82rem;cursor:pointer" onclick="rptAlertMarkRead('${esc(a.id)}',this.closest('tr'))">${esc(time)}</td>
             <td><button class="btn-icon-danger" title="Dismiss alert" onclick="rptAlertDelete('${esc(a.id)}',this.closest('tr'))"><i class="fa-solid fa-xmark"></i></button></td>

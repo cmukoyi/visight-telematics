@@ -471,6 +471,7 @@ def _maybe_send_hive_alert(hive: Hive, new_state: str, prev_state: str,
 
     meta_data = {
         "hive_id": str(hive.id),
+        "hive_name": hive.name,
         "diameter_m": diameter_m,
         "outlier_tag_id": str(outlier_tag_id) if outlier_tag_id else None,
         "outlier_imei": outlier_imei,
@@ -510,6 +511,7 @@ def _send_resolved_by_transit_alert(hive: Hive, prev_state: str, db: Session) ->
     )
     meta_data = {
         "hive_id": str(hive.id),
+        "hive_name": hive.name,
         "previous_alert_state": prev_state,
         "reason": "RESOLVED_BY_TRANSIT",
     }
