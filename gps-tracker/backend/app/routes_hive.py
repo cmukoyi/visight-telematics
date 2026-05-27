@@ -816,24 +816,55 @@ def recreate_hive(
     if not src_cfg:
         raise HTTPException(400, "Source hive has no config")
 
-    # Get old memberships (for archived hives these will be gone — use hive_events for tag list)
+    # Snapshot the source hive's tag labels BEFORE we touch its memberships.
+    # For archived hives this is empty (tags already released on archive) and
+    # the recreate ends up tag-less — which is why the archive UI no longer
+    # exposes a Recreate button. The endpoint stays usable for active hives.
     old_labels = {str(m.tag_id): m.label for m in source.memberships}
 
-    # Validate tags are free (for active hive recreation, they should already be released)
+    # Verify none of the tags have somehow ended up in *another* active hive
+    # (shouldn't happen, but defend against drift) and refuse to recreate
+    # rather than silently steal a tag from a different hive.
     for tid in old_labels:
         existing = db.query(HiveTagMembership).filter(HiveTagMembership.tag_id == tid).first()
-        if existing:
-            existing_hive = db.query(Hive).filter(
+        if existing and str(existing.hive_id) != str(source.id):
+            other_hive = db.query(Hive).filter(
                 Hive.id == existing.hive_id, Hive.status == "active"
             ).first()
-            if existing_hive and existing_hive.id != source.id:
+            if other_hive:
                 raise HTTPException(
                     409,
-                    f"Tag {tid} is in active hive '{existing_hive.name}' — cannot recreate",
+                    f"Tag {tid} is in active hive '{other_hive.name}' — cannot recreate",
                 )
 
     now = datetime.now(UTC)
     new_id = str(uuid.uuid4())
+
+    # Release the source hive's memberships now so we can re-bind the same
+    # tag_ids to the new hive without hitting the (tag_id) uniqueness rule.
+    # If the source is active, also flip it to archived in the same txn —
+    # otherwise we'd be left with an "active" hive that has no tags, which
+    # confuses every list/evaluation downstream.
+    if old_labels:
+        db.query(HiveTagMembership).filter(
+            HiveTagMembership.hive_id == str(source.id)
+        ).delete(synchronize_session=False)
+
+    if source.status == "active":
+        source.status = "archived"
+        source.archived_at = now
+        source.archived_reason = "recreated"
+        source.archive_expires_at = now + timedelta(days=60)
+        ls = db.query(HiveLiveState).filter(HiveLiveState.hive_id == str(source.id)).first()
+        if ls and ls.alert_state != "OK":
+            ls.alert_state = "OK"
+            db.add(HiveEvent(
+                id=str(uuid.uuid4()),
+                hive_id=str(source.id),
+                occurred_at=now,
+                event_type="RESOLVED_BY_HIVE_DELETION",
+            ))
+    db.flush()
 
     new_hive = Hive(
         id=new_id,

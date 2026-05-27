@@ -1014,25 +1014,28 @@
   100% { transform:scale(3.2); opacity:0; }
 }
 
-/* ── Hive threshold range slider (config modal) ── */
+/* ── Hive threshold range slider (config modal) ──
+   NB: this modal is rendered OUTSIDE #tab-hive so any --hive-* vars are
+   undefined here. Use globally-available --primary / --bg-* / --border so
+   the thumb and track always render in both light and dark mode. */
 input.hive-range {
   -webkit-appearance:none; appearance:none;
   width:100%; height:8px; border-radius:6px;
   background: linear-gradient(90deg,
-    var(--hive-green) 0%,
-    var(--hive-amber) 55%,
-    var(--hive-red)   100%);
+    var(--primary) 0%,
+    var(--warning, #f59e0b) 55%,
+    var(--danger, #ef4444)  100%);
   outline:none;
   cursor:pointer;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,.4);
-  border:1px solid var(--hive-border);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.25);
+  border:1px solid var(--border);
 }
 input.hive-range::-webkit-slider-thumb {
   -webkit-appearance:none; appearance:none;
   width:22px; height:22px; border-radius:50%;
-  background: radial-gradient(circle at 35% 30%, #fff 0%, var(--hive-green) 65%, color-mix(in srgb,var(--hive-green) 60%,#000) 100%);
-  border:2px solid var(--hive-text1);
-  box-shadow: 0 0 8px color-mix(in srgb,var(--hive-green) 70%,transparent), 0 2px 6px rgba(0,0,0,.5);
+  background: radial-gradient(circle at 35% 30%, #fff 0%, var(--primary) 65%, color-mix(in srgb,var(--primary) 60%,#000) 100%);
+  border:2px solid #fff;
+  box-shadow: 0 0 0 1px var(--primary), 0 0 8px color-mix(in srgb,var(--primary) 60%,transparent), 0 2px 6px rgba(0,0,0,.35);
   cursor:grab;
   transition: transform .12s ease, box-shadow .12s ease;
 }
@@ -1040,31 +1043,35 @@ input.hive-range::-webkit-slider-thumb:hover { transform:scale(1.12); }
 input.hive-range:active::-webkit-slider-thumb { cursor:grabbing; transform:scale(1.18); }
 input.hive-range::-moz-range-thumb {
   width:22px; height:22px; border-radius:50%;
-  background: radial-gradient(circle at 35% 30%, #fff 0%, var(--hive-green) 65%, color-mix(in srgb,var(--hive-green) 60%,#000) 100%);
-  border:2px solid var(--hive-text1);
-  box-shadow: 0 0 8px color-mix(in srgb,var(--hive-green) 70%,transparent), 0 2px 6px rgba(0,0,0,.5);
+  background: radial-gradient(circle at 35% 30%, #fff 0%, var(--primary) 65%, color-mix(in srgb,var(--primary) 60%,#000) 100%);
+  border:2px solid #fff;
+  box-shadow: 0 0 0 1px var(--primary), 0 0 8px color-mix(in srgb,var(--primary) 60%,transparent), 0 2px 6px rgba(0,0,0,.35);
   cursor:grab;
 }
 input.hive-range::-moz-range-track {
   height:8px; border-radius:6px;
   background: linear-gradient(90deg,
-    var(--hive-green) 0%, var(--hive-amber) 55%, var(--hive-red) 100%);
-  border:1px solid var(--hive-border);
+    var(--primary) 0%, var(--warning, #f59e0b) 55%, var(--danger, #ef4444) 100%);
+  border:1px solid var(--border);
 }
 
+/* Map overlays sit on a dark canvas background in BOTH light and dark mode,
+   so their text & icons must always render light. Using --hive-text* here
+   gave dark-on-dark in light mode (invisible). Hard-code light colours. */
 #tab-hive .hive-map-info {
   position:absolute;top:12px;left:12px;
   background:rgba(14,24,34,.9);backdrop-filter:blur(8px);
-  border:1px solid var(--hive-border);border-radius:6px;padding:9px 13px;
-  font-size:12px;color:var(--hive-text2);pointer-events:none;
+  border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:9px 13px;
+  font-size:12px;color:rgba(255,255,255,.92);pointer-events:none;
 }
+#tab-hive .hive-map-info b { color:#fff; }
 #tab-hive .hive-map-legend {
   position:absolute;bottom:12px;left:12px;
   background:rgba(14,24,34,.9);backdrop-filter:blur(8px);
-  border:1px solid var(--hive-border);border-radius:6px;padding:9px 13px;
+  border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:9px 13px;
   display:flex;gap:13px;font-size:11px;pointer-events:none;
 }
-#tab-hive .hive-legend-item { display:flex;align-items:center;gap:6px;color:var(--hive-text2); }
+#tab-hive .hive-legend-item { display:flex;align-items:center;gap:6px;color:rgba(255,255,255,.92); }
 #tab-hive .hive-legend-dot  { width:8px;height:8px;border-radius:50%;flex-shrink:0; }
 
 /* zoom controls */
@@ -1073,13 +1080,13 @@ input.hive-range::-moz-range-track {
   display:flex;flex-direction:column;gap:4px;z-index:5;
 }
 #tab-hive .hive-map-zoom button {
-  width:34px;height:34px;border:1px solid var(--hive-border);
+  width:34px;height:34px;border:1px solid rgba(255,255,255,.18);
   background:rgba(14,24,34,.92);backdrop-filter:blur(8px);
-  color:var(--hive-text1);border-radius:6px;cursor:pointer;
+  color:rgba(255,255,255,.95);border-radius:6px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;font-size:13px;
   transition:all .15s;
 }
-#tab-hive .hive-map-zoom button:hover { background:var(--hive-card-2);border-color:var(--hive-border-bright); }
+#tab-hive .hive-map-zoom button:hover { background:rgba(30,45,60,.95);border-color:rgba(255,255,255,.35);color:#fff; }
 
 /* diameter row */
 #tab-hive .hive-diameter-row {
@@ -10754,30 +10761,61 @@ function hiveRenderDetail(d) {
     hiveDrawMap(d);
 }
 
-function hiveRenderTimeline(events, tags) {
-    const el = document.getElementById('hive-timeline');
-    if (!events.length) { el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-3);font-size:12px">No events yet</div>'; return; }
+// Pagination state for the per-hive Recent Activity feed. We render in
+// pages of HIVE_TIMELINE_PAGE_SIZE so a busy hive doesn't produce a wall of
+// rows. Older pages are revealed by clicking "Show more".
+const HIVE_TIMELINE_PAGE_SIZE = 10;
+let _hiveTimelineEvents = [];
+let _hiveTimelineTags   = [];
+let _hiveTimelineShown  = 0;
+
+function _hiveTimelineRowHtml(ev, tags) {
     const tagLabel = (id) => {
         if (!id) return '';
         const t = (tags||[]).find(x => x.tag_id === id);
         return t ? (t.label || t.tag_id) : id;
     };
-    el.innerHTML = events.map(ev => {
-        const col   = HIVE_EVENT_COLOR[ev.event_type] || '';
-        const label = HIVE_EVENT_LABELS[ev.event_type] || ev.event_type;
-        const t     = new Date(ev.occurred_at);
-        const timeStr = t.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-        const detail  = ev.details && typeof ev.details === 'object' && ev.details.reason ? ev.details.reason : '';
-        const trigName = ev.triggering_tag_id ? tagLabel(ev.triggering_tag_id) : '';
-        return `<div class="hive-tl-item">
-          <div class="hive-tl-time">${timeStr}</div>
-          <div class="hive-tl-marker ${col}"></div>
-          <div>
-            <div class="hive-tl-text">${hiveEsc(label)}${trigName ? ' · <span style="color:var(--hive-red)">' + hiveEsc(trigName) + '</span>' : ''}</div>
-            ${detail ? `<div class="hive-tl-detail">${hiveEsc(detail)}</div>` : ''}
-          </div>
-        </div>`;
-    }).join('');
+    const col   = HIVE_EVENT_COLOR[ev.event_type] || '';
+    const label = HIVE_EVENT_LABELS[ev.event_type] || ev.event_type;
+    const t     = new Date(ev.occurred_at);
+    const timeStr = t.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    const detail  = ev.details && typeof ev.details === 'object' && ev.details.reason ? ev.details.reason : '';
+    const trigName = ev.triggering_tag_id ? tagLabel(ev.triggering_tag_id) : '';
+    return `<div class="hive-tl-item">
+      <div class="hive-tl-time">${timeStr}</div>
+      <div class="hive-tl-marker ${col}"></div>
+      <div>
+        <div class="hive-tl-text">${hiveEsc(label)}${trigName ? ' · <span style="color:var(--hive-red)">' + hiveEsc(trigName) + '</span>' : ''}</div>
+        ${detail ? `<div class="hive-tl-detail">${hiveEsc(detail)}</div>` : ''}
+      </div>
+    </div>`;
+}
+
+function _hiveTimelineRender() {
+    const el = document.getElementById('hive-timeline');
+    if (!el) return;
+    const total = _hiveTimelineEvents.length;
+    if (!total) { el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-3);font-size:12px">No events yet</div>'; return; }
+    const shown = Math.min(_hiveTimelineShown, total);
+    const rows  = _hiveTimelineEvents.slice(0, shown).map(ev => _hiveTimelineRowHtml(ev, _hiveTimelineTags)).join('');
+    const remaining = total - shown;
+    const more = remaining > 0
+        ? `<button type="button" onclick="hiveTimelineShowMore()" style="margin:10px auto 4px;padding:7px 14px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-2);font-size:12px;cursor:pointer;align-self:center">Show ${Math.min(HIVE_TIMELINE_PAGE_SIZE, remaining)} more <span style="color:var(--text-3);font-weight:400">(${remaining} remaining)</span></button>`
+        : (total > HIVE_TIMELINE_PAGE_SIZE
+            ? `<div style="text-align:center;font-size:11px;color:var(--text-3);padding:8px 0 2px">Showing all ${total} events</div>` : '');
+    el.innerHTML = rows + more;
+}
+
+function hiveTimelineShowMore() {
+    _hiveTimelineShown = Math.min(_hiveTimelineEvents.length, _hiveTimelineShown + HIVE_TIMELINE_PAGE_SIZE);
+    _hiveTimelineRender();
+}
+
+function hiveRenderTimeline(events, tags) {
+    _hiveTimelineEvents = Array.isArray(events) ? events : [];
+    _hiveTimelineTags   = Array.isArray(tags)   ? tags   : [];
+    _hiveTimelineShown  = HIVE_TIMELINE_PAGE_SIZE;
+    _hiveTimelineRender();
 }
 
 // ── position map (DOM-based, matching sample design) ─────────────────────────
@@ -11071,8 +11109,11 @@ function hiveRenderArchive(hives) {
             <span style="color:var(--hive-text2)">Archived ${h.archived_at ? new Date(h.archived_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '—'}</span>
             <span class="hive-expiry-days">${purgeIn != null ? 'Purges in ' + purgeIn + 'd' : ''}</span>
           </div>
-          <div class="hive-card-actions hive-3col">
-            <button onclick="hiveArchiveRecreate('${hid}')"><i class="fa-solid fa-rotate-right"></i> Recreate</button>
+          <!-- Recreating from archive intentionally removed: archived hives have
+               no live memberships, so the recreated hive would contain no tags
+               and require too many cross-checks to repopulate safely. Users
+               should recreate from an active hive (Lifecycle panel) instead. -->
+          <div class="hive-card-actions" style="grid-template-columns:1fr 1fr">
             <button onclick="hiveOpenDetail('${hid}')"><i class="fa-solid fa-clock-rotate-left"></i> History</button>
             <button class="hive-delete" onclick="hivePurge('${hid}','${hiveEsc(h.name)}')"><i class="fa-solid fa-trash"></i> Purge</button>
           </div>
