@@ -171,7 +171,7 @@ class HiveCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     tag_ids: List[str] = Field(..., min_length=2)
     tag_labels: Optional[Dict[str, str]] = None      # tag_id → label
-    mobility_profile: str = "mobile"                 # stationary|slow|mobile|fast
+    mobility_profile: str = "mobile"                 # stationary|slow|mobile
     distance_threshold_m: Optional[float] = None     # None → use preset default
     # Validity — how many days the hive remains active before auto-archive.
     # Default 60 days; min 1, max 3650 (10 years).

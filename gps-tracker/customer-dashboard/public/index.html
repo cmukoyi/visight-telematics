@@ -3403,8 +3403,7 @@ input.hive-range::-moz-range-track {
                 <select id="hive-cfg-profile" class="form-control" style="width:100%">
                     <option value="stationary">Stationary — items stay put</option>
                     <option value="slow">Slow — moves occasionally</option>
-                    <option value="mobile">Mobile — moves regularly</option>
-                    <option value="fast">Fast — usually in transit</option>
+                    <option value="mobile">Mobile — moves regularly or in transit</option>
                 </select>
             </div>
             <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:baseline">
@@ -10476,7 +10475,7 @@ let _hiveWizAvailableTags = [];
 let _hiveAllCards = [];   // for search filtering
 let _hiveAllArchive = []; // for archive search
 
-const HIVE_PROFILE_LABELS = { stationary: 'Stationary', slow: 'Slow', mobile: 'Mobile', fast: 'Fast', custom: 'Custom' };
+const HIVE_PROFILE_LABELS = { stationary: 'Stationary', slow: 'Slow', mobile: 'Mobile', custom: 'Custom' };
 
 const hiveWizState = { step: 1, name: '', selectedTags: [], profile: '', threshold_m: null, _suggestion: null };
 
@@ -11106,8 +11105,7 @@ document.querySelector('[data-hscreen="archive"]')?.addEventListener('click', ()
 const WIZARD_PROFILES = [
     { id: 'stationary', label: 'They stay put',              desc: "Items that shouldn't normally move. Tools in a workshop, equipment in a yard." },
     { id: 'slow',       label: 'They move occasionally',      desc: 'Items that move sometimes, slowly. Parked vehicles, luggage during a trip.' },
-    { id: 'mobile',     label: 'They move regularly',         desc: 'Items carried day-to-day. Personal belongings, shared equipment.' },
-    { id: 'fast',       label: "They're usually in transit",  desc: 'Items actively being moved. Couriered packages, vehicles on the road.' },
+    { id: 'mobile',     label: 'They move regularly or in transit', desc: 'Items carried day-to-day or actively being moved. Personal belongings, shared equipment, couriered packages, vehicles on the road.' },
 ];
 
 function hiveWizReset() {

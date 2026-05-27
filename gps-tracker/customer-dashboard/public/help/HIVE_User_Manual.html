@@ -795,7 +795,7 @@
 
         <h3>Mobility Profile</h3>
         <p>
-          A bundled preset that controls how HIVE interprets your tags' position data. Affects freshness windows, alert sensitivity, and confirmation requirements. Four options: <b>Stationary</b>, <b>Slow</b>, <b>Mobile</b>, and <b>Fast</b>.
+          A bundled preset that controls how HIVE interprets your tags' position data. Affects freshness windows, alert sensitivity, motion detection, and confirmation requirements. Three options: <b>Stationary</b>, <b>Slow</b>, and <b>Mobile</b>.
         </p>
 
         <h3>Freshness Tier</h3>
@@ -827,7 +827,7 @@
 
         <h3>Question 2 — How much do these items move?</h3>
         <p>
-          The mobility profile choice. HIVE pre-selects this based on how your tags have moved in the last few weeks, marked with a <span class="status-pill green"><span class="dot"></span>SUGGESTED</span> badge. Four options to pick from — see <a href="#mobility">Mobility Profiles</a> for details.
+          The mobility profile choice. HIVE pre-selects this based on how your tags have moved in the last few weeks, marked with a <span class="status-pill green"><span class="dot"></span>SUGGESTED</span> badge. Three options to pick from — see <a href="#mobility">Mobility Profiles</a> for details.
         </p>
 
         <h3>Question 3 — How close should they stay?</h3>
@@ -854,28 +854,26 @@
 
         <table class="doc-table">
           <thead>
-            <tr><th>Profile</th><th>Best For</th><th>Threshold</th></tr>
+            <tr><th>Profile</th><th>Best For</th><th>Default Threshold</th><th>Motion Detection</th></tr>
           </thead>
           <tbody>
             <tr>
               <td>Stationary</td>
               <td>Tools, equipment, instruments — assets that shouldn't normally move</td>
-              <td>50m</td>
+              <td>150m</td>
+              <td>Disabled (any motion is treated as an anomaly)</td>
             </tr>
             <tr>
               <td>Slow</td>
               <td>Livestock, parked vehicles, mobility aids, luggage during a trip</td>
-              <td>100m</td>
+              <td>450m</td>
+              <td>10 km/h · 10 min settling</td>
             </tr>
             <tr>
               <td>Mobile</td>
-              <td>Personal belongings, shared equipment, items in daily use</td>
-              <td>200m</td>
-            </tr>
-            <tr>
-              <td>Fast</td>
-              <td>Couriered packages, in-transit vehicles, actively-carried items</td>
-              <td>500m+</td>
+              <td>Personal belongings, shared equipment, couriered packages, in-transit vehicles</td>
+              <td>1000m</td>
+              <td>15 km/h · 10 min settling</td>
             </tr>
           </tbody>
         </table>
@@ -1041,13 +1039,13 @@
 
         <table class="doc-table">
           <thead>
-            <tr><th>Tier</th><th>Stationary</th><th>Slow</th><th>Mobile</th><th>Fast</th></tr>
+            <tr><th>Tier</th><th>Stationary</th><th>Slow</th><th>Mobile</th></tr>
           </thead>
           <tbody>
-            <tr><td>Fresh</td><td>&lt;30m</td><td>&lt;15m</td><td>&lt;5m</td><td>&lt;2m</td></tr>
-            <tr><td>Recent</td><td>30m–4h</td><td>15m–1h</td><td>5–20m</td><td>2–10m</td></tr>
-            <tr><td>Stale</td><td>4–24h</td><td>1–6h</td><td>20m–2h</td><td>10–30m</td></tr>
-            <tr><td>Lost</td><td>&gt;24h</td><td>&gt;6h</td><td>&gt;2h</td><td>&gt;30m</td></tr>
+            <tr><td>Fresh</td><td>&lt;30m</td><td>&lt;20m</td><td>&lt;15m</td></tr>
+            <tr><td>Recent</td><td>30m–4h</td><td>20m–2h</td><td>15m–1h</td></tr>
+            <tr><td>Stale</td><td>4–24h</td><td>2–8h</td><td>1–4h</td></tr>
+            <tr><td>Lost</td><td>&gt;24h</td><td>&gt;8h</td><td>&gt;2h</td></tr>
           </tbody>
         </table>
 

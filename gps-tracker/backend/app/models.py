@@ -602,19 +602,20 @@ class MobilityProfile(str, enum.Enum):
     STATIONARY = "stationary"
     SLOW       = "slow"
     MOBILE     = "mobile"
-    FAST       = "fast"
     CUSTOM     = "custom"
 
 
-# Preset parameters per mobility profile (sourced from spec Appendix A)
+# Preset parameters per mobility profile (spec v1.1 Appendix A).
+# Calibrated for 5–10 minute crowdsourced reporting cadence.
+# Fast profile deprecated in v1.1 — merged into Mobile.
 MOBILITY_PRESETS = {
     "stationary": {
-        "fresh_window_s":    1800,   # 30 min
-        "recent_window_s":   14400,  # 4 hr
-        "stale_window_s":    86400,  # 24 hr
-        "lost_threshold_s":  86400,
+        "fresh_window_s":    1800,   # <30 min
+        "recent_window_s":   14400,  # 30 min – 4 hr
+        "stale_window_s":    86400,  # 4 – 24 hr
+        "lost_threshold_s":  86400,  # >24 hr
         "meaningful_change_m": 2.5,
-        "distance_threshold_m": 50.0,
+        "distance_threshold_m": 150.0,
         "hysteresis_pct":    90.0,
         "confirmation_count": 1,
         # Motion detection disabled — stationary hives shouldn't move; if they
@@ -625,46 +626,32 @@ MOBILITY_PRESETS = {
         "coherence_bearing_tol_deg":  None,
     },
     "slow": {
-        "fresh_window_s":    900,    # 15 min
-        "recent_window_s":   3600,   # 1 hr
-        "stale_window_s":    21600,  # 6 hr
-        "lost_threshold_s":  21600,
-        "meaningful_change_m": 7.5,
-        "distance_threshold_m": 100.0,
+        "fresh_window_s":    1200,   # <20 min
+        "recent_window_s":   7200,   # 20 min – 2 hr
+        "stale_window_s":    28800,  # 2 – 8 hr
+        "lost_threshold_s":  28800,  # >8 hr
+        "meaningful_change_m": 15.0,
+        "distance_threshold_m": 450.0,
         "hysteresis_pct":    85.0,
         "confirmation_count": 1,
         "motion_speed_threshold_kmh": 10.0,
-        "motion_settling_time_s":     180,   # 3 min
+        "motion_settling_time_s":     600,   # 10 min
         "coherence_speed_tol_kmh":    5.0,
         "coherence_bearing_tol_deg":  60.0,
     },
     "mobile": {
-        "fresh_window_s":    300,    # 5 min
-        "recent_window_s":   1200,   # 20 min
-        "stale_window_s":    7200,   # 2 hr
-        "lost_threshold_s":  7200,
-        "meaningful_change_m": 20.0,
-        "distance_threshold_m": 200.0,
-        "hysteresis_pct":    80.0,
-        "confirmation_count": 2,
-        "motion_speed_threshold_kmh": 5.0,
-        "motion_settling_time_s":     300,   # 5 min
+        "fresh_window_s":    900,    # <15 min
+        "recent_window_s":   3600,   # 15 min – 1 hr
+        "stale_window_s":    14400,  # 1 – 4 hr
+        "lost_threshold_s":  7200,   # >2 hr
+        "meaningful_change_m": 30.0,
+        "distance_threshold_m": 1000.0,
+        "hysteresis_pct":    75.0,
+        "confirmation_count": 1,
+        "motion_speed_threshold_kmh": 15.0,
+        "motion_settling_time_s":     600,   # 10 min
         "coherence_speed_tol_kmh":    10.0,
         "coherence_bearing_tol_deg":  45.0,
-    },
-    "fast": {
-        "fresh_window_s":    120,    # 2 min
-        "recent_window_s":   600,    # 10 min
-        "stale_window_s":    1800,   # 30 min
-        "lost_threshold_s":  1800,
-        "meaningful_change_m": 40.0,
-        "distance_threshold_m": 500.0,
-        "hysteresis_pct":    75.0,
-        "confirmation_count": 2,
-        "motion_speed_threshold_kmh": 5.0,
-        "motion_settling_time_s":     300,   # 5 min
-        "coherence_speed_tol_kmh":    15.0,
-        "coherence_bearing_tol_deg":  30.0,
     },
 }
 
