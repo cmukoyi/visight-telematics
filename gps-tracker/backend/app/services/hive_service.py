@@ -61,31 +61,46 @@ def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * _EARTH_R * math.asin(math.sqrt(a))
 
 
-def pairwise_max_distance(positions: List[Tuple[str, float, float]]) -> Tuple[Optional[float], Optional[str]]:
+def pairwise_max_distance_and_outlier(
+    positions: List[Tuple[str, float, float]],
+    threshold_m: float
+) -> Tuple[Optional[float], Optional[str]]:
     """
     Given a list of (tag_id, lat, lng), compute the maximum pairwise distance
-    (group diameter) and the tag_id that is the outlier (has the most breaching
-    pairs or the furthest single distance).
+    (group diameter) and the tag_id that is the outlier (per spec §2.4: the
+    tag participating in the most breaching pairs).
+
+    A breaching pair is one where distance > threshold_m.
 
     Returns (diameter_m, outlier_tag_id). If fewer than 2 positions, returns
-    (None, None).
+    (None, None). If no pairs breach threshold, outlier is None.
     """
     if len(positions) < 2:
         return None, None
 
     max_dist = 0.0
-    pair_distances: Dict[str, List[float]] = {tid: [] for tid, _, _ in positions}
+    breaching_pair_counts: Dict[str, int] = {tid: 0 for tid, _, _ in positions}
 
     for i, (tid_a, lat_a, lon_a) in enumerate(positions):
         for tid_b, lat_b, lon_b in positions[i + 1:]:
             d = haversine_m(lat_a, lon_a, lat_b, lon_b)
-            pair_distances[tid_a].append(d)
-            pair_distances[tid_b].append(d)
             if d > max_dist:
                 max_dist = d
+            # Count breaching pairs: both tags in the pair get +1 if d > threshold
+            if d > threshold_m:
+                breaching_pair_counts[tid_a] += 1
+                breaching_pair_counts[tid_b] += 1
 
-    # Outlier = tag with the highest max pairwise distance
-    outlier = max(pair_distances, key=lambda t: max(pair_distances[t]) if pair_distances[t] else 0.0)
+    # Outlier = tag with the highest breaching_pair_count.
+    # If no pairs breach, all counts are 0 → outlier is None.
+    # Tiebreaker: first by tag_id alphabetically (deterministic).
+    max_count = max(breaching_pair_counts.values())
+    if max_count == 0:
+        outlier = None
+    else:
+        candidates = [tid for tid, cnt in breaching_pair_counts.items() if cnt == max_count]
+        outlier = sorted(candidates)[0]  # alphabetical tiebreaker
+
     return max_dist, outlier
 
 
@@ -173,10 +188,11 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
     # Prefer fresh+recent; fall back to stale so a hive with infrequent
     # GPS reports still surfaces a diameter and can detect breach (with
     # 'low' confidence). Tags fully 'lost' are excluded.
+    threshold_m = cfg.distance_threshold_m
     if len(fresh_recent_positions) >= 2:
-        diameter_m, outlier_id = pairwise_max_distance(fresh_recent_positions)
+        diameter_m, outlier_id = pairwise_max_distance_and_outlier(fresh_recent_positions, threshold_m)
     else:
-        diameter_m, outlier_id = pairwise_max_distance(usable_positions)
+        diameter_m, outlier_id = pairwise_max_distance_and_outlier(usable_positions, threshold_m)
 
     # No meaningful spread — clear outlier so UI doesn't flag a tag incorrectly
     if diameter_m is not None and diameter_m < cfg.meaningful_change_m:
@@ -285,6 +301,50 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
                 live.consecutive_confirms = 0
 
     state_changed = new_state != prev_state
+
+    # ── Diagnostic logging (HIVE bug fix — May 2026) ──────────────────
+    # Structured log capturing full evaluation state for debugging motion
+    # oscillation (Bug 1) and outlier mis-attribution (Bug 2).
+    log.info(
+        f"HIVE evaluation: {hive_id}",
+        extra={
+            "hive_id": hive_id,
+            "evaluated_at": now.isoformat(),
+            "motion_state_before": motion_decision.previous_state,
+            "motion_state_after": motion_decision.state,
+            "motion_changed": motion_decision.changed,
+            "suppress_proximity": motion_decision.suppress_proximity,
+            "centroid": {
+                "lat": centroid_v.centroid_lat if centroid_v else None,
+                "lng": centroid_v.centroid_lng if centroid_v else None,
+                "speed_kmh": round(centroid_v.speed_kmh, 2) if centroid_v else 0.0,
+                "bearing_deg": centroid_v.bearing_deg if centroid_v else None,
+                "fresh_tag_count": len(fresh_positions),
+                "fresh_tags": [tid for tid, _, _ in fresh_positions],
+            },
+            "coherence": {
+                "score": round(coherence, 3),
+                "threshold": hive_motion.COHERENCE_THRESHOLD,
+                "tags_with_velocity": len(tag_velocities),
+                "result": "PASS" if coherence >= hive_motion.COHERENCE_THRESHOLD else "FAIL",
+            },
+            "proximity": {
+                "diameter_m": round(diameter_m, 1) if diameter_m else None,
+                "threshold_m": threshold,
+                "is_breaching": diameter_m > threshold if diameter_m else False,
+                "outlier_tag_id": outlier_id,
+                "fresh_count": len(fresh_positions),
+                "recent_count": len(fresh_recent_positions) - len(fresh_positions),
+                "stale_count": composition.get("stale", 0),
+                "lost_count": composition.get("lost", 0),
+            },
+            "alert_state_before": prev_state,
+            "alert_state_after": new_state,
+            "alert_changed": state_changed,
+            "confidence": confidence,
+            "resolve_by_transit": resolve_by_transit,
+        },
+    )
 
     # ── Persist evaluation record ──────────────────────────────────────
     eval_id = str(uuid.uuid4())
