@@ -11312,7 +11312,7 @@ function hiveWizRender() {
             <input type="number" class="hive-form-input" placeholder="60" min="1" max="3650" value="${hiveWizState.validity_days||60}" oninput="hiveWizState.validity_days=parseInt(this.value)||60">
             <div class="hive-wizard-help" style="margin-top:4px">Hive auto-archives after this many days. Default 60 days. You can extend later.</div>
           </div>
-          <div class="hive-form-summary"><strong>${hiveWizState.selectedTags.length} tags</strong> · <strong>${HIVE_PROFILE_LABELS[hiveWizState.profile]||''} profile</strong>${sug ? ' · Suggested: ' + sug.suggested_threshold_m + 'm threshold' : ''}</div>`;
+          <div class="hive-form-summary"><strong>${hiveWizState.selectedTags.length} tags</strong> · <strong>${HIVE_PROFILE_LABELS[hiveWizState.profile]||''} profile</strong>${(() => { const PROFILE_DEFAULTS = { stationary: 150, slow: 450, mobile: 1000 }; const defaultThreshold = PROFILE_DEFAULTS[hiveWizState.profile] || 1000; return ' · Suggested: ' + defaultThreshold + 'm threshold'; })()}</div>`;
     }
     document.getElementById('hive-wiz-err').style.display = 'none';
 }
