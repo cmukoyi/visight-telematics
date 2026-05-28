@@ -820,14 +820,14 @@ def recreate_hive(
     # For archived hives this is empty (tags already released on archive) and
     # the recreate ends up tag-less — which is why the archive UI no longer
     # exposes a Recreate button. The endpoint stays usable for active hives.
-    old_labels = {str(m.tag_id): m.label for m in source.memberships}
+    old_labels = {m.tag_id: m.label for m in source.memberships}
 
     # Verify none of the tags have somehow ended up in *another* active hive
     # (shouldn't happen, but defend against drift) and refuse to recreate
     # rather than silently steal a tag from a different hive.
     for tid in old_labels:
         existing = db.query(HiveTagMembership).filter(HiveTagMembership.tag_id == tid).first()
-        if existing and str(existing.hive_id) != str(source.id):
+        if existing and existing.hive_id != source.id:
             other_hive = db.query(Hive).filter(
                 Hive.id == existing.hive_id, Hive.status == "active"
             ).first()
@@ -847,7 +847,7 @@ def recreate_hive(
     # confuses every list/evaluation downstream.
     if old_labels:
         db.query(HiveTagMembership).filter(
-            HiveTagMembership.hive_id == str(source.id)
+            HiveTagMembership.hive_id == source.id
         ).delete(synchronize_session=False)
 
     if source.status == "active":
@@ -855,7 +855,7 @@ def recreate_hive(
         source.archived_at = now
         source.archived_reason = "recreated"
         source.archive_expires_at = now + timedelta(days=60)
-        ls = db.query(HiveLiveState).filter(HiveLiveState.hive_id == str(source.id)).first()
+        ls = db.query(HiveLiveState).filter(HiveLiveState.hive_id == source.id).first()
         if ls and ls.alert_state != "OK":
             ls.alert_state = "OK"
             db.add(HiveEvent(
