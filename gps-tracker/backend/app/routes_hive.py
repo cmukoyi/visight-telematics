@@ -716,7 +716,7 @@ def update_hive_config(
         current.valid_to = now
 
     new_cfg = HiveConfigVersion(
-        id=str(uuid.uuid4()),
+        id=uuid.uuid4(),
         hive_id=hive_id,
         version_number=next_version,
         valid_from=now,
@@ -734,11 +734,11 @@ def update_hive_config(
         motion_settling_time_s=preset.get("motion_settling_time_s"),
         coherence_speed_tol_kmh=preset.get("coherence_speed_tol_kmh"),
         coherence_bearing_tol_deg=preset.get("coherence_bearing_tol_deg"),
-        changed_by=str(me.id),
+        changed_by=me.id,
     )
     db.add(new_cfg)
     db.add(HiveEvent(
-        id=str(uuid.uuid4()),
+        id=uuid.uuid4(),
         hive_id=hive_id,
         occurred_at=now,
         event_type="CONFIG_CHANGED",
