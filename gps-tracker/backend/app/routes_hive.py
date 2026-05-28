@@ -838,7 +838,7 @@ def recreate_hive(
                 )
 
     now = datetime.now(UTC)
-    new_id = str(uuid.uuid4())
+    new_id = uuid.uuid4()
 
     # Release the source hive's memberships now so we can re-bind the same
     # tag_ids to the new hive without hitting the (tag_id) uniqueness rule.
@@ -859,8 +859,8 @@ def recreate_hive(
         if ls and ls.alert_state != "OK":
             ls.alert_state = "OK"
             db.add(HiveEvent(
-                id=str(uuid.uuid4()),
-                hive_id=str(source.id),
+                id=uuid.uuid4(),
+                hive_id=source.id,
                 occurred_at=now,
                 event_type="RESOLVED_BY_HIVE_DELETION",
             ))
@@ -869,18 +869,18 @@ def recreate_hive(
     new_hive = Hive(
         id=new_id,
         usergroup_id=gid,
-        created_by=str(me.id),
+        created_by=me.id,
         name=source.name,
         status="active",
         expires_at=now + timedelta(days=60),
         settling_until=now + timedelta(minutes=10),
-        parent_hive_id=str(source.id),
+        parent_hive_id=source.id,
     )
     db.add(new_hive)
     db.flush()
 
     new_cfg = HiveConfigVersion(
-        id=str(uuid.uuid4()),
+        id=uuid.uuid4(),
         hive_id=new_id,
         version_number=1,
         valid_from=now,
@@ -900,7 +900,7 @@ def recreate_hive(
         motion_settling_time_s=getattr(src_cfg, "motion_settling_time_s", 30),
         coherence_speed_tol_kmh=getattr(src_cfg, "coherence_speed_tol_kmh", 10.0),
         coherence_bearing_tol_deg=getattr(src_cfg, "coherence_bearing_tol_deg", 45.0),
-        changed_by=str(me.id),
+        changed_by=me.id,
     )
     db.add(new_cfg)
 
@@ -909,7 +909,7 @@ def recreate_hive(
 
     db.add(HiveLiveState(hive_id=new_id, alert_state="OK", consecutive_confirms=0))
     db.add(HiveEvent(
-        id=str(uuid.uuid4()),
+        id=uuid.uuid4(),
         hive_id=new_id,
         occurred_at=now,
         event_type="HIVE_CREATED",
