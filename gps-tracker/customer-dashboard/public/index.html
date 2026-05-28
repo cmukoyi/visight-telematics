@@ -10798,6 +10798,25 @@ function _hiveEventLabelFallback(enumStr) {
     return enumStr.split('_').map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
 }
 
+// Helper: format date as "Today", "Yesterday", or "Mon 27 May"
+function _hiveTimelineDateLabel(dateStr) {
+    const d = new Date(dateStr);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const isSameDay = (a, b) => 
+        a.getFullYear() === b.getFullYear() &&
+        a.getMonth() === b.getMonth() &&
+        a.getDate() === b.getDate();
+    
+    if (isSameDay(d, today)) return 'Today';
+    if (isSameDay(d, yesterday)) return 'Yesterday';
+    
+    // Format as "Mon 27 May"
+    return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
 function _hiveTimelineRowHtml(ev, tags) {
     const tagLabel = (id) => {
         if (!id) return '';
@@ -10825,8 +10844,30 @@ function _hiveTimelineRender() {
     if (!el) return;
     const total = _hiveTimelineEvents.length;
     if (!total) { el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-3);font-size:12px">No events yet</div>'; return; }
+    
     const shown = Math.min(_hiveTimelineShown, total);
-    const rows  = _hiveTimelineEvents.slice(0, shown).map(ev => _hiveTimelineRowHtml(ev, _hiveTimelineTags)).join('');
+    const toShow = _hiveTimelineEvents.slice(0, shown);
+    
+    // Group events by date for display
+    const grouped = [];
+    let currentDate = null;
+    for (const ev of toShow) {
+        const evDate = new Date(ev.occurred_at).toDateString();
+        if (evDate !== currentDate) {
+            currentDate = evDate;
+            grouped.push({ type: 'date', dateStr: ev.occurred_at });
+        }
+        grouped.push({ type: 'event', event: ev });
+    }
+    
+    const rows = grouped.map(item => {
+        if (item.type === 'date') {
+            return `<div style="padding:12px 0 4px;font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em">${_hiveTimelineDateLabel(item.dateStr)}</div>`;
+        } else {
+            return _hiveTimelineRowHtml(item.event, _hiveTimelineTags);
+        }
+    }).join('');
+    
     const remaining = total - shown;
     const more = remaining > 0
         ? `<button type="button" onclick="hiveTimelineShowMore()" style="margin:10px auto 4px;padding:7px 14px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-2);font-size:12px;cursor:pointer;align-self:center">Show ${Math.min(HIVE_TIMELINE_PAGE_SIZE, remaining)} more <span style="color:var(--text-3);font-weight:400">(${remaining} remaining)</span></button>`
