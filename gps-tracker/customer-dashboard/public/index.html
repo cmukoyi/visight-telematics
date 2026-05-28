@@ -10583,7 +10583,7 @@ function hiveCardHTML(h) {
     const dotCls = state === 'BREACHING' ? 'hive-red'  : (state === 'BREACH_PENDING' || state === 'RESOLVING') ? 'hive-amber' : '';
     const diamColor = state === 'BREACHING' ? 'hive-alert' : state === 'OK' ? 'hive-green' : 'hive-warn';
     const threshold = h.threshold_m || '—';
-    const diamText  = h.diameter_m != null ? `${Math.round(h.diameter_m)}m / ${threshold}m` : `— / ${threshold}m`;
+    const diamText  = h.diameter_m != null ? `${fmtDistance(h.diameter_m)} / ${fmtDistance(h.threshold_m)}` : `— / ${fmtDistance(h.threshold_m)}`;
     const expiryUrgent = h.days_remaining != null && h.days_remaining <= 14;
     const pips = (h.tags||[]).map(t => {
         const fc = t.freshness === 'fresh' ? 'hive-fresh' : t.freshness === 'recent' ? 'hive-recent' : t.freshness === 'stale' ? 'hive-stale' : 'hive-lost';
@@ -10700,7 +10700,7 @@ function hiveRenderDetail(d) {
         const fc = t.freshness === 'fresh' ? 'hive-fresh' : t.freshness === 'recent' ? 'hive-recent' : t.freshness === 'stale' ? 'hive-stale' : 'hive-lost';
         const isOut = t.tag_id === d.outlier_tag_id;
         const lastSeen = t.last_seen ? _hiveRelTime(t.last_seen) : '—';
-        const distText = t.distance_from_centre_m != null ? Math.round(t.distance_from_centre_m) + 'm' : (isOut && d.current_diameter_m ? Math.round(d.current_diameter_m) + 'm' : '—');
+        const distText = t.distance_from_centre_m != null ? fmtDistance(t.distance_from_centre_m) : (isOut && d.current_diameter_m ? fmtDistance(d.current_diameter_m) : '—');
         return `<tr${isOut ? ' class="hive-outlier-row"' : ''}>
           <td><span class="hive-tag-id"${isOut ? ' style="color:var(--hive-red)"' : ''}>${hiveEsc(t.tag_id)}</span></td>
           <td>
@@ -10716,7 +10716,7 @@ function hiveRenderDetail(d) {
     // diameter
     const diam = d.current_diameter_m != null ? d.current_diameter_m : d.diameter_m;
     const diamEl = document.getElementById('hive-diameter-num');
-    diamEl.textContent = diam != null ? Math.round(diam) : '—';
+    diamEl.textContent = diam != null ? fmtDistance(diam) : '—';
     diamEl.style.color = isAlert ? 'var(--hive-red)' : 'var(--hive-green)';
     // Bar fill: shows diameter relative to threshold. Caps at 100% (the
     // threshold marker conveys position when in breach).
@@ -10730,15 +10730,15 @@ function hiveRenderDetail(d) {
     const barMax = Math.max(threshold, diam || threshold);
     const thresholdPct = Math.min(95, Math.max(5, Math.round(threshold / barMax * 100)));
     const tmEl = document.getElementById('hive-threshold-mark');
-    if (tmEl) { tmEl.style.left = thresholdPct + '%'; tmEl.style.display = ''; tmEl.setAttribute('data-label', `THRESHOLD ${threshold}M`); }
+    if (tmEl) { tmEl.style.left = thresholdPct + '%'; tmEl.style.display = ''; tmEl.setAttribute('data-label', `THRESHOLD ${fmtDistance(threshold)}`); }
     const stateEl = document.getElementById('hive-diameter-state');
     if (state === 'BREACHING') {
         const over = diam ? Math.round(diam - threshold) : '?';
-        stateEl.textContent = `BREACHING · ${over}M OVER`;
+        stateEl.textContent = `BREACHING · ${typeof over === 'number' ? fmtDistance(over) : over} OVER`;
         stateEl.style.color = 'var(--hive-red)';
     } else if (state === 'BREACH_PENDING') {
         const over = diam ? Math.round(diam - threshold) : '?';
-        stateEl.textContent = `SUSPECTED BREACH · ${over}M OVER`;
+        stateEl.textContent = `SUSPECTED BREACH · ${typeof over === 'number' ? fmtDistance(over) : over} OVER`;
         stateEl.style.color = 'var(--hive-amber)';
     } else if (state === 'OK') {
         stateEl.textContent = 'TOGETHER';
@@ -11043,7 +11043,7 @@ function hiveDrawMap(d) {
     const outlierLabel = outliers[0] ? (outliers[0].label || outliers[0].tag_id) : null;
     infoEl.style.display = '';
     infoEl.innerHTML = [
-        diameter != null ? `Group Diameter <b${d.alert_state==='BREACHING'?' class="hive-alert" style="color:var(--hive-red)"':''}>` + Math.round(diameter) + 'm</b>' : '',
+        diameter != null ? `Group Diameter <b${d.alert_state==='BREACHING'?' class="hive-alert" style="color:var(--hive-red)"':''}>` + fmtDistance(diameter) + '</b>' : '',
         outlierLabel ? `Outlier <b style="color:var(--hive-red)">${hiveEsc(outlierLabel)}</b>` : '',
     ].filter(Boolean).join(' · ');
 }
