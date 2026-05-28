@@ -591,7 +591,7 @@ def get_hive(hive_id: str, request: Request, db: Session = Depends(get_db)):
         db.query(HiveEvent)
         .filter(HiveEvent.hive_id == hive_id, HiveEvent.occurred_at >= cutoff)
         .order_by(HiveEvent.occurred_at.desc())
-        .limit(20)
+        .limit(200)  # Increased from 20 to support busy hives; frontend paginates at 10/page
         .all()
     )
     events_out = [
