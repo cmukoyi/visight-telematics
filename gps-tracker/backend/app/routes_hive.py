@@ -894,10 +894,12 @@ def recreate_hive(
         meaningful_change_m=src_cfg.meaningful_change_m,
         hysteresis_pct=src_cfg.hysteresis_pct,
         confirmation_count=src_cfg.confirmation_count,
-        motion_speed_threshold_kmh=src_cfg.motion_speed_threshold_kmh,
-        motion_settling_time_s=src_cfg.motion_settling_time_s,
-        coherence_speed_tol_kmh=src_cfg.coherence_speed_tol_kmh,
-        coherence_bearing_tol_deg=src_cfg.coherence_bearing_tol_deg,
+        # Motion fields (HIVE v1.1) — fall back to defaults if source config
+        # was created before the v1.1 migration
+        motion_speed_threshold_kmh=getattr(src_cfg, "motion_speed_threshold_kmh", 5.0),
+        motion_settling_time_s=getattr(src_cfg, "motion_settling_time_s", 30),
+        coherence_speed_tol_kmh=getattr(src_cfg, "coherence_speed_tol_kmh", 10.0),
+        coherence_bearing_tol_deg=getattr(src_cfg, "coherence_bearing_tol_deg", 45.0),
         changed_by=str(me.id),
     )
     db.add(new_cfg)
