@@ -10507,10 +10507,16 @@ const hiveWizState = { step: 1, name: '', selectedTags: [], profile: '', thresho
 const HIVE_EVENT_LABELS = {
     CONFIRMED_BREACH:'Breach confirmed', SUSPECTED_BREACH:'Suspected breach',
     BREACH_CLEARING:'Breach clearing', BREACH_CLEARED:'Breach cleared',
+    BREACH_PENDING:'Breach pending',
     LOST_CONTACT:'Lost contact',
     PARTIALLY_OBSERVABLE:'Partial data', HIVE_CREATED:'Hive created',
     HIVE_EXPIRED:'Hive expired', HIVE_ARCHIVED:'Hive archived', HIVE_RECREATED:'Hive recreated',
     BREACH_START:'Breach confirmed', BREACH_RESOLVE:'Breach resolved',
+    MOTION_STATE_CHANGED:'Motion state changed',
+    CONFIG_CHANGED:'Configuration changed',
+    RESOLVED_BY_TRANSIT:'On the move',
+    RESOLVED_BY_HIVE_DELETION:'Resolved by deletion',
+    RESOLVED_BY_HIVE_EXPIRY:'Resolved by expiry',
 };
 const HIVE_EVENT_COLOR = {
     CONFIRMED_BREACH:'hive-red', BREACH_START:'hive-red',
@@ -10787,6 +10793,11 @@ let _hiveTimelineEvents = [];
 let _hiveTimelineTags   = [];
 let _hiveTimelineShown  = 0;
 
+// Helper: convert SNAKE_CASE to Title Case (fallback for unmapped event types)
+function _hiveEventLabelFallback(enumStr) {
+    return enumStr.split('_').map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
+}
+
 function _hiveTimelineRowHtml(ev, tags) {
     const tagLabel = (id) => {
         if (!id) return '';
@@ -10794,7 +10805,7 @@ function _hiveTimelineRowHtml(ev, tags) {
         return t ? (t.label || t.tag_id) : id;
     };
     const col   = HIVE_EVENT_COLOR[ev.event_type] || '';
-    const label = HIVE_EVENT_LABELS[ev.event_type] || ev.event_type;
+    const label = HIVE_EVENT_LABELS[ev.event_type] || _hiveEventLabelFallback(ev.event_type);
     const t     = new Date(ev.occurred_at);
     const timeStr = t.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
     const detail  = ev.details && typeof ev.details === 'object' && ev.details.reason ? ev.details.reason : '';
