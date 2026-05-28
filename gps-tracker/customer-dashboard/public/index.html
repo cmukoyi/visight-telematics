@@ -11296,6 +11296,13 @@ async function hiveWizNext() {
         hiveWizState.step = 2; hiveWizRender();
     } else if (step === 2) {
         if (!hiveWizState.profile) { hiveWizErr('Choose a movement profile'); return; }
+        // If no threshold set yet (or user manually chose a different profile than
+        // what was suggested), apply the profile's default threshold per HIVE v1.1
+        // preset spec (Appendix A): stationary=150m, slow=450m, mobile=1000m.
+        if (!hiveWizState.threshold_m || hiveWizState._suggestion?.suggested_profile !== hiveWizState.profile) {
+            const PROFILE_DEFAULTS = { stationary: 150, slow: 450, mobile: 1000 };
+            hiveWizState.threshold_m = PROFILE_DEFAULTS[hiveWizState.profile] || 1000;
+        }
         hiveWizState.step = 3; hiveWizRender();
     } else {
         if (!hiveWizState.name.trim()) { hiveWizErr('Enter a name'); return; }
