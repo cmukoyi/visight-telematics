@@ -300,8 +300,10 @@ def evaluate_motion_state(
         state_since = _now_aware(live.motion_state_since) or now
 
         if prev_state == HiveMotionState.STATIONARY.value:
-            if moving:
+            if moving and coherence >= COHERENCE_THRESHOLD:
                 # Start (or continue) tracking how long we've been moving.
+                # Spec §11.1: PRE_TRANSIT requires BOTH centroid velocity > threshold
+                # AND coherence ≥ 60% (tags moving together in same direction).
                 if pending_since is None:
                     live.pending_motion_change_since = now
                 elif (now - pending_since).total_seconds() >= PRE_TRANSIT_CONFIRM_SECONDS:
