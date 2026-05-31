@@ -11214,9 +11214,9 @@ document.querySelector('[data-hscreen="archive"]')?.addEventListener('click', ()
 
 // ── wizard ────────────────────────────────────────────────────────────────────
 const WIZARD_PROFILES = [
-    { id: 'stationary', label: 'They stay put',              desc: "Items that shouldn't normally move. Tools in a workshop, equipment in a yard." },
-    { id: 'slow',       label: 'They move occasionally',      desc: 'Items that move sometimes, slowly. Parked vehicles, luggage during a trip.' },
-    { id: 'mobile',     label: 'They move regularly or in transit', desc: 'Items carried day-to-day or actively being moved. Personal belongings, shared equipment, couriered packages, vehicles on the road.' },
+    { id: 'stationary', label: 'They stay put',              desc: "Tools in a workshop, equipment in a yard, instruments in a lab. Items that shouldn't normally move from where you've placed them.<br><em>HIVE alerts you to any movement or separation. Tight threshold, fast detection.</em><br><em>Best for: theft monitoring, asset location verification, \"did this walk away?\" tracking.</em>" },
+    { id: 'slow',       label: 'They move occasionally',      desc: 'Livestock, parked vehicles between trips, mobility aids, luggage during a stay. Items that mostly stay put but move slowly when they do.<br><em>HIVE pauses monitoring during movement and resumes when the items are at rest. Alerts arrive once things settle.</em><br><em>Best for: tracking items that have long stationary periods with occasional slow movement between locations.</em>' },
+    { id: 'mobile',     label: 'They move regularly or in transit', desc: 'Personal belongings carried day-to-day, shared equipment, couriered packages, fleet items, vehicles on the road. Items that travel with you or are actively being moved.<br><em>HIVE pauses monitoring during transit and resumes when you arrive at your destination. Wider threshold to handle position uncertainty during movement. Alerts arrive after you\'ve stopped.</em><br><em>Best for: travel kits (\"did everything arrive with me?\"), delivery tracking, fleet monitoring. Most accurate at rest; in-transit alerts are paused by design.</em>' },
 ];
 
 function hiveWizReset() {
@@ -11281,7 +11281,7 @@ function hiveWizRender() {
         const sugLabel = sug ? HIVE_PROFILE_LABELS[sug.suggested_profile] || sug.suggested_profile : '';
         content.innerHTML = `
           <div class="hive-wizard-q">How much do these items move?</div>
-          <div class="hive-wizard-help">We'll use this to set freshness windows, confirmation rules, and alert sensitivity. You can change this later.</div>
+          <div class="hive-wizard-help">This affects how quickly HIVE flags problems and how it handles your items being on the move. You can change this later.</div>
           <div class="hive-options">${WIZARD_PROFILES.map(p => {
             const sel   = hiveWizState.profile === p.id;
             const badge = sug && sug.suggested_profile === p.id ? '<span class="hive-badge">Suggested</span>' : '';
