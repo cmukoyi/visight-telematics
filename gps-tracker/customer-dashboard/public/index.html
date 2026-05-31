@@ -11279,13 +11279,18 @@ function hiveWizRender() {
     } else if (step === 2) {
         const sug = hiveWizState._suggestion;
         const sugLabel = sug ? HIVE_PROFILE_LABELS[sug.suggested_profile] || sug.suggested_profile : '';
+        // Pre-select suggested profile if user hasn't made a choice yet
+        if (sug && sug.suggested_profile && !hiveWizState.profile) {
+            hiveWizState.profile = sug.suggested_profile;
+        }
         content.innerHTML = `
           <div class="hive-wizard-q">How much do these items move?</div>
           <div class="hive-wizard-help">This affects how quickly HIVE flags problems and how it handles your items being on the move. You can change this later.</div>
           <div class="hive-options">${WIZARD_PROFILES.map(p => {
             const sel   = hiveWizState.profile === p.id;
-            const badge = sug && sug.suggested_profile === p.id ? '<span class="hive-badge">Suggested</span>' : '';
-            const note  = sug && sug.suggested_profile === p.id ? ` <em>— based on movement patterns over the last days</em>` : '';
+            const showBadge = sug && sug.suggested_profile === p.id && sug.confidence !== 'none';
+            const badge = showBadge ? '<span class="hive-badge">Suggested</span>' : '';
+            const note  = showBadge && sug.rationale ? ` <em>— ${sug.rationale}.</em>` : '';
             return `<div class="hive-option ${sel?'hive-selected':''}" onclick="hiveWizState.profile='${p.id}';hiveWizRender()">
               <div class="hive-option-radio"></div>
               <div>
@@ -11293,6 +11298,7 @@ function hiveWizRender() {
                 <div class="hive-option-desc">${p.desc}${note}</div>
               </div>
             </div>`;
+          }).join('')}</div>`;
           }).join('')}</div>`;
     } else {
         const sug = hiveWizState._suggestion;
@@ -11332,18 +11338,20 @@ async function hiveWizNext() {
         if (sr && sr.ok) {
             const sug = await sr.json();
             hiveWizState._suggestion = sug;
-            // Show express card if high confidence
-            if (sug.confidence === 'high' || sug.confidence === 'medium') {
+            // Show express card only if there's a real suggestion (high confidence)
+            if (sug.confidence === 'high' && sug.suggested_profile) {
                 const ec = document.getElementById('hive-express-card');
                 document.getElementById('hive-express-desc').textContent =
-                    `Based on how your selected tags have moved, we suggest the following configuration. You can review and adjust, or use these defaults.`;
+                    `Based on your recent hive setup, we suggest the following configuration. You can review and adjust, or use these defaults.`;
                 document.getElementById('hive-express-summary').innerHTML = `
                   <div class="hive-express-item"><div class="hive-express-label">Mobility</div><div class="hive-express-value">${HIVE_PROFILE_LABELS[sug.suggested_profile]||sug.suggested_profile}</div></div>
                   <div class="hive-express-item"><div class="hive-express-label">Threshold</div><div class="hive-express-value">${sug.suggested_threshold_m}m</div></div>
                   <div class="hive-express-item"><div class="hive-express-label">Tags</div><div class="hive-express-value">${sug.tag_count} selected</div></div>`;
                 ec.style.display = '';
             }
-            if (!hiveWizState.threshold_m) hiveWizState.threshold_m = sug.suggested_threshold_m;
+            if (sug.suggested_threshold_m && !hiveWizState.threshold_m) {
+                hiveWizState.threshold_m = sug.suggested_threshold_m;
+            }
         }
         hiveWizState.step = 2; hiveWizRender();
     } else if (step === 2) {

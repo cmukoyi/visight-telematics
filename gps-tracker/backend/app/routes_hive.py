@@ -315,37 +315,69 @@ def get_hive_suggestion(
     db: Session = Depends(get_db),
 ):
     """
-    Suggest mobility profile and threshold based on selected tags' recent history.
-    tag_ids = comma-separated list of BLE tag UUIDs.
+    Suggest mobility profile and threshold based on user's recent hive history.
+    Per HIVE_Wizard_Smart_Defaults_Implementation.md:
+    - Query user's last 5 hives within 90 days
+    - Suggest profile only if 2+ hives all share the same profile
+    - Return null suggestion if no clear pattern
     """
     me = get_portal_user_from_request(request, db)
     ids = [t.strip() for t in tag_ids.split(",") if t.strip()]
     if len(ids) < 2:
         raise HTTPException(400, "At least 2 tag IDs required")
 
-    # For MVP: suggest 'mobile' profile + 200m threshold when we have limited data.
-    # A full implementation would query historical positions.
-    # We check whether tags have recent GPS fixes to set confidence.
-    has_recent = 0
-    for tid in ids:
-        tag = db.query(BLETag).filter(BLETag.id == tid).first()
-        if tag and tag.last_seen:
-            ls = tag.last_seen
-            if ls.tzinfo is None:
-                ls = ls.replace(tzinfo=UTC)
-            if (datetime.now(UTC) - ls).days < 7:
-                has_recent += 1
+    # Query user's recent hives to detect pattern
+    ninety_days_ago = datetime.now(UTC) - timedelta(days=90)
+    recent_hives = (
+        db.query(Hive)
+        .join(HiveConfigVersion, HiveConfigVersion.hive_id == Hive.id)
+        .filter(
+            Hive.created_by == str(me.id),
+            Hive.status.in_(["active", "archived"]),
+            Hive.created_at >= ninety_days_ago,
+            HiveConfigVersion.version_number == 1,  # initial config
+        )
+        .order_by(Hive.created_at.desc())
+        .limit(5)
+        .all()
+    )
 
-    confidence = "high" if has_recent >= len(ids) * 0.7 else "low"
-    suggested_profile = "mobile"
-    preset = MOBILITY_PRESETS[suggested_profile]
+    # Extract profiles from recent hives
+    recent_profiles = []
+    for hive in recent_hives:
+        cfg = db.query(HiveConfigVersion).filter(
+            HiveConfigVersion.hive_id == hive.id,
+            HiveConfigVersion.version_number == 1
+        ).first()
+        if cfg and cfg.mobility_profile:
+            recent_profiles.append(cfg.mobility_profile)
+
+    # Determine suggestion: only if 2+ hives and all match
+    suggested_profile = None
+    confidence = "none"
+    rationale = None
+
+    if len(recent_profiles) >= 2:
+        # Check if all profiles are the same
+        if all(p == recent_profiles[0] for p in recent_profiles):
+            suggested_profile = recent_profiles[0]
+            confidence = "high"
+            rationale = "based on your recent hives, you typically use this profile"
+
+    # Get preset for suggested profile or default to mobile
+    if suggested_profile and suggested_profile in MOBILITY_PRESETS:
+        preset = MOBILITY_PRESETS[suggested_profile]
+    else:
+        # No suggestion - return empty suggestion
+        preset = MOBILITY_PRESETS["mobile"]
 
     return {
         "suggested_profile": suggested_profile,
-        "suggested_threshold_m": preset["distance_threshold_m"],
+        "suggested_threshold_m": preset["distance_threshold_m"] if suggested_profile else None,
         "confidence": confidence,
+        "rationale": rationale,
         "tag_count": len(ids),
-        "preset": preset,
+        "preset": preset if suggested_profile else None,
     }
 
 
