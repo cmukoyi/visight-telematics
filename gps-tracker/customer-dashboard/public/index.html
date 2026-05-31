@@ -127,7 +127,7 @@
                 </label>
             </div>
             <div class="form-group">
-                <label for="loginCaptcha">Human check: <span id="captchaQuestion" style="font-weight:600"></span></label>
+                <label for="loginCaptcha">Human check: <span id="captchaQuestion"></span></label>
                 <input type="number" id="loginCaptcha" placeholder="Answer" required autocomplete="off" style="max-width:100px">
             </div>
             <button type="submit" class="btn btn-primary btn-full" id="loginBtn">
@@ -3975,7 +3975,9 @@ function _generateCaptcha() {
         el.textContent = `${a} + ${b} = ?`;
         // Apply the primary text color based on current theme
         const theme = document.documentElement.getAttribute('data-theme') || 'dark';
-        el.style.color = theme === 'dark' ? '#E8EDF8' : '#0F172A';
+        const color = theme === 'dark' ? '#E8EDF8' : '#0F172A';
+        el.style.cssText = `font-weight: 600; color: ${color} !important;`;
+        console.log('Captcha generated with theme:', theme, 'color:', color);
     }
     const inp = document.getElementById('loginCaptcha');
     if (inp) inp.value = '';
@@ -4374,11 +4376,10 @@ function applyTheme(theme) {
         if (stored && typeof applyBranding === 'function') applyBranding(stored);
     } catch (_) {}
     // Update captcha color if it exists
-    if (typeof _generateCaptcha === 'function') {
-        const el = document.getElementById('captchaQuestion');
-        if (el && el.textContent) {
-            el.style.color = theme === 'dark' ? '#E8EDF8' : '#0F172A';
-        }
+    const el = document.getElementById('captchaQuestion');
+    if (el && el.textContent) {
+        const color = theme === 'dark' ? '#E8EDF8' : '#0F172A';
+        el.style.cssText = `font-weight: 600; color: ${color} !important;`;
     }
 }
 function toggleTheme() {
