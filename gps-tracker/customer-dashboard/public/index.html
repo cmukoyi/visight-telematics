@@ -3971,7 +3971,10 @@ function _generateCaptcha() {
     const b = Math.floor(Math.random() * 9) + 1;
     _captchaAnswer = a + b;
     const el = document.getElementById('captchaQuestion');
-    if (el) el.textContent = `${a} + ${b} = ?`;
+    if (el) {
+        el.textContent = `${a} + ${b} = ?`;
+        el.style.color = getComputedStyle(document.documentElement).getPropertyValue('--text').trim();
+    }
     const inp = document.getElementById('loginCaptcha');
     if (inp) inp.value = '';
 }
