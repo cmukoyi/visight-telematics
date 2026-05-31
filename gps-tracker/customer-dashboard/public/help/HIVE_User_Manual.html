@@ -33,6 +33,34 @@
     --blue-bg:        rgba(74, 158, 255, 0.1);
   }
 
+  /* Light mode theme */
+  body.light {
+    --bg-deep:        #ffffff;
+    --bg-sidebar:     #f8f9fa;
+    --bg-content:     #ffffff;
+    --bg-elevated:    #f1f3f5;
+    --bg-card:        #ffffff;
+    --border:         #e1e4e8;
+    --border-bright:  #d0d7de;
+
+    --text-primary:   #24292f;
+    --text-secondary: #57606a;
+    --text-tertiary:  #6e7781;
+    --text-muted:     #8c959f;
+
+    --green:          #00a854;
+    --green-dim:      #008542;
+    --green-bg:       rgba(0, 168, 84, 0.1);
+    --green-glow:     rgba(0, 168, 84, 0.2);
+
+    --red:            #d73a49;
+    --red-bg:         rgba(215, 58, 73, 0.1);
+    --amber:          #e36209;
+    --amber-bg:       rgba(227, 98, 9, 0.1);
+    --blue:           #0969da;
+    --blue-bg:        rgba(9, 105, 218, 0.1);
+  }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   html, body {
@@ -1668,6 +1696,13 @@
 </div>
 
 <script>
+  // Theme detection from URL parameter
+  const urlParams = new URLSearchParams(window.location.search);
+  const theme = urlParams.get('theme');
+  if (theme === 'light') {
+    document.body.classList.add('light');
+  }
+
   const sections = document.querySelectorAll('.section');
   const navItems = document.querySelectorAll('.nav-item');
 
