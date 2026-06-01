@@ -9196,6 +9196,11 @@ let _lmSelected     = null;      // currently selected imei
 let _lmCatFilter    = 'all';     // 'all' | category UUID from _categoriesCache
 let _lmStatusFilter = 'all';     // 'all' | 'active' | 'inactive' | 'stock'
 
+// Asset tracking (QR/NFC scanned assets)
+let _lmAssetMarkers = {};        // asset_id → L.marker
+let _lmAccuracyCircles = {};     // asset_id → L.circle
+let _assetSSEConnected = false;  // SSE connection status
+
 // Activity status — UNIFIED across asset list, live map and reports.
 // Conditions (based on real GPS-fix age, not poll time):
 //   ACTIVE  : last_seen within 24 hours
@@ -9395,6 +9400,13 @@ async function initLiveMap() {
         _liveMap.invalidateSize();
     }
     await _lmLoadTags();
+    // Load asset markers after regular tags
+    await _lmLoadAssets();
+    // Connect to SSE stream for real-time asset updates
+    if (!_assetSSEConnected) {
+        _lmConnectAssetSSE();
+        _assetSSEConnected = true;
+    }
 }
 
 async function _lmLoadTags() {
@@ -9452,6 +9464,136 @@ function _lmPlaceMarkers() {
         const bounds = L.latLngBounds(located.map(t => [parseFloat(t.latitude), parseFloat(t.longitude)]));
         _liveMap.fitBounds(bounds, { padding: [40,40], maxZoom: 16 });
     }
+}
+
+// ── Asset Tracking (QR/NFC markers) ────────────────────────────────────
+async function _lmLoadAssets() {
+    try {
+        const res = await apiFetch('/api/assets');
+        if (!res.ok) {
+            console.warn('Failed to load assets:', res.status);
+            return;
+        }
+        const assets = await res.json();
+        assets.forEach(asset => {
+            if (asset.lat && asset.lng) {
+                _lmUpsertAssetMarker(asset);
+            }
+        });
+        console.log(`Loaded ${assets.length} assets`);
+    } catch (err) {
+        console.warn('Error loading assets:', err);
+    }
+}
+
+function _lmUpsertAssetMarker(asset) {
+    if (!_liveMap || !asset.lat || !asset.lng) return;
+    
+    const latLng = [asset.lat, asset.lng];
+    const assetColor = asset.type_code === 'N' ? '#e65100' : '#006400'; // Orange for NFC, Green for QR
+    
+    // Create or update marker
+    if (_lmAssetMarkers[asset.id]) {
+        // Update existing marker
+        _lmAssetMarkers[asset.id].setLatLng(latLng);
+    } else {
+        // Create new marker with custom icon
+        const icon = L.divIcon({
+            className: '',
+            html: `<div style="width:14px;height:14px;border-radius:50%;background:${assetColor};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`,
+            iconSize: [14, 14],
+            iconAnchor: [7, 7]
+        });
+        
+        const marker = L.marker(latLng, { icon })
+            .addTo(_liveMap)
+            .bindPopup(_lmBuildAssetPopup(asset), { maxWidth: 240 });
+        
+        _lmAssetMarkers[asset.id] = marker;
+    }
+    
+    // Update popup content
+    _lmAssetMarkers[asset.id].setPopupContent(_lmBuildAssetPopup(asset));
+    
+    // Create or update accuracy circle
+    if (asset.accuracy) {
+        if (_lmAccuracyCircles[asset.id]) {
+            _lmAccuracyCircles[asset.id].setLatLng(latLng).setRadius(asset.accuracy);
+        } else {
+            _lmAccuracyCircles[asset.id] = L.circle(latLng, {
+                radius: asset.accuracy,
+                color: assetColor,
+                fillOpacity: 0.06,
+                weight: 1,
+                dashArray: '4 4'
+            }).addTo(_liveMap);
+        }
+    }
+}
+
+function _lmBuildAssetPopup(asset) {
+    const typeLabels = { Q: 'QR Code', N: 'NFC Tag' };
+    const type = typeLabels[asset.type_code] || 'Manual';
+    const seen = asset.last_seen ? new Date(asset.last_seen).toLocaleString() : '-';
+    const acc = asset.accuracy ? `±${Math.round(asset.accuracy)}m` : '-';
+    
+    return `
+        <div style="font-family:system-ui;min-width:180px">
+            <b style="font-size:14px">${esc(asset.name || asset.id)}</b>
+            <div style="font-size:11px;color:#888;font-family:monospace;margin:4px 0 8px">${esc(asset.id)}</div>
+            <table style="font-size:12px;width:100%">
+                <tr><td style="color:#888">Type</td><td style="text-align:right">${type}</td></tr>
+                <tr><td style="color:#888">GPS accuracy</td><td style="text-align:right">${acc}</td></tr>
+                <tr><td style="color:#888">Total scans</td><td style="text-align:right">${asset.scan_count || '-'}</td></tr>
+                <tr><td style="color:#888">Last seen</td><td style="text-align:right">${seen}</td></tr>
+            </table>
+            <a href="/api/assets/${esc(asset.id)}/history" 
+               style="display:block;margin-top:10px;font-size:12px;color:#006400;text-align:center;padding:5px;background:#e6f2e6;border-radius:5px;text-decoration:none"
+               target="_blank">View scan history</a>
+        </div>
+    `;
+}
+
+function _lmConnectAssetSSE() {
+    if (!window.EventSource) {
+        console.warn('EventSource not supported - real-time asset updates disabled');
+        return;
+    }
+    
+    const eventSource = new EventSource('/api/scan/events');
+    
+    eventSource.onopen = () => {
+        console.log('✓ Asset SSE connected');
+    };
+    
+    eventSource.onmessage = (e) => {
+        try {
+            const data = JSON.parse(e.data);
+            
+            if (data.type === 'location_update') {
+                // Update asset marker in real-time
+                _lmUpsertAssetMarker({
+                    id: data.asset_id,
+                    name: data.asset_name,
+                    type_code: data.type_code,
+                    lat: data.lat,
+                    lng: data.lng,
+                    accuracy: data.accuracy,
+                    scan_count: data.scan_count,
+                    last_seen: data.timestamp
+                });
+                console.log('Asset updated:', data.asset_id);
+            }
+        } catch (err) {
+            console.error('Error processing SSE message:', err);
+        }
+    };
+    
+    eventSource.onerror = (err) => {
+        console.warn('Asset SSE connection error (will auto-reconnect):', err);
+    };
+    
+    // EventSource automatically reconnects on disconnect
 }
 
 function lmShareTag(imei, ev) {

@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Asset Scan — Pinplot</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --primary: #006400;
+  --primary-hover: #004d00;
+  --primary-light: #e6f2e6;
+  --bg: #f2f5f2;
+  --surface: #ffffff;
+  --border: #dde3dd;
+  --text-primary: #1a1a18;
+  --text-secondary: #4a5a4a;
+  --text-muted: #7a8a7a;
+  --success-bg: #e6f2e6;
+  --success-text: #006400;
+  --error-bg: #ffebee;
+  --error-text: #c62828;
+  --shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+html, body {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px 24px;
+  box-shadow: var(--shadow);
+  text-align: center;
+  width: 100%;
+}
+
+.icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 20px;
+  background: var(--primary-light);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon svg {
+  width: 32px;
+  height: 32px;
+  stroke: var(--primary);
+  fill: none;
+  stroke-width: 2;
+}
+
+h1 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.asset-id {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-family: monospace;
+  margin-bottom: 20px;
+}
+
+.status {
+  font-size: 15px;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 16px;
+  border: 3px solid var(--primary-light);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.success-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  background: var(--success-bg);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.success-icon svg {
+  width: 28px;
+  height: 28px;
+  stroke: var(--success-text);
+  stroke-width: 3;
+}
+
+.error-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  background: var(--error-bg);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.error-icon svg {
+  width: 28px;
+  height: 28px;
+  stroke: var(--error-text);
+  stroke-width: 3;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  color: var(--text-muted);
+}
+
+.detail-value {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.btn {
+  display: inline-block;
+  width: 100%;
+  padding: 14px 24px;
+  margin-top: 20px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn:hover {
+  background: var(--primary-hover);
+}
+
+.btn-secondary {
+  background: var(--surface);
+  color: var(--primary);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  background: var(--primary-light);
+}
+
+.hidden {
+  display: none;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="card">
+    <!-- Icon -->
+    <div class="icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+        <circle cx="12" cy="10" r="3"></circle>
+      </svg>
+    </div>
+
+    <!-- Initial State -->
+    <div id="initial-state">
+      <h1 id="asset-name">Loading asset...</h1>
+      <p class="asset-id" id="asset-id"></p>
+      <div class="spinner"></div>
+      <p class="status">Acquiring GPS location...</p>
+    </div>
+
+    <!-- Success State -->
+    <div id="success-state" class="hidden">
+      <div class="success-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+      <h1>Location Updated!</h1>
+      <p class="status">Your scan has been recorded successfully.</p>
+      
+      <div style="margin: 20px 0;">
+        <div class="detail-row">
+          <span class="detail-label">Asset</span>
+          <span class="detail-value" id="success-asset-name"></span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">GPS Accuracy</span>
+          <span class="detail-value" id="success-accuracy"></span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Scan Count</span>
+          <span class="detail-value" id="success-scan-count"></span>
+        </div>
+      </div>
+
+      <a href="/" class="btn">View on Map</a>
+    </div>
+
+    <!-- Error State -->
+    <div id="error-state" class="hidden">
+      <div class="error-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+      </div>
+      <h1>Scan Failed</h1>
+      <p class="status" id="error-message"></p>
+      <button class="btn btn-secondary" onclick="location.reload()">Try Again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const BASE_URL = window.location.origin;
+let assetId = '';
+let assetName = '';
+
+// Extract asset ID from URL path (/asset/HPSQ123...)
+function extractAssetId() {
+  const path = window.location.pathname;
+  const match = path.match(/\/asset\/([A-Z0-9]+)/);
+  return match ? match[1] : '';
+}
+
+// Fetch asset details
+async function fetchAssetDetails(id) {
+  try {
+    const response = await fetch(`${BASE_URL}/api/assets/${id}`);
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Asset not found. This QR code may not be registered yet.');
+      }
+      throw new Error(`Failed to fetch asset details (${response.status})`);
+    }
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching asset:', error);
+    throw error;
+  }
+}
+
+// Request GPS location
+function getLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Geolocation is not supported by your browser.'));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        });
+      },
+      (error) => {
+        let message = 'Unable to get your location.';
+        if (error.code === error.PERMISSION_DENIED) {
+          message = 'Location permission denied. Please enable location access.';
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          message = 'Location information unavailable. Please move to an open area.';
+        } else if (error.code === error.TIMEOUT) {
+          message = 'Location request timed out. Please try again.';
+        }
+        reject(new Error(message));
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0
+      }
+    );
+  });
+}
+
+// Submit scan to API
+async function submitScan(assetId, location) {
+  // Derive source from asset ID prefix
+  let source = 'qr';
+  if (assetId.startsWith('HPSN')) {
+    source = 'nfc';
+  }
+
+  const response = await fetch(`${BASE_URL}/api/scan`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      asset_id: assetId,
+      lat: location.lat,
+      lng: location.lng,
+      accuracy: location.accuracy,
+      source: source
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail?.message || error.detail?.error || 'Failed to record scan');
+  }
+
+  return await response.json();
+}
+
+// Show error state
+function showError(message) {
+  document.getElementById('initial-state').classList.add('hidden');
+  document.getElementById('success-state').classList.add('hidden');
+  document.getElementById('error-state').classList.remove('hidden');
+  document.getElementById('error-message').textContent = message;
+}
+
+// Show success state
+function showSuccess(scanData, location) {
+  document.getElementById('initial-state').classList.add('hidden');
+  document.getElementById('error-state').classList.add('hidden');
+  document.getElementById('success-state').classList.remove('hidden');
+  
+  document.getElementById('success-asset-name').textContent = scanData.asset_name || assetId;
+  document.getElementById('success-accuracy').textContent = location.accuracy 
+    ? `±${Math.round(location.accuracy)}m` 
+    : 'Unknown';
+  document.getElementById('success-scan-count').textContent = scanData.scan_count || 1;
+}
+
+// Main execution
+async function main() {
+  try {
+    // Extract asset ID
+    assetId = extractAssetId();
+    if (!assetId) {
+      showError('Invalid asset ID in URL.');
+      return;
+    }
+
+    document.getElementById('asset-id').textContent = assetId;
+
+    // Fetch asset details
+    const asset = await fetchAssetDetails(assetId);
+    assetName = asset.name || assetId;
+    document.getElementById('asset-name').textContent = assetName;
+
+    // Get GPS location
+    const location = await getLocation();
+
+    // Check accuracy threshold (client-side validation)
+    if (location.accuracy > 500) {
+      showError(`GPS accuracy is too low (±${Math.round(location.accuracy)}m). Please move to an open area with clear sky view for better signal.`);
+      return;
+    }
+
+    // Submit scan
+    const scanData = await submitScan(assetId, location);
+
+    // Show success
+    showSuccess(scanData, location);
+
+  } catch (error) {
+    console.error('Scan error:', error);
+    showError(error.message);
+  }
+}
+
+// Run on page load
+main();
+</script>
+
+</body>
+</html>

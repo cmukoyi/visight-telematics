@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
@@ -193,6 +194,37 @@ app.include_router(hive_router)
 # Include Floor Plan router (BLE indoor tracking via Pareto Anywhere)
 from app.routes_floorplan import router as floorplan_router  # noqa: E402
 app.include_router(floorplan_router)
+
+# Include Asset Tracking routers (QR/NFC scanning)
+from app.routes_assets import router as assets_router  # noqa: E402
+app.include_router(assets_router)
+
+from app.routes_scan import router as scan_router  # noqa: E402
+app.include_router(scan_router)
+
+# Serve static files for asset tracking
+# This will serve files from customer-dashboard/public directory
+static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "customer-dashboard", "public")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+# Asset landing page route (when QR code is scanned)
+@app.get("/asset/{asset_id}")
+async def asset_landing_page(asset_id: str):
+    """Serve the phone scan landing page for QR/NFC scans"""
+    asset_html_path = os.path.join(static_dir, "asset.html")
+    if os.path.exists(asset_html_path):
+        return FileResponse(asset_html_path)
+    return {"error": "Asset landing page not found", "asset_id": asset_id}
+
+# Scanner tool route
+@app.get("/scanner.html")
+async def scanner_tool():
+    """Serve the bulk scanner tool for stocktake operations"""
+    scanner_html_path = os.path.join(static_dir, "scanner.html")
+    if os.path.exists(scanner_html_path):
+        return FileResponse(scanner_html_path)
+    return {"error": "Scanner tool not found"}
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
