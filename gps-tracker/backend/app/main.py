@@ -202,29 +202,21 @@ app.include_router(assets_router)
 from app.routes_scan import router as scan_router  # noqa: E402
 app.include_router(scan_router)
 
-# Serve static files for asset tracking
-# customer-dashboard/public is mounted at /app/static in the container
+# Static files for asset tracking (baked into Docker image at build time)
 static_dir = "/app/static"
-if os.path.exists(static_dir):
-    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # Asset landing page route (when QR code is scanned)
 @app.get("/asset/{asset_id}")
 async def asset_landing_page(asset_id: str):
     """Serve the phone scan landing page for QR/NFC scans"""
-    asset_html_path = os.path.join(static_dir, "asset.html")
-    if os.path.exists(asset_html_path):
-        return FileResponse(asset_html_path)
-    return {"error": "Asset landing page not found", "asset_id": asset_id, "path": asset_html_path}
+    return FileResponse(os.path.join(static_dir, "asset.html"))
 
 # Scanner tool route
 @app.get("/scanner.html")
 async def scanner_tool():
     """Serve the bulk scanner tool for stocktake operations"""
-    scanner_html_path = os.path.join(static_dir, "scanner.html")
-    if os.path.exists(scanner_html_path):
-        return FileResponse(scanner_html_path)
-    return {"error": "Scanner tool not found", "path": scanner_html_path}
+    return FileResponse(os.path.join(static_dir, "scanner.html"))
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

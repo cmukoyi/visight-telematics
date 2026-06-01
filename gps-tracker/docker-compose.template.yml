@@ -43,8 +43,8 @@ services:
 
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./backend/Dockerfile
     container_name: __TENANT_PREFIX___backend
     env_file:
       - ./backend/.env
@@ -65,8 +65,8 @@ services:
       retries: 3
       start_period: 20s
     volumes:
-      - nginx_logs:/var/log/nginx:ro
-      - /var/run/docker.sock:/var/run/docker.sock
+      # Docker socket for container management API (routes_ops.py)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - DEBUG=False
       - ENVIRONMENT=production
