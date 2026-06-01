@@ -8,7 +8,6 @@ Create Date: 2026-06-01 10:00:00.000000
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
-from geoalchemy2 import Geography
 
 # revision identifiers, used by Alembic.
 revision = '040_add_asset_tracking'
@@ -18,9 +17,6 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Enable PostGIS if not already enabled
-    op.execute('CREATE EXTENSION IF NOT EXISTS postgis')
-    
     # Create assets table
     op.create_table(
         'assets',
@@ -43,7 +39,6 @@ def upgrade() -> None:
         sa.Column('lat', sa.Float(), nullable=False),
         sa.Column('lng', sa.Float(), nullable=False),
         sa.Column('accuracy', sa.Float(), nullable=True),
-        sa.Column('location', Geography('POINT', srid=4326), nullable=True),
         sa.Column('source', sa.String(10), server_default='qr', nullable=False),
         sa.Column('scanned_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column('scanner_ip', sa.String(45), nullable=True),
@@ -54,7 +49,6 @@ def upgrade() -> None:
     # Create indexes for scan_events
     op.create_index('idx_scan_events_asset_id', 'scan_events', ['asset_id'])
     op.create_index('idx_scan_events_scanned_at', 'scan_events', [sa.text('scanned_at DESC')])
-    op.execute('CREATE INDEX idx_scan_events_location ON scan_events USING GIST(location)')
     
     # Create asset_locations table
     op.create_table(
@@ -63,14 +57,10 @@ def upgrade() -> None:
         sa.Column('lat', sa.Float(), nullable=False),
         sa.Column('lng', sa.Float(), nullable=False),
         sa.Column('accuracy', sa.Float(), nullable=True),
-        sa.Column('location', Geography('POINT', srid=4326), nullable=True),
         sa.Column('source', sa.String(10), server_default='qr', nullable=False),
         sa.Column('last_seen', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column('scan_count', sa.Integer(), server_default='1', nullable=False)
     )
-    
-    # Create spatial index for asset_locations
-    op.execute('CREATE INDEX idx_asset_locations_location ON asset_locations USING GIST(location)')
     
     # Create trigger function for updated_at
     op.execute('''
@@ -95,9 +85,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.execute('DROP TRIGGER IF EXISTS assets_updated_at ON assets')
     op.execute('DROP FUNCTION IF EXISTS update_updated_at()')
-    op.drop_index('idx_asset_locations_location', table_name='asset_locations')
     op.drop_table('asset_locations')
-    op.drop_index('idx_scan_events_location', table_name='scan_events')
     op.drop_index('idx_scan_events_scanned_at', table_name='scan_events')
     op.drop_index('idx_scan_events_asset_id', table_name='scan_events')
     op.drop_table('scan_events')
