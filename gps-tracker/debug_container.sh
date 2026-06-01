@@ -6,16 +6,18 @@ echo "Container Static File Debug"
 echo "=================================="
 echo ""
 
-BACKEND_CONTAINER="beacon_telematics_backend"
+# Auto-detect backend container name
+BACKEND_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '(backend|pinplot_backend|beacon.*backend)' | head -n1)
 
-# Check if container is running
-if ! docker ps --format '{{.Names}}' | grep -q "^${BACKEND_CONTAINER}$"; then
-    echo "❌ Backend container is not running!"
+if [ -z "$BACKEND_CONTAINER" ]; then
+    echo "❌ No backend container found!"
     echo ""
     echo "Available containers:"
     docker ps --format 'table {{.Names}}\t{{.Status}}'
     exit 1
 fi
+
+echo "✅ Found backend container: $BACKEND_CONTAINER"
 
 echo "✅ Container ${BACKEND_CONTAINER} is running"
 echo ""

@@ -9,6 +9,31 @@ echo "QR Asset End-to-End Test"
 echo "=================================="
 echo ""
 
+# Auto-detect container names
+DB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '(db|pinplot_db|beacon.*db)' | head -n1)
+BACKEND_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '(backend|pinplot_backend|beacon.*backend)' | head -n1)
+
+if [ -z "$DB_CONTAINER" ]; then
+    echo "❌ Database container not found!"
+    docker ps --format 'table {{.Names}}\t{{.Status}}'
+    exit 1
+fi
+
+if [ -z "$BACKEND_CONTAINER" ]; then
+    echo "❌ Backend container not found!"
+    docker ps --format 'table {{.Names}}\t{{.Status}}'
+    exit 1
+fi
+
+# Auto-detect database credentials from environment
+DB_USER=$(docker exec "$DB_CONTAINER" env | grep POSTGRES_USER | cut -d'=' -f2 || echo "postgres")
+DB_NAME=$(docker exec "$DB_CONTAINER" env | grep POSTGRES_DB | cut -d'=' -f2 || echo "postgres")
+
+echo "🔧 Using DB container: $DB_CONTAINER"
+echo "🔧 Using backend container: $BACKEND_CONTAINER"
+echo "🔧 Database: $DB_NAME, User: $DB_USER"
+echo ""
+
 # Generate unique test IMEI
 TEST_IMEI="HPSQ$(date +%s)$(shuf -i 100-999 -n 1)"
 echo "🔑 Test IMEI: $TEST_IMEI"
@@ -37,7 +62,7 @@ elif echo "$REGISTER_RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
     echo "❌ Asset registration failed: $(echo "$REGISTER_RESPONSE" | jq -r '.error')"
     echo ""
     echo "Checking backend logs for errors..."
-    docker logs --tail 50 beacon_telematics_backend
+    docker logs --tail 50 "$BACKEND_CONTAINER"
     exit 1
 else
     echo "❌ Unexpected response"
@@ -48,7 +73,7 @@ echo ""
 # Test 3: Verify in Database
 echo "Test 3: Verify Asset in Database"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-docker exec pinplot_db psql -U pinplot_user -d pinplot_db -c \
+docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -c \
   "SELECT imei, tag_type, device_name, user_id, is_active FROM ble_tags WHERE imei = '$TEST_IMEI';"
 
 echo "✅ Asset found in ble_tags table"
@@ -114,7 +139,7 @@ echo ""
 # Test 7: Verify Location in Database
 echo "Test 7: Verify Location Updated in Database"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-docker exec pinplot_db psql -U pinplot_user -d pinplot_db -c \
+docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -c \
   "SELECT imei, latitude, longitude, last_seen FROM ble_tags WHERE imei = '$TEST_IMEI';"
 
 echo "✅ Location data persisted"
@@ -146,14 +171,14 @@ echo ""
 # Test 9: Check Static File Mounting
 echo "Test 9: Verify Static Files Mounted"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if docker exec pinplot_backend test -f /app/static/asset.html; then
+if docker exec "$BACKEND_CONTAINER" test -f /app/static/asset.html; then
     echo "✅ asset.html exists at /app/static/asset.html"
 else
     echo "❌ asset.html NOT found in container"
     exit 1
 fi
 
-if docker exec pinplot_backend test -f /app/static/scanner.html; then
+if docker exec "$BACKEND_CONTAINER" test -f /app/static/scanner.html; then
     echo "✅ scanner.html exists at /app/static/scanner.html"
 else
     echo "⚠️  scanner.html NOT found in container (non-critical)"
