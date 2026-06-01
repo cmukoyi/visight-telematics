@@ -24,17 +24,23 @@ echo ""
 # Test 2: Register QR Asset
 echo "Test 2: Register QR Asset"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-REGISTER_RESPONSE=$(curl -s -X POST http://localhost:8001/api/qr-assets/register \
+REGISTER_RESPONSE=$(curl -s --max-time 10 -X POST http://localhost:8001/api/qr-assets/register \
   -H "Content-Type: application/json" \
-  -d "{\"imei\":\"$TEST_IMEI\",\"type_code\":\"Q\"}")
+  -d "{\"imei\":\"$TEST_IMEI\",\"type_code\":\"Q\"}" || echo '{"error":"Request timeout or connection failed"}')
 
-echo "$REGISTER_RESPONSE" | jq '.'
+echo "$REGISTER_RESPONSE" | jq '.' 2>/dev/null || echo "$REGISTER_RESPONSE"
 
-if echo "$REGISTER_RESPONSE" | jq -e '.success == true' > /dev/null; then
+if echo "$REGISTER_RESPONSE" | jq -e '.success == true' > /dev/null 2>&1; then
     TAG_ID=$(echo "$REGISTER_RESPONSE" | jq -r '.tag_id')
     echo "✅ Asset registered successfully (tag_id: $TAG_ID)"
+elif echo "$REGISTER_RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
+    echo "❌ Asset registration failed: $(echo "$REGISTER_RESPONSE" | jq -r '.error')"
+    echo ""
+    echo "Checking backend logs for errors..."
+    docker logs --tail 50 beacon_telematics_backend
+    exit 1
 else
-    echo "❌ Asset registration failed"
+    echo "❌ Unexpected response"
     exit 1
 fi
 echo ""
@@ -51,11 +57,11 @@ echo ""
 # Test 4: Re-register (should return "Already registered")
 echo "Test 4: Test Idempotency (re-register same asset)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-REREGISTER_RESPONSE=$(curl -s -X POST http://localhost:8001/api/qr-assets/register \
+REREGISTER_RESPONSE=$(curl -s --max-time 10 -X POST http://localhost:8001/api/qr-assets/register \
   -H "Content-Type: application/json" \
-  -d "{\"imei\":\"$TEST_IMEI\",\"type_code\":\"Q\"}")
+  -d "{\"imei\":\"$TEST_IMEI\",\"type_code\":\"Q\"}" || echo '{"error":"timeout"}')
 
-echo "$REREGISTER_RESPONSE" | jq '.'
+echo "$REREGISTER_RESPONSE" | jq '.' 2>/dev/null || echo "$REREGISTER_RESPONSE"
 
 if echo "$REREGISTER_RESPONSE" | jq -e '.message | contains("Already registered")' > /dev/null; then
     echo "✅ Idempotency check passed"
@@ -67,13 +73,17 @@ echo ""
 # Test 5: Check Asset Landing Page
 echo "Test 5: Asset Landing Page"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8001/asset/$TEST_IMEI)
+HTTP_CODE=$(curl -s --max-time 10 -o /dev/null -w "%{http_code}" http://localhost:8001/asset/$TEST_IMEI)
 
 if [ "$HTTP_CODE" = "200" ]; then
     echo "✅ Asset landing page loads (HTTP $HTTP_CODE)"
 else
     echo "❌ Asset landing page failed (HTTP $HTTP_CODE)"
-    curl -s http://localhost:8001/asset/$TEST_IMEI
+    RESPONSE=$(curl -s --max-time 5 http://localhost:8001/asset/$TEST_IMEI)
+    echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
+    echo ""
+    echo "This error means /app/static/asset.html is missing in backend container."
+    echo "Run: bash debug_container.sh"
     exit 1
 fi
 echo ""
@@ -81,7 +91,7 @@ echo ""
 # Test 6: Record GPS Scan
 echo "Test 6: Record GPS Scan"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-SCAN_RESPONSE=$(curl -s -X POST http://localhost:8001/api/scan \
+SCAN_RESPONSE=$(curl -s --max-time 10 -X POST http://localhost:8001/api/scan \
   -H "Content-Type: application/json" \
   -d "{
     \"asset_id\":\"$TEST_IMEI\",
@@ -89,9 +99,9 @@ SCAN_RESPONSE=$(curl -s -X POST http://localhost:8001/api/scan \
     \"lng\":-0.1278,
     \"accuracy\":25.5,
     \"source\":\"qr\"
-  }")
+  }" || echo '{"error":"timeout"}')
 
-echo "$SCAN_RESPONSE" | jq '.'
+echo "$SCAN_RESPONSE" | jq '.' 2>/dev/null || echo "$SCAN_RESPONSE"
 
 if echo "$SCAN_RESPONSE" | jq -e '.success == true' > /dev/null; then
     echo "✅ GPS scan recorded successfully"
