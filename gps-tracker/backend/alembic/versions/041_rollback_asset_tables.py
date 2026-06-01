@@ -19,10 +19,11 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Drop the asset tracking tables (no longer needed)
-    op.drop_table('scan_events')
-    op.drop_table('asset_locations')
-    op.drop_table('assets')
+    # Drop the asset tracking tables if they exist (no longer needed)
+    # Use raw SQL with IF EXISTS since tables may not exist if 040 failed
+    op.execute('DROP TABLE IF EXISTS scan_events CASCADE')
+    op.execute('DROP TABLE IF EXISTS asset_locations CASCADE')
+    op.execute('DROP TABLE IF EXISTS assets CASCADE')
 
 
 def downgrade() -> None:
