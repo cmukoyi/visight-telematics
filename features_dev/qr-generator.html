@@ -3685,14 +3685,12 @@ function exportClean(callback) {
 // Silent fire-and-forget — never blocks or errors the download.
 function registerAsset(id, typeCode) {
   if (!id) return;
-  var PINPLOT_API = 'https://pinplot.me/api/assets';
+  var PINPLOT_API = 'https://pinplot.me/api/qr-assets/register';
   
-  // Prepare payload with series 3 and default package
+  // Prepare payload for series_3 tag registration
   var payload = {
-    id: id,
-    type_code: typeCode,
-    category: 'series_3',  // Series 3 assets
-    notes: 'Default package - Auto-registered from QR/NFC generator'
+    imei: id,
+    type_code: typeCode
   };
   
   fetch(PINPLOT_API, {
@@ -3701,12 +3699,10 @@ function registerAsset(id, typeCode) {
     body:    JSON.stringify(payload)
   })
   .then(function(r) {
-    if (r.status === 409) {
-      console.log('[Pinplot] Asset already registered:', id);
-      return; // already registered — fine
-    }
     if (r.ok) {
-      console.log('[Pinplot] Asset registered:', id);
+      return r.json().then(function(data) {
+        console.log('[Pinplot] Asset registered as series_3 tag:', data);
+      });
     } else {
       console.warn('[Pinplot] Asset registration failed:', r.status);
     }

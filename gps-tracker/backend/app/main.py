@@ -203,8 +203,8 @@ from app.routes_scan import router as scan_router  # noqa: E402
 app.include_router(scan_router)
 
 # Serve static files for asset tracking
-# This will serve files from customer-dashboard/public directory
-static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "customer-dashboard", "public")
+# customer-dashboard/public is mounted at /app/static in the container
+static_dir = "/app/static"
 if os.path.exists(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
@@ -215,7 +215,7 @@ async def asset_landing_page(asset_id: str):
     asset_html_path = os.path.join(static_dir, "asset.html")
     if os.path.exists(asset_html_path):
         return FileResponse(asset_html_path)
-    return {"error": "Asset landing page not found", "asset_id": asset_id}
+    return {"error": "Asset landing page not found", "asset_id": asset_id, "path": asset_html_path}
 
 # Scanner tool route
 @app.get("/scanner.html")
@@ -224,7 +224,7 @@ async def scanner_tool():
     scanner_html_path = os.path.join(static_dir, "scanner.html")
     if os.path.exists(scanner_html_path):
         return FileResponse(scanner_html_path)
-    return {"error": "Scanner tool not found"}
+    return {"error": "Scanner tool not found", "path": scanner_html_path}
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
