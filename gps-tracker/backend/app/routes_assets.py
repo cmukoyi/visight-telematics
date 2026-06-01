@@ -41,6 +41,7 @@ async def register_qr_asset(body: QRAssetRegister, db: Session = Depends(get_db)
     # Create ble_tags row for series_3 QR asset
     asset_type = 'QR' if body.type_code == 'Q' else 'NFC'
     tag = BLETag(
+        user_id=None,  # QR assets are public (no user ownership)
         imei=body.imei,
         tag_type='series_3',
         device_name=f"{asset_type} Asset {body.imei[:8]}",

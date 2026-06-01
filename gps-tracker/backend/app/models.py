@@ -94,7 +94,7 @@ class BLETag(Base):
     __tablename__ = "ble_tags"
     
     id = get_uuid_column()
-    user_id = get_uuid_fk("users.id")
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True)  # Nullable for series_3 QR assets
     imei = Column(String(50), unique=True, nullable=False, index=True)
     device_name = Column(String(100))
     device_model = Column(String(100))
