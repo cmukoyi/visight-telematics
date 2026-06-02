@@ -278,23 +278,10 @@ function extractAssetId() {
   return match ? match[1] : '';
 }
 
-// Fetch asset details
-async function fetchAssetDetails(id) {
-  try {
-    const response = await fetch(`${BASE_URL}/api/assets/${id}`);
-    if (!response.ok) {
-      if (response.status === 404) {
-        throw new Error('Asset not found. This QR code may not be registered yet.');
-      }
-      throw new Error(`Failed to fetch asset details (${response.status})`);
-    }
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error fetching asset:', error);
-    throw error;
-  }
-}
+// Legacy note:
+// We intentionally do not pre-fetch /api/assets/{id} because that endpoint is
+// not guaranteed to exist for public QR scans across tenants/routes.
+// /api/scan is the source of truth and returns 404 when an asset is truly missing.
 
 // Request GPS location
 function getLocation() {
@@ -393,9 +380,8 @@ async function main() {
 
     document.getElementById('asset-id').textContent = assetId;
 
-    // Fetch asset details
-    const asset = await fetchAssetDetails(assetId);
-    assetName = asset.name || assetId;
+    // Use ID as fallback display name; /api/scan response returns resolved name.
+    assetName = assetId;
     document.getElementById('asset-name').textContent = assetName;
 
     // Get GPS location
