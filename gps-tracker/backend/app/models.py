@@ -752,6 +752,11 @@ class HiveEvaluation(Base):
     # distinguish a suppressed evaluation (in transit) from a real OK.
     motion_state          = Column(String(20), nullable=True)
     centroid_speed_kmh    = Column(Float, nullable=True)
+    positions_used        = Column(Text, nullable=True)   # JSON array of (tag_id, observed_at)
+    max_pair_dt_s         = Column(Float, nullable=True)
+    coherent_pair_count   = Column(Integer, nullable=True)
+    incoherent_pair_count = Column(Integer, nullable=True)
+    breach_evidence       = Column(String(30), nullable=True)
 
     hive = relationship("Hive", back_populates="evaluations")
 

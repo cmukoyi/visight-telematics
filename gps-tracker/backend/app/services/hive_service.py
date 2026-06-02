@@ -104,6 +104,131 @@ def pairwise_max_distance_and_outlier(
     return max_dist, outlier
 
 
+def _profile_coherence_window_s(profile: Optional[str]) -> int:
+    """Per-profile temporal coherence window used by v1.2 evaluation."""
+    p = (profile or "").strip().lower()
+    if p == "stationary":
+        return 30 * 60
+    if p == "slow":
+        return 10 * 60
+    # default/mobile
+    return 5 * 60
+
+
+def pairwise_temporal_eval(
+    positions: List[Tuple[str, float, float, datetime]],
+    threshold_m: float,
+    coherence_window_s: int,
+) -> Tuple[
+    Optional[float],  # display diameter (all candidate pairs)
+    Optional[float],  # coherent diameter (only temporally coherent pairs)
+    Optional[str],    # coherent outlier
+    int,              # coherent_pair_count
+    int,              # incoherent_pair_count
+    Optional[float],  # max_pair_dt_s
+]:
+    """Evaluate pairwise distances with a temporal coherence gate.
+
+    v1.2 semantics:
+    - display diameter is computed from all candidate pairs
+    - coherent diameter/outlier are computed only from pairs where
+      |observed_at(A) - observed_at(B)| <= coherence_window_s
+    """
+    if len(positions) < 2:
+        return None, None, None, 0, 0, None
+
+    display_max = 0.0
+    coherent_max: Optional[float] = None
+    coherent_pair_count = 0
+    incoherent_pair_count = 0
+    max_pair_dt_s = 0.0
+    breaching_pair_counts: Dict[str, int] = {tid: 0 for tid, _, _, _ in positions}
+
+    for i, (tid_a, lat_a, lon_a, ts_a) in enumerate(positions):
+        for tid_b, lat_b, lon_b, ts_b in positions[i + 1:]:
+            d = haversine_m(lat_a, lon_a, lat_b, lon_b)
+            if d > display_max:
+                display_max = d
+
+            dt_s = abs((ts_a - ts_b).total_seconds())
+            if dt_s > max_pair_dt_s:
+                max_pair_dt_s = dt_s
+
+            if dt_s <= coherence_window_s:
+                coherent_pair_count += 1
+                if coherent_max is None or d > coherent_max:
+                    coherent_max = d
+                if d > threshold_m:
+                    breaching_pair_counts[tid_a] += 1
+                    breaching_pair_counts[tid_b] += 1
+            else:
+                incoherent_pair_count += 1
+
+    outlier = None
+    if coherent_pair_count > 0:
+        max_count = max(breaching_pair_counts.values())
+        if max_count > 0:
+            candidates = [tid for tid, cnt in breaching_pair_counts.items() if cnt == max_count]
+            outlier = sorted(candidates)[0]
+
+    return display_max, coherent_max, outlier, coherent_pair_count, incoherent_pair_count, max_pair_dt_s
+
+
+def _snapshot_fingerprint(positions: List[Tuple[str, float, float, datetime]]) -> Optional[str]:
+    """Stable fingerprint of the position set feeding this evaluation."""
+    payload = _positions_used_payload(positions)
+    if not payload:
+        return None
+    return "|".join(f"{item['tag_id']}@{item['observed_at']}" for item in payload)
+
+
+def _positions_used_payload(positions: List[Tuple[str, float, float, datetime]]) -> List[Dict[str, str]]:
+    """Canonical JSON-safe representation of the position set used for evaluation."""
+    payload: List[Dict[str, str]] = []
+    for tid, _lat, _lng, ts in positions:
+        ts_utc = ts if ts.tzinfo else ts.replace(tzinfo=UTC)
+        payload.append({
+            "tag_id": tid,
+            "observed_at": ts_utc.astimezone(UTC).isoformat(),
+        })
+    payload.sort(key=lambda item: (item["tag_id"], item["observed_at"]))
+    return payload
+
+
+def _previous_snapshot_fingerprint(hive_id: str, db: Session) -> Optional[str]:
+    """Read prior evaluation fingerprint from explicit positions_used or legacy metadata."""
+    prev = (
+        db.query(HiveEvaluation)
+        .filter(HiveEvaluation.hive_id == hive_id)
+        .order_by(HiveEvaluation.evaluated_at.desc())
+        .first()
+    )
+    if not prev:
+        return None
+    if prev.positions_used:
+        try:
+            payload = json.loads(prev.positions_used)
+        except Exception:
+            payload = None
+        if isinstance(payload, list) and payload:
+            return "|".join(
+                f"{item.get('tag_id')}@{item.get('observed_at')}"
+                for item in payload
+                if isinstance(item, dict) and item.get("tag_id") and item.get("observed_at")
+            ) or None
+    if not prev.freshness_composition:
+        return None
+    try:
+        payload = json.loads(prev.freshness_composition)
+    except Exception:
+        return None
+    meta = payload.get("meta") if isinstance(payload, dict) else None
+    if isinstance(meta, dict):
+        fp = meta.get("snapshot_fingerprint")
+        return fp if isinstance(fp, str) and fp else None
+    return None
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Freshness tier
 # ──────────────────────────────────────────────────────────────────────────────
@@ -163,7 +288,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
 
     fresh_positions: List[Tuple[str, float, float]] = []
     fresh_recent_positions: List[Tuple[str, float, float]] = []
-    usable_positions: List[Tuple[str, float, float]] = []   # fresh + recent + stale (anything not fully lost)
+    candidate_positions: List[Tuple[str, float, float, datetime]] = []
     composition = {"fresh": 0, "recent": 0, "stale": 0, "lost": 0}
 
     for m in memberships:
@@ -172,27 +297,42 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
             continue
         tier = freshness_tier(tag.last_seen, cfg)
         composition[tier] += 1
-        if tag.latitude and tag.longitude:
+        if tag.latitude and tag.longitude and tag.last_seen:
             try:
                 lat, lon = float(tag.latitude), float(tag.longitude)
             except (TypeError, ValueError):
                 continue
+            ts = tag.last_seen if tag.last_seen.tzinfo else tag.last_seen.replace(tzinfo=UTC)
             if tier in ("fresh", "recent", "stale"):
-                usable_positions.append((m.tag_id, lat, lon))
+                candidate_positions.append((m.tag_id, lat, lon, ts))
             if tier in ("fresh", "recent"):
                 fresh_recent_positions.append((m.tag_id, lat, lon))
             if tier == "fresh":
                 fresh_positions.append((m.tag_id, lat, lon))
 
-    # ── Compute diameter ───────────────────────────────────────────────
-    # Prefer fresh+recent; fall back to stale so a hive with infrequent
-    # GPS reports still surfaces a diameter and can detect breach (with
-    # 'low' confidence). Tags fully 'lost' are excluded.
+    # ── Compute diameter with v1.2 temporal coherence rules ───────────
     threshold_m = cfg.distance_threshold_m
-    if len(fresh_recent_positions) >= 2:
-        diameter_m, outlier_id = pairwise_max_distance_and_outlier(fresh_recent_positions, threshold_m)
+    coherence_window_s = _profile_coherence_window_s(getattr(cfg, "mobility_profile", None))
+    if len(candidate_positions) >= 2:
+        display_diameter_m, coherent_diameter_m, outlier_id, coherent_pair_count, incoherent_pair_count, max_pair_dt_s = (
+            pairwise_temporal_eval(candidate_positions, threshold_m, coherence_window_s)
+        )
     else:
-        diameter_m, outlier_id = pairwise_max_distance_and_outlier(usable_positions, threshold_m)
+        display_diameter_m = None
+        coherent_diameter_m = None
+        outlier_id = None
+        coherent_pair_count = 0
+        incoherent_pair_count = 0
+        max_pair_dt_s = None
+
+    # Keep UI-facing diameter, but gate state transitions on coherent evidence.
+    diameter_m = display_diameter_m
+
+    snapshot_fp = _snapshot_fingerprint(candidate_positions)
+    prev_snapshot_fp = _previous_snapshot_fingerprint(hive_id, db)
+    stale_snapshot = bool(snapshot_fp and prev_snapshot_fp and snapshot_fp == prev_snapshot_fp)
+
+    positions_used_payload = _positions_used_payload(candidate_positions)
 
     # No meaningful spread — clear outlier so UI doesn't flag a tag incorrectly
     if diameter_m is not None and diameter_m < cfg.meaningful_change_m:
@@ -231,43 +371,30 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
     prev_state = live.alert_state or "OK"
     new_state = prev_state
     confidence = None
-    # True iff this cycle should auto-resolve any active breach because the
-    # hive just entered the motion lifecycle (spec §11.6).
-    resolve_by_transit = (
-        motion_decision.changed
-        and motion_decision.state == HiveMotionState.PRE_TRANSIT.value
-        and prev_state in ("BREACH_PENDING", "BREACHING", "RESOLVING")
-    )
+    # v1.2: motion state is retained for diagnostics only and does not gate alerts.
+    resolve_by_transit = False
 
-    if resolve_by_transit:
-        # Force-resolve: hive is on the move, proximity is meaningless.
-        new_state = "OK"
-        confidence = None
-        live.pending_breach_since = None
-        live.pending_clear_since = None
-        live.consecutive_confirms = 0
-    elif motion_decision.suppress_proximity:
-        # PRE_TRANSIT / IN_TRANSIT / SETTLING — hold current alert state,
-        # don't run the proximity machine. Note any active BREACHING from
-        # before motion-entry would have been resolved above.
-        pass
-    elif settling or diameter_m is None:
+    if settling or diameter_m is None:
         # Not enough data / still in creation-time settling window —
         # hold current OK / RESOLVING.
         new_state = "OK" if prev_state in ("OK", "BREACH_PENDING") else prev_state
     else:
-        is_breaching = diameter_m > threshold
+        is_breaching = coherent_diameter_m is not None and coherent_diameter_m > threshold
         clear_threshold = threshold * (cfg.hysteresis_pct / 100.0)
-        is_cleared = diameter_m <= clear_threshold
+        is_cleared = coherent_diameter_m is not None and coherent_diameter_m <= clear_threshold
+        required_confirms = max(int(cfg.confirmation_count or 1), 2)
 
         # Confidence: high if we have ≥ confirmation_count fresh tags
-        confidence = "high" if len(fresh_positions) >= cfg.confirmation_count else "low"
+        confidence = "high" if len(fresh_positions) >= required_confirms else "low"
+
+        # Rule 2: stale snapshot cannot advance the breach state machine.
+        can_advance_breach = not stale_snapshot
 
         if prev_state == "OK":
-            if is_breaching:
+            if is_breaching and can_advance_breach:
                 live.pending_breach_since = now
                 live.consecutive_confirms = 1
-                if confidence == "high" and 1 >= cfg.confirmation_count:
+                if confidence == "high" and 1 >= required_confirms:
                     new_state = "BREACHING"
                 else:
                     # Low-confidence (stale GPS) or pending confirmation
@@ -279,10 +406,11 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
                 new_state = "OK"
                 live.pending_breach_since = None
                 live.consecutive_confirms = 0
-            else:
+            elif can_advance_breach:
                 live.consecutive_confirms = (live.consecutive_confirms or 0) + 1
-                if live.consecutive_confirms >= cfg.confirmation_count:
+                if live.consecutive_confirms >= required_confirms:
                     new_state = "BREACHING"
+            # stale snapshot: hold BREACH_PENDING without incrementing confirms
 
         elif prev_state == "BREACHING":
             if is_cleared:
@@ -301,6 +429,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
                 live.consecutive_confirms = 0
 
     state_changed = new_state != prev_state
+    alert_diameter_m = coherent_diameter_m if coherent_diameter_m is not None else diameter_m
 
     # ── Diagnostic logging (HIVE bug fix — May 2026) ──────────────────
     # Structured log capturing full evaluation state for debugging motion
@@ -330,9 +459,15 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
             },
             "proximity": {
                 "diameter_m": round(diameter_m, 1) if diameter_m else None,
+                "coherent_diameter_m": round(coherent_diameter_m, 1) if coherent_diameter_m else None,
                 "threshold_m": threshold,
-                "is_breaching": diameter_m > threshold if diameter_m else False,
+                "is_breaching": coherent_diameter_m > threshold if coherent_diameter_m else False,
                 "outlier_tag_id": outlier_id,
+                "coherence_window_s": coherence_window_s,
+                "coherent_pair_count": coherent_pair_count,
+                "incoherent_pair_count": incoherent_pair_count,
+                "max_pair_dt_s": max_pair_dt_s,
+                "stale_snapshot": stale_snapshot,
                 "fresh_count": len(fresh_positions),
                 "recent_count": len(fresh_recent_positions) - len(fresh_positions),
                 "stale_count": composition.get("stale", 0),
@@ -348,6 +483,28 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
 
     # ── Persist evaluation record ──────────────────────────────────────
     eval_id = str(uuid.uuid4())
+    if stale_snapshot:
+        breach_evidence = "stale_snapshot"
+    elif coherent_diameter_m is not None and coherent_diameter_m > threshold:
+        breach_evidence = "coherent"
+    elif coherent_pair_count == 0 and incoherent_pair_count > 0 and diameter_m and diameter_m > threshold:
+        breach_evidence = "incoherent_only"
+    else:
+        breach_evidence = "none"
+
+    freshness_payload = {
+        **composition,
+        "meta": {
+            "snapshot_fingerprint": snapshot_fp,
+            "coherence_window_s": coherence_window_s,
+            "coherent_pair_count": coherent_pair_count,
+            "incoherent_pair_count": incoherent_pair_count,
+            "max_pair_dt_s": max_pair_dt_s,
+            "stale_snapshot": stale_snapshot,
+            "breach_evidence": breach_evidence,
+        },
+    }
+
     eval_rec = HiveEvaluation(
         id=eval_id,
         hive_id=hive_id,
@@ -356,12 +513,17 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
         diameter_m=diameter_m,
         threshold_m=threshold,
         outlier_tag_id=outlier_id,
-        freshness_composition=json.dumps(composition),
+        freshness_composition=json.dumps(freshness_payload),
         alert_state=new_state,
         breach_confidence=confidence,
         motion_state=motion_decision.state,
         centroid_speed_kmh=(motion_decision.centroid.speed_kmh
                             if motion_decision.centroid else None),
+        positions_used=json.dumps(positions_used_payload),
+        max_pair_dt_s=max_pair_dt_s,
+        coherent_pair_count=coherent_pair_count,
+        incoherent_pair_count=incoherent_pair_count,
+        breach_evidence=breach_evidence,
     )
     db.add(eval_rec)
 
@@ -380,7 +542,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
             to_state=new_state,
             triggering_tag_id=outlier_id,
             details=json.dumps({
-                "diameter_m": diameter_m,
+                "diameter_m": alert_diameter_m,
                 "motion_state": motion_decision.state,
             }),
         ))
@@ -395,7 +557,12 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
             from_state=prev_state,
             to_state=new_state,
             triggering_tag_id=outlier_id,
-            details=json.dumps({"diameter_m": diameter_m, "confidence": confidence}),
+            details=json.dumps({
+                "diameter_m": alert_diameter_m,
+                "display_diameter_m": diameter_m,
+                "confidence": confidence,
+                "breach_evidence": breach_evidence,
+            }),
         )
         db.add(event)
 
@@ -456,7 +623,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
             live.last_alert_at = now
             db.commit()
     elif should_alert:
-        delivered = _maybe_send_hive_alert(hive, new_state, prev_state, diameter_m,
+        delivered = _maybe_send_hive_alert(hive, new_state, prev_state, alert_diameter_m,
                                            outlier_id, cfg, db,
                                            force_renotify=not state_changed)
         if delivered:
