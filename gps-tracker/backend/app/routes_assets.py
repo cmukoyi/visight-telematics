@@ -167,7 +167,7 @@ async def register_qr_asset(
         imei=body.imei,
         tag_type='series_3',
         device_name=f"{asset_type} Asset {body.imei[:8]}",
-        description=f"{asset_type} Asset - Auto-registered",
+        description=f"{asset_type} Asset",
         is_active=True,
         attributes=attrs,
     )

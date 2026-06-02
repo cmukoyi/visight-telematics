@@ -315,7 +315,7 @@
 
             <button class="nav-item" data-tab="qr" onclick="switchTab('qr')">
                 <span class="nav-icon"><i class="fa-solid fa-qrcode"></i></span>
-                <span class="nav-label">QR / NFC Tags <span class="beta-badge">Beta</span></span>
+                <span class="nav-label">QR / NFC Tags</span>
             </button>
 
             <button class="nav-item" data-tab="building" onclick="switchTab('building')">
@@ -4306,14 +4306,29 @@ function _ppMapTilerStyle() {
 function _ppMapTilerUrl(style) {
     return `https://api.maptiler.com/maps/${style || _ppMapTilerStyle()}/{z}/{x}/{y}{r}.png?key=${_ppMaptilerKey()}`;
 }
-function addPinplotBasemap(map) {
-    const layer = L.tileLayer(_ppMapTilerUrl(), {
-        maxZoom: 20,
-        tileSize: 512,
-        zoomOffset: -1,
+function _ppHasMaptilerKey() {
+    const key = _ppMaptilerKey();
+    return typeof key === 'string' && key.trim().length > 0;
+}
+function _ppCreateBasemapLayer() {
+    if (_ppHasMaptilerKey()) {
+        return L.tileLayer(_ppMapTilerUrl(), {
+            maxZoom: 20,
+            tileSize: 512,
+            zoomOffset: -1,
+            crossOrigin: true,
+            attribution: '&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors'
+        });
+    }
+    // Graceful fallback when tenant MAPTILER_KEY is not configured yet.
+    return L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
         crossOrigin: true,
-        attribution: '&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors'
-    }).addTo(map);
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors'
+    });
+}
+function addPinplotBasemap(map) {
+    const layer = _ppCreateBasemapLayer().addTo(map);
     _ppMapTilerLayers.push({ map, layer });
     return layer;
 }
@@ -4322,8 +4337,6 @@ function addPinplotBasemap(map) {
 // zoom/pan, which manifests as a "blank map" after the theme toggle. A clean
 // remove+add forces Leaflet to fetch and paint the new style immediately.
 function _ppRefreshAllBasemaps() {
-    const newAttribution = '&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors';
-    const newUrl = _ppMapTilerUrl();
     const refreshed = [];
     _ppMapTilerLayers.forEach(entry => {
         const { map, layer } = entry;
@@ -4332,13 +4345,7 @@ function _ppRefreshAllBasemaps() {
             // map view hasn't changed (Leaflet won't repaint same-zoom tiles
             // after a setUrl unless the view is invalidated).
             map.removeLayer(layer);
-            const fresh = L.tileLayer(newUrl, {
-                maxZoom: 20,
-                tileSize: 512,
-                zoomOffset: -1,
-                crossOrigin: true,
-                attribution: newAttribution
-            }).addTo(map);
+            const fresh = _ppCreateBasemapLayer().addTo(map);
             // Force Leaflet to recompute container size + redraw immediately.
             map.invalidateSize({ animate: false });
             refreshed.push({ map, layer: fresh });
@@ -4537,6 +4544,24 @@ function esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+function _ppTagTypeLabel(tt) {
+    const map = {
+        scope: 'Series 1',
+        series1: 'Series 1',
+        tracksolid: 'Series 2',
+        series2: 'Series 2',
+        series_3: 'Series 3',
+        series3: 'Series 3',
+    };
+    const key = (tt || '').toLowerCase();
+    return map[key] || (tt || '—');
+}
+
+function _ppIsQrNfcTag(tag) {
+    const type = (tag?.tag_type || '').toLowerCase();
+    return type === 'series_3' || type === 'series3';
+}
+
 function showTabAlert(prefix, msg, type) {
     const el = document.getElementById(prefix + 'Alert');
     document.getElementById(prefix + 'AlertText').textContent = msg;
@@ -4620,7 +4645,7 @@ async function loadGroupTags() {
                 <td><code>${esc(t.imei)}</code></td>
                 <td>${esc(t.description || t.device_name || '—')}</td>
                 <td style="font-size:12px;color:var(--gray)">${esc(t.owner_email)}</td>
-                <td>${{scope:'Series 1',tracksolid:'Series 2',series1:'Series 1',series2:'Series 2'}[(t.tag_type||'').toLowerCase()] || t.tag_type || '—'}</td>
+                <td>${esc(_ppTagTypeLabel(t.tag_type))}</td>
                 <td>${statusBadge}</td>
                 <td style="font-size:12px">${addedAt}</td>
                 <td style="font-size:12px">${esc(t.package_name || '—')}</td>
@@ -9669,7 +9694,8 @@ function _lmRenderList(query) {
         // Skip rows with no IMEI — they cannot be tracked or actioned and would
         // appear as visually-blank rows in the Live Assets list.
         if (!t.imei) return false;
-        if (_lmCatFilter !== 'all' && t.category_id !== _lmCatFilter) return false;
+        if (_lmCatFilter === '__qr_nfc__' && !_ppIsQrNfcTag(t)) return false;
+        if (_lmCatFilter !== 'all' && _lmCatFilter !== '__qr_nfc__' && t.category_id !== _lmCatFilter) return false;
         if (_lmStatusFilter !== 'all' && _lmStatusClass(t) !== _lmStatusFilter) return false;
         if (!query) return true;
         const haystack = [t.imei, t.description, t.device_name, t.owner_email].join(' ').toLowerCase();
@@ -9744,10 +9770,11 @@ function renderLmCategoryFilters() {
     const bar = document.getElementById('lm-cat-filter');
     if (!bar) return;
     // Keep "All" button active state, reset filter if selected category no longer exists
-    if (_lmCatFilter !== 'all' && !_categoriesCache.find(c => c.id === _lmCatFilter)) {
+    if (_lmCatFilter !== 'all' && _lmCatFilter !== '__qr_nfc__' && !_categoriesCache.find(c => c.id === _lmCatFilter)) {
         _lmCatFilter = 'all';
     }
     bar.innerHTML = `<button class="cat-btn ${_lmCatFilter === 'all' ? 'active' : ''}" onclick="lmFilterCat('all', this)">All</button>` +
+        `<button class="cat-btn ${_lmCatFilter === '__qr_nfc__' ? 'active' : ''}" onclick="lmFilterCat('__qr_nfc__', this)">QR/NFC</button>` +
         _categoriesCache.map(c => {
             const icon  = c.icon  ? `<i class="fa-solid ${esc(c.icon)}"></i> ` : '';
             const color = c.color ? ` style="--cat-accent:${esc(c.color)}"` : '';
@@ -9780,8 +9807,7 @@ function _lmRenderDetail(t) {
     const status  = _lmStatusClass(t);
     const statusColors = { active: 'var(--success)', idle: 'var(--warning,#f59e0b)', offline: 'var(--danger)' };
     const statusLabel  = { active: 'Active', idle: 'Idle', offline: 'Offline' };
-    const _tagTypeLabels = { scope: 'Series 1', tracksolid: 'Series 2', series1: 'Series 1', series2: 'Series 2' };
-    const tagTypeDisplay = _tagTypeLabels[(t.tag_type || '').toLowerCase()] || (t.tag_type ? esc(t.tag_type) : '—');
+    const tagTypeDisplay = esc(_ppTagTypeLabel(t.tag_type));
     const lastSeen  = t.last_seen   ? new Date(t.last_seen).toLocaleString()    : '—';
     const expiry    = t.expiry_date ? new Date(t.expiry_date).toLocaleDateString() : '—';
     const daysLeft  = t.package_id
@@ -9915,7 +9941,7 @@ function alRenderTable() {
     }
     const statusColors = { active: 'var(--success)', idle: 'var(--warning,#f59e0b)', offline: 'var(--danger)' };
     const statusLabel  = { active: 'Active', idle: 'Idle', offline: 'Offline' };
-    const _tagTypeLabel = tt => ({ scope: 'Series 1', series1: 'Series 1', tracksolid: 'Series 2', series2: 'Series 2' })[(tt||'').toLowerCase()] || (tt || '—');
+    const _tagTypeLabel = tt => _ppTagTypeLabel(tt);
     tbody.innerHTML = list.map(t => {
         const status = _lmStatusClass(t);
         const label  = esc(t.description || t.device_name || t.imei);
@@ -10360,7 +10386,7 @@ function amRenderCards() {
     }
     const statusColors = { active: 'var(--success)', idle: 'var(--warning,#f59e0b)', offline: 'var(--danger)' };
     const statusLabel  = { active: 'Active', idle: 'Idle', offline: 'Offline' };
-    const _tagTypeLabel = tt => ({ scope: 'Series 1', series1: 'Series 1', tracksolid: 'Series 2', series2: 'Series 2' })[(tt||'').toLowerCase()] || (tt || '—');
+    const _tagTypeLabel = tt => _ppTagTypeLabel(tt);
     grid.innerHTML = `<div class="asset-card-grid">${list.map(t => {
         const status   = _lmStatusClass(t);
         const color    = statusColors[status];
@@ -10374,13 +10400,20 @@ function amRenderCards() {
         const tagTypeColor = tagType === 'Series 1' ? 'var(--primary)' : tagType === 'Series 2' ? 'var(--warning,#f59e0b)' : 'var(--text-3)';
         const lastSeen = t.last_seen ? new Date(t.last_seen).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
         const expiryDate = t.expiry_date ? new Date(t.expiry_date).toLocaleDateString([], {day:'2-digit',month:'short',year:'numeric'}) : null;
-        const daysLeft = hasPkg
-            ? (t.days_remaining != null
-                ? (t.days_remaining > 0 ? `${t.days_remaining} days left` : t.days_remaining === 0 ? 'Expires today' : 'Expired')
-                : '—')
-            : '—';
-        const daysColor= !hasPkg ? 'var(--danger)' : (t.days_remaining != null ? (t.days_remaining > 30 ? 'var(--success)' : t.days_remaining > 7 ? 'var(--warning)' : 'var(--danger)') : 'var(--text-3)');
-        const expiryDisplay = hasPkg && expiryDate ? `${daysLeft}<br><small style="color:var(--text-3)">${expiryDate}</small>` : daysLeft;
+        const daysLeft = t.days_remaining != null
+            ? (t.days_remaining > 0 ? `${t.days_remaining} days left` : t.days_remaining === 0 ? 'Expires today' : 'Expired')
+            : null;
+        const daysColor= t.days_remaining != null
+            ? (t.days_remaining > 30 ? 'var(--success)' : t.days_remaining > 7 ? 'var(--warning)' : 'var(--danger)')
+            : (expiryDate ? 'var(--text-2)' : 'var(--text-3)');
+        let expiryDisplay = '—';
+        if (expiryDate && daysLeft) {
+            expiryDisplay = `${daysLeft}<br><small style="color:var(--text-3)">${expiryDate}</small>`;
+        } else if (expiryDate) {
+            expiryDisplay = expiryDate;
+        } else if (daysLeft) {
+            expiryDisplay = daysLeft;
+        }
         const batPct   = t.battery_level;
         const batCls   = batPct == null ? '' : batPct <= 20 ? 'battery-critical' : batPct <= 50 ? 'battery-low' : 'battery-ok';
         const batHtml  = batPct != null
