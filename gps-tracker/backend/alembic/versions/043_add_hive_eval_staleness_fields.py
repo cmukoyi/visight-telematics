@@ -1,6 +1,6 @@
 """add explicit v1.2 staleness-aware hive evaluation fields
 
-Revision ID: 043_add_hive_eval_staleness_fields
+Revision ID: 043_hive_eval_v12
 Revises: 042_nullable_user_id_for_qr
 Create Date: 2026-06-02 23:30:00.000000
 """
@@ -9,7 +9,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '043_add_hive_eval_staleness_fields'
+revision = '043_hive_eval_v12'
 down_revision = '042_nullable_user_id_for_qr'
 branch_labels = None
 depends_on = None
