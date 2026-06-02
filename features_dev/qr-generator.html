@@ -3683,19 +3683,27 @@ function exportClean(callback) {
 // ── Asset registration ───────────────────────────────────────────────────────
 // Called only when the user downloads a QR/NFC code.
 // Silent fire-and-forget — never blocks or errors the download.
+// Sends the logged-in user's token so the tag is assigned to their account.
 function registerAsset(id, typeCode) {
   if (!id) return;
   var PINPLOT_API = 'https://pinplot.me/api/qr-assets/register';
-  
+
+  // Read auth token from the customer portal session (same localStorage origin)
+  var token = null;
+  try { token = localStorage.getItem('pp_portal_token'); } catch (_) {}
+
   // Prepare payload for series_3 tag registration
   var payload = {
     imei: id,
     type_code: typeCode
   };
-  
+
+  var headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
   fetch(PINPLOT_API, {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: headers,
     body:    JSON.stringify(payload)
   })
   .then(function(r) {

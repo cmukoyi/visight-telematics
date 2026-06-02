@@ -601,7 +601,32 @@ window.QRG = (function() {
     var t=getText().text; return t.replace(/[^a-zA-Z0-9]/g,'_').substring(0,24)||'qrcode';
   }
 
+  // ── Asset registration ─────────────────────────────────────
+  // Fire-and-forget: assigns the downloaded tag to the logged-in user's account.
+  function registerAsset(id, typeCode) {
+    if (!id) return;
+    var token = null;
+    try { token = localStorage.getItem('pp_portal_token'); } catch (_) {}
+    var headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    fetch('/api/qr-assets/register', {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({ imei: id, type_code: typeCode })
+    })
+    .then(function(r) { if (r.ok) r.json().then(function(d) { console.log('[QRG] registered:', d); }); })
+    .catch(function(e) { console.warn('[QRG] registration skipped:', e.message); });
+  }
+
+  function getActiveAsset() {
+    if (mode === 'url') return { id: _currentQId, typeCode: 'Q' };
+    if (mode === 'nfc') return { id: _currentNId, typeCode: 'N' };
+    return null;
+  }
+
   function dlPNG() {
+    var asset = getActiveAsset();
+    if (asset) registerAsset(asset.id, asset.typeCode);
     exportClean(function(dataURL){
       var a=document.createElement('a'); a.href=dataURL; a.download=slugName()+'.png';
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
@@ -609,6 +634,8 @@ window.QRG = (function() {
   }
 
   function dlSVG() {
+    var asset = getActiveAsset();
+    if (asset) registerAsset(asset.id, asset.typeCode);
     exportClean(function(dataURL,w,h){
       var svgStr='<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'">'
         +'<image href="'+dataURL+'" width="'+w+'" height="'+h+'"/></svg>';
