@@ -9425,13 +9425,8 @@ async function initLiveMap() {
         _liveMap.invalidateSize();
     }
     await _lmLoadTags();
-    // Load asset markers after regular tags
-    await _lmLoadAssets();
-    // Connect to SSE stream for real-time asset updates
-    if (!_assetSSEConnected) {
-        _lmConnectAssetSSE();
-        _assetSSEConnected = true;
-    }
+    // Legacy QR/NFC asset endpoint (/api/assets) was removed; series_3 assets
+    // are now included in /api/portal/tags and rendered with regular markers.
 }
 
 async function _lmLoadTags() {
