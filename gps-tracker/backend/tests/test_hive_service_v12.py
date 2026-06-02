@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from app.services import hive_service as hs
@@ -58,3 +60,16 @@ class TestTemporalCoherenceHelpers:
         positions_b = list(reversed(positions_a))
 
         assert hs._snapshot_fingerprint(positions_a) == hs._snapshot_fingerprint(positions_b)
+
+    def test_positions_payload_serializes_uuid_tag_ids(self):
+        now = datetime(2025, 1, 1, 12, 0, tzinfo=UTC)
+        positions = [
+            (uuid.uuid4(), 51.5000, -0.1000, now),
+            (uuid.uuid4(), 51.5001, -0.1001, now + timedelta(seconds=10)),
+        ]
+
+        payload = hs._positions_used_payload(positions)
+        encoded = json.dumps(payload)
+
+        assert isinstance(encoded, str)
+        assert all(isinstance(item["tag_id"], str) for item in payload)

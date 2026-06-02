@@ -188,7 +188,7 @@ def _positions_used_payload(positions: List[Tuple[str, float, float, datetime]])
     for tid, _lat, _lng, ts in positions:
         ts_utc = ts if ts.tzinfo else ts.replace(tzinfo=UTC)
         payload.append({
-            "tag_id": tid,
+            "tag_id": str(tid),
             "observed_at": ts_utc.astimezone(UTC).isoformat(),
         })
     payload.sort(key=lambda item: (item["tag_id"], item["observed_at"]))
