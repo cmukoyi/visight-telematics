@@ -181,6 +181,7 @@ window.FP = (() => {
 
   let _initialized = false;
   let _liveTimer   = null;
+  let _assetsInFlight = false;
 
   // ── ID shorthand (all floor-plan DOM IDs are prefixed fp-) ──
   const $id = id => document.getElementById('fp-' + id);
@@ -683,6 +684,7 @@ window.FP = (() => {
     _updateCounts(); _renderList();
     selectedId = null;
     resetView();
+    _fetchAssets();
   }
 
   // ═══════════════════════════════════════════════════════
@@ -695,8 +697,21 @@ window.FP = (() => {
   }
 
   async function _fetchAssets() {
+    if (_assetsInFlight) return;
+    _assetsInFlight = true;
     try {
-      const r = await fetch(API_BASE + '/assets', { headers: _authHeaders(), cache: 'no-store' });
+      const params = new URLSearchParams();
+      if (activeFloor) params.set('floor_key', activeFloor);
+      if (activeStatus && activeStatus !== 'all') params.set('status_filter', activeStatus);
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      const r = await fetch(API_BASE + '/assets?' + params.toString(), {
+        headers: _authHeaders(),
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
       if (!r.ok) {
         // 404 = floorplan feature disabled for this tenant; 401 = no session.
         // Either way, stop polling silently.
@@ -710,6 +725,8 @@ window.FP = (() => {
       _updateCounts(); _renderList(); _drawAll();
     } catch (e) {
       // Network error — keep polling, the next tick may succeed.
+    } finally {
+      _assetsInFlight = false;
     }
   }
 

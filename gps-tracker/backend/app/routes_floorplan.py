@@ -9,6 +9,7 @@ URL prefix: /api/portal/floorplan
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -30,6 +31,9 @@ router = APIRouter(
     tags=["floorplan"],
     dependencies=[Depends(require_feature_enabled("floorplan"))],
 )
+
+_ASSET_CACHE_TTL_S = 2.5
+_ASSET_CACHE: dict[tuple[str, str, str], tuple[float, dict]] = {}
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -177,6 +181,12 @@ def list_assets(
       status_filter — 'online' | 'idle' | 'offline'.
     """
     me = get_portal_user_from_request(request, db)
+    cache_key = (str(me.usergroup_id), floor_key or "", status_filter or "")
+    now_m = time.monotonic()
+    cached = _ASSET_CACHE.get(cache_key)
+    if cached and cached[0] > now_m:
+        return cached[1]
+
     q = db.query(TagIndoorPosition).filter(
         TagIndoorPosition.usergroup_id == me.usergroup_id
     )
@@ -219,7 +229,13 @@ def list_assets(
             asset_type="equipment",
             emoji=_emoji_for_tag(tag),
         ))
-    return {"count": len(out), "assets": out}
+    payload = {"count": len(out), "assets": out}
+    _ASSET_CACHE[cache_key] = (now_m + _ASSET_CACHE_TTL_S, payload)
+    if len(_ASSET_CACHE) > 64:
+        expired = [k for k, (exp, _) in _ASSET_CACHE.items() if exp <= now_m]
+        for k in expired:
+            _ASSET_CACHE.pop(k, None)
+    return payload
 
 
 @router.put("/assets/{tag_id}")

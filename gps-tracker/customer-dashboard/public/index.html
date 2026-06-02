@@ -3910,7 +3910,28 @@ function authHeaders() {
 }
 
 async function apiFetch(path, options = {}) {
-    const res = await fetch(path, { ...options, headers: { ...authHeaders(), ...(options.headers || {}) } });
+    const timeoutMs = Number(options.timeoutMs || 12000);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const { timeoutMs: _omitTimeoutMs, ...fetchOptions } = options;
+    let res;
+    try {
+        res = await fetch(path, {
+            ...fetchOptions,
+            signal: controller.signal,
+            headers: { ...authHeaders(), ...(fetchOptions.headers || {}) }
+        });
+    } catch (err) {
+        if (err && err.name === 'AbortError') {
+            return new Response(
+                JSON.stringify({ detail: `Request timed out after ${Math.round(timeoutMs / 1000)}s` }),
+                { status: 504, headers: { 'Content-Type': 'application/json' } }
+            );
+        }
+        throw err;
+    } finally {
+        clearTimeout(timer);
+    }
     if (res.status === 401) {
         _sessionExpiredLogout();
         // Return a sealed 401 so callers that try to .json() the body don't
@@ -4503,22 +4524,29 @@ function switchTab(name) {
     const contentEl = document.querySelector('.content');
     if (contentEl) contentEl.classList.toggle('live-map-active', name === 'livemap');
 
-    if (name === 'livemap')    initLiveMap();
-    if (name === 'assets')     initAssetList();
-    if (name === 'history')    initHistoryTab();
-    if (name === 'asset-mgmt') initAssetMgmt();
-    if (name === 'locations')  locationsLoad();
-    if (name === 'floorplan')  FP.onShow();
-    if (name === 'users')      loadUsers();
-    if (name === 'settings')   loadSettings();
-    if (name === 'qr' && typeof QRG !== 'undefined') QRG.onShow();
-    if (name === 'reports-subscriptions') loadReports();
-    if (name === 'reports-activity')  loadReportsActivity();
-    if (name === 'reports-trips')     loadReportsTrips();
-    if (name === 'reports-geofence')  loadReportsGeofence();
-    if (name === 'reports-battery')   loadReportsBattery();
-    if (name === 'reports-alerts')    rptAlertsLoad();
-    if (name === 'hive')              { hiveLoadStats(); hiveLoadList(); }
+    const _runTabTask = (task, label) => {
+        Promise.resolve(task).catch(err => {
+            console.warn(`Tab load failed (${label}):`, err);
+            showTabAlert('Load issue', `${TAB_TITLES[name] || name} is taking too long. Please refresh or try again.`, 'error');
+        });
+    };
+
+    if (name === 'livemap')    _runTabTask(initLiveMap(), 'livemap');
+    if (name === 'assets')     _runTabTask(initAssetList(), 'assets');
+    if (name === 'history')    _runTabTask(initHistoryTab(), 'history');
+    if (name === 'asset-mgmt') _runTabTask(initAssetMgmt(), 'asset-mgmt');
+    if (name === 'locations')  _runTabTask(locationsLoad(), 'locations');
+    if (name === 'floorplan')  _runTabTask(FP.onShow(), 'floorplan');
+    if (name === 'users')      _runTabTask(loadUsers(), 'users');
+    if (name === 'settings')   _runTabTask(loadSettings(), 'settings');
+    if (name === 'qr' && typeof QRG !== 'undefined') _runTabTask(QRG.onShow(), 'qr');
+    if (name === 'reports-subscriptions') _runTabTask(loadReports(), 'reports-subscriptions');
+    if (name === 'reports-activity')  _runTabTask(loadReportsActivity(), 'reports-activity');
+    if (name === 'reports-trips')     _runTabTask(loadReportsTrips(), 'reports-trips');
+    if (name === 'reports-geofence')  _runTabTask(loadReportsGeofence(), 'reports-geofence');
+    if (name === 'reports-battery')   _runTabTask(loadReportsBattery(), 'reports-battery');
+    if (name === 'reports-alerts')    _runTabTask(rptAlertsLoad(), 'reports-alerts');
+    if (name === 'hive')              { _runTabTask(hiveLoadStats(), 'hive-stats'); _runTabTask(hiveLoadList(), 'hive-list'); }
     // Sketch tab: resize canvases now the container is visible
     if (name === 'building' && typeof resizeCanvases === 'function') {
         requestAnimationFrame(() => { resizeCanvases(); if (typeof render === 'function') render(); });
