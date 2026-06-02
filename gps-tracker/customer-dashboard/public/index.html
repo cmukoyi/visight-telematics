@@ -3957,6 +3957,18 @@ async function _apiFetchOnce(path, options = {}, timeoutMs = 12000) {
             signal: controller.signal,
             headers: { ...authHeaders(), ...(fetchOptions.headers || {}) }
         });
+        // Normalize non-JSON error bodies so existing callers using res.json()
+        // don't crash with "Unexpected token I" on plain-text 500 responses.
+        if (!res.ok) {
+            const ct = (res.headers.get('content-type') || '').toLowerCase();
+            if (!ct.includes('application/json')) {
+                const txt = await res.text().catch(() => '');
+                return new Response(
+                    JSON.stringify({ detail: txt || `Request failed (${res.status})` }),
+                    { status: res.status, headers: { 'Content-Type': 'application/json' } }
+                );
+            }
+        }
         const elapsedMs = ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - startedAt;
         if (!res.ok || _isPortalTagsListPath(path)) {
             _apiDebug('debug', 'fetch complete', { method, path, status: res.status, elapsedMs: Math.round(elapsedMs) });

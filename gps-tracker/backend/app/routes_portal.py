@@ -1066,6 +1066,19 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
         .all()
     )
 
+    # Some group-scoped tags are included via attributes._created_usergroup_id
+    # and may belong to users outside the current domain filter. Resolve those
+    # owner emails as well so response model validation never sees None.
+    missing_owner_ids = {
+        str(t.user_id)
+        for t in tags
+        if t.user_id and str(t.user_id) not in owner_email_map
+    }
+    if missing_owner_ids:
+        extra_owner_rows = db.query(User.id, User.email).filter(User.id.in_(list(missing_owner_ids))).all()
+        for uid, email in extra_owner_rows:
+            owner_email_map[str(uid)] = email
+
     # Build package lookup cache for this batch
     pkg_ids = {t.package_id for t in tags if t.package_id}
     pkg_map: dict = {}
@@ -1084,6 +1097,8 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
     result = []
     for tag in tags:
         owner_email = owner_email_map.get(str(tag.user_id)) if tag.user_id else None
+        if not owner_email:
+            owner_email = "unknown@unknown"
         pkg = pkg_map.get(str(tag.package_id)) if tag.package_id else None
         days_remaining = None
         if tag.expiry_date:
