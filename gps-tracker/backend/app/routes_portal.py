@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from datetime import datetime, timedelta
+from time import perf_counter
 from typing import List, Optional
 from uuid import UUID
 from pydantic import BaseModel, EmailStr
@@ -1032,18 +1033,33 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
 
     Returns an empty list (not an error) when no domain is configured yet.
     """
+    started_at = perf_counter()
     me = get_portal_user_from_request(request, db)
     group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
     if not group or not group.email_domain:
         return []
 
     domains = _domains(group)
+    group_id = str(group.id)
+
+    # Resolve domain-scoped owners once, then query BLETag directly.
+    owner_rows = db.query(User.id, User.email).filter(_domain_filter(domains)).all()
+    owner_email_map = {str(uid): email for uid, email in owner_rows}
+    owner_ids = [uid for uid, _ in owner_rows]
+
+    tag_scope_filter = (
+        or_(
+            BLETag.user_id.in_(owner_ids),
+            BLETag.attributes.op("->>")("_created_usergroup_id") == group_id,
+        )
+        if owner_ids
+        else BLETag.attributes.op("->>")("_created_usergroup_id") == group_id
+    )
 
     tags = (
-        db.query(BLETag, User.email)
-        .outerjoin(User, User.id == BLETag.user_id)
+        db.query(BLETag)
         .filter(
-            _group_tag_scope_filter(group, domains),
+            tag_scope_filter,
             BLETag.is_active == True,
         )
         .order_by(BLETag.added_at.desc())
@@ -1051,7 +1067,7 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
     )
 
     # Build package lookup cache for this batch
-    pkg_ids = {t.package_id for t, _ in tags if t.package_id}
+    pkg_ids = {t.package_id for t in tags if t.package_id}
     pkg_map: dict = {}
     if pkg_ids:
         for p in db.query(TagPackage).filter(TagPackage.id.in_(pkg_ids)).all():
@@ -1066,7 +1082,8 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
         cat_name_map[cat.name.lower()] = (str(cat.id), cat.name)
 
     result = []
-    for tag, owner_email in tags:
+    for tag in tags:
+        owner_email = owner_email_map.get(str(tag.user_id)) if tag.user_id else None
         pkg = pkg_map.get(str(tag.package_id)) if tag.package_id else None
         days_remaining = None
         if tag.expiry_date:
@@ -1105,6 +1122,17 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
             category_name=cat_name,
             activity_status=_compute_activity_status(tag.last_seen),
         ))
+
+    elapsed_ms = (perf_counter() - started_at) * 1000.0
+    if elapsed_ms > 1500:
+        logger.warning(
+            "portal-tags slow path: usergroup_id=%s domains=%s owners=%d tags=%d elapsed_ms=%.1f",
+            group_id,
+            ",".join(domains),
+            len(owner_ids),
+            len(result),
+            elapsed_ms,
+        )
     return result
 
 

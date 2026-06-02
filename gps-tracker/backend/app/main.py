@@ -11,6 +11,7 @@ import random
 import secrets
 import os
 import logging
+from time import perf_counter
 from sqlalchemy.orm import Session
 
 from app.database import get_db, init_db
@@ -221,6 +222,76 @@ async def scanner_tool():
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Verbose request logging for production incident diagnosis (disabled by default).
+# Enable with PORTAL_VERBOSE_LOGGING=1 and tune threshold with PORTAL_VERBOSE_SLOW_MS.
+_PORTAL_VERBOSE_LOGGING = os.getenv("PORTAL_VERBOSE_LOGGING", "0").strip().lower() in ("1", "true", "yes", "on")
+_PORTAL_VERBOSE_SLOW_MS = int(os.getenv("PORTAL_VERBOSE_SLOW_MS", "800"))
+
+
+def _is_verbose_path(path: str) -> bool:
+    return path.startswith("/api/portal/") or path.startswith("/api/assets")
+
+
+@app.middleware("http")
+async def portal_request_timing_middleware(request, call_next):
+    path = request.url.path
+    if not _PORTAL_VERBOSE_LOGGING or not _is_verbose_path(path):
+        return await call_next(request)
+
+    req_id = request.headers.get("x-request-id") or secrets.token_hex(4)
+    method = request.method
+    query = request.url.query or "-"
+    xff = request.headers.get("x-forwarded-for", "")
+    client_ip = xff.split(",")[0].strip() if xff else (request.client.host if request.client else "unknown")
+    ua = request.headers.get("user-agent", "-")
+    started_at = perf_counter()
+    status_code = 500
+
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+    except Exception:
+        elapsed_ms = (perf_counter() - started_at) * 1000.0
+        logger.exception(
+            "portal-req exception req_id=%s method=%s path=%s query=%s ip=%s elapsed_ms=%.1f ua=%s",
+            req_id,
+            method,
+            path,
+            query,
+            client_ip,
+            elapsed_ms,
+            ua,
+        )
+        raise
+
+    elapsed_ms = (perf_counter() - started_at) * 1000.0
+    response.headers["X-Portal-Req-Id"] = req_id
+    response.headers["X-Portal-Elapsed-Ms"] = f"{elapsed_ms:.1f}"
+
+    if elapsed_ms >= _PORTAL_VERBOSE_SLOW_MS or status_code >= 500:
+        logger.warning(
+            "portal-req slow req_id=%s method=%s path=%s query=%s status=%s elapsed_ms=%.1f ip=%s ua=%s",
+            req_id,
+            method,
+            path,
+            query,
+            status_code,
+            elapsed_ms,
+            client_ip,
+            ua,
+        )
+    else:
+        logger.info(
+            "portal-req req_id=%s method=%s path=%s status=%s elapsed_ms=%.1f ip=%s",
+            req_id,
+            method,
+            path,
+            status_code,
+            elapsed_ms,
+            client_ip,
+        )
+    return response
 
 # CORS middleware - restrict to known origins only
 _cors_origins_env = os.getenv("CORS_ORIGINS", "https://beacontelematics.co.uk,https://www.beacontelematics.co.uk")

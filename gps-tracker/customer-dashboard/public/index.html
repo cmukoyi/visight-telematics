@@ -3909,20 +3909,63 @@ function authHeaders() {
     return { 'Authorization': `Bearer ${getSession().token}`, 'Content-Type': 'application/json' };
 }
 
-async function apiFetch(path, options = {}) {
-    const timeoutMs = Number(options.timeoutMs || 12000);
+const _apiInflight = new Map();
+
+function _apiDebugEnabled() {
+    try { return localStorage.getItem('pp-debug-api') === '1'; } catch (_) { return false; }
+}
+
+function _apiDebug(level, msg, meta) {
+    if (!_apiDebugEnabled()) return;
+    const fn = (console && console[level]) ? console[level].bind(console) : console.log.bind(console);
+    fn(`[api] ${msg}`, meta || {});
+}
+
+function _apiMethod(options = {}) {
+    return String(options.method || 'GET').toUpperCase();
+}
+
+function _isPortalTagsListPath(path) {
+    return path === '/api/portal/tags' || path.startsWith('/api/portal/tags?');
+}
+
+function _apiTimeoutFor(path, options = {}) {
+    if (options.timeoutMs !== undefined && options.timeoutMs !== null) {
+        return Number(options.timeoutMs || 12000);
+    }
+    // Tags list payload is reused across many tabs and can be heavier on larger tenants.
+    if (_isPortalTagsListPath(path) && _apiMethod(options) === 'GET') return 20000;
+    return 12000;
+}
+
+function _apiInflightKey(path, options = {}) {
+    if (_apiMethod(options) !== 'GET') return null;
+    // Dedupe only the hot endpoint to avoid changing semantics elsewhere.
+    if (_isPortalTagsListPath(path)) return `GET:${path}`;
+    return null;
+}
+
+async function _apiFetchOnce(path, options = {}, timeoutMs = 12000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     const { timeoutMs: _omitTimeoutMs, ...fetchOptions } = options;
-    let res;
+    const method = _apiMethod(fetchOptions);
+    const startedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     try {
-        res = await fetch(path, {
+        const res = await fetch(path, {
             ...fetchOptions,
             signal: controller.signal,
             headers: { ...authHeaders(), ...(fetchOptions.headers || {}) }
         });
+        const elapsedMs = ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - startedAt;
+        if (!res.ok || _isPortalTagsListPath(path)) {
+            _apiDebug('debug', 'fetch complete', { method, path, status: res.status, elapsedMs: Math.round(elapsedMs) });
+        }
+        return res;
     } catch (err) {
         if (err && err.name === 'AbortError') {
+            const elapsedMs = ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - startedAt;
+            _apiDebug('warn', 'fetch timeout abort', { method, path, timeoutMs, elapsedMs: Math.round(elapsedMs) });
             return new Response(
                 JSON.stringify({ detail: `Request timed out after ${Math.round(timeoutMs / 1000)}s` }),
                 { status: 504, headers: { 'Content-Type': 'application/json' } }
@@ -3932,6 +3975,41 @@ async function apiFetch(path, options = {}) {
     } finally {
         clearTimeout(timer);
     }
+}
+
+async function apiFetch(path, options = {}) {
+    const timeoutMs = _apiTimeoutFor(path, options);
+    const inflightKey = _apiInflightKey(path, options);
+    const tagsListRead = _isPortalTagsListPath(path) && _apiMethod(options) === 'GET';
+
+    const run = async () => {
+        let res = await _apiFetchOnce(path, options, timeoutMs);
+        // Retry once for read-only tags list requests that hit timeout.
+        if (tagsListRead && res.status === 504) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+            res = await _apiFetchOnce(path, options, timeoutMs);
+        }
+        return res;
+    };
+
+    let res;
+    if (inflightKey) {
+        if (!_apiInflight.has(inflightKey)) {
+            _apiInflight.set(
+                inflightKey,
+                run().finally(() => {
+                    _apiInflight.delete(inflightKey);
+                })
+            );
+        } else {
+            _apiDebug('debug', 'dedupe reuse in-flight', { inflightKey, path });
+        }
+        res = await _apiInflight.get(inflightKey);
+        res = res.clone();
+    } else {
+        res = await run();
+    }
+
     if (res.status === 401) {
         _sessionExpiredLogout();
         // Return a sealed 401 so callers that try to .json() the body don't
