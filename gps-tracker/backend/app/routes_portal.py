@@ -1041,9 +1041,9 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
 
     tags = (
         db.query(BLETag, User.email)
-        .join(User, User.id == BLETag.user_id)
+        .outerjoin(User, User.id == BLETag.user_id)
         .filter(
-            _domain_filter(domains),
+            _group_tag_scope_filter(group, domains),
             BLETag.is_active == True,
         )
         .order_by(BLETag.added_at.desc())
@@ -1344,6 +1344,19 @@ def _domain_filter(domains: list):
     return or_(*(User.email.ilike(f"%@{d}") for d in domains))
 
 
+def _group_tag_scope_filter(group: UserGroup, domains: list):
+    """Return a filter clause for tags visible to a portal group.
+
+    Includes tags owned by users in the group's email domain and tags stamped
+    at QR registration with this group's id in attributes._created_usergroup_id.
+    """
+    gid = str(group.id)
+    return or_(
+        _domain_filter(domains),
+        BLETag.attributes.op("->>")("_created_usergroup_id") == gid,
+    )
+
+
 def _assert_user_in_domain(user: User, domain_or_domains) -> None:
     """Raise 403 if the user's email doesn't match any of the configured domains."""
     if not user:
@@ -1375,8 +1388,8 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
 
     tag = (
         db.query(BLETag)
-        .join(User, User.id == BLETag.user_id)
-        .filter(BLETag.id == tag_id, _domain_filter(_domains(group)))
+        .outerjoin(User, User.id == BLETag.user_id)
+        .filter(BLETag.id == tag_id, _group_tag_scope_filter(group, _domains(group)))
         .first()
     )
     if not tag:
@@ -1532,8 +1545,8 @@ def assign_tag(tag_id: str, data: PortalTagAssign, request: Request, db: Session
     # Tag must belong to a user already in this group's domain
     tag = (
         db.query(BLETag)
-        .join(User, User.id == BLETag.user_id)
-        .filter(BLETag.id == tag_id, _domain_filter(_domains(group)))
+        .outerjoin(User, User.id == BLETag.user_id)
+        .filter(BLETag.id == tag_id, _group_tag_scope_filter(group, _domains(group)))
         .first()
     )
     if not tag:
@@ -1560,8 +1573,8 @@ def delete_tags(data: PortalTagDelete, request: Request, db: Session = Depends(g
     for tag_id in data.tag_ids:
         tag = (
             db.query(BLETag)
-            .join(User, User.id == BLETag.user_id)
-            .filter(BLETag.id == tag_id, _domain_filter(_domains(group)))
+            .outerjoin(User, User.id == BLETag.user_id)
+            .filter(BLETag.id == tag_id, _group_tag_scope_filter(group, _domains(group)))
             .first()
         )
         if tag:
@@ -1580,8 +1593,8 @@ def delete_tag_single(tag_id: str, request: Request, db: Session = Depends(get_d
 
     tag = (
         db.query(BLETag)
-        .join(User, User.id == BLETag.user_id)
-        .filter(BLETag.id == tag_id, _domain_filter(_domains(group)))
+        .outerjoin(User, User.id == BLETag.user_id)
+        .filter(BLETag.id == tag_id, _group_tag_scope_filter(group, _domains(group)))
         .first()
     )
     if not tag:
@@ -1693,14 +1706,16 @@ async def portal_get_trips(
     if not group or not group.email_domain:
         return {"success": False, "error": "Group has no configured domain", "trips": []}
 
-    # Verify the tag belongs to this group's domain
+    domains = _domains(group)
+
+    # Verify the tag belongs to this group
     tag = (
         db.query(BLETag)
-        .join(User, User.id == BLETag.user_id)
+        .outerjoin(User, User.id == BLETag.user_id)
         .filter(
             BLETag.id == data.vehicleId,
             BLETag.is_active == True,
-            _domain_filter(_domains(group)),
+            _group_tag_scope_filter(group, domains),
         )
         .first()
     )
@@ -1995,15 +2010,16 @@ def report_geofence_events(
     if not group or not group.email_domain:
         return []
 
+    domains = _domains(group)
     since = datetime.utcnow() - timedelta(days=max(1, min(days, 365)))
 
     q = (
         db.query(GeofenceAlert)
         .join(BLETag, BLETag.id == GeofenceAlert.tracker_id)
-        .join(User, User.id == BLETag.user_id)
+        .outerjoin(User, User.id == BLETag.user_id)
         .join(POI, POI.id == GeofenceAlert.poi_id)
         .filter(
-            _domain_filter(_domains(group)),
+            _group_tag_scope_filter(group, domains),
             GeofenceAlert.created_at >= since,
         )
     )
