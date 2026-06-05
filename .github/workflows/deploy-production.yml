@@ -102,12 +102,14 @@ jobs:
           # Count only in git-tracked files outside tenants/.
           # Excludes:
           #   - tenants/                       — legitimate per-tenant brand content
+          #   - features_dev/                  — tenant-branded source files (copied to tenants/)
           #   - DEPLOY_RUNBOOK                 — local-only operator doc (gitignored anyway)
           #   - this workflow                  — self-reference; PATTERNS would match itself
           #   - .github/copilot-instructions.md — documents the banned strings as examples
           actual=$(
             git ls-files \
               | grep -v '^tenants/' \
+              | grep -v '^features_dev/' \
               | grep -v '^DEPLOY_RUNBOOK\.md$' \
               | grep -v '^\.github/workflows/deploy-production\.yml$' \
               | grep -v '^\.github/copilot-instructions\.md$' \
