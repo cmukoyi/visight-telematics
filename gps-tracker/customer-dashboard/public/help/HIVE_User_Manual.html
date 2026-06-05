@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HIVE — User Manual v1.1</title>
+<title>HIVE — User Manual v2.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -31,34 +31,6 @@
     --amber-bg:       rgba(255, 182, 72, 0.1);
     --blue:           #4a9eff;
     --blue-bg:        rgba(74, 158, 255, 0.1);
-  }
-
-  /* Light mode theme */
-  body.light {
-    --bg-deep:        #ffffff;
-    --bg-sidebar:     #f8f9fa;
-    --bg-content:     #ffffff;
-    --bg-elevated:    #f1f3f5;
-    --bg-card:        #ffffff;
-    --border:         #e1e4e8;
-    --border-bright:  #d0d7de;
-
-    --text-primary:   #24292f;
-    --text-secondary: #57606a;
-    --text-tertiary:  #6e7781;
-    --text-muted:     #8c959f;
-
-    --green:          #00a854;
-    --green-dim:      #008542;
-    --green-bg:       rgba(0, 168, 84, 0.1);
-    --green-glow:     rgba(0, 168, 84, 0.2);
-
-    --red:            #d73a49;
-    --red-bg:         rgba(215, 58, 73, 0.1);
-    --amber:          #e36209;
-    --amber-bg:       rgba(227, 98, 9, 0.1);
-    --blue:           #0969da;
-    --blue-bg:        rgba(9, 105, 218, 0.1);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -530,7 +502,7 @@
     font-size: 16px;
   }
 
-  /* Motion state visual */
+  /* (legacy motion-state visual styles — retained, unused) */
   .motion-states {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr 1fr;
@@ -695,11 +667,11 @@
   <aside class="sidebar">
     <div class="docs-label">Documentation</div>
     <div class="docs-title">HIVE Tracking</div>
-    <div class="docs-version">v1.1 — Pinplot Platform <span class="new-badge">UPDATED</span></div>
+    <div class="docs-version">v2.0 — Pinplot Platform <span class="new-badge">UPDATED</span></div>
 
     <div class="nav-section">Getting Started</div>
     <a class="nav-item active" href="#overview">Overview</a>
-    <a class="nav-item" href="#whats-new">What's New in v1.1 <span class="new-tag">NEW</span></a>
+    <a class="nav-item" href="#whats-new">What's New in v2.0 <span class="new-tag">NEW</span></a>
     <a class="nav-item" href="#how-it-works">How It Works</a>
     <a class="nav-item" href="#quick-start">Quick Start</a>
     <a class="nav-item" href="#concepts">Key Concepts</a>
@@ -716,11 +688,6 @@
     <a class="nav-item" href="#alerts">Alerts &amp; Breaches</a>
     <a class="nav-item" href="#freshness">Tag Freshness</a>
 
-    <div class="nav-section">Hives on the Move</div>
-    <a class="nav-item" href="#motion-overview">Motion Awareness <span class="new-tag">NEW</span></a>
-    <a class="nav-item" href="#motion-states">Motion States <span class="new-tag">NEW</span></a>
-    <a class="nav-item" href="#in-transit-behaviour">In Transit Behaviour <span class="new-tag">NEW</span></a>
-
     <div class="nav-section">Lifecycle</div>
     <a class="nav-item" href="#lifecycle">60-Day Lifetime</a>
     <a class="nav-item" href="#deletion">Delete &amp; Recreate</a>
@@ -736,7 +703,7 @@
     <div class="content-inner">
 
       <!-- ===== HERO ===== -->
-      <div class="kicker">User Manual · v1.1</div>
+      <div class="kicker">User Manual · v2.0</div>
       <h1 class="hero-title">
         HIVE
         <span class="accent">Tracking</span>
@@ -750,21 +717,20 @@
         <span class="pill">60-Day Cycle</span>
         <span class="pill">Smart Defaults</span>
         <span class="pill">Mobility Profiles</span>
-        <span class="pill new">Motion Aware</span>
-        <span class="pill new">Transit Detection</span>
+        <span class="pill new">Staleness-Aware</span>
       </div>
 
       <!-- What's New banner -->
       <div class="whats-new">
-        <div class="whats-new-tag">v1.1 · What's New</div>
-        <div class="whats-new-title">Hives on the Move — Now Properly Handled</div>
+        <div class="whats-new-tag">v2.0 · What's New</div>
+        <div class="whats-new-title">Travelling Together — No More False Alerts</div>
         <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 0;">
-          Real-world testing showed HIVE was firing false breach alerts when groups travelled together in vehicles. v1.1 introduces motion awareness — HIVE now detects when your hive is in transit and adjusts behaviour accordingly.
+          Real-world testing showed HIVE was firing false breach alerts when groups travelled together in vehicles. v2.0 introduces staleness-aware evaluation — HIVE no longer trusts a "breach" built from position reports captured at different points along a journey.
         </p>
         <ul class="whats-new-list">
-          <li><b>Four new hive states</b> — Stationary, Starting, In Transit, Stopping — visible on the hive list and detail views</li>
-          <li><b>Smart suppression</b> — proximity alerts pause during transit and resume automatically when your hive arrives</li>
-          <li><b>No setup required</b> — motion awareness is automatic, driven by your hive's mobility profile</li>
+          <li><b>Temporal coherence</b> — HIVE only confirms a breach from positions captured close together in time, so travel no longer looks like separation</li>
+          <li><b>Persistence required</b> — a breach must be backed by fresh, consistent evidence before it's confirmed; brief artefacts stay "suspected" and clear themselves</li>
+          <li><b>No setup required</b> — the new evaluation is automatic and applies to every hive</li>
         </ul>
       </div>
 
@@ -773,7 +739,7 @@
         <div class="quick-toc-title">In This Manual</div>
         <div class="quick-toc-list">
           <a href="#overview"><span class="num">01</span>Overview</a>
-          <a href="#whats-new"><span class="num">02</span>What's New in v1.1<span class="new-mini">NEW</span></a>
+          <a href="#whats-new"><span class="num">02</span>What's New in v2.0<span class="new-mini">NEW</span></a>
           <a href="#how-it-works"><span class="num">03</span>How It Works</a>
           <a href="#quick-start"><span class="num">04</span>Quick Start</a>
           <a href="#concepts"><span class="num">05</span>Key Concepts</a>
@@ -783,14 +749,11 @@
           <a href="#detail-view"><span class="num">09</span>Detail View</a>
           <a href="#alerts"><span class="num">10</span>Alerts &amp; Breaches</a>
           <a href="#freshness"><span class="num">11</span>Tag Freshness</a>
-          <a href="#motion-overview"><span class="num">12</span>Motion Awareness<span class="new-mini">NEW</span></a>
-          <a href="#motion-states"><span class="num">13</span>Motion States<span class="new-mini">NEW</span></a>
-          <a href="#in-transit-behaviour"><span class="num">14</span>In Transit Behaviour<span class="new-mini">NEW</span></a>
-          <a href="#lifecycle"><span class="num">15</span>60-Day Lifetime</a>
-          <a href="#deletion"><span class="num">16</span>Delete &amp; Recreate</a>
-          <a href="#archive"><span class="num">17</span>Archive</a>
-          <a href="#troubleshooting"><span class="num">18</span>Troubleshooting</a>
-          <a href="#faq"><span class="num">19</span>FAQ</a>
+          <a href="#lifecycle"><span class="num">12</span>60-Day Lifetime</a>
+          <a href="#deletion"><span class="num">13</span>Delete &amp; Recreate</a>
+          <a href="#archive"><span class="num">14</span>Archive</a>
+          <a href="#troubleshooting"><span class="num">15</span>Troubleshooting</a>
+          <a href="#faq"><span class="num">16</span>FAQ</a>
         </div>
       </div>
 
@@ -810,13 +773,13 @@
         </p>
 
         <p>
-          As of v1.1, HIVE is <b>motion-aware</b>. When your hive is travelling together (in a car, on a bike, in your bag while walking), HIVE knows the difference between "really separated" and "just on the move," and adjusts its behaviour to avoid false alerts.
+          As of v2.0, HIVE uses <b>staleness-aware evaluation</b>. When your hive is travelling together (in a car, on a bike, in your bag while walking), HIVE knows the difference between "really separated" and "just looks separated because the position reports were taken at different points along the way," and avoids firing false alerts.
         </p>
 
         <div class="callout">
           <div class="callout-title">→ At a Glance</div>
           <p>
-            Group <b>2–5 tags</b> per hive · Configurable distance threshold · Per-hive mobility profile · 60-day operational lifetime · 60-day archive retention · Permanent delete option · <b>Motion-aware evaluation (new)</b>.
+            Group <b>2–5 tags</b> per hive · Configurable distance threshold · Per-hive mobility profile · 60-day operational lifetime · 60-day archive retention · Permanent delete option · <b>Staleness-aware evaluation (new)</b>.
           </p>
         </div>
       </section>
@@ -825,12 +788,12 @@
       <section class="section" id="whats-new">
         <div class="section-head">
           <div class="section-num">02</div>
-          <h2 class="section-title">What's New in v1.1</h2>
+          <h2 class="section-title">What's New in v2.0</h2>
           <span class="section-title-tag">New</span>
         </div>
 
         <p>
-          v1.1 is a substantial update focused on a single problem: HIVE wasn't handling moving hives well. If you've ever had your travel kit fire a "breach" alert while you were just driving home from the supermarket, this release is for you.
+          v2.0 is a substantial update focused on a single problem: HIVE wasn't handling moving hives well. If you've ever had your travel kit fire a "breach" alert while you were just driving home from the supermarket, this release is for you.
         </p>
 
         <h3>The Problem</h3>
@@ -843,17 +806,17 @@
 
         <h3>The Solution</h3>
         <p>
-          HIVE now <b>detects when your hive is in motion</b> and pauses proximity checks until you stop. When you arrive somewhere and settle, normal monitoring resumes automatically. You see a clear "In Transit" indicator on your hive while this is happening, so you always know what HIVE is doing.
+          HIVE now uses <b>staleness-aware evaluation</b>. Before declaring a breach, it checks whether the positions it's comparing were captured close enough together in time to be trustworthy. Two reports taken ten minutes apart while you're driving describe two different points on your route, not the distance between two tags — so HIVE refuses to confirm a breach from them. A breach is only confirmed when fresh, time-aligned reports consistently show a real separation. Brief artefacts from travel show up as "suspected" and clear themselves once you stop.
         </p>
 
         <h3>What You Need to Do</h3>
         <p>
-          Nothing. Motion awareness is automatic and driven by your hive's existing mobility profile. There are no new settings to configure. Existing hives benefit from the new behaviour immediately on upgrade.
+          Nothing. Staleness-aware evaluation is automatic. There are no new settings to configure, and existing hives benefit from the new behaviour immediately on upgrade.
         </p>
 
         <div class="callout info">
           <div class="callout-title">→ One Important Trade-off</div>
-          <p>While your hive is In Transit, proximity alerts are paused. If a tag is genuinely lost mid-journey, you'll find out when you stop and HIVE re-evaluates. For most users (whose tagged items are with them) this is the right behaviour — you can't usefully act on an alert while driving anyway.</p>
+          <p>While your hive is travelling together, a genuine separation mid-journey may show only as a suspected breach until you stop and fresh, time-aligned reports confirm it. For most users (whose tagged items are with them) this is the right behaviour — you can't usefully act on an alert while driving anyway.</p>
         </div>
       </section>
 
@@ -865,7 +828,7 @@
         </div>
 
         <p>
-          Every time one of your tagged items reports a new position, HIVE re-evaluates the hive. It calculates the distance between every pair of tags in the group and finds the largest distance — the <b>group diameter</b>. If the diameter exceeds your threshold <b>and</b> the hive isn't in motion, an alert fires.
+          Every time one of your tagged items reports a new position, HIVE re-evaluates the hive. It calculates the distance between every pair of tags in the group and finds the largest distance — the <b>group diameter</b>. If the diameter exceeds your threshold <b>and</b> the separation is confirmed by time-aligned reports, an alert fires.
         </p>
 
         <h3>The Alert State Machine</h3>
@@ -899,9 +862,9 @@
           When a breach fires, HIVE identifies <b>which tag</b> caused it by counting how many over-threshold pairs each tag participates in. The tag with the most breaching pairs is flagged as the outlier — usually the one that wandered off — and is highlighted in alerts and the detail view.
         </p>
 
-        <h3>Motion-Aware Evaluation (v1.1)</h3>
+        <h3>Staleness-Aware Evaluation (v2.0)</h3>
         <p>
-          The state machine above runs only when your hive is <b>Stationary</b>. When the hive is detected as <b>In Transit</b> or <b>Settling</b>, proximity evaluation is paused. See <a href="#motion-states">Motion States</a> for full details.
+          Before the state machine above can confirm a breach, HIVE applies a <b>staleness check</b>. Each pairwise distance is only trusted if the two positions were captured close together in time (within minutes, tuned per mobility profile). A "breach" supported only by time-mismatched positions — the typical signature of a group travelling together — is held as <span class="status-pill amber"><span class="dot"></span>SUSPECTED</span> and never confirmed. It clears on its own once fresh, time-aligned reports arrive. A breach is confirmed only when temporally-coherent reports consistently show a real separation.
         </p>
       </section>
 
@@ -923,7 +886,7 @@
         </ol>
 
         <p>
-          Your hive begins tracking immediately. There's a short 5–10 minute settling period where alerts are suppressed while HIVE establishes baseline state. After that, alerts fire normally — except when your hive is moving.
+          Your hive begins tracking immediately. There's a short 5–10 minute warm-up period while HIVE establishes baseline state, after which alerts fire normally. While your items are travelling together, breach artefacts are held as "suspected" and clear themselves once you settle.
         </p>
 
         <div class="callout info">
@@ -946,12 +909,12 @@
 
         <h3>Distance Threshold</h3>
         <p>
-          The maximum group diameter you'll tolerate before an alert fires. Configurable per hive, and shown alongside the live diameter on every screen. Common values range from 50m (very close) to 1km (roughly together).
+          The maximum group diameter you'll tolerate before an alert fires. Configurable per hive, and shown alongside the live diameter on every screen. Default values range from 150m (stationary assets) to 1000m (mobile/transit assets) depending on your profile choice.
         </p>
 
         <h3>Mobility Profile</h3>
         <p>
-          A bundled preset that controls how HIVE interprets your tags' position data. Affects freshness windows, alert sensitivity, motion detection thresholds, and confirmation requirements. Three options: <b>Stationary</b>, <b>Slow</b>, and <b>Mobile</b>.
+          A bundled preset that controls how HIVE interprets your tags' position data. Affects freshness windows, alert sensitivity, the temporal-coherence window, and confirmation requirements. Three options: <b>Stationary</b>, <b>Slow</b>, and <b>Mobile</b>.
         </p>
 
         <h3>Freshness Tier</h3>
@@ -959,9 +922,9 @@
           Each tag is classified by how recently it reported. Tags fade through tiers as they go silent: <span class="status-pill green"><span class="dot"></span>FRESH</span> <span class="status-pill blue"><span class="dot"></span>RECENT</span> <span class="status-pill amber"><span class="dot"></span>STALE</span> <span class="status-pill red"><span class="dot"></span>LOST</span>. Only Fresh and Recent tags participate in alert evaluation.
         </p>
 
-        <h3>Motion State <span class="status-pill green" style="margin-left: 8px;"><span class="dot"></span>NEW v1.1</span></h3>
+        <h3>Temporal Coherence <span class="status-pill green" style="margin-left: 8px;"><span class="dot"></span>NEW v2.0</span></h3>
         <p>
-          A separate state from the alert state, indicating whether your hive is at rest or moving. Four values: <span class="status-pill green"><span class="dot"></span>STATIONARY</span> <span class="status-pill amber"><span class="dot"></span>STARTING</span> <span class="status-pill blue"><span class="dot"></span>IN TRANSIT</span> <span class="status-pill amber"><span class="dot"></span>STOPPING</span>. Only Stationary hives are evaluated for proximity breaches. See <a href="#motion-states">Motion States</a>.
+          Whether two position reports were captured close enough together in time to be meaningfully compared. HIVE only confirms a breach from temporally-coherent positions, so a group travelling together (whose reports are spread across a journey) doesn't look like a separation. The acceptable time gap is tuned per mobility profile.
         </p>
 
         <h3>Hive Lifecycle</h3>
@@ -993,13 +956,13 @@
         <ul>
           <li><b>They stay put</b> — items that shouldn't normally move from where you've placed them. Tools in a workshop, equipment in a yard, instruments in a lab.</li>
           <li><b>They move occasionally</b> — items that move sometimes, slowly. Livestock, parked vehicles, mobility aids, luggage during a trip. HIVE expects extended periods of rest with occasional movement.</li>
-          <li><b>They're often on the move</b> — items carried with you day-to-day or in transit. Personal belongings, delivery packages, fleet equipment. HIVE monitors them when at rest; in-transit periods are paused and resume at the destination.</li>
+          <li><b>They're often on the move</b> — items carried with you day-to-day or in transit. Personal belongings, delivery packages, fleet equipment. HIVE is most accurate when these items are at rest; while they travel together, breach artefacts are held as "suspected" and clear once you arrive.</li>
         </ul>
         <p>See <a href="#mobility">Mobility Profiles</a> for full details.</p>
 
         <h3>Question 3 — How close should they stay?</h3>
         <p>
-          The distance threshold. Choose from preset values (Very Close 50m, Close 100m, Nearby 250m, In the Same Area 500m, Roughly Together 1km) or enter a custom value. The default matches your selected mobility profile.
+          The distance threshold. Choose from preset values (150m, 250m, 450m, 750m, 1000m) or enter a custom value. The default matches your selected mobility profile.
         </p>
 
         <div class="callout info">
@@ -1016,41 +979,41 @@
         </div>
 
         <p>
-          Mobility profiles are the most important configuration choice. They tell HIVE what kind of asset you're tracking, which affects almost every aspect of how alerts are evaluated — including motion detection behaviour.
+          Mobility profiles are the most important configuration choice. They tell HIVE what kind of asset you're tracking, which affects almost every aspect of how alerts are evaluated — including the temporal-coherence window used by staleness-aware evaluation.
         </p>
 
         <table class="doc-table">
           <thead>
-            <tr><th>Profile</th><th>Best For</th><th>Default Threshold</th><th>Motion Detection</th></tr>
+            <tr><th>Profile</th><th>Best For</th><th>Default Threshold</th><th>Coherence Window</th></tr>
           </thead>
           <tbody>
             <tr>
               <td>Stationary</td>
               <td>Tools, equipment, instruments — assets that shouldn't normally move</td>
               <td>150m</td>
-              <td>Disabled (any motion is alerted)</td>
+              <td>30 min</td>
             </tr>
             <tr>
               <td>Slow</td>
               <td>Livestock, parked vehicles, mobility aids, luggage during a trip</td>
               <td>450m</td>
-              <td>Active above 10 km/h</td>
+              <td>10 min</td>
             </tr>
             <tr>
               <td>Mobile</td>
-              <td>Personal belongings, shared equipment, couriered packages, fleet items in transit</td>
+              <td>Personal belongings, shared equipment, couriered packages, fleet items, vehicles on the road</td>
               <td>1000m</td>
-              <td>Active above 15 km/h</td>
+              <td>5 min</td>
             </tr>
           </tbody>
         </table>
 
         <h3>What Profiles Actually Change</h3>
         <p>
-          Picking a profile sets several parameters at once. As mobility increases, freshness windows shorten (older positions become less trustworthy faster), confirmation requirements tighten, noise filters widen, and motion detection becomes more aggressive.
+          Picking a profile sets several parameters at once. As mobility increases, freshness windows shorten (older positions become less trustworthy faster), confirmation requirements tighten, noise filters widen, and the temporal-coherence window narrows (so faster-moving assets demand more closely time-aligned reports before a breach is trusted).
         </p>
         <p>
-          The <b>Mobile</b> profile covers a wide range — from personal items that mostly sit still to delivery packages in active transit. HIVE is most accurate when these items are at rest; alerts during transit are paused and resume when the hive arrives at its destination. See <a href="#in-transit-behaviour">In Transit Behaviour</a> for full details.
+          The <b>Mobile</b> profile covers a wide range — from personal items that mostly sit still to delivery packages in active transit. HIVE is most accurate when these items are at rest; while they travel together, breach artefacts are held as "suspected" rather than confirmed, and clear once the hive settles.
         </p>
         <p>
           The <b>Default Threshold</b> column shows the starting value for each profile, calibrated for typical 5–10 minute reporting cadence. You can adjust the threshold up or down for your specific use case during setup or later in hive settings.
@@ -1079,9 +1042,7 @@
         </p>
         <ul>
           <li><span class="status-pill green"><span class="dot"></span>GREEN</span> — All tags are together, hive is OK</li>
-          <li><span class="status-pill blue"><span class="dot"></span>BLUE</span> — Hive is In Transit; proximity checks paused <span class="status-pill green" style="margin-left: 6px; font-size: 9px;">NEW</span></li>
-          <li><span class="status-pill amber"><span class="dot"></span>AMBER (motion)</span> — Hive is Starting or Stopping; brief buffer period either side of transit, alerts paused <span class="status-pill green" style="margin-left: 6px; font-size: 9px;">NEW</span></li>
-          <li><span class="status-pill amber"><span class="dot"></span>AMBER</span> — Partial data, freshness issues, or settling after movement</li>
+          <li><span class="status-pill amber"><span class="dot"></span>AMBER</span> — Partial data, freshness issues, or a suspected (unconfirmed) breach</li>
           <li><span class="status-pill red"><span class="dot"></span>RED</span> — Active breach; one or more tags have separated</li>
         </ul>
 
@@ -1128,7 +1089,7 @@
 
         <h3>Diameter Readout</h3>
         <p>
-          A live numeric display of the current group diameter, shown alongside a horizontal bar chart with the threshold marker. When the bar crosses the marker and the hive is Stationary, you're in breach. When the hive is In Transit, the diameter is shown but annotated as "(in transit — not evaluated)" so you know it isn't being judged for breaches.
+          A live numeric display of the current group diameter, shown alongside a horizontal bar chart with the threshold marker. When the bar crosses the marker and the separation is confirmed by time-aligned reports, you're in breach. A diameter that's over threshold only because of time-mismatched reports (typical during travel) shows as a suspected breach rather than a confirmed one.
         </p>
 
         <h3>Tag Table</h3>
@@ -1140,10 +1101,9 @@
         <p>The right column groups several panels:</p>
         <ul>
           <li><b>Active Alert</b> — Details of the current breach (if any), with cause and confirmation count</li>
-          <li><b>Motion State</b> <span class="status-pill green" style="font-size: 9px;">NEW</span> — Current motion state (Stationary / In Transit / Settling), with a small visual indicator and time-in-state</li>
           <li><b>Configuration</b> — Current mobility profile, threshold, freshness windows, and other parameters</li>
           <li><b>Lifecycle</b> — Days remaining on the 60-day clock, with a quick <code>Recreate Hive</code> button</li>
-          <li><b>Recent Activity</b> — Timeline of evaluations, motion state changes, and alerts over the last 24 hours</li>
+          <li><b>Recent Activity</b> — Timeline of evaluations, breach events, and alerts over the last 24 hours</li>
         </ul>
       </section>
 
@@ -1155,7 +1115,7 @@
         </div>
 
         <p>
-          HIVE issues different alert types depending on data quality, motion state, and what changed. Knowing the difference helps you respond appropriately.
+          HIVE issues different alert types depending on data quality and what changed. Knowing the difference helps you respond appropriately.
         </p>
 
         <table class="doc-table">
@@ -1203,7 +1163,7 @@
 
         <div class="callout warn">
           <div class="callout-title">→ Honest About Uncertainty</div>
-          <p>HIVE will surface "data quality degraded" or "in transit" rather than fire low-confidence alerts. If you see one of these, it means the hive can't confidently say what's happening — usually because tags have gone quiet or the hive is moving, not because something's wrong.</p>
+          <p>HIVE will surface "data quality degraded" rather than fire low-confidence alerts. If you see this, it means the hive can't confidently say what's happening — usually because tags have gone quiet or their reports aren't time-aligned enough to trust, not because something's wrong.</p>
         </div>
       </section>
 
@@ -1235,228 +1195,10 @@
         </p>
       </section>
 
-      <!-- ===== 12 MOTION OVERVIEW ===== -->
-      <section class="section" id="motion-overview">
-        <div class="section-head">
-          <div class="section-num">12</div>
-          <h2 class="section-title">Motion Awareness</h2>
-          <span class="section-title-tag">New</span>
-        </div>
-
-        <p>
-          The biggest change in v1.1: HIVE now recognises when your hive is on the move and adjusts its behaviour accordingly. This eliminates a category of false-positive breach alerts that used to fire whenever a hive travelled together in a vehicle.
-        </p>
-
-        <h3>The Underlying Problem</h3>
-        <p>
-          BLE tags don't have GPS. Their positions come from passing phones, which means each tag in your hive gets an updated position roughly every 2–5 minutes — but at different times for different tags. When everyone's standing still, this is fine. When everyone's in a moving car, two tags reported a few minutes apart appear to be far apart, even though they're sitting next to each other.
-        </p>
-        <p>
-          At urban driving speeds (around 30 km/h), a 2-minute-old position is up to 1 km behind reality. Without motion awareness, this looks indistinguishable from a real separation.
-        </p>
-
-        <h3>The Solution</h3>
-        <p>
-          HIVE now tracks the <b>centre of your hive</b> over time. If the centre is moving consistently in a direction at vehicle speed, and the individual tags' movements agree with that direction, HIVE concludes the hive is travelling together and pauses proximity checks until you stop.
-        </p>
-
-        <h3>What You'll See</h3>
-        <p>
-          When your hive enters motion, the status changes to <span class="status-pill blue"><span class="dot"></span>IN TRANSIT</span> on the hive list and detail views. A friendly indicator explains:
-        </p>
-        <div class="callout info">
-          <div class="callout-title">→ In Transit</div>
-          <p>Your hive is on the move — proximity monitoring paused. Will resume monitoring when stopped for a few minutes.</p>
-        </div>
-
-        <h3>What Happens to Existing Alerts</h3>
-        <p>
-          If a breach alert was active when the hive started moving, it's automatically resolved with a "Resolved by Transit" notification. This isn't HIVE saying the breach was wrong — it's HIVE acknowledging that the data is no longer reliable enough to maintain the alert. When you stop, the hive is re-evaluated fresh.
-        </p>
-
-        <h3>What Stays Active</h3>
-        <p>
-          Even during transit, HIVE continues:
-        </p>
-        <ul>
-          <li>Showing live tag positions on the map</li>
-          <li>Tracking tag freshness and lost contact (a tag battery dying is meaningful regardless of motion)</li>
-          <li>Logging position history for later review</li>
-        </ul>
-      </section>
-
-      <!-- ===== 13 MOTION STATES ===== -->
-      <section class="section" id="motion-states">
-        <div class="section-head">
-          <div class="section-num">13</div>
-          <h2 class="section-title">Motion States</h2>
-          <span class="section-title-tag">New</span>
-        </div>
-
-        <p>
-          Every hive has a <b>motion state</b> in addition to its alert state. The motion state determines how (or whether) HIVE evaluates proximity.
-        </p>
-
-        <div class="motion-states">
-          <div class="motion-state-box stationary">
-            <div class="motion-state-icon">● Stationary</div>
-            <div class="motion-state-name">At Rest</div>
-            <div class="motion-state-desc">Centre of the hive isn't moving. Normal proximity evaluation runs. All alert types active.</div>
-          </div>
-          <div class="motion-state-box starting">
-            <div class="motion-state-icon">● Starting</div>
-            <div class="motion-state-name">Just Started</div>
-            <div class="motion-state-desc">Initial motion detected. Brief pause (~30s–2min) while HIVE confirms the hive is really moving. Alerts paused.</div>
-          </div>
-          <div class="motion-state-box transit">
-            <div class="motion-state-icon">● In Transit</div>
-            <div class="motion-state-name">On the Move</div>
-            <div class="motion-state-desc">Centre is moving consistently with coherent group motion. Proximity alerts paused. Tags still tracked.</div>
-          </div>
-          <div class="motion-state-box settling">
-            <div class="motion-state-icon">● Stopping</div>
-            <div class="motion-state-name">Just Stopped</div>
-            <div class="motion-state-desc">Recently came to rest. Brief pause (3–5 min) while position data stabilises. Then re-evaluates.</div>
-          </div>
-        </div>
-
-        <h3>How HIVE Detects Motion</h3>
-        <p>
-          HIVE computes the geometric centre of all your tags' fresh positions, and tracks how it moves over time. The journey through motion has two transitional buffer states (Starting and Stopping) on either side of full In Transit, so that proximity alerts are paused across the whole motion lifecycle — not just the middle.
-        </p>
-        <p>
-          To enter In Transit, two conditions must both be true:
-        </p>
-        <ol>
-          <li>The centre has been moving faster than the profile's threshold (15 km/h for Mobile, 10 km/h for Slow) for at least 2 minutes</li>
-          <li>Most individual tags' movements agree with the centre's direction (showing they're moving together as a group)</li>
-        </ol>
-        <p>
-          The second condition is important: it prevents one drifting tag from making the system think the whole hive is moving.
-        </p>
-
-        <h3>State Transitions</h3>
-
-        <div class="figure">
-          <div class="state-diagram">
-            <div class="state-node ok">STATIONARY</div>
-            <div class="state-arrow">→</div>
-            <div class="state-node starting">STARTING</div>
-            <div class="state-arrow">→</div>
-            <div class="state-node transit">IN TRANSIT</div>
-            <div class="state-arrow">→</div>
-            <div class="state-node settling">STOPPING</div>
-            <div class="state-arrow">→</div>
-            <div class="state-node ok">STATIONARY</div>
-          </div>
-          <div class="figure-caption">
-            <b>Figure 2.</b> Motion state machine — four states form a cycle, with Starting and Stopping as buffer states either side of In Transit.
-          </div>
-        </div>
-
-        <ul>
-          <li><b>Stationary → Starting:</b> centre starts moving faster than threshold for ~30 seconds</li>
-          <li><b>Starting → In Transit:</b> motion sustained for 2 minutes total with coherent group motion</li>
-          <li><b>Starting → Stationary:</b> motion didn't last (e.g. brief burst that stopped) — alerts resume</li>
-          <li><b>In Transit → Stopping:</b> centre stable (slower than threshold) for 3 minutes</li>
-          <li><b>Stopping → Stationary:</b> continued stability for ~5 minutes total post-stop, then full re-evaluation</li>
-          <li><b>Stopping → In Transit:</b> motion re-detected (handles brief stops at traffic lights)</li>
-        </ul>
-
-        <h3>Why Two Buffer States?</h3>
-        <p>
-          Position data is unreliable both at the <b>start</b> of motion (we need to confirm it's real) and at the <b>end</b> of motion (the trailing edge of in-motion reports keeps arriving for a few minutes). Starting and Stopping are symmetric — both pause alert evaluation during transitional moments where the data can't be trusted. This eliminates false breach alerts across the whole journey, not just the middle.
-        </p>
-
-        <h3>Profile Differences</h3>
-
-        <table class="doc-table">
-          <thead>
-            <tr><th>Profile</th><th>Motion threshold</th><th>Starting buffer</th><th>Stopping buffer</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>Stationary</td><td>Disabled — any motion is alerted</td><td>n/a</td><td>n/a</td></tr>
-            <tr><td>Slow</td><td>10 km/h</td><td>10 min</td><td>10 min</td></tr>
-            <tr><td>Mobile</td><td>15 km/h</td><td>10 min</td><td>10 min</td></tr>
-          </tbody>
-        </table>
-
-        <p>
-          Stationary-profile hives don't use motion detection because they're <b>supposed</b> to stay still. If a Stationary-profile hive starts moving, that itself is unusual and you'll get the alerts.
-        </p>
-      </section>
-
-      <!-- ===== 14 IN TRANSIT BEHAVIOUR ===== -->
-      <section class="section" id="in-transit-behaviour">
-        <div class="section-head">
-          <div class="section-num">14</div>
-          <h2 class="section-title">In Transit Behaviour</h2>
-          <span class="section-title-tag">New</span>
-        </div>
-
-        <p>
-          This section walks through what HIVE does as your hive moves through the full motion lifecycle — from the first hint of motion, through full transit, to settled at destination.
-        </p>
-
-        <h3>What's Suppressed (and When)</h3>
-        <p>
-          Proximity alerts are suppressed across the entire motion lifecycle — Starting, In Transit, and Stopping. You'll only get proximity alerts when your hive is fully Stationary.
-        </p>
-        <ul>
-          <li><b>Confirmed Breach alerts</b> — paused throughout Starting / In Transit / Stopping</li>
-          <li><b>Suspected Breach alerts</b> — paused throughout Starting / In Transit / Stopping</li>
-          <li><b>Active alerts at the moment motion starts</b> — automatically resolved with "Resolved by Transit" notification</li>
-        </ul>
-
-        <h3>What Stays Active</h3>
-        <ul>
-          <li><b>Live position display</b> — you can still see where your tags are on the map</li>
-          <li><b>Lost Contact alerts</b> — if a tag goes completely silent for hours, you still want to know (battery dead, tag damaged)</li>
-          <li><b>Position history logging</b> — every report is still recorded for later review</li>
-          <li><b>Motion state changes</b> — recorded in the activity timeline</li>
-        </ul>
-
-        <h3>What Happens When You Start Moving</h3>
-        <p>
-          When the hive's centre starts moving above threshold, the motion state transitions to <span class="status-pill amber"><span class="dot"></span>STARTING</span>. Alerts are suppressed immediately. HIVE then waits up to 2 minutes to confirm the motion is real and sustained.
-        </p>
-        <ul>
-          <li><b>If motion is sustained:</b> the hive transitions to <span class="status-pill blue"><span class="dot"></span>IN TRANSIT</span></li>
-          <li><b>If motion stops before 2 minutes:</b> the hive returns to <span class="status-pill green"><span class="dot"></span>STATIONARY</span> and runs a fresh proximity evaluation. Any genuine breach that happened during the brief motion is then captured.</li>
-        </ul>
-
-        <h3>What Happens When You Stop</h3>
-        <p>
-          When the hive's centre stops moving, the motion state transitions to <span class="status-pill amber"><span class="dot"></span>STOPPING</span>. During Stopping, evaluation remains paused for 3–5 minutes (depending on profile). This is to avoid noise from the trailing edge of stale-but-arriving reports.
-        </p>
-        <p>
-          Once Stopping completes, the hive transitions to <span class="status-pill green"><span class="dot"></span>STATIONARY</span> and runs a fresh proximity evaluation:
-        </p>
-        <ul>
-          <li><b>If everything's together:</b> nothing happens (no alert needed). The hive is back to normal.</li>
-          <li><b>If a tag is genuinely missing:</b> a Confirmed Breach alert fires with copy that acknowledges the timing. Example: <em>"Travel Kit arrived but Headphones (T-04) is missing. Last seen 35 minutes ago, 12 km from current position."</em></li>
-        </ul>
-
-        <h3>Brief Stops Don't Restart the Cycle</h3>
-        <p>
-          Stopping at traffic lights for a couple of minutes doesn't transition the hive into Stopping. The 10-minute settling requirement means brief urban stops are absorbed naturally — the hive remains In Transit until you actually arrive somewhere.
-        </p>
-
-        <h3>Brief Starts Don't Lock You Out of Alerts</h3>
-        <p>
-          Similarly, a brief moment of motion that doesn't sustain (e.g. you picked up your bag, walked across the room, set it down) won't trap the hive in suppressed-alert mode. The Starting state has its own timeout — if motion doesn't sustain for 2 minutes, the hive returns to Stationary and fully re-evaluates.
-        </p>
-
-        <div class="callout warn">
-          <div class="callout-title">→ Trade-off to Understand</div>
-          <p>While the hive is in any motion state (Starting, In Transit, or Stopping), HIVE doesn't fire breach alerts even if a tag is genuinely separated. You'll find out at the next stable rest. For most users this is fine — you can't usefully act on an alert while driving. Mid-journey detection is on the roadmap for future releases based on user need.</p>
-        </div>
-      </section>
-
-      <!-- ===== 15 LIFECYCLE ===== -->
+      <!-- ===== 12 LIFECYCLE ===== -->
       <section class="section" id="lifecycle">
         <div class="section-head">
-          <div class="section-num">15</div>
+          <div class="section-num">12</div>
           <h2 class="section-title">60-Day Lifetime</h2>
         </div>
 
@@ -1507,10 +1249,10 @@
         </div>
       </section>
 
-      <!-- ===== 16 DELETE & RECREATE ===== -->
+      <!-- ===== 13 DELETE & RECREATE ===== -->
       <section class="section" id="deletion">
         <div class="section-head">
-          <div class="section-num">16</div>
+          <div class="section-num">13</div>
           <h2 class="section-title">Delete &amp; Recreate</h2>
         </div>
 
@@ -1553,10 +1295,10 @@
         </div>
       </section>
 
-      <!-- ===== 17 ARCHIVE ===== -->
+      <!-- ===== 14 ARCHIVE ===== -->
       <section class="section" id="archive">
         <div class="section-head">
-          <div class="section-num">17</div>
+          <div class="section-num">14</div>
           <h2 class="section-title">Archive</h2>
         </div>
 
@@ -1566,7 +1308,7 @@
 
         <h3>What You Can Do in the Archive</h3>
         <ul>
-          <li><b>Review</b> past alerts, breaches, motion-state changes, and timelines</li>
+          <li><b>Review</b> past alerts, breaches, and timelines</li>
           <li><b>Recreate</b> based on an archived hive's configuration</li>
           <li><b>Permanently delete</b> an archived hive to clear its data immediately</li>
         </ul>
@@ -1577,33 +1319,21 @@
         </p>
       </section>
 
-      <!-- ===== 18 TROUBLESHOOTING ===== -->
+      <!-- ===== 15 TROUBLESHOOTING ===== -->
       <section class="section" id="troubleshooting">
         <div class="section-head">
-          <div class="section-num">18</div>
+          <div class="section-num">15</div>
           <h2 class="section-title">Troubleshooting</h2>
         </div>
 
         <h3>I'm getting fewer false breach alerts during car journeys — is something broken?</h3>
         <p>
-          No — that's the v1.1 motion awareness working as intended. Previously HIVE would fire false breaches whenever you drove with your hive in the car. Those alerts are now correctly suppressed during transit. Real breaches at the destination still fire after you stop.
+          No — that's v2.0 staleness-aware evaluation working as intended. Previously HIVE would fire false breaches whenever you drove with your hive in the car, because it compared position reports taken at different points along the route. HIVE now refuses to confirm a breach from time-mismatched reports, so travel produces at most a brief "suspected" breach that clears itself. Real separations still fire after you stop.
         </p>
 
-        <h3>My hive shows "In Transit" but I'm not moving</h3>
+        <h3>I see "suspected breach" then "cleared" while travelling — what's that?</h3>
         <p>
-          This usually means several tags' position reports show movement that the system has interpreted as group motion. Most common causes:
-        </p>
-        <ul>
-          <li>Multiple tags reported new positions at roughly the same time, with reports coming from a moving phone (e.g. a passing vehicle)</li>
-          <li>Phone GPS noise was significant enough to look like motion</li>
-        </ul>
-        <p>
-          The state should self-correct within a few minutes once stable reports come in. If it persists, check whether your tags are actually stationary — sometimes things have moved without you realising.
-        </p>
-
-        <h3>My hive went into "In Transit" briefly when I was cycling or scooting</h3>
-        <p>
-          Cycling pace (15–20 km/h) crosses both the Slow profile motion threshold (10 km/h) and the Mobile profile threshold (15 km/h). If you carry your hive while cycling, transit detection will activate. This is expected and harmless — proximity evaluation resumes when you stop. Walking, however, should not trigger transit detection at either profile.
+          That's staleness-aware evaluation at work. While your items travel together, their position reports are taken at different points along the route, which can briefly look like a separation. HIVE flags this as a <b>suspected</b> breach rather than confirming it, and clears it automatically once fresh, time-aligned reports show the group together. You won't get a confirmed-breach alert from normal travel.
         </p>
 
         <h3>My hive shows "Partial Data" — is something wrong?</h3>
@@ -1616,14 +1346,14 @@
           Three things to check:
         </p>
         <ul>
-          <li>Is your distance threshold appropriate? Mobile-profile assets often need 200m+ to avoid noise</li>
+          <li>Is your distance threshold appropriate? Consider increasing it if you're getting false alerts — the default for Mobile profile is 1000m</li>
           <li>Is your mobility profile right? A stationary profile on actually-mobile assets will alert constantly</li>
           <li>Are tag positions noisy? Low-quality phone GPS can produce 10–50m of jitter</li>
         </ul>
 
         <h3>I'm getting too few alerts</h3>
         <p>
-          Either your threshold is too generous or your tags are reporting infrequently. Consider tightening the threshold and watch for a week. Also check that your hive isn't constantly stuck In Transit — if motion is being detected when it shouldn't be, alerts will be suppressed.
+          Either your threshold is too generous or your tags are reporting infrequently. Consider tightening the threshold and watch for a week. Note that a genuine separation is only confirmed once fresh, time-aligned reports establish it — if your tags report very infrequently, confirmation can lag until enough coherent reports arrive.
         </p>
 
         <h3>A tag I want to use says it's "in another hive"</h3>
@@ -1637,10 +1367,10 @@
         </p>
       </section>
 
-      <!-- ===== 19 FAQ ===== -->
+      <!-- ===== 16 FAQ ===== -->
       <section class="section" id="faq">
         <div class="section-head">
-          <div class="section-num">19</div>
+          <div class="section-num">16</div>
           <h2 class="section-title">FAQ</h2>
         </div>
 
@@ -1665,14 +1395,8 @@
         <h4>How quickly do alerts arrive?</h4>
         <p>Depends on how frequently your tags report. Urban areas typically see alerts within 3–8 minutes of a real breach. Rural areas can take 15–30 minutes. The system waits for confirmation to avoid false alarms.</p>
 
-        <h4>Will I miss alerts while my hive is moving? <span class="status-pill green" style="font-size: 9px; margin-left: 4px;">v1.1</span></h4>
-        <p>Standard breach alerts are paused during transit and resume when you stop. Any breach detected after the hive comes to rest will fire normally. Mid-journey detection is on the roadmap for future releases based on user need.</p>
-
-        <h4>Can I turn off motion awareness? <span class="status-pill green" style="font-size: 9px; margin-left: 4px;">v1.1</span></h4>
-        <p>Not directly — it's tied to your mobility profile. If you don't want motion detection, use the Stationary profile (which assumes any movement is unwanted and alerts you regardless). For other profiles, motion awareness is essential to avoid false positives.</p>
-
-        <h4>What happens if my hive moves but only some tags report? <span class="status-pill green" style="font-size: 9px; margin-left: 4px;">v1.1</span></h4>
-        <p>Motion detection requires several tags' positions to assess group coherence. If too few tags are reporting fresh positions, the system can't reliably determine motion state and stays in its current state until enough data is available.</p>
+        <h4>Will I miss a real separation while my hive is moving? <span class="status-pill green" style="font-size: 9px; margin-left: 4px;">v2.0</span></h4>
+        <p>A genuine separation is confirmed once fresh, time-aligned reports establish it — which usually means shortly after you stop, when reports stabilise. During travel a real separation may show as a suspected breach first. Any confirmed breach fires normally. For most users, whose items travel with them, the meaningful question is "did everything arrive with me," which is answered as soon as you settle.</p>
 
         <h4>What happens if a tag's battery dies?</h4>
         <p>It will go silent, transitioning through Stale to Lost over time. You'll receive a Lost Contact alert for that tag. Replace the tag and re-add it — note that you'll need to delete and recreate the hive to swap the tag.</p>
@@ -1686,7 +1410,7 @@
 
       <!-- footer -->
       <div class="doc-footer">
-        <div>HIVE Tracking · v1.1 · Motion-Aware</div>
+        <div>HIVE Tracking · v2.0 · Staleness-Aware</div>
         <div>Pinplot Platform Documentation</div>
       </div>
 
@@ -1696,13 +1420,6 @@
 </div>
 
 <script>
-  // Theme detection from URL parameter
-  const urlParams = new URLSearchParams(window.location.search);
-  const theme = urlParams.get('theme');
-  if (theme === 'light') {
-    document.body.classList.add('light');
-  }
-
   const sections = document.querySelectorAll('.section');
   const navItems = document.querySelectorAll('.nav-item');
 
