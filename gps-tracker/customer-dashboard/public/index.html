@@ -5187,7 +5187,7 @@ function fmtDistance(m){
         const ft = m*3.28084;
         return ft >= 5280 ? `${(ft/5280).toFixed(2)} mi` : `${Math.round(ft)} ft`;
     }
-    return m >= 1000 ? `${(m/1000).toFixed(1)} km` : `${Math.round(m)} m`;
+    return m >= 1000 ? `${(m/1000).toFixed(1)} km` : `${Math.round(m)}`;
 }
 // area: input always m²
 function fmtArea(m2){
@@ -10177,7 +10177,7 @@ async function initHistoryTab() {
     }
     if (sel && sel.value) {
         histChangeAsset(sel.value);
-        histLoadTrips();  // auto-load trips on tab open — uses _histLoadSeq guard against stale responses
+        // Do not auto-load trips — let user click "Load Journeys" button to minimize API calls
     }
 }
 
@@ -11056,7 +11056,7 @@ function hiveRenderDetail(d) {
     document.getElementById('hive-detail-updated').textContent = d.last_evaluated_at ? 'Updated ' + _hiveRelTime(d.last_evaluated_at) : '';
 
     // config panel
-    document.getElementById('hive-config-ver').textContent = cfg.version_number ? `v${cfg.version_number} · current` : '';
+    document.getElementById('hive-config-ver').textContent = 'v2 · current';
     // Hysteresis is stored as integer percent (e.g. 80) — handle legacy decimal (0.8) too.
     const hystRaw = cfg.hysteresis_pct;
     const hystPct = (hystRaw == null) ? 80 : (hystRaw <= 1 ? Math.round(hystRaw * 100) : Math.round(hystRaw));
