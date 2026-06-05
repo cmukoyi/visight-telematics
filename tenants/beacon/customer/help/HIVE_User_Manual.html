@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HIVE — User Manual v2.0</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep:        #0a0f14;
+    --bg-sidebar:     #0c1218;
+    --bg-content:     #0a0f14;
+    --bg-elevated:    #131a22;
+    --bg-card:        #161e28;
+    --border:         #1d2730;
+    --border-bright:  #2a3a48;
+
+    --text-primary:   #e8ecef;
+    --text-secondary: #a0adb8;
+    --text-tertiary:  #6b7785;
+    --text-muted:     #4a5663;
+
+    --green:          #3565d3;
+    --green-dim:      #2850a8;
+    --green-bg:       rgba(53, 101, 211, 0.1);
+    --green-glow:     rgba(53, 101, 211, 0.3);
+
+    --red:            #ff4757;
+    --red-bg:         rgba(255, 71, 87, 0.1);
+    --amber:          #ffb648;
+    --amber-bg:       rgba(255, 182, 72, 0.1);
+    --blue:           #4a9eff;
+    --blue-bg:        rgba(74, 158, 255, 0.1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+    scroll-behavior: smooth;
+  }
+
+  .docs {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    min-height: 100vh;
+  }
+
+  /* ===== Sidebar ===== */
+  .sidebar {
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border);
+    padding: 32px 28px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  .sidebar::-webkit-scrollbar { width: 6px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .docs-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--green);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    margin-bottom: 6px;
+  }
+  .docs-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+    letter-spacing: -0.01em;
+  }
+  .docs-version {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 22px;
+  }
+  .docs-version .new-badge {
+    display: inline-block;
+    background: var(--green-bg);
+    color: var(--green);
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 6px;
+    letter-spacing: 0.06em;
+  }
+
+  .nav-section {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    margin: 22px 0 10px;
+  }
+  .nav-section:first-of-type { margin-top: 0; }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 0 7px 14px;
+    color: var(--text-tertiary);
+    text-decoration: none;
+    font-size: 14px;
+    border-left: 2px solid transparent;
+    margin-left: -16px;
+    padding-left: 14px;
+    transition: all 0.12s;
+    cursor: pointer;
+  }
+  .nav-item::before {
+    content: '•';
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+  .nav-item:hover { color: var(--text-primary); }
+  .nav-item.active {
+    color: var(--green);
+    background: rgba(0, 217, 107, 0.06);
+    border-left-color: var(--green);
+    font-weight: 500;
+  }
+  .nav-item.active::before { color: var(--green); }
+  .nav-item .new-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    background: var(--green);
+    color: var(--bg-deep);
+    padding: 1px 5px;
+    border-radius: 2px;
+    font-weight: 700;
+    margin-left: auto;
+    letter-spacing: 0.04em;
+  }
+
+  /* ===== Content ===== */
+  .content {
+    background: var(--bg-content);
+    background-image:
+      radial-gradient(circle at 20% 0%, rgba(0, 217, 107, 0.04), transparent 50%),
+      radial-gradient(circle at 80% 100%, rgba(0, 217, 107, 0.02), transparent 50%);
+    padding: 60px 80px 120px;
+    max-width: 100%;
+  }
+  .content-inner {
+    max-width: 760px;
+  }
+
+  .kicker {
+    display: flex; align-items: center; gap: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    margin-bottom: 24px;
+  }
+  .kicker::before {
+    content: '';
+    width: 28px; height: 2px;
+    background: var(--green);
+  }
+
+  .hero-title {
+    font-size: 84px;
+    font-weight: 800;
+    line-height: 0.96;
+    letter-spacing: -0.04em;
+    margin-bottom: 32px;
+    color: var(--text-primary);
+  }
+  .hero-title .accent { color: var(--green); display: block; }
+
+  .hero-lede {
+    font-size: 18px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    max-width: 600px;
+    margin-bottom: 32px;
+  }
+
+  .pill-row {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 80px;
+  }
+  .pill {
+    display: inline-flex; align-items: center;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-bright);
+    color: var(--text-secondary);
+    padding: 7px 14px;
+    border-radius: 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+  }
+  .pill.new {
+    background: var(--green-bg);
+    border-color: var(--green-dim);
+    color: var(--green);
+  }
+
+  .section {
+    margin-bottom: 80px;
+    scroll-margin-top: 40px;
+  }
+  .section-head {
+    display: flex; align-items: center; gap: 18px;
+    margin-bottom: 32px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--green);
+    background: rgba(0, 217, 107, 0.08);
+    border: 1px solid var(--green-dim);
+    padding: 6px 10px;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+  }
+  .section-title {
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    flex: 1;
+  }
+  .section-title-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    background: var(--green);
+    color: var(--bg-deep);
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .section h3 {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 36px 0 14px;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+  }
+  .section h4 {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 26px 0 10px;
+    color: var(--text-primary);
+  }
+  .section p {
+    color: var(--text-secondary);
+    margin-bottom: 18px;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+  .section p b, .section p strong {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+  .section a {
+    color: var(--green);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(0, 217, 107, 0.3);
+    transition: border-color 0.15s;
+  }
+  .section a:hover { border-bottom-color: var(--green); }
+
+  .section ul, .section ol {
+    margin: 0 0 18px 4px;
+    padding-left: 24px;
+    color: var(--text-secondary);
+  }
+  .section li {
+    margin-bottom: 8px;
+    line-height: 1.65;
+  }
+  .section li b { color: var(--text-primary); font-weight: 600; }
+  .section li::marker { color: var(--green); }
+
+  .callout {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--green);
+    padding: 18px 22px;
+    margin: 24px 0;
+    border-radius: 4px;
+  }
+  .callout.info { border-left-color: var(--blue); }
+  .callout.warn { border-left-color: var(--amber); }
+  .callout.danger { border-left-color: var(--red); }
+  .callout-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--green);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    margin-bottom: 8px;
+  }
+  .callout.info .callout-title { color: var(--blue); }
+  .callout.warn .callout-title { color: var(--amber); }
+  .callout.danger .callout-title { color: var(--red); }
+  .callout p { margin-bottom: 0; font-size: 14px; }
+
+  .doc-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 18px 0;
+    font-size: 13px;
+  }
+  .doc-table th {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-bright);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .doc-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-secondary);
+  }
+  .doc-table td:first-child {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  .doc-table tr:last-child td { border-bottom: none; }
+  .doc-table .center { text-align: center; }
+
+  code, .kbd {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.88em;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    color: var(--green);
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 12px;
+    letter-spacing: 0.04em;
+  }
+  .status-pill.green { background: var(--green-bg); color: var(--green); }
+  .status-pill.red { background: var(--red-bg); color: var(--red); }
+  .status-pill.amber { background: var(--amber-bg); color: var(--amber); }
+  .status-pill.blue { background: var(--blue-bg); color: var(--blue); }
+  .status-pill.muted { background: var(--bg-elevated); color: var(--text-tertiary); border: 1px solid var(--border-bright); }
+  .status-pill .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .figure {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 24px;
+    margin: 24px 0;
+  }
+  .figure-caption {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--border);
+  }
+  .figure-caption b { color: var(--green); font-weight: 600; }
+
+  .state-diagram {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .state-node {
+    flex: 1;
+    min-width: 110px;
+    text-align: center;
+    padding: 14px 10px;
+    border-radius: 6px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-bright);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+  .state-node.ok { border-color: var(--green-dim); color: var(--green); }
+  .state-node.pending { border-color: var(--amber); color: var(--amber); }
+  .state-node.alert { border-color: var(--red); color: var(--red); }
+  .state-node.resolving { border-color: var(--blue); color: var(--blue); }
+  .state-node.starting { border-color: var(--amber); color: var(--amber); }
+  .state-node.transit { border-color: var(--blue); color: var(--blue); }
+  .state-node.settling { border-color: var(--amber); color: var(--amber); }
+  .state-arrow {
+    color: var(--text-tertiary);
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .pip-row {
+    display: flex; gap: 6px; align-items: center;
+    margin: 12px 0;
+  }
+  .pip {
+    width: 28px; height: 28px;
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+  .pip.fresh { background: var(--green-bg); color: var(--green); border-color: var(--green-dim); }
+  .pip.recent { background: var(--blue-bg); color: var(--blue); border-color: rgba(74, 158, 255, 0.4); }
+  .pip.stale { background: var(--amber-bg); color: var(--amber); border-color: rgba(255, 182, 72, 0.4); }
+  .pip.lost { background: var(--red-bg); color: var(--red); border-color: rgba(255, 71, 87, 0.4); }
+
+  .lifecycle-vis {
+    display: grid;
+    grid-template-columns: 1fr 24px 1fr 24px 1fr;
+    align-items: stretch;
+    gap: 0;
+  }
+  .lifecycle-stage {
+    background: var(--bg-card);
+    border: 1px solid var(--border-bright);
+    border-radius: 6px;
+    padding: 16px 18px;
+    text-align: center;
+  }
+  .lifecycle-stage.active { border-color: var(--green-dim); }
+  .lifecycle-stage.archived { border-color: var(--text-muted); opacity: 0.85; }
+  .lifecycle-stage.purged { border-color: var(--red); opacity: 0.65; }
+  .lifecycle-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    margin-bottom: 6px;
+  }
+  .lifecycle-stage.active .lifecycle-label { color: var(--green); }
+  .lifecycle-stage.archived .lifecycle-label { color: var(--text-secondary); }
+  .lifecycle-stage.purged .lifecycle-label { color: var(--red); }
+  .lifecycle-stage-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+  .lifecycle-duration {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+  .lifecycle-arrow {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+  }
+
+  /* (legacy motion-state visual styles — retained, unused) */
+  .motion-states {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 12px;
+    margin: 24px 0;
+  }
+  .motion-state-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border-bright);
+    border-radius: 6px;
+    padding: 18px 20px;
+  }
+  .motion-state-box.stationary { border-left: 3px solid var(--green); }
+  .motion-state-box.starting { border-left: 3px solid var(--amber); }
+  .motion-state-box.transit { border-left: 3px solid var(--blue); }
+  .motion-state-box.settling { border-left: 3px solid var(--amber); }
+  .motion-state-icon {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+  .motion-state-box.stationary .motion-state-icon { color: var(--green); }
+  .motion-state-box.starting .motion-state-icon { color: var(--amber); }
+  .motion-state-box.transit .motion-state-icon { color: var(--blue); }
+  .motion-state-box.settling .motion-state-icon { color: var(--amber); }
+  .motion-state-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+  .motion-state-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .quick-toc {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 22px 26px;
+    margin-bottom: 60px;
+  }
+  .quick-toc-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    margin-bottom: 12px;
+  }
+  .quick-toc-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px 24px;
+  }
+  .quick-toc-list a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 13px;
+    padding: 4px 0;
+    border-bottom: none !important;
+    transition: color 0.12s;
+    display: flex; align-items: center;
+  }
+  .quick-toc-list a:hover { color: var(--green); }
+  .quick-toc-list a .num {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-muted);
+    margin-right: 10px;
+    font-size: 11px;
+  }
+  .quick-toc-list a .new-mini {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    background: var(--green);
+    color: var(--bg-deep);
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-weight: 700;
+    margin-left: auto;
+    letter-spacing: 0.04em;
+  }
+
+  .doc-footer {
+    margin-top: 100px;
+    padding-top: 30px;
+    border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+
+  /* Whats new banner */
+  .whats-new {
+    background: linear-gradient(135deg, rgba(0, 217, 107, 0.08), rgba(0, 217, 107, 0.02));
+    border: 1px solid var(--green-dim);
+    border-radius: 8px;
+    padding: 24px 28px;
+    margin-bottom: 50px;
+    position: relative;
+  }
+  .whats-new-tag {
+    position: absolute;
+    top: -10px; right: 24px;
+    background: var(--green);
+    color: var(--bg-deep);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 4px 10px;
+    border-radius: 3px;
+  }
+  .whats-new-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+  .whats-new-list {
+    margin: 12px 0 0 4px;
+    padding-left: 24px;
+    color: var(--text-secondary);
+    font-size: 14px;
+  }
+  .whats-new-list li {
+    margin-bottom: 6px;
+  }
+  .whats-new-list li::marker { color: var(--green); }
+
+  @media (max-width: 1100px) {
+    .docs { grid-template-columns: 240px 1fr; }
+    .content { padding: 40px 50px 80px; }
+    .hero-title { font-size: 64px; }
+    .motion-states { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 800px) {
+    .docs { grid-template-columns: 1fr; }
+    .sidebar { position: relative; height: auto; }
+    .content { padding: 30px 24px 60px; }
+    .hero-title { font-size: 44px; }
+    .quick-toc-list { grid-template-columns: 1fr; }
+    .lifecycle-vis { grid-template-columns: 1fr; }
+    .lifecycle-arrow { padding: 6px 0; transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+
+<div class="docs">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar">
+    <div class="docs-label">Documentation</div>
+    <div class="docs-title">HIVE Tracking</div>
+    <div class="docs-version">v2.0 — Beacon Telematics Platform <span class="new-badge">UPDATED</span></div>
+
+    <div class="nav-section">Getting Started</div>
+    <a class="nav-item active" href="#overview">Overview</a>
+    <a class="nav-item" href="#whats-new">What's New in v2.0 <span class="new-tag">NEW</span></a>
+    <a class="nav-item" href="#how-it-works">How It Works</a>
+    <a class="nav-item" href="#quick-start">Quick Start</a>
+    <a class="nav-item" href="#concepts">Key Concepts</a>
+
+    <div class="nav-section">Creating Hives</div>
+    <a class="nav-item" href="#wizard">Setup Wizard</a>
+    <a class="nav-item" href="#mobility">Mobility Profiles</a>
+    <a class="nav-item" href="#thresholds">Distance Thresholds</a>
+    <a class="nav-item" href="#smart-defaults">Smart Defaults</a>
+
+    <div class="nav-section">Monitoring</div>
+    <a class="nav-item" href="#hive-list">Hive List</a>
+    <a class="nav-item" href="#detail-view">Detail View</a>
+    <a class="nav-item" href="#alerts">Alerts &amp; Breaches</a>
+    <a class="nav-item" href="#freshness">Tag Freshness</a>
+
+    <div class="nav-section">Lifecycle</div>
+    <a class="nav-item" href="#lifecycle">60-Day Lifetime</a>
+    <a class="nav-item" href="#deletion">Delete &amp; Recreate</a>
+    <a class="nav-item" href="#archive">Archive</a>
+
+    <div class="nav-section">Reference</div>
+    <a class="nav-item" href="#troubleshooting">Troubleshooting</a>
+    <a class="nav-item" href="#faq">FAQ</a>
+  </aside>
+
+  <!-- ===== CONTENT ===== -->
+  <main class="content">
+    <div class="content-inner">
+
+      <!-- ===== HERO ===== -->
+      <div class="kicker">User Manual · v2.0</div>
+      <h1 class="hero-title">
+        HIVE
+        <span class="accent">Tracking</span>
+      </h1>
+      <p class="hero-lede">
+        Group your BLE tags into watched sets and get alerted the moment they drift apart. Built for travel kits, workshop tools, fleet assets, and anything else that should stay together — at rest or on the move.
+      </p>
+      <div class="pill-row">
+        <span class="pill">Group Tracking</span>
+        <span class="pill">Crowdsourced Location</span>
+        <span class="pill">60-Day Cycle</span>
+        <span class="pill">Smart Defaults</span>
+        <span class="pill">Mobility Profiles</span>
+        <span class="pill new">Staleness-Aware</span>
+      </div>
+
+      <!-- What's New banner -->
+      <div class="whats-new">
+        <div class="whats-new-tag">v2.0 · What's New</div>
+        <div class="whats-new-title">Travelling Together — No More False Alerts</div>
+        <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 0;">
+          Real-world testing showed HIVE was firing false breach alerts when groups travelled together in vehicles. v2.0 introduces staleness-aware evaluation — HIVE no longer trusts a "breach" built from position reports captured at different points along a journey.
+        </p>
+        <ul class="whats-new-list">
+          <li><b>Temporal coherence</b> — HIVE only confirms a breach from positions captured close together in time, so travel no longer looks like separation</li>
+          <li><b>Persistence required</b> — a breach must be backed by fresh, consistent evidence before it's confirmed; brief artefacts stay "suspected" and clear themselves</li>
+          <li><b>No setup required</b> — the new evaluation is automatic and applies to every hive</li>
+        </ul>
+      </div>
+
+      <!-- Quick TOC -->
+      <div class="quick-toc">
+        <div class="quick-toc-title">In This Manual</div>
+        <div class="quick-toc-list">
+          <a href="#overview"><span class="num">01</span>Overview</a>
+          <a href="#whats-new"><span class="num">02</span>What's New in v2.0<span class="new-mini">NEW</span></a>
+          <a href="#how-it-works"><span class="num">03</span>How It Works</a>
+          <a href="#quick-start"><span class="num">04</span>Quick Start</a>
+          <a href="#concepts"><span class="num">05</span>Key Concepts</a>
+          <a href="#wizard"><span class="num">06</span>Setup Wizard</a>
+          <a href="#mobility"><span class="num">07</span>Mobility Profiles</a>
+          <a href="#hive-list"><span class="num">08</span>Hive List</a>
+          <a href="#detail-view"><span class="num">09</span>Detail View</a>
+          <a href="#alerts"><span class="num">10</span>Alerts &amp; Breaches</a>
+          <a href="#freshness"><span class="num">11</span>Tag Freshness</a>
+          <a href="#lifecycle"><span class="num">12</span>60-Day Lifetime</a>
+          <a href="#deletion"><span class="num">13</span>Delete &amp; Recreate</a>
+          <a href="#archive"><span class="num">14</span>Archive</a>
+          <a href="#troubleshooting"><span class="num">15</span>Troubleshooting</a>
+          <a href="#faq"><span class="num">16</span>FAQ</a>
+        </div>
+      </div>
+
+      <!-- ===== 01 OVERVIEW ===== -->
+      <section class="section" id="overview">
+        <div class="section-head">
+          <div class="section-num">01</div>
+          <h2 class="section-title">Overview</h2>
+        </div>
+
+        <p>
+          HIVE is a proximity-tracking feature for groups of BLE tags. You select a set of 2 to 5 tags that belong together — a travel kit, a tool collection, a delivery load — and HIVE watches their positions. If any tag drifts further than your configured distance from the others, you get an alert.
+        </p>
+
+        <p>
+          HIVE works with any iBeacon or Eddystone BLE tags already registered in <b>Beacon Telematics</b>. It uses the same crowdsourced location data your tags already report, no special hardware or anchor required. Tags report their position whenever a phone running a compatible app passes nearby, which means data quality is best in busy areas and naturally sparser in quiet ones.
+        </p>
+
+        <p>
+          As of v2.0, HIVE uses <b>staleness-aware evaluation</b>. When your hive is travelling together (in a car, on a bike, in your bag while walking), HIVE knows the difference between "really separated" and "just looks separated because the position reports were taken at different points along the way," and avoids firing false alerts.
+        </p>
+
+        <div class="callout">
+          <div class="callout-title">→ At a Glance</div>
+          <p>
+            Group <b>2–5 tags</b> per hive · Configurable distance threshold · Per-hive mobility profile · 60-day operational lifetime · 60-day archive retention · Permanent delete option · <b>Staleness-aware evaluation (new)</b>.
+          </p>
+        </div>
+      </section>
+
+      <!-- ===== 02 WHAT'S NEW ===== -->
+      <section class="section" id="whats-new">
+        <div class="section-head">
+          <div class="section-num">02</div>
+          <h2 class="section-title">What's New in v2.0</h2>
+          <span class="section-title-tag">New</span>
+        </div>
+
+        <p>
+          v2.0 is a substantial update focused on a single problem: HIVE wasn't handling moving hives well. If you've ever had your travel kit fire a "breach" alert while you were just driving home from the supermarket, this release is for you.
+        </p>
+
+        <h3>The Problem</h3>
+        <p>
+          BLE tag positions are reported by passing phones — typically every 2–5 minutes. When your hive is sitting still, this is fine: a position from 3 minutes ago is still roughly correct. But when your hive is moving in a vehicle at 40 km/h, a 3-minute-old position is over 2 km away from where the tag actually is now.
+        </p>
+        <p>
+          The old version of HIVE didn't account for this. It would compare a tag's fresh position against another tag's older position, see them as 1+ km apart, and fire a breach alert — even though both tags were sitting peacefully next to each other in the same boot of the same car.
+        </p>
+
+        <h3>The Solution</h3>
+        <p>
+          HIVE now uses <b>staleness-aware evaluation</b>. Before declaring a breach, it checks whether the positions it's comparing were captured close enough together in time to be trustworthy. Two reports taken ten minutes apart while you're driving describe two different points on your route, not the distance between two tags — so HIVE refuses to confirm a breach from them. A breach is only confirmed when fresh, time-aligned reports consistently show a real separation. Brief artefacts from travel show up as "suspected" and clear themselves once you stop.
+        </p>
+
+        <h3>What You Need to Do</h3>
+        <p>
+          Nothing. Staleness-aware evaluation is automatic. There are no new settings to configure, and existing hives benefit from the new behaviour immediately on upgrade.
+        </p>
+
+        <div class="callout info">
+          <div class="callout-title">→ One Important Trade-off</div>
+          <p>While your hive is travelling together, a genuine separation mid-journey may show only as a suspected breach until you stop and fresh, time-aligned reports confirm it. For most users (whose tagged items are with them) this is the right behaviour — you can't usefully act on an alert while driving anyway.</p>
+        </div>
+      </section>
+
+      <!-- ===== 03 HOW IT WORKS ===== -->
+      <section class="section" id="how-it-works">
+        <div class="section-head">
+          <div class="section-num">03</div>
+          <h2 class="section-title">How It Works</h2>
+        </div>
+
+        <p>
+          Every time one of your tagged items reports a new position, HIVE re-evaluates the hive. It calculates the distance between every pair of tags in the group and finds the largest distance — the <b>group diameter</b>. If the diameter exceeds your threshold <b>and</b> the separation is confirmed by time-aligned reports, an alert fires.
+        </p>
+
+        <h3>The Alert State Machine</h3>
+        <p>
+          Alerts don't fire on the first sign of trouble — that would create noise from GPS jitter and brief edge cases. Instead, hives move through a deliberate sequence of states:
+        </p>
+
+        <div class="figure">
+          <div class="state-diagram">
+            <div class="state-node ok">OK</div>
+            <div class="state-arrow">→</div>
+            <div class="state-node pending">PENDING</div>
+            <div class="state-arrow">→</div>
+            <div class="state-node alert">BREACHING</div>
+            <div class="state-arrow">→</div>
+            <div class="state-node resolving">RESOLVING</div>
+            <div class="state-arrow">→</div>
+            <div class="state-node ok">OK</div>
+          </div>
+          <div class="figure-caption">
+            <b>Figure 1.</b> Alert state machine — confirmation required to enter breach, hysteresis required to clear back to OK.
+          </div>
+        </div>
+
+        <p>
+          A suspected breach moves the hive to <span class="status-pill amber"><span class="dot"></span>PENDING</span> while waiting for a confirming report. Once confirmed, it transitions to <span class="status-pill red"><span class="dot"></span>BREACHING</span> and the alert is sent. When the wandering tag rejoins, the hive doesn't immediately clear — it must drop comfortably below the threshold before transitioning through <span class="status-pill blue"><span class="dot"></span>RESOLVING</span> back to <span class="status-pill green"><span class="dot"></span>OK</span>.
+        </p>
+
+        <h3>Outlier Detection</h3>
+        <p>
+          When a breach fires, HIVE identifies <b>which tag</b> caused it by counting how many over-threshold pairs each tag participates in. The tag with the most breaching pairs is flagged as the outlier — usually the one that wandered off — and is highlighted in alerts and the detail view.
+        </p>
+
+        <h3>Staleness-Aware Evaluation (v2.0)</h3>
+        <p>
+          Before the state machine above can confirm a breach, HIVE applies a <b>staleness check</b>. Each pairwise distance is only trusted if the two positions were captured close together in time (within minutes, tuned per mobility profile). A "breach" supported only by time-mismatched positions — the typical signature of a group travelling together — is held as <span class="status-pill amber"><span class="dot"></span>SUSPECTED</span> and never confirmed. It clears on its own once fresh, time-aligned reports arrive. A breach is confirmed only when temporally-coherent reports consistently show a real separation.
+        </p>
+      </section>
+
+      <!-- ===== 04 QUICK START ===== -->
+      <section class="section" id="quick-start">
+        <div class="section-head">
+          <div class="section-num">04</div>
+          <h2 class="section-title">Quick Start</h2>
+        </div>
+
+        <p>Getting your first hive running takes under a minute if you accept the suggested settings.</p>
+
+        <ol>
+          <li>From the sidebar, choose <b>HIVE Tracking</b>, then click <code>+ New Hive</code>.</li>
+          <li>Pick the tags you want to group (between 2 and 5). Tags already in another hive will be unavailable.</li>
+          <li>Give the hive a name — something descriptive like <em>Travel Kit</em> or <em>Workshop Tools</em>.</li>
+          <li>HIVE analyses your tags' recent movement and suggests a mobility profile and distance threshold. If the badge says <b>High Confidence</b>, click <code>Use Suggested Settings</code> and you're done.</li>
+          <li>Otherwise, click <code>Review Settings</code> to walk through the 3-question wizard.</li>
+        </ol>
+
+        <p>
+          Your hive begins tracking immediately. There's a short 5–10 minute warm-up period while HIVE establishes baseline state, after which alerts fire normally. While your items are travelling together, breach artefacts are held as "suspected" and clear themselves once you settle.
+        </p>
+
+        <div class="callout info">
+          <div class="callout-title">→ Tip</div>
+          <p>If you've used HIVE before, the wizard remembers your last configuration. Recreating a hive with similar settings takes just a few clicks.</p>
+        </div>
+      </section>
+
+      <!-- ===== 05 KEY CONCEPTS ===== -->
+      <section class="section" id="concepts">
+        <div class="section-head">
+          <div class="section-num">05</div>
+          <h2 class="section-title">Key Concepts</h2>
+        </div>
+
+        <h3>Group Diameter</h3>
+        <p>
+          The largest distance between any two tags in your hive. If your hive has 5 tags, HIVE measures all 10 pairwise distances and reports the biggest one. The group is "together" when the diameter stays below your threshold.
+        </p>
+
+        <h3>Distance Threshold</h3>
+        <p>
+          The maximum group diameter you'll tolerate before an alert fires. Configurable per hive, and shown alongside the live diameter on every screen. Default values range from 150m (stationary assets) to 1000m (mobile/transit assets) depending on your profile choice.
+        </p>
+
+        <h3>Mobility Profile</h3>
+        <p>
+          A bundled preset that controls how HIVE interprets your tags' position data. Affects freshness windows, alert sensitivity, the temporal-coherence window, and confirmation requirements. Three options: <b>Stationary</b>, <b>Slow</b>, and <b>Mobile</b>.
+        </p>
+
+        <h3>Freshness Tier</h3>
+        <p>
+          Each tag is classified by how recently it reported. Tags fade through tiers as they go silent: <span class="status-pill green"><span class="dot"></span>FRESH</span> <span class="status-pill blue"><span class="dot"></span>RECENT</span> <span class="status-pill amber"><span class="dot"></span>STALE</span> <span class="status-pill red"><span class="dot"></span>LOST</span>. Only Fresh and Recent tags participate in alert evaluation.
+        </p>
+
+        <h3>Temporal Coherence <span class="status-pill green" style="margin-left: 8px;"><span class="dot"></span>NEW v2.0</span></h3>
+        <p>
+          Whether two position reports were captured close enough together in time to be meaningfully compared. HIVE only confirms a breach from temporally-coherent positions, so a group travelling together (whose reports are spread across a journey) doesn't look like a separation. The acceptable time gap is tuned per mobility profile.
+        </p>
+
+        <h3>Hive Lifecycle</h3>
+        <p>
+          Every hive has a 60-day operational life from the moment it's created. After that, it moves to a 60-day archive where you can review its history but it no longer tracks. After the archive period, data is purged unless you act.
+        </p>
+      </section>
+
+      <!-- ===== 06 SETUP WIZARD ===== -->
+      <section class="section" id="wizard">
+        <div class="section-head">
+          <div class="section-num">06</div>
+          <h2 class="section-title">Setup Wizard</h2>
+        </div>
+
+        <p>
+          The wizard is a 3-question flow designed to take seconds, not minutes. It pre-fills every answer based on your tags' recent activity, so most users can simply confirm and continue.
+        </p>
+
+        <h3>Question 1 — What are you tracking?</h3>
+        <p>
+          A descriptive name for the hive. Optional but recommended — alerts and history reference this name, so something concrete like <em>Travel Kit</em> beats <em>Hive 4</em>.
+        </p>
+
+        <h3>Question 2 — How much do these items move?</h3>
+        <p>
+          The mobility profile choice. HIVE pre-selects this based on how your tags have moved in the last few weeks, marked with a <span class="status-pill green"><span class="dot"></span>SUGGESTED</span> badge. Three options to pick from:
+        </p>
+        <ul>
+          <li><b>They stay put</b> — items that shouldn't normally move from where you've placed them. Tools in a workshop, equipment in a yard, instruments in a lab.</li>
+          <li><b>They move occasionally</b> — items that move sometimes, slowly. Livestock, parked vehicles, mobility aids, luggage during a trip. HIVE expects extended periods of rest with occasional movement.</li>
+          <li><b>They're often on the move</b> — items carried with you day-to-day or in transit. Personal belongings, delivery packages, fleet equipment. HIVE is most accurate when these items are at rest; while they travel together, breach artefacts are held as "suspected" and clear once you arrive.</li>
+        </ul>
+        <p>See <a href="#mobility">Mobility Profiles</a> for full details.</p>
+
+        <h3>Question 3 — How close should they stay?</h3>
+        <p>
+          The distance threshold. Choose from preset values (150m, 250m, 450m, 750m, 1000m) or enter a custom value. The default matches your selected mobility profile.
+        </p>
+
+        <div class="callout info">
+          <div class="callout-title">→ Express Path</div>
+          <p>If HIVE has high confidence in its suggestions (typically when your tags have at least 7 days of history), an express card appears at the top of the wizard. Click <code>Use Suggested Settings</code> to skip the questions entirely.</p>
+        </div>
+      </section>
+
+      <!-- ===== 07 MOBILITY ===== -->
+      <section class="section" id="mobility">
+        <div class="section-head">
+          <div class="section-num">07</div>
+          <h2 class="section-title">Mobility Profiles</h2>
+        </div>
+
+        <p>
+          Mobility profiles are the most important configuration choice. They tell HIVE what kind of asset you're tracking, which affects almost every aspect of how alerts are evaluated — including the temporal-coherence window used by staleness-aware evaluation.
+        </p>
+
+        <table class="doc-table">
+          <thead>
+            <tr><th>Profile</th><th>Best For</th><th>Default Threshold</th><th>Coherence Window</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Stationary</td>
+              <td>Tools, equipment, instruments — assets that shouldn't normally move</td>
+              <td>150m</td>
+              <td>30 min</td>
+            </tr>
+            <tr>
+              <td>Slow</td>
+              <td>Livestock, parked vehicles, mobility aids, luggage during a trip</td>
+              <td>450m</td>
+              <td>10 min</td>
+            </tr>
+            <tr>
+              <td>Mobile</td>
+              <td>Personal belongings, shared equipment, couriered packages, fleet items, vehicles on the road</td>
+              <td>1000m</td>
+              <td>5 min</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>What Profiles Actually Change</h3>
+        <p>
+          Picking a profile sets several parameters at once. As mobility increases, freshness windows shorten (older positions become less trustworthy faster), confirmation requirements tighten, noise filters widen, and the temporal-coherence window narrows (so faster-moving assets demand more closely time-aligned reports before a breach is trusted).
+        </p>
+        <p>
+          The <b>Mobile</b> profile covers a wide range — from personal items that mostly sit still to delivery packages in active transit. HIVE is most accurate when these items are at rest; while they travel together, breach artefacts are held as "suspected" rather than confirmed, and clear once the hive settles.
+        </p>
+        <p>
+          The <b>Default Threshold</b> column shows the starting value for each profile, calibrated for typical 5–10 minute reporting cadence. You can adjust the threshold up or down for your specific use case during setup or later in hive settings.
+        </p>
+
+        <div class="callout warn">
+          <div class="callout-title">→ Picking the Wrong Profile</div>
+          <p>If your hive consistently produces too many false alerts or misses real ones, the profile is probably mismatched. HIVE will surface a gentle suggestion if it detects this. You can change the profile mid-life — see <a href="#deletion">Delete &amp; Recreate</a>.</p>
+        </div>
+      </section>
+
+      <!-- ===== 08 HIVE LIST ===== -->
+      <section class="section" id="hive-list">
+        <div class="section-head">
+          <div class="section-num">08</div>
+          <h2 class="section-title">Hive List</h2>
+        </div>
+
+        <p>
+          The main HIVE screen shows all your active hives at a glance. Each card displays the hive name, current status, group diameter against threshold, tag freshness pips, the outlier (if any), and the lifecycle clock.
+        </p>
+
+        <h3>Status at a Glance</h3>
+        <p>
+          The coloured top border tells you the state instantly:
+        </p>
+        <ul>
+          <li><span class="status-pill green"><span class="dot"></span>GREEN</span> — All tags are together, hive is OK</li>
+          <li><span class="status-pill amber"><span class="dot"></span>AMBER</span> — Partial data, freshness issues, or a suspected (unconfirmed) breach</li>
+          <li><span class="status-pill red"><span class="dot"></span>RED</span> — Active breach; one or more tags have separated</li>
+        </ul>
+
+        <h3>Tag Pips</h3>
+        <p>
+          The small numbered squares represent each tag in the hive, colour-coded by freshness:
+        </p>
+        <div class="pip-row">
+          <div class="pip fresh">01</div>
+          <div class="pip fresh">02</div>
+          <div class="pip recent">03</div>
+          <div class="pip stale">04</div>
+          <div class="pip lost">05</div>
+        </div>
+        <p>
+          A red dot on the corner of a pip indicates that tag is the current outlier.
+        </p>
+
+        <h3>Card Actions</h3>
+        <p>Each card has four quick actions:</p>
+        <ul>
+          <li><b>Edit</b> — Open hive settings (mobility profile, threshold)</li>
+          <li><b>Map</b> — Jump to live position view</li>
+          <li><b>History</b> — Review past alerts and evaluations</li>
+          <li><b>Delete</b> — Move the hive to archive (recoverable for 60 days)</li>
+        </ul>
+      </section>
+
+      <!-- ===== 09 DETAIL VIEW ===== -->
+      <section class="section" id="detail-view">
+        <div class="section-head">
+          <div class="section-num">09</div>
+          <h2 class="section-title">Detail View</h2>
+        </div>
+
+        <p>
+          Clicking any hive card opens its detail view — the deepest workspace for understanding hive state and history.
+        </p>
+
+        <h3>Live Position Map</h3>
+        <p>
+          Shows each tag's most recent position relative to the others. The dashed circle marks your distance threshold. Connecting lines show pairwise distances — green lines for in-bounds pairs, dashed red lines for over-threshold pairs leading to the outlier.
+        </p>
+
+        <h3>Diameter Readout</h3>
+        <p>
+          A live numeric display of the current group diameter, shown alongside a horizontal bar chart with the threshold marker. When the bar crosses the marker and the separation is confirmed by time-aligned reports, you're in breach. A diameter that's over threshold only because of time-mismatched reports (typical during travel) shows as a suspected breach rather than a confirmed one.
+        </p>
+
+        <h3>Tag Table</h3>
+        <p>
+          A row for each tag showing ID, name, last-seen time, distance from group centre, and role (core or outlier). Sortable on any column. Stale or lost tags are dimmed.
+        </p>
+
+        <h3>Side Panels</h3>
+        <p>The right column groups several panels:</p>
+        <ul>
+          <li><b>Active Alert</b> — Details of the current breach (if any), with cause and confirmation count</li>
+          <li><b>Configuration</b> — Current mobility profile, threshold, freshness windows, and other parameters</li>
+          <li><b>Lifecycle</b> — Days remaining on the 60-day clock, with a quick <code>Recreate Hive</code> button</li>
+          <li><b>Recent Activity</b> — Timeline of evaluations, breach events, and alerts over the last 24 hours</li>
+        </ul>
+      </section>
+
+      <!-- ===== 10 ALERTS ===== -->
+      <section class="section" id="alerts">
+        <div class="section-head">
+          <div class="section-num">10</div>
+          <h2 class="section-title">Alerts &amp; Breaches</h2>
+        </div>
+
+        <p>
+          HIVE issues different alert types depending on data quality and what changed. Knowing the difference helps you respond appropriately.
+        </p>
+
+        <table class="doc-table">
+          <thead>
+            <tr><th>Alert Type</th><th>Meaning</th><th>Action</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Confirmed Breach</td>
+              <td>Multiple fresh reports show the hive is split (Stationary only)</td>
+              <td>Verify and act — most reliable signal</td>
+            </tr>
+            <tr>
+              <td>Suspected Breach</td>
+              <td>One fresh report shows a breach, awaiting confirmation</td>
+              <td>Watch for escalation; may auto-resolve</td>
+            </tr>
+            <tr>
+              <td>Lost Contact</td>
+              <td>A tag has gone silent beyond the lost threshold</td>
+              <td>Check tag battery and physical condition</td>
+            </tr>
+            <tr>
+              <td>Partially Observable</td>
+              <td>Too many tags stale to evaluate confidently</td>
+              <td>Often resolves on its own as data flows in</td>
+            </tr>
+            <tr>
+              <td>Breach Cleared</td>
+              <td>The hive returned to OK state</td>
+              <td>Informational — confirms the issue is resolved</td>
+            </tr>
+            <tr>
+              <td>Resolved by Transit <span class="status-pill green" style="font-size: 9px; margin-left: 4px;">NEW</span></td>
+              <td>An active breach was resolved because the hive started moving</td>
+              <td>Informational — monitoring resumes when you stop</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Why Alerts May Take Time</h3>
+        <p>
+          Because tag positions arrive from crowdsourced sources, alert latency depends on how often phones pass nearby. In urban areas, breaches typically confirm within 3–8 minutes. In rural or low-traffic areas, it can take 15–30 minutes or longer. This isn't a system delay — it's the time required to gather enough evidence to be confident.
+        </p>
+
+        <div class="callout warn">
+          <div class="callout-title">→ Honest About Uncertainty</div>
+          <p>HIVE will surface "data quality degraded" rather than fire low-confidence alerts. If you see this, it means the hive can't confidently say what's happening — usually because tags have gone quiet or their reports aren't time-aligned enough to trust, not because something's wrong.</p>
+        </div>
+      </section>
+
+      <!-- ===== 11 FRESHNESS ===== -->
+      <section class="section" id="freshness">
+        <div class="section-head">
+          <div class="section-num">11</div>
+          <h2 class="section-title">Tag Freshness</h2>
+        </div>
+
+        <p>
+          Tag freshness reflects how recently we have a position. The thresholds vary by mobility profile — a fast-moving asset's position ages faster than a stationary one's.
+        </p>
+
+        <table class="doc-table">
+          <thead>
+            <tr><th>Tier</th><th>Stationary</th><th>Slow</th><th>Mobile</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Fresh</td><td>&lt;30 min</td><td>&lt;20 min</td><td>&lt;15 min</td></tr>
+            <tr><td>Recent</td><td>30 min – 4 hr</td><td>20 min – 2 hr</td><td>15 min – 1 hr</td></tr>
+            <tr><td>Stale</td><td>4–24 hr</td><td>2–8 hr</td><td>1–4 hr</td></tr>
+            <tr><td>Lost</td><td>&gt;24 hr</td><td>&gt;8 hr</td><td>&gt;2 hr</td></tr>
+          </tbody>
+        </table>
+
+        <p>
+          Only <b>Fresh</b> and <b>Recent</b> tags are used in breach evaluation. Stale tags are excluded but still shown in the UI. Lost tags trigger a separate Lost Contact alert.
+        </p>
+      </section>
+
+      <!-- ===== 12 LIFECYCLE ===== -->
+      <section class="section" id="lifecycle">
+        <div class="section-head">
+          <div class="section-num">12</div>
+          <h2 class="section-title">60-Day Lifetime</h2>
+        </div>
+
+        <p>
+          Every hive has a fixed 60-day operational lifetime from the moment of creation. This isn't a limitation — it's a hygiene mechanism that keeps your hive list focused on what's actually relevant. After expiry, the hive moves to a 60-day archive where you can still review history.
+        </p>
+
+        <div class="figure">
+          <div class="lifecycle-vis">
+            <div class="lifecycle-stage active">
+              <div class="lifecycle-label">Phase 1</div>
+              <div class="lifecycle-stage-name">Active</div>
+              <div class="lifecycle-duration">Up to 60 days</div>
+            </div>
+            <div class="lifecycle-arrow">→</div>
+            <div class="lifecycle-stage archived">
+              <div class="lifecycle-label">Phase 2</div>
+              <div class="lifecycle-stage-name">Archived</div>
+              <div class="lifecycle-duration">60 days retention</div>
+            </div>
+            <div class="lifecycle-arrow">→</div>
+            <div class="lifecycle-stage purged">
+              <div class="lifecycle-label">Phase 3</div>
+              <div class="lifecycle-stage-name">Purged</div>
+              <div class="lifecycle-duration">Permanent</div>
+            </div>
+          </div>
+          <div class="figure-caption">
+            <b>Figure 3.</b> Hive lifecycle — active for up to 60 days, archived for 60 more, then purged.
+          </div>
+        </div>
+
+        <h3>Notifications as Expiry Approaches</h3>
+        <ul>
+          <li><b>7 days before expiry</b> — first warning with one-tap recreate option</li>
+          <li><b>2 days before expiry</b> — second warning</li>
+          <li><b>At expiry</b> — final notification with one-tap recreate option</li>
+        </ul>
+
+        <h3>Recreating a Hive</h3>
+        <p>
+          The <code>Recreate Hive</code> button (visible on the hive detail page and in expiry notifications) opens a fresh wizard pre-filled with your current configuration and tags. One click and your tracking continues uninterrupted.
+        </p>
+
+        <div class="callout info">
+          <div class="callout-title">→ Why a 60-Day Cap?</div>
+          <p>Hives accumulate. Without a lifecycle, abandoned hives clutter the UI and consume tag slots indefinitely. The 60-day cap forces a periodic review — keep what matters, let the rest expire.</p>
+        </div>
+      </section>
+
+      <!-- ===== 13 DELETE & RECREATE ===== -->
+      <section class="section" id="deletion">
+        <div class="section-head">
+          <div class="section-num">13</div>
+          <h2 class="section-title">Delete &amp; Recreate</h2>
+        </div>
+
+        <p>
+          Hive membership is locked at creation. To add or remove a tag from a hive, you must delete it and create a new one. This sounds restrictive but is actually faster than editing — the recreation flow pre-fills everything.
+        </p>
+
+        <h3>Two Kinds of Deletion</h3>
+
+        <table class="doc-table">
+          <thead>
+            <tr><th>Action</th><th>Result</th><th>Reversible?</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Delete</td>
+              <td>Hive moves to archive · history retained for 60 days</td>
+              <td>Yes, via Recreate</td>
+            </tr>
+            <tr>
+              <td>Permanently Delete</td>
+              <td>All data removed immediately · no archive</td>
+              <td>No</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p>
+          Both options are offered in the standard delete confirmation. <b>Delete</b> is the recoverable choice; <b>Permanently Delete</b> requires you to type the hive name to confirm.
+        </p>
+
+        <h3>The Recreate Flow</h3>
+        <p>
+          When you delete a hive then recreate, the wizard opens pre-populated with the deleted hive's configuration and tags. You can adjust anything — add or remove tags, change the threshold, switch mobility profile — and confirm. The new hive starts fresh with no inherited history.
+        </p>
+
+        <div class="callout warn">
+          <div class="callout-title">→ One Tag, One Hive</div>
+          <p>A tag can only belong to one hive at a time. If you try to add a tag that's already in another hive, you'll see which hive it's in — delete that one first to free the tag.</p>
+        </div>
+      </section>
+
+      <!-- ===== 14 ARCHIVE ===== -->
+      <section class="section" id="archive">
+        <div class="section-head">
+          <div class="section-num">14</div>
+          <h2 class="section-title">Archive</h2>
+        </div>
+
+        <p>
+          The Archive view shows all your past hives — both deleted and expired — within their 60-day retention window. Each archived hive retains its full alert history, evaluation log, and configuration record.
+        </p>
+
+        <h3>What You Can Do in the Archive</h3>
+        <ul>
+          <li><b>Review</b> past alerts, breaches, and timelines</li>
+          <li><b>Recreate</b> based on an archived hive's configuration</li>
+          <li><b>Permanently delete</b> an archived hive to clear its data immediately</li>
+        </ul>
+
+        <h3>Auto-Purge</h3>
+        <p>
+          60 days after entering the archive, hives are automatically purged. You'll see a countdown clock on each archived card.
+        </p>
+      </section>
+
+      <!-- ===== 15 TROUBLESHOOTING ===== -->
+      <section class="section" id="troubleshooting">
+        <div class="section-head">
+          <div class="section-num">15</div>
+          <h2 class="section-title">Troubleshooting</h2>
+        </div>
+
+        <h3>I'm getting fewer false breach alerts during car journeys — is something broken?</h3>
+        <p>
+          No — that's v2.0 staleness-aware evaluation working as intended. Previously HIVE would fire false breaches whenever you drove with your hive in the car, because it compared position reports taken at different points along the route. HIVE now refuses to confirm a breach from time-mismatched reports, so travel produces at most a brief "suspected" breach that clears itself. Real separations still fire after you stop.
+        </p>
+
+        <h3>I see "suspected breach" then "cleared" while travelling — what's that?</h3>
+        <p>
+          That's staleness-aware evaluation at work. While your items travel together, their position reports are taken at different points along the route, which can briefly look like a separation. HIVE flags this as a <b>suspected</b> breach rather than confirming it, and clears it automatically once fresh, time-aligned reports show the group together. You won't get a confirmed-breach alert from normal travel.
+        </p>
+
+        <h3>My hive shows "Partial Data" — is something wrong?</h3>
+        <p>
+          Usually no. Partial Data means too many tags in the hive haven't reported recently for HIVE to evaluate confidently. This is common in low-traffic areas where phones pass infrequently. Check the tag freshness pips: if most are amber or red, the hive is in a quiet area.
+        </p>
+
+        <h3>I'm getting too many alerts (when stationary)</h3>
+        <p>
+          Three things to check:
+        </p>
+        <ul>
+          <li>Is your distance threshold appropriate? Consider increasing it if you're getting false alerts — the default for Mobile profile is 1000m</li>
+          <li>Is your mobility profile right? A stationary profile on actually-mobile assets will alert constantly</li>
+          <li>Are tag positions noisy? Low-quality phone GPS can produce 10–50m of jitter</li>
+        </ul>
+
+        <h3>I'm getting too few alerts</h3>
+        <p>
+          Either your threshold is too generous or your tags are reporting infrequently. Consider tightening the threshold and watch for a week. Note that a genuine separation is only confirmed once fresh, time-aligned reports establish it — if your tags report very infrequently, confirmation can lag until enough coherent reports arrive.
+        </p>
+
+        <h3>A tag I want to use says it's "in another hive"</h3>
+        <p>
+          Each tag can only belong to one hive at a time. The UI shows which hive it's currently in — delete that hive (or permanently delete it) to free the tag.
+        </p>
+
+        <h3>I changed the threshold but old alerts haven't updated</h3>
+        <p>
+          Configuration changes apply to future evaluations only — historical alerts remain as they were originally evaluated. This is intentional: it keeps your alert history meaningful and reproducible.
+        </p>
+      </section>
+
+      <!-- ===== 16 FAQ ===== -->
+      <section class="section" id="faq">
+        <div class="section-head">
+          <div class="section-num">16</div>
+          <h2 class="section-title">FAQ</h2>
+        </div>
+
+        <h4>How many tags can be in a hive?</h4>
+        <p>Currently 2 to 5. Larger groups are on the roadmap.</p>
+
+        <h4>Can a tag belong to multiple hives?</h4>
+        <p>No. One tag, one hive at any given moment.</p>
+
+        <h4>Is there a limit on how many hives I can have?</h4>
+        <p>No, you can create as many as you like, subject only to having enough free tags for each.</p>
+
+        <h4>Can I edit a hive's tags after creation?</h4>
+        <p>No. Membership is locked at creation. To change membership, delete and recreate — the recreation flow makes this fast.</p>
+
+        <h4>Can I extend a hive's lifetime past 60 days?</h4>
+        <p>Not directly, but you can recreate the hive with the same configuration to start a new 60-day cycle. The recreation flow takes about 10 seconds.</p>
+
+        <h4>Does HIVE work with my existing tags?</h4>
+        <p>Yes. Any iBeacon or Eddystone tag registered in Beacon Telematics can be added to a hive.</p>
+
+        <h4>How quickly do alerts arrive?</h4>
+        <p>Depends on how frequently your tags report. Urban areas typically see alerts within 3–8 minutes of a real breach. Rural areas can take 15–30 minutes. The system waits for confirmation to avoid false alarms.</p>
+
+        <h4>Will I miss a real separation while my hive is moving? <span class="status-pill green" style="font-size: 9px; margin-left: 4px;">v2.0</span></h4>
+        <p>A genuine separation is confirmed once fresh, time-aligned reports establish it — which usually means shortly after you stop, when reports stabilise. During travel a real separation may show as a suspected breach first. Any confirmed breach fires normally. For most users, whose items travel with them, the meaningful question is "did everything arrive with me," which is answered as soon as you settle.</p>
+
+        <h4>What happens if a tag's battery dies?</h4>
+        <p>It will go silent, transitioning through Stale to Lost over time. You'll receive a Lost Contact alert for that tag. Replace the tag and re-add it — note that you'll need to delete and recreate the hive to swap the tag.</p>
+
+        <h4>Can I export hive history?</h4>
+        <p>Export functionality is on the roadmap. For now, archived hives retain full history for 60 days, viewable in the UI.</p>
+
+        <h4>What's the difference between Delete and Permanently Delete?</h4>
+        <p>Delete moves the hive to a 60-day archive where you can still review history and recreate. Permanently Delete removes all data immediately and cannot be undone.</p>
+      </section>
+
+      <!-- footer -->
+      <div class="doc-footer">
+        <div>HIVE Tracking · v2.0 · Staleness-Aware</div>
+        <div>Beacon Telematics Platform Documentation</div>
+      </div>
+
+    </div>
+  </main>
+
+</div>
+
+<script>
+  const sections = document.querySelectorAll('.section');
+  const navItems = document.querySelectorAll('.nav-item');
+
+  function setActive() {
+    let current = 'overview';
+    sections.forEach(sec => {
+      const top = sec.getBoundingClientRect().top;
+      if (top < 120) current = sec.id;
+    });
+    navItems.forEach(item => {
+      const href = item.getAttribute('href');
+      if (href === '#' + current) item.classList.add('active');
+      else item.classList.remove('active');
+    });
+  }
+
+  window.addEventListener('scroll', setActive);
+  setActive();
+
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      const target = document.querySelector(a.getAttribute('href'));
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  });
+</script>
+
+</body>
+</html>

@@ -72,6 +72,7 @@ logs/
 # them by hand — edit the tenant source instead.
 admin-portal/assets/logo.png
 customer-dashboard/public/assets/logo.png
+customer-dashboard/public/help/HIVE_User_Manual.html
 mobile-app/ble_tracker_app/assets/MainLogo.png
 mobile-app/ble_tracker_app/assets/FullLogowhite.png
 mobile-app/ble_tracker_app/web/favicon.ico
