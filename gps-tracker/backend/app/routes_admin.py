@@ -754,8 +754,8 @@ async def export_hive_logs(
         evals_data = f"Recent evaluations (last {days} days): {len(evals)}\n\n"
         for e in evals:
             evals_data += f"Hive: {e.hive_id}\nTime: {e.evaluated_at}\n"
-            evals_data += f"State: {e.alert_state}\nDiameter: {e.current_diameter_m}m\n"
-            evals_data += f"Snapshot ID: {e.snapshot_id}\n\n"
+            evals_data += f"State: {e.alert_state}\nDiameter: {e.diameter_m}m\nThreshold: {e.threshold_m}m\n"
+            evals_data += f"Config V: {e.config_version_number}\nMotion: {e.motion_state or 'N/A'}\n\n"
         
         info = tarfile.TarInfo(name='hive-evaluations.txt')
         info.size = len(evals_data.encode('utf-8'))
