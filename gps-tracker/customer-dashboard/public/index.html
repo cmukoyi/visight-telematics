@@ -5151,7 +5151,7 @@ async function submitTagForm(e) {
         } else {
             _lmTags = [];
         }
-        amRenderCards();   // immediately refresh asset management grid
+        initAssetMgmt();   // reload asset management grid with fresh data
         alRenderTable();   // keep asset list table in sync
         loadGroupTags();   // refresh the tags table so newly added tag is visible
     } catch (err) {
@@ -6457,6 +6457,7 @@ function _alertMeta(type) {
         case 'geofence_entry':           return { icon: 'fa-right-to-bracket',   color: 'var(--success)', label: 'Geofence Entry' };
         case 'battery_low':              return { icon: 'fa-battery-low',        color: 'var(--warning)', label: 'Low Battery'    };
         case 'tag_offline':              return { icon: 'fa-wifi-slash',         color: 'var(--text-3)',  label: 'Tag Offline'    };
+        case 'gdpr_deletion_warning':    return { icon: 'fa-trash',              color: '#7C3AED',        label: 'GDPR Deletion Warning' };
         // Hive alerts — breach is red (matches the rest of the danger palette),
         // cleared stays green, on-the-move is a neutral info colour.
         case 'hive_breach':              return { icon: 'fa-triangle-exclamation', color: 'var(--danger)',  label: 'Hive Breach'    };
