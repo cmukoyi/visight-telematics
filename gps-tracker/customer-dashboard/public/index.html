@@ -11062,7 +11062,7 @@ function hiveRenderDetail(d) {
     const hystPct = (hystRaw == null) ? 80 : (hystRaw <= 1 ? Math.round(hystRaw * 100) : Math.round(hystRaw));
     document.getElementById('hive-config-body').innerHTML = [
         ['Mobility Profile', HIVE_PROFILE_LABELS[cfg.mobility_profile]||cfg.mobility_profile||'—', 'fa-route', ''],
-        ['Distance Threshold', threshold + '', 'fa-ruler-horizontal', 'm'],
+        ['Distance Threshold', fmtDistance(threshold), 'fa-ruler-horizontal', ''],
         ['Fresh Window', Math.round((cfg.fresh_window_s||300)/60) + '', 'fa-regular fa-clock', ' min'],
         ['Lost Threshold', Math.round((cfg.lost_threshold_s||7200)/3600) + '', 'fa-signal', ' hr'],
         ['Hysteresis', hystPct + '', 'fa-wave-square', '%'],
