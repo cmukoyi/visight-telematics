@@ -736,8 +736,9 @@ async def export_hive_logs(
         hives = db.query(Hive).all()
         hives_data = f"Total hives: {len(hives)}\n\n"
         for h in hives:
-            hives_data += f"ID: {h.id}\nName: {h.name}\nOwner: {h.owner_email}\nState: {h.alert_state}\n"
-            hives_data += f"Created: {h.created_at}\nArchived: {h.archived_at}\n\n"
+            alert_state = h.live_state.alert_state if h.live_state else "N/A"
+            hives_data += f"ID: {h.id}\nName: {h.name}\nCreated By: {h.created_by or 'N/A'}\nAlert State: {alert_state}\n"
+            hives_data += f"Created: {h.created_at}\nArchived: {h.archived_at}\nStatus: {h.status}\n\n"
         
         info = tarfile.TarInfo(name='hives.txt')
         info.size = len(hives_data.encode('utf-8'))
