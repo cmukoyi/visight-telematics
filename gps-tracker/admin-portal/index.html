@@ -2245,6 +2245,8 @@
 
         // BILLING
         async function loadBillingData() {
+            const authToken = localStorage.getItem('adminToken');
+            if (!authToken) return;
             try {
                 const response = await fetch(`${API_URL}/api/admin/billing/summary`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
@@ -2310,6 +2312,8 @@
 
         // LOGS (App Logs — table)
         async function loadLogs() {
+            const authToken = localStorage.getItem('adminToken');
+            if (!authToken) return;
             try {
                 const level    = document.getElementById('logLevelFilter') ? document.getElementById('logLevelFilter').value : '';
                 const category = document.getElementById('logCategoryFilter') ? document.getElementById('logCategoryFilter').value : '';
@@ -2362,6 +2366,8 @@
 
         // CONTAINER LOG VIEWER (backend DB rows or nginx file lines)
         async function loadContainerLogs() {
+            const authToken = localStorage.getItem('adminToken');
+            if (!authToken) return;
             const src    = (currentLogSource === 'app') ? 'backend' : currentLogSource;
             const linesEl = document.getElementById('containerLinesFilter');
             const searchEl = document.getElementById('containerSearchInput');
@@ -2493,6 +2499,8 @@
 
         // DELETE LOGS
         async function deleteLogs() {
+            const authToken = localStorage.getItem('adminToken');
+            if (!authToken) return;
             if (!confirm('Delete logs older than 30 days? This cannot be undone.')) return;
             try {
                 const response = await fetch(API_URL + '/api/admin/logs?days=30', {
@@ -2510,6 +2518,8 @@
 
                 // ADMIN USERS
         async function loadAdminUsers() {
+            const authToken = localStorage.getItem('adminToken');
+            if (!authToken) return;
             try {
                 const response = await fetch(`${API_URL}/api/admin/users`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
@@ -2600,6 +2610,8 @@
 
         // AUDIT LOGS
         async function loadAuditLogs() {
+            const authToken = localStorage.getItem('adminToken');
+            if (!authToken) return;
             try {
                 const action = document.getElementById('auditActionFilter')?.value || '';
                 const days = document.getElementById('auditDaysFilter')?.value || '7';
@@ -2643,6 +2655,8 @@
         let _featuresLoaded = false; // guard: don't auto-save before first load completes
 
         async function loadFeatures() {
+            const authToken = localStorage.getItem('adminToken');
+            if (!authToken) return;
             _featuresLoaded = false;
             document.getElementById('featuresLoadError').style.display = 'none';
             document.getElementById('featuresSaveMsg').style.display = 'none';
