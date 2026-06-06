@@ -355,6 +355,9 @@ class UserGroup(Base):
     # List of section keys enabled for this tenant: 'tracking', 'management', 'reports'
     # NULL means all sections are enabled (default — backward-compatible).
     allowed_sections = Column(JSON, nullable=True)
+    # Tag type restrictions: list of allowed tag types ['series1', 'series2', 'series3']
+    # NULL means all types allowed (default — backward-compatible).
+    allowed_tag_types = Column(JSON, nullable=True)
 
     portal_users = relationship("PortalUser", back_populates="usergroup",
                                 cascade="all, delete-orphan")

@@ -888,6 +888,7 @@ class UserGroupCreate(BaseModel):
     admin_last_name: str = ""
     email_domain: Optional[str] = None   # comma-separated e.g. "acme.com,acme.co.za"
     package_id: Optional[str] = None     # default package UUID (optional)
+    allowed_tag_types: Optional[list] = None  # e.g. ["series1", "series2"] — None means all allowed
 
 
 class PortalUserOut(BaseModel):
@@ -921,6 +922,7 @@ class UserGroupOut(BaseModel):
     default_package_id: Optional[str] = None
     default_package_name: Optional[str] = None
     allowed_sections: Optional[list] = None
+    allowed_tag_types: Optional[list] = None
     packages: List[GroupPackageOut] = []
     created_at: Optional[datetime] = None
     portal_users: List[PortalUserOut] = []
@@ -966,6 +968,7 @@ class UserGroupOut(BaseModel):
             default_package_id=default_pkg_id,
             default_package_name=default_pkg_name,
             allowed_sections=g.allowed_sections,
+            allowed_tag_types=g.allowed_tag_types,
             packages=packages_out,
             created_at=g.created_at,
             portal_users=g.portal_users,
@@ -1025,6 +1028,7 @@ def create_usergroup(
         slug=slug,
         is_active=True,
         email_domain=domain_value,
+        allowed_tag_types=data.allowed_tag_types,
     )
     db.add(group)
     db.flush()   # get group.id without committing
@@ -1157,6 +1161,7 @@ def activate_usergroup(
 class UserGroupUpdate(BaseModel):
     email_domain: Optional[str] = None   # empty string clears it; comma-separated for multiple domains
     allowed_sections: Optional[list] = None  # e.g. ["tracking","management","reports"] — None means no change
+    allowed_tag_types: Optional[list] = None  # e.g. ["series1","series2"] — None means no change
 
 
 @router.put("/usergroups/{group_id}")
@@ -1204,8 +1209,19 @@ def update_usergroup(
             secs = secs or None   # empty list → store null (= all enabled)
         group.allowed_sections = secs
 
+    # allowed_tag_types: use model_fields_set so explicit null = "reset to all"
+    if "allowed_tag_types" in data.model_fields_set:
+        tag_types = data.allowed_tag_types
+        valid = {"series1", "series2", "series3"}
+        if tag_types is not None:
+            bad = [t for t in tag_types if t not in valid]
+            if bad:
+                raise HTTPException(status_code=400, detail=f"Invalid tag type(s): {bad}. Allowed: {list(valid)}")
+            tag_types = tag_types or None   # empty list → store null (= all allowed)
+        group.allowed_tag_types = tag_types
+
     db.commit()
-    return {"id": str(group.id), "name": group.name, "email_domain": group.email_domain, "allowed_sections": group.allowed_sections}
+    return {"id": str(group.id), "name": group.name, "email_domain": group.email_domain, "allowed_sections": group.allowed_sections, "allowed_tag_types": group.allowed_tag_types}
 
 
 # ---------------------------------------------------------------------------

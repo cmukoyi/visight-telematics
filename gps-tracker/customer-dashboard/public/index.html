@@ -3585,6 +3585,7 @@ input.hive-range::-moz-range-track {
                 <select id="tagMgmtType">
                     <option value="series1">Series 1</option>
                     <option value="series2">Series 2</option>
+                    <option value="series3">Series 3</option>
                 </select>
             </div>
             <div id="tagMgmtCategoryGroup" class="form-group">
@@ -4891,12 +4892,22 @@ async function openAddTagModal() {
     imeiInput.style.color = '';
     imeiInput.setAttribute('required', '');
     document.getElementById('tagMgmtDesc').value = '';
+    
+    // Filter tag type options based on usergroup permissions
     const _typeSelAdd = document.getElementById('tagMgmtType');
-    _typeSelAdd.value = 'series1';
+    const session = getSession();
+    const allowedTypes = session.group?.allowed_tag_types || ['series1', 'series2', 'series3'];
+    // Show/hide options based on allowed types
+    Array.from(_typeSelAdd.options).forEach(opt => {
+        opt.style.display = allowedTypes.includes(opt.value) ? '' : 'none';
+    });
+    // Set default to first allowed type
+    _typeSelAdd.value = allowedTypes.includes('series1') ? 'series1' : allowedTypes[0];
     _typeSelAdd.disabled = false;
     _typeSelAdd.style.background = '';
     _typeSelAdd.style.color = '';
     _typeSelAdd.style.cursor = '';
+    
     document.getElementById('tagMgmtImeiGroup').style.display = '';
     document.getElementById('tagMgmtDescGroup').style.display = '';
     document.getElementById('tagMgmtTypeGroup').style.display = '';
@@ -4951,9 +4962,17 @@ async function openTagMgmtModal(mode, imei) {
     document.getElementById('tagMgmtDesc').value = tag.description || tag.device_name || '';
     document.getElementById('tagMgmtDescGroup').style.display = '';
 
-    // Tag type — normalise canonical DB values (scope/tracksolid) to select option values (series1/series2)
-    const _typeAliasToSelect = { scope: 'series1', tracksolid: 'series2', series1: 'series1', series2: 'series2' };
+    // Tag type — normalise canonical DB values (scope/tracksolid/series3) to select option values (series1/series2/series3)
+    const _typeAliasToSelect = { scope: 'series1', tracksolid: 'series2', series3: 'series3', series1: 'series1', series2: 'series2' };
     const _typeSelect = document.getElementById('tagMgmtType');
+    
+    // Filter tag type options based on usergroup permissions
+    const session = getSession();
+    const allowedTypes = session.group?.allowed_tag_types || ['series1', 'series2', 'series3'];
+    Array.from(_typeSelect.options).forEach(opt => {
+        opt.style.display = allowedTypes.includes(opt.value) ? '' : 'none';
+    });
+    
     _typeSelect.value = _typeAliasToSelect[(tag.tag_type || 'scope').toLowerCase()] || 'series1';
     _typeSelect.disabled = true;
     _typeSelect.style.background = 'var(--bg-2,#f3f4f6)';

@@ -1323,6 +1323,24 @@
                                             <option value="">— No package —</option>
                                         </select>
                                     </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Allowed Tag Types <span style="font-weight:normal;color:var(--text-secondary)">(optional)</span></label>
+                                        <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 10px">Select which tag types this group can add. Leave all unchecked to allow all types.</p>
+                                        <div style="display:flex;gap:16px;flex-wrap:wrap">
+                                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                                                <input type="checkbox" id="cgTypeSeries1" value="series1">
+                                                <span>Series 1 (MZone)</span>
+                                            </label>
+                                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                                                <input type="checkbox" id="cgTypeSeries2" value="series2">
+                                                <span>Series 2 (TrackSolid)</span>
+                                            </label>
+                                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                                                <input type="checkbox" id="cgTypeSeries3" value="series3">
+                                                <span>Series 3 (Scope)</span>
+                                            </label>
+                                        </div>
+                                    </div>
                                     <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:8px">
                                         <button type="button" class="btn btn-secondary" onclick="closeModal('createGroupModal')">Cancel</button>
                                         <button type="submit" class="btn btn-primary" id="cgSubmitBtn">Create Group</button>
@@ -1388,6 +1406,27 @@
                                         <p style="font-size:11px;color:var(--text-secondary);margin:6px 0 0">
                                             <i class="fa-solid fa-circle-info"></i> Individual users can be further restricted via their Role in the customer portal.
                                         </p>
+                                    </div>
+                                    <!-- Allowed Tag Types -->
+                                    <div class="form-group">
+                                        <label class="form-label">Allowed Tag Types</label>
+                                        <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 10px">
+                                            Select which tag types users in this group can add. All checked means all types allowed.
+                                        </p>
+                                        <div style="display:flex;gap:16px;flex-wrap:wrap;padding:10px 12px;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border-color)">
+                                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                                                <input type="checkbox" id="egTypeSeries1" value="series1" checked>
+                                                <span>Series 1 (MZone)</span>
+                                            </label>
+                                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                                                <input type="checkbox" id="egTypeSeries2" value="series2" checked>
+                                                <span>Series 2 (TrackSolid)</span>
+                                            </label>
+                                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                                                <input type="checkbox" id="egTypeSeries3" value="series3" checked>
+                                                <span>Series 3 (Scope)</span>
+                                            </label>
+                                        </div>
                                     </div>
                                     <!-- Multi-package section -->
                                     <div class="form-group">
@@ -2776,7 +2815,7 @@
                         <td>${badge}</td>
                         <td>${date}</td>
                         <td style="display:flex;gap:6px;flex-wrap:wrap">
-                            <button class="btn btn-secondary" style="padding:4px 10px;font-size:12px" onclick="openEditGroupModal('${g.id}','${escHtml(g.name)}','${escHtml(g.email_domain||'')}',${JSON.stringify(g.allowed_sections||null).replace(/"/g,'&quot;')})">Edit</button>
+                            <button class="btn btn-secondary" style="padding:4px 10px;font-size:12px" onclick="openEditGroupModal('${g.id}','${escHtml(g.name)}','${escHtml(g.email_domain||'')}',${JSON.stringify(g.allowed_sections||null).replace(/"/g,'&quot;')},${JSON.stringify(g.allowed_tag_types||null).replace(/"/g,'&quot;')})">Edit</button>
                             <button class="btn btn-secondary" style="padding:4px 10px;font-size:12px" onclick="openSysAdminModal('${g.id}','${escHtml(g.name)}')" title="Manage Built-in System Admins">🔑 Sys Admins</button>
                             ${deactivateBtn}
                         </td>
@@ -2824,6 +2863,13 @@
             btn.disabled = true;
             btn.textContent = 'Creating…';
             document.getElementById('cgAlert').style.display = 'none';
+            
+            // Collect allowed tag types
+            const allowedTypes = [];
+            if (document.getElementById('cgTypeSeries1').checked) allowedTypes.push('series1');
+            if (document.getElementById('cgTypeSeries2').checked) allowedTypes.push('series2');
+            if (document.getElementById('cgTypeSeries3').checked) allowedTypes.push('series3');
+            
             const payload = {
                 name: document.getElementById('cgName').value.trim(),
                 admin_email: document.getElementById('cgEmail').value.trim(),
@@ -2831,6 +2877,7 @@
                 admin_last_name: document.getElementById('cgLast').value.trim(),
                 email_domain: document.getElementById('cgDomain').value.trim() || null,
                 package_id: document.getElementById('cgPackage').value || null,
+                allowed_tag_types: allowedTypes.length > 0 ? allowedTypes : null,
             };
             try {
                 const res = await fetch(`${API_URL}/api/admin/usergroups`, {
@@ -3008,7 +3055,7 @@
             navigator.clipboard.writeText(pwd).catch(() => {});
         }
 
-        async function openEditGroupModal(groupId, groupName, emailDomain, allowedSections) {
+        async function openEditGroupModal(groupId, groupName, emailDomain, allowedSections, allowedTagTypes) {
             document.getElementById('egGroupId').value = groupId;
             document.getElementById('egGroupName').textContent = groupName;
             document.getElementById('egDomain').value = emailDomain || '';
@@ -3020,6 +3067,11 @@
             document.getElementById('egFeatTracking').checked   = secs.includes('tracking');
             document.getElementById('egFeatManagement').checked = secs.includes('management');
             document.getElementById('egFeatReports').checked    = secs.includes('reports');
+            // Populate tag type checkboxes — null means all allowed
+            const types = allowedTagTypes || ['series1', 'series2', 'series3'];
+            document.getElementById('egTypeSeries1').checked = types.includes('series1');
+            document.getElementById('egTypeSeries2').checked = types.includes('series2');
+            document.getElementById('egTypeSeries3').checked = types.includes('series3');
             document.getElementById('editGroupModal').classList.add('active');
             // Load all packages + this group's assigned packages in parallel
             await _egRefreshPackages(groupId);
@@ -3128,6 +3180,11 @@
             if (document.getElementById('egFeatTracking').checked)   allowedSections.push('tracking');
             if (document.getElementById('egFeatManagement').checked) allowedSections.push('management');
             if (document.getElementById('egFeatReports').checked)    allowedSections.push('reports');
+            // Build allowed_tag_types from checkboxes
+            const allowedTagTypes = [];
+            if (document.getElementById('egTypeSeries1').checked) allowedTagTypes.push('series1');
+            if (document.getElementById('egTypeSeries2').checked) allowedTagTypes.push('series2');
+            if (document.getElementById('egTypeSeries3').checked) allowedTagTypes.push('series3');
             try {
                 const res = await fetch(`${API_URL}/api/admin/usergroups/${groupId}`, {
                     method: 'PUT',
@@ -3135,6 +3192,7 @@
                     body: JSON.stringify({
                         email_domain: domain,
                         allowed_sections: allowedSections.length === 3 ? null : allowedSections,
+                        allowed_tag_types: allowedTagTypes.length === 3 ? null : allowedTagTypes,
                     })
                 });
                 if (res.status === 401) { handle401(); return; }
