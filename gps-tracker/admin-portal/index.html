@@ -2430,6 +2430,12 @@
 
         // HIVE LOGS EXPORT
         async function exportHiveLogs() {
+            const authToken = localStorage.getItem('adminToken');
+            if (!authToken) {
+                alert('Please log in first');
+                return;
+            }
+            
             const daysEl = document.getElementById('hiveDaysFilter');
             const days = daysEl ? daysEl.value : '7';
             const statusEl = document.getElementById('hiveExportStatus');
