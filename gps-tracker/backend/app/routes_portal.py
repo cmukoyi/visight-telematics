@@ -217,6 +217,7 @@ class UserGroupOut(BaseModel):
     id: UUID
     name: str
     slug: str
+    allowed_tag_types: Optional[list] = None
 
     class Config:
         from_attributes = True
