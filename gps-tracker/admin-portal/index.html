@@ -2252,6 +2252,7 @@
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
 
+                if (response.status === 401) { handle401(); return; }
                 if (!response.ok) throw new Error('Failed to load billing data');
 
                 const data = await response.json();
@@ -2322,6 +2323,7 @@
                 if (level)    url += '&level=' + level;
                 if (category) url += '&category=' + category;
                 const response = await fetch(url, { headers: { 'Authorization': 'Bearer ' + authToken } });
+                if (response.status === 401) { handle401(); return; }
                 if (!response.ok) throw new Error(response.status + ' ' + response.statusText);
                 const logs = await response.json();
                 let tableHtml = '';
@@ -2380,6 +2382,7 @@
             if (output) output.innerHTML = '<span style="color:#555;">Loading...</span>';
             try {
                 const response = await fetch(url, { headers: { 'Authorization': 'Bearer ' + authToken } });
+                if (response.status === 401) { handle401(); return; }
                 if (!response.ok) {
                     const err = await response.json().catch(function(){ return {}; });
                     if (output) output.innerHTML = '<span style="color:#f87171;">Error ' + response.status + ': ' + (err.detail || response.statusText) + '</span>';
@@ -2507,6 +2510,7 @@
                     method: 'DELETE',
                     headers: { 'Authorization': 'Bearer ' + authToken }
                 });
+                if (response.status === 401) { handle401(); return; }
                 if (!response.ok) throw new Error('Failed to delete logs');
                 const result = await response.json();
                 showAlert('Deleted ' + result.deleted + ' logs', 'success');
@@ -2525,6 +2529,7 @@
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
 
+                if (response.status === 401) { handle401(); return; }
                 if (!response.ok) throw new Error('Failed to load users');
 
                 const users = await response.json();
@@ -2623,6 +2628,7 @@
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
 
+                if (response.status === 401) { handle401(); return; }
                 if (!response.ok) throw new Error('Failed to load audit logs');
 
                 const logs = await response.json();
