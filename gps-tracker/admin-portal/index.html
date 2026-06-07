@@ -1927,6 +1927,14 @@
                                     <label>End date</label>
                                     <input type="date" id="emailStatsEndDate" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);color:var(--text)">
                                 </div>
+                                <div class="filter-group">
+                                    <label>Alert type</label>
+                                    <input type="text" id="emailStatsAlertType" placeholder="e.g. battery_low" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);color:var(--text)">
+                                </div>
+                                <div class="filter-group">
+                                    <label>Device IMEI</label>
+                                    <input type="text" id="emailStatsDeviceImei" placeholder="contains IMEI" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);color:var(--text)">
+                                </div>
                                 <button class="btn btn-primary btn-small" onclick="loadEmailAlertStats()">Apply</button>
                             </div>
                         </div>
@@ -4233,6 +4241,8 @@
         const tbody = document.getElementById('emailAlertStatsBody');
         const summary = document.getElementById('emailStatsSummary');
         const preset = document.getElementById('emailStatsPreset').value;
+        const alertType = (document.getElementById('emailStatsAlertType').value || '').trim();
+        const deviceImei = (document.getElementById('emailStatsDeviceImei').value || '').trim();
 
         let query = `preset=${encodeURIComponent(preset)}&limit=20`;
         if (preset === 'custom') {
@@ -4244,6 +4254,12 @@
                 return;
             }
             query += `&start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`;
+        }
+        if (alertType) {
+            query += `&alert_type=${encodeURIComponent(alertType)}`;
+        }
+        if (deviceImei) {
+            query += `&device_imei=${encodeURIComponent(deviceImei)}`;
         }
 
         tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem">Loading…</td></tr>';
@@ -4259,7 +4275,15 @@
             }
 
             const rows = Array.isArray(data.rows) ? data.rows : [];
-            summary.textContent = `Range: ${data.start_date} to ${data.end_date} • Showing top ${Math.min(rows.length, 20)} of ${data.total_rows || 0} rows`;
+            const activeFilters = [];
+            if (data.applied_filters && data.applied_filters.alert_type) {
+                activeFilters.push(`alert_type=${data.applied_filters.alert_type}`);
+            }
+            if (data.applied_filters && data.applied_filters.device_imei) {
+                activeFilters.push(`device_imei=${data.applied_filters.device_imei}`);
+            }
+            const filtersText = activeFilters.length ? ` • Filters: ${activeFilters.join(', ')}` : '';
+            summary.textContent = `Range: ${data.start_date} to ${data.end_date} • Showing top ${Math.min(rows.length, 20)} of ${data.total_rows || 0} rows${filtersText}`;
 
             if (!rows.length) {
                 tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-secondary)">No alert rows found for this date range.</td></tr>';
@@ -4273,7 +4297,7 @@
                         <td>${escH(row.alert_type || '')}</td>
                         <td>${escH(row.device_label || '')}</td>
                         <td>${escH(row.device_imei || '')}</td>
-                        <td>${escH(row.usergroup_id || '')}</td>
+                        <td>${escH(row.usergroup_name || row.usergroup_id || '')}</td>
                         <td style="text-align:right">${Number(row.alerts || 0).toLocaleString()}</td>
                         <td style="text-align:right">${Number(row.recipient_count || 0).toLocaleString()}</td>
                         <td style="text-align:right;font-weight:600">${Number(row.generated_emails || 0).toLocaleString()}</td>

@@ -2573,6 +2573,8 @@ def get_alert_device_email_stats(
     preset: str = Query("current_month", description="today | last_7_days | current_month | custom"),
     start_date: Optional[str] = Query(None, description="YYYY-MM-DD, required for custom"),
     end_date: Optional[str] = Query(None, description="YYYY-MM-DD, required for custom"),
+    alert_type: Optional[str] = Query(None, description="Optional alert type filter, e.g. battery_low"),
+    device_imei: Optional[str] = Query(None, description="Optional device IMEI contains filter"),
     limit: int = Query(20, ge=1, le=100),
     request: Request = None,
     db: Session = Depends(get_db),
@@ -2586,10 +2588,19 @@ def get_alert_device_email_stats(
         end_date=end_date,
     )
 
-    alerts = db.query(PortalAlert).filter(
+    raw_alerts = db.query(PortalAlert).filter(
         PortalAlert.created_at >= start_dt,
         PortalAlert.created_at < end_dt_exclusive,
     ).all()
+
+    alert_type_filter = (alert_type or "").strip().lower()
+    imei_filter = (device_imei or "").strip().lower()
+
+    alerts = []
+    for alert in raw_alerts:
+        if alert_type_filter and (alert.alert_type or "").strip().lower() != alert_type_filter:
+            continue
+        alerts.append(alert)
 
     # Cache BLE tags for fast device resolution
     tag_ids = {a.tag_id for a in alerts if a.tag_id is not None}
@@ -2597,6 +2608,12 @@ def get_alert_device_email_stats(
     if tag_ids:
         tags = db.query(BLETag).filter(BLETag.id.in_(list(tag_ids))).all()
         tag_map = {str(t.id): t for t in tags}
+
+    group_ids = {str(a.usergroup_id) for a in alerts}
+    group_map: dict[str, UserGroup] = {}
+    if group_ids:
+        groups = db.query(UserGroup).filter(UserGroup.id.in_(list(group_ids))).all()
+        group_map = {str(g.id): g for g in groups}
 
     # Aggregate by (alert_type, usergroup_id, device_imei)
     buckets: dict[tuple[str, str, str], dict] = {}
@@ -2608,12 +2625,22 @@ def get_alert_device_email_stats(
         device_imei = _extract_device_imei(tag, alert.meta_data)
         device_label = _extract_device_label(tag, device_imei)
 
+        if imei_filter and imei_filter not in (device_imei or "").lower():
+            continue
+
+        group = group_map.get(group_id)
+        if group:
+            group_display = group.name or group.slug or group_id
+        else:
+            group_display = group_id
+
         key = (alert_type, group_id, device_imei)
         row = buckets.get(key)
         if not row:
             row = {
                 "alert_type": alert_type,
                 "usergroup_id": group_id,
+                "usergroup_name": group_display,
                 "device_imei": device_imei,
                 "device_label": device_label,
                 "alerts": 0,
@@ -2651,6 +2678,10 @@ def get_alert_device_email_stats(
         "preset": preset,
         "start_date": applied_start,
         "end_date": applied_end,
+        "applied_filters": {
+            "alert_type": alert_type_filter or None,
+            "device_imei": imei_filter or None,
+        },
         "total_rows": len(results),
         "rows": results[:limit],
     }
