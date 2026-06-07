@@ -36,9 +36,42 @@ class _AddTagScreenState extends State<AddTagScreen> {
   final _tagNameController = TextEditingController();
 
   BleTagType _selectedType = BleTagType.series1;
+  List<BleTagType> _allowedTypes = BleTagType.values.toList();
   bool _isLoading = false;
+  bool _isLoadingAllowedTypes = true;
   String? _validationMessage; // feedback shown below IMEI field
   int? _validatedBatteryLevel; // battery level returned by TrackSolid validation
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAllowedTagTypes();
+  }
+
+  Future<void> _loadAllowedTagTypes() async {
+    try {
+      final allowed = await _authService.getAllowedTagTypes();
+      final filtered = allowed == null
+          ? BleTagType.values.toList()
+          : BleTagType.values
+              .where((type) => allowed.contains(type.apiValue))
+              .toList();
+      if (!mounted) return;
+      setState(() {
+        _allowedTypes = filtered;
+        if (_allowedTypes.isNotEmpty && !_allowedTypes.contains(_selectedType)) {
+          _selectedType = _allowedTypes.first;
+        }
+        _isLoadingAllowedTypes = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _allowedTypes = BleTagType.values.toList();
+        _isLoadingAllowedTypes = false;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -73,6 +106,11 @@ class _AddTagScreenState extends State<AddTagScreen> {
 
   // ── Submit ───────────────────────────────────────────────────────────────────
   Future<void> _submit() async {
+    if (_allowedTypes.isEmpty) {
+      setState(() => _validationMessage = 'No supported tag types are enabled for your usergroup in the mobile app.');
+      return;
+    }
+
     final imei = _imeiController.text.trim();
     if (!_locationService.isValidIMEI(imei)) {
       setState(() => _validationMessage = 'Please enter a valid IMEI (15 digits or valid GUID).');
@@ -178,30 +216,47 @@ class _AddTagScreenState extends State<AddTagScreen> {
             // ── Tag Type Dropdown ──────────────────────────────────────────
             _SectionLabel('Tag Type'),
             const SizedBox(height: 8),
-            DropdownButtonFormField<BleTagType>(
-              value: _selectedType,
-              decoration: _inputDecoration(
-                hintText: 'Select tag type',
-                prefixIcon: Icons.devices,
-              ),
-              items: BleTagProviderFactory.supportedTypes.map((type) {
-                return DropdownMenuItem(
-                  value: type,
-                  child: Text(type.displayName),
-                );
-              }).toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() {
-                    _selectedType = value;
-                    _validationMessage = null;
-                  });
-                }
-              },
-            ).animate().fadeIn(duration: 400.ms),
+            if (_isLoadingAllowedTypes)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else
+              DropdownButtonFormField<BleTagType>(
+                value: _allowedTypes.isEmpty ? null : _selectedType,
+                decoration: _inputDecoration(
+                  hintText: _allowedTypes.isEmpty ? 'No supported tag types available' : 'Select tag type',
+                  prefixIcon: Icons.devices,
+                ),
+                items: _allowedTypes.map((type) {
+                  return DropdownMenuItem(
+                    value: type,
+                    child: Text(type.displayName),
+                  );
+                }).toList(),
+                onChanged: _allowedTypes.length <= 1
+                    ? null
+                    : (value) {
+                        if (value != null) {
+                          setState(() {
+                            _selectedType = value;
+                            _validationMessage = null;
+                          });
+                        }
+                      },
+              ).animate().fadeIn(duration: 400.ms),
 
             const SizedBox(height: 8),
-            _TagTypeHint(type: _selectedType),
+            if (_allowedTypes.isEmpty)
+              Text(
+                'Your usergroup currently has no mobile-supported tag types enabled.',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: Colors.red.shade700,
+                ),
+              )
+            else
+              _TagTypeHint(type: _selectedType),
 
             const SizedBox(height: 24),
 

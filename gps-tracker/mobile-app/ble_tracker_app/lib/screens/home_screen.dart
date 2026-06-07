@@ -9,6 +9,7 @@ import 'package:ble_tracker_app/services/location_service.dart';
 import 'package:ble_tracker_app/screens/map_screen.dart';
 import 'package:ble_tracker_app/screens/qr_scanner_screen.dart';
 import 'package:ble_tracker_app/screens/add_tag_screen.dart';
+import 'package:ble_tracker_app/device_providers/ble_tag_type.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -31,11 +32,40 @@ class _HomeScreenState extends State<HomeScreen> {
   final _imeiController = TextEditingController();
   final _tagNameController = TextEditingController();
   String _selectedMethod = 'manual'; // 'manual' or 'qr'
+  BleTagType _selectedType = BleTagType.series1;
+  List<BleTagType> _allowedTypes = BleTagType.values.toList();
+  bool _loadingAllowedTypes = true;
 
   @override
   void initState() {
     super.initState();
+    _loadAllowedTagTypes();
     _checkUserTags();
+  }
+
+  Future<void> _loadAllowedTagTypes() async {
+    try {
+      final allowed = await _authService.getAllowedTagTypes();
+      final filtered = allowed == null
+          ? BleTagType.values.toList()
+          : BleTagType.values
+              .where((type) => allowed.contains(type.apiValue))
+              .toList();
+      if (!mounted) return;
+      setState(() {
+        _allowedTypes = filtered;
+        if (_allowedTypes.isNotEmpty && !_allowedTypes.contains(_selectedType)) {
+          _selectedType = _allowedTypes.first;
+        }
+        _loadingAllowedTypes = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _allowedTypes = BleTagType.values.toList();
+        _loadingAllowedTypes = false;
+      });
+    }
   }
 
   Future<void> _checkUserTags() async {
@@ -114,6 +144,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _addTag() async {
+    if (_allowedTypes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No supported tag types are enabled for your usergroup in the mobile app.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     final imei = _imeiController.text.trim();
     
     if (!_locationService.isValidIMEI(imei)) {
@@ -134,37 +174,22 @@ class _HomeScreenState extends State<HomeScreen> {
       await _locationService.saveIMEI(imei, description: tagName.isEmpty ? null : tagName);
       print('✅ HomeScreen: IMEI saved to local storage: $imei');
       
-      // Optional: Also try to save to backend for user's account (legacy API)
+      // Validate and save to backend using the selected tag type.
       try {
-        final validationResult = await _authService.validateIMEI(imei);
+        final validationResult = await _authService.validateTagByType(imei, _selectedType.apiValue);
         
-        if (validationResult['requiresLogin'] == true) {
-          // Authentication failed - redirect to login
-          print('🔒 HomeScreen: Session expired, redirecting to login');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('${validationResult['message']}'),
-                backgroundColor: Colors.orange,
-                duration: Duration(seconds: 3),
-              ),
-            );
-            await Future.delayed(Duration(milliseconds: 500));
-            Navigator.pushReplacementNamed(context, '/');
-          }
-          return;
-        }
-        
-        if (validationResult['success']) {
+        if (validationResult['is_valid'] == true) {
           await _authService.addBLETag(
             imei: imei,
             name: _tagNameController.text.trim().isEmpty 
                 ? null 
                 : _tagNameController.text.trim(),
+            tagType: _selectedType.apiValue,
           );
           print('✅ HomeScreen: IMEI also saved to backend');
         } else {
           print('ℹ️ HomeScreen: IMEI not validated by backend (${validationResult['message']}), but saved locally');
+          throw Exception(validationResult['message'] ?? 'Validation failed');
         }
       } catch (e) {
         print('⚠️ HomeScreen: Backend save failed: $e (IMEI still saved locally)');
@@ -650,6 +675,60 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             SizedBox(height: 20),
+
+                            Text(
+                              'Tag Type',
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.brandPrimary,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            if (_loadingAllowedTypes)
+                              const Center(child: CircularProgressIndicator())
+                            else
+                              DropdownButtonFormField<BleTagType>(
+                                value: _allowedTypes.isEmpty ? null : _selectedType,
+                                decoration: InputDecoration(
+                                  hintText: _allowedTypes.isEmpty ? 'No supported tag types available' : 'Select tag type',
+                                  prefixIcon: Icon(Icons.devices, color: AppTheme.brandPrimary),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                      color: AppTheme.brandPrimary,
+                                      width: 2,
+                                    ),
+                                  ),
+                                ),
+                                items: _allowedTypes.map((type) {
+                                  return DropdownMenuItem<BleTagType>(
+                                    value: type,
+                                    child: Text(type.displayName),
+                                  );
+                                }).toList(),
+                                onChanged: _allowedTypes.length <= 1
+                                    ? null
+                                    : (value) {
+                                        if (value != null) {
+                                          setState(() => _selectedType = value);
+                                        }
+                                      },
+                              ),
+                            if (!_loadingAllowedTypes && _allowedTypes.isEmpty) ...[
+                              SizedBox(height: 8),
+                              Text(
+                                'Your usergroup currently has no mobile-supported tag types enabled.',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  color: Colors.red.shade700,
+                                ),
+                              ),
+                            ],
+                            SizedBox(height: 24),
 
                             // Tag Name Input
                             Text(

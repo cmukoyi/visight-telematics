@@ -75,6 +75,8 @@ class UserResponse(BaseModel):
     is_active: bool
     is_admin: bool
     created_at: datetime
+    usergroup_name: Optional[str] = None
+    allowed_tag_types: Optional[List[str]] = None
     
     class Config:
         from_attributes = True
@@ -648,6 +650,30 @@ def _auto_provision_portal_user(db: Session, user: "User") -> None:
     db.commit()
 
 
+def _get_mobile_usergroup(db: Session, user: User):
+    """Resolve the active portal usergroup for a mobile app user by email.
+
+    Mobile users do not store a direct usergroup_id on the User row. The tenant
+    link is derived from the matching PortalUser record created for the same
+    email address. If no active group exists, the mobile app should behave as
+    unrestricted.
+    """
+    portal_user = (
+        db.query(PortalUser)
+        .filter(PortalUser.email == user.email, PortalUser.is_active == True)
+        .order_by(PortalUser.created_at.asc())
+        .first()
+    )
+    return portal_user.usergroup if portal_user and portal_user.usergroup and portal_user.usergroup.is_active else None
+
+
+def _get_mobile_allowed_tag_types(db: Session, user: User) -> Optional[List[str]]:
+    group = _get_mobile_usergroup(db, user)
+    if not group or not group.allowed_tag_types:
+        return None
+    return [str(tag_type).lower() for tag_type in group.allowed_tag_types if str(tag_type).strip()]
+
+
 @app.post("/api/v1/auth/register", response_model=Token)
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
     """Register a new user — only called after email/PIN verification and details entry"""
@@ -936,9 +962,23 @@ def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db))
     }
 
 @app.get("/api/v1/auth/me", response_model=UserResponse)
-def get_me(current_user: User = Depends(get_current_user)):
+def get_me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Get current user info"""
-    return current_user
+    group = _get_mobile_usergroup(db, current_user)
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "first_name": current_user.first_name,
+        "last_name": current_user.last_name,
+        "phone": current_user.phone,
+        "email_verified": current_user.email_verified,
+        "email_alerts_enabled": current_user.email_alerts_enabled,
+        "is_active": current_user.is_active,
+        "is_admin": current_user.is_admin,
+        "created_at": current_user.created_at,
+        "usergroup_name": group.name if group else None,
+        "allowed_tag_types": _get_mobile_allowed_tag_types(db, current_user),
+    }
 
 class UserPreferencesUpdate(BaseModel):
     email_alerts_enabled: Optional[bool] = None
@@ -1015,7 +1055,15 @@ async def add_ble_tag(
     # user-facing series names ('series1'/'series2') as aliases.
     # Always store the canonical vendor name so the DB is consistent.
     _ALIAS_MAP = {"series1": "scope", "series2": "tracksolid"}
+    _SERIES_ALIAS_MAP = {"scope": "series1", "tracksolid": "series2"}
     raw_type = (tag_data.tag_type or 'scope').lower()
+    requested_series_type = _SERIES_ALIAS_MAP.get(raw_type, raw_type)
+    allowed_tag_types = _get_mobile_allowed_tag_types(db, current_user)
+    if allowed_tag_types is not None and requested_series_type not in allowed_tag_types:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Tag type '{requested_series_type}' is not enabled for your usergroup"
+        )
     tag_type = _ALIAS_MAP.get(raw_type, raw_type)
     try:
         provider = DeviceProviderFactory.get_provider(tag_type)
@@ -1620,9 +1668,9 @@ def verify_pin_compat(request: VerifyPINRequest, db: Session = Depends(get_db)):
 
 
 @app.get("/api/auth/me", response_model=UserResponse)
-def get_me_compat(current_user: User = Depends(get_current_user)):
+def get_me_compat(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Mobile app compatibility endpoint for current user"""
-    return current_user
+    return get_me(current_user, db)
 
 
 @app.post("/api/tags/add")

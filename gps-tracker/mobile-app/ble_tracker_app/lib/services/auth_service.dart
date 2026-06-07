@@ -850,6 +850,18 @@ class AuthService {
       rethrow;
     }
   }
+
+  Future<List<String>?> getAllowedTagTypes() async {
+    final userInfo = await getUserInfo();
+    final allowedTagTypes = userInfo?['allowed_tag_types'];
+    if (allowedTagTypes is! List || allowedTagTypes.isEmpty) {
+      return null;
+    }
+    return allowedTagTypes
+        .map((tagType) => tagType.toString().toLowerCase())
+        .where((tagType) => tagType.isNotEmpty)
+        .toList();
+  }
   
   // Update user preferences (email alerts, etc.)
   Future<Map<String, dynamic>> updateUserPreferences({
