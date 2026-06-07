@@ -10977,6 +10977,10 @@ function hiveRenderDetail(d) {
     const threshold = cfg.distance_threshold_m || 100;
     const state     = d.alert_state || 'OK';
     const isAlert   = state === 'BREACHING' || state === 'BREACH_PENDING';
+    const breachEv = (d.recent_events||[]).find(e => ['BREACH_START','CONFIRMED_BREACH','SUSPECTED_BREACH','BREACH_PENDING'].includes(e.event_type));
+    const evDetails = (breachEv && breachEv.details && typeof breachEv.details === 'object') ? breachEv.details : {};
+    const effectiveOutlierId = evDetails.outlier_tag_id || d.outlier_tag_id;
+    d._effective_outlier_tag_id = effectiveOutlierId;
 
     // header
     const headEl = document.getElementById('hive-detail-head');
@@ -10999,11 +11003,12 @@ function hiveRenderDetail(d) {
     if (isAlert) {
         banner.style.display = '';
         document.getElementById('hive-alert-banner-title').textContent = state === 'BREACHING' ? 'Confirmed Breach' : 'Suspected Breach';
-        const outlier = (d.tags||[]).find(t => t.tag_id === d.outlier_tag_id);
+        const outlier = (d.tags||[]).find(t => t.tag_id === effectiveOutlierId);
+        const selReason = evDetails.outlier_selection_reason || '';
+        const reasonText = selReason && selReason !== 'none' ? ` (selection: ${selReason.replaceAll('_',' ')})` : '';
         document.getElementById('hive-alert-banner-body').innerHTML = outlier
-            ? `<b style="color:var(--hive-red)">${hiveEsc(outlier.label||outlier.tag_id)}</b> has separated from the group. Currently exceeding the ${threshold}m threshold.`
+            ? `<b style="color:var(--hive-red)">${hiveEsc(outlier.label||outlier.tag_id)}</b> has separated from the group${hiveEsc(reasonText)}. Currently exceeding the ${threshold}m threshold.`
             : `Group diameter exceeds the ${threshold}m threshold.`;
-        const breachEv = (d.recent_events||[]).find(e => ['BREACH_START','CONFIRMED_BREACH','SUSPECTED_BREACH','BREACH_PENDING'].includes(e.event_type));
         const raisedAgo   = breachEv ? 'Raised ' + _hiveRelTime(breachEv.occurred_at) : '';
         const confirmCount = cfg.confirmation_count;
         document.getElementById('hive-alert-banner-meta').innerHTML = [
@@ -11019,7 +11024,7 @@ function hiveRenderDetail(d) {
     const tbody = document.getElementById('hive-tag-tbody');
     tbody.innerHTML = (d.tags||[]).map(t => {
         const fc = t.freshness === 'fresh' ? 'hive-fresh' : t.freshness === 'recent' ? 'hive-recent' : t.freshness === 'stale' ? 'hive-stale' : 'hive-lost';
-        const isOut = t.tag_id === d.outlier_tag_id;
+        const isOut = t.tag_id === effectiveOutlierId;
         const lastSeen = t.last_seen ? _hiveRelTime(t.last_seen) : '—';
         const distText = t.distance_from_centre_m != null ? fmtDistance(t.distance_from_centre_m) : (isOut && d.current_diameter_m ? fmtDistance(d.current_diameter_m) : '—');
         return `<tr${isOut ? ' class="hive-outlier-row"' : ''}>
@@ -11148,7 +11153,24 @@ function _hiveTimelineRowHtml(ev, tags) {
     const label = HIVE_EVENT_LABELS[ev.event_type] || _hiveEventLabelFallback(ev.event_type);
     const t     = new Date(ev.occurred_at);
     const timeStr = t.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-    const detail  = ev.details && typeof ev.details === 'object' && ev.details.reason ? ev.details.reason : '';
+    const details = (ev.details && typeof ev.details === 'object') ? ev.details : {};
+    const detailBits = [];
+    if (details.reason) detailBits.push(String(details.reason));
+    if (details.outlier_selection_reason && details.outlier_selection_reason !== 'none') {
+        detailBits.push(`selection: ${String(details.outlier_selection_reason).replaceAll('_', ' ')}`);
+    }
+    if (details.breach_evidence && details.breach_evidence !== 'none') {
+        detailBits.push(`evidence: ${String(details.breach_evidence).replaceAll('_', ' ')}`);
+    }
+    if (details.breaching_pair_counts && typeof details.breaching_pair_counts === 'object') {
+        const top = Object.entries(details.breaching_pair_counts)
+            .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0))
+            .slice(0, 2)
+            .map(([tid, cnt]) => `${hiveEsc(tagLabel(tid))}:${Number(cnt || 0)}`)
+            .join(' · ');
+        if (top) detailBits.push(`pair counts: ${top}`);
+    }
+    const detail  = detailBits.join(' • ');
     const trigName = ev.triggering_tag_id ? tagLabel(ev.triggering_tag_id) : '';
     return `<div class="hive-tl-item">
       <div class="hive-tl-time">${timeStr}</div>
@@ -11235,7 +11257,7 @@ function hiveDrawMap(d) {
 
     const cfg       = d.config || {};
     const threshold = cfg.distance_threshold_m || 100;
-    const outlierId = d.outlier_tag_id;
+    const outlierId = d._effective_outlier_tag_id || d.outlier_tag_id;
     const positioned = (d.tags||[]).filter(t => t.latitude != null && t.longitude != null);
 
     if (!positioned.length) {
