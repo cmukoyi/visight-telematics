@@ -10,8 +10,27 @@ from pydantic import BaseModel, EmailStr, field_validator
 import logging
 
 from app.database import get_db
-from app.models_admin import AdminUser, AppLog, AuditLog, BillingData, BillingTransaction
-from app.models import AppFeatures, UserGroup, UserGroupPackage, PortalUser, Building, Floor, IndoorGateway, Room
+from app.models_admin import (
+    AdminUser,
+    AppLog,
+    AuditLog,
+    BillingData,
+    BillingTransaction,
+    CriticalServiceAlertSubscription,
+    CriticalServiceCategory,
+)
+from app.models import (
+    AppFeatures,
+    UserGroup,
+    UserGroupPackage,
+    PortalUser,
+    Building,
+    Floor,
+    IndoorGateway,
+    Room,
+    BLETag,
+    PortalAlert,
+)
 from app.admin_auth import (
     hash_password, verify_password, create_admin_access_token,
     decode_admin_token, check_role_permission
@@ -19,6 +38,17 @@ from app.admin_auth import (
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 logger = logging.getLogger(__name__)
+
+
+_EMAIL_NOTIFY_FLAG_BY_ALERT = {
+    "battery_low": "notify_battery_low",
+    "tag_offline": "notify_offline",
+    "geofence_entry": "notify_geofence_exit",
+    "geofence_exit": "notify_geofence_exit",
+    "gdpr_deletion_warning": "alerts_enabled",
+    "hive_breach": "notify_hive_breach",
+    "hive_breach_cleared": "notify_hive_breach",
+}
 
 
 # Pydantic Models
@@ -102,6 +132,88 @@ class BillingDataResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+def _resolve_stats_date_range(
+    preset: str,
+    start_date: Optional[str],
+    end_date: Optional[str],
+) -> tuple[datetime, datetime, str, str]:
+    now = datetime.utcnow()
+    today = now.date()
+
+    if preset == "today":
+        start = today
+        end = today
+    elif preset == "last_7_days":
+        start = today - timedelta(days=6)
+        end = today
+    elif preset == "current_month":
+        start = today.replace(day=1)
+        end = today
+    elif preset == "custom":
+        if not start_date or not end_date:
+            raise HTTPException(status_code=400, detail="start_date and end_date are required for custom preset")
+        try:
+            start = datetime.fromisoformat(start_date).date()
+            end = datetime.fromisoformat(end_date).date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid custom date format. Use YYYY-MM-DD")
+    else:
+        raise HTTPException(status_code=400, detail="Invalid preset. Use today, last_7_days, current_month, or custom")
+
+    if end < start:
+        raise HTTPException(status_code=400, detail="end_date must be on or after start_date")
+
+    # Inclusive date range: [start, end]
+    start_dt = datetime.combine(start, datetime.min.time())
+    end_exclusive = datetime.combine(end + timedelta(days=1), datetime.min.time())
+    return start_dt, end_exclusive, start.isoformat(), end.isoformat()
+
+
+def _extract_device_imei(tag: Optional[BLETag], meta_data: Optional[dict]) -> str:
+    if tag and tag.imei:
+        return tag.imei
+    if isinstance(meta_data, dict):
+        for key in ("imei", "outlier_imei", "tag_imei"):
+            value = meta_data.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return "unknown"
+
+
+def _extract_device_label(tag: Optional[BLETag], imei: str) -> str:
+    if tag:
+        if tag.description:
+            return tag.description
+        if tag.device_name:
+            return tag.device_name
+        if tag.imei:
+            return tag.imei
+    return imei if imei and imei != "unknown" else "Unknown Device"
+
+
+def _emails_for_group_alert_type(db: Session, usergroup_id: str, alert_type: str) -> list[str]:
+    flag = _EMAIL_NOTIFY_FLAG_BY_ALERT.get(alert_type, "alerts_enabled")
+    users = db.query(PortalUser).filter(
+        PortalUser.usergroup_id == usergroup_id,
+        PortalUser.is_active == True,
+        PortalUser.alerts_enabled == True,
+        PortalUser.notify_via_email == True,
+    ).all()
+
+    recipients: set[str] = set()
+    for user in users:
+        if not getattr(user, flag, True):
+            continue
+        if user.email and isinstance(user.email, str):
+            recipients.add(user.email.strip().lower())
+        if isinstance(user.notification_emails, list):
+            for extra in user.notification_emails:
+                if isinstance(extra, str) and extra.strip():
+                    recipients.add(extra.strip().lower())
+
+    return sorted(e for e in recipients if e)
 
 
 # Helper function to get admin from token
@@ -2290,6 +2402,93 @@ def health_system(request: Request, db: Session = Depends(get_db)):
 # ─────────────────────────────────────────────────────────────────────────────
 # SendGrid email statistics
 # ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/sendgrid/alert-device-stats")
+def get_alert_device_email_stats(
+    preset: str = Query("current_month", description="today | last_7_days | current_month | custom"),
+    start_date: Optional[str] = Query(None, description="YYYY-MM-DD, required for custom"),
+    end_date: Optional[str] = Query(None, description="YYYY-MM-DD, required for custom"),
+    limit: int = Query(20, ge=1, le=100),
+    request: Request = None,
+    db: Session = Depends(get_db),
+):
+    """Top alert/device rows by estimated generated emails for a date range."""
+    get_admin_from_request(request, db)
+
+    start_dt, end_dt_exclusive, applied_start, applied_end = _resolve_stats_date_range(
+        preset=preset,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+    alerts = db.query(PortalAlert).filter(
+        PortalAlert.created_at >= start_dt,
+        PortalAlert.created_at < end_dt_exclusive,
+    ).all()
+
+    # Cache BLE tags for fast device resolution
+    tag_ids = {a.tag_id for a in alerts if a.tag_id is not None}
+    tag_map: dict[str, BLETag] = {}
+    if tag_ids:
+        tags = db.query(BLETag).filter(BLETag.id.in_(list(tag_ids))).all()
+        tag_map = {str(t.id): t for t in tags}
+
+    # Aggregate by (alert_type, usergroup_id, device_imei)
+    buckets: dict[tuple[str, str, str], dict] = {}
+    for alert in alerts:
+        group_id = str(alert.usergroup_id)
+        alert_type = alert.alert_type or "unknown"
+        tag = tag_map.get(str(alert.tag_id)) if alert.tag_id is not None else None
+
+        device_imei = _extract_device_imei(tag, alert.meta_data)
+        device_label = _extract_device_label(tag, device_imei)
+
+        key = (alert_type, group_id, device_imei)
+        row = buckets.get(key)
+        if not row:
+            row = {
+                "alert_type": alert_type,
+                "usergroup_id": group_id,
+                "device_imei": device_imei,
+                "device_label": device_label,
+                "alerts": 0,
+            }
+            buckets[key] = row
+        row["alerts"] += 1
+
+    # Resolve recipients once per (group, alert_type)
+    recipient_cache: dict[tuple[str, str], list[str]] = {}
+    results = []
+    for row in buckets.values():
+        cache_key = (row["usergroup_id"], row["alert_type"])
+        recipients = recipient_cache.get(cache_key)
+        if recipients is None:
+            recipients = _emails_for_group_alert_type(
+                db,
+                usergroup_id=row["usergroup_id"],
+                alert_type=row["alert_type"],
+            )
+            recipient_cache[cache_key] = recipients
+
+        recipient_count = len(recipients)
+        generated_emails = row["alerts"] * recipient_count
+
+        results.append({
+            **row,
+            "recipient_count": recipient_count,
+            "generated_emails": generated_emails,
+            "recipients": recipients,
+        })
+
+    results.sort(key=lambda r: (r["generated_emails"], r["alerts"]), reverse=True)
+
+    return {
+        "preset": preset,
+        "start_date": applied_start,
+        "end_date": applied_end,
+        "total_rows": len(results),
+        "rows": results[:limit],
+    }
 
 @router.get("/sendgrid/stats")
 def get_sendgrid_stats(

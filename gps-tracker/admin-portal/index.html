@@ -878,6 +878,12 @@
                         </button>
                     </li>
                     <li class="sidebar-item">
+                        <button class="sidebar-link" onclick="switchTab('email-alert-stats')">
+                            <span>📊</span>
+                            <span>Email Alert Stats</span>
+                        </button>
+                    </li>
+                    <li class="sidebar-item">
                         <button class="sidebar-link" onclick="switchTab('endusers')">
                             <span>👥</span>
                             <span>End Users</span>
@@ -1850,6 +1856,103 @@
                     </div>
                     <!-- END HEALTH TAB -->
 
+                    <!-- CRITICAL ALERTS TAB -->
+                    <div id="critical-alerts" class="tab-content">
+                        <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
+                            <div>
+                                <h2 class="page-title">Critical Service Alerts</h2>
+                                <p class="page-subtitle">Choose exactly which categories can email notifications. Categories stay silent until toggled on.</p>
+                            </div>
+                            <button class="btn btn-primary btn-small" onclick="loadCriticalAlerts()">↻ Refresh</button>
+                        </div>
+
+                        <div id="criticalAlertsBanner" class="alert" style="display:none"><span id="criticalAlertsBannerText"></span></div>
+
+                        <div class="card">
+                            <div class="table-wrapper">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Category</th>
+                                            <th>Enabled</th>
+                                            <th>Threshold</th>
+                                            <th>Window (min)</th>
+                                            <th>Cooldown (min)</th>
+                                            <th>Recipients</th>
+                                            <th>Last Sent</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="criticalAlertsBody">
+                                        <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-secondary)">Loading…</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END CRITICAL ALERTS TAB -->
+
+                    <!-- EMAIL ALERT STATS TAB -->
+                    <div id="email-alert-stats" class="tab-content">
+                        <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+                            <div>
+                                <h2 class="page-title">Email Alert Stats</h2>
+                                <p class="page-subtitle">Top 20 alert/device combinations by generated emails, including recipient list.</p>
+                            </div>
+                            <button class="btn btn-primary btn-small" onclick="loadEmailAlertStats()">↻ Refresh</button>
+                        </div>
+
+                        <div class="card" style="margin-bottom:16px">
+                            <div class="filters" style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap">
+                                <div class="filter-group">
+                                    <label>Date range</label>
+                                    <select id="emailStatsPreset" onchange="onEmailStatsPresetChange()" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);color:var(--text)">
+                                        <option value="today">Today</option>
+                                        <option value="last_7_days">Last 7 days</option>
+                                        <option value="current_month" selected>Current month</option>
+                                        <option value="custom">Custom</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group" id="emailStatsStartWrap" style="display:none">
+                                    <label>Start date</label>
+                                    <input type="date" id="emailStatsStartDate" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);color:var(--text)">
+                                </div>
+                                <div class="filter-group" id="emailStatsEndWrap" style="display:none">
+                                    <label>End date</label>
+                                    <input type="date" id="emailStatsEndDate" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);color:var(--text)">
+                                </div>
+                                <button class="btn btn-primary btn-small" onclick="loadEmailAlertStats()">Apply</button>
+                            </div>
+                        </div>
+
+                        <div class="card" style="margin-bottom:12px">
+                            <div id="emailStatsSummary" style="font-size:13px;color:var(--text-secondary)">Select a date range to load statistics.</div>
+                        </div>
+
+                        <div class="card">
+                            <div class="table-wrapper">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Alert Type</th>
+                                            <th>Device</th>
+                                            <th>IMEI</th>
+                                            <th>User Group</th>
+                                            <th style="text-align:right">Alerts</th>
+                                            <th style="text-align:right">Recipients</th>
+                                            <th style="text-align:right">Generated Emails</th>
+                                            <th>To Who</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="emailAlertStatsBody">
+                                        <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-secondary)">No data loaded.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END EMAIL ALERT STATS TAB -->
+
                     <div id="audit" class="tab-content">
                         <div class="page-header">
                             <h2 class="page-title">Audit Logs</h2>
@@ -2251,6 +2354,7 @@
                 'buildings': 'Buildings & Floor Plans',
                 'health': 'System Health',
                 'sendgrid': 'SendGrid Email Stats',
+                'email-alert-stats': 'Email Alert Stats',
                 'endusers': 'End Users',
                 'imei': 'IMEI / Tags'
             };
@@ -2267,6 +2371,7 @@
             if (tabName === 'buildings') { loadBuildings(); }
             if (tabName === 'health') { healthRefresh(); }
             if (tabName === 'sendgrid') { loadSendgridStats(); }
+            if (tabName === 'email-alert-stats') { loadEmailAlertStats(); }
             if (tabName === 'endusers') { loadEndUsers(); }
             if (tabName === 'imei') { loadIMEI(); }
         }
@@ -3973,6 +4078,84 @@
 
     function escH(s) {
         return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ── EMAIL ALERT STATS ────────────────────────────────────────────────
+    function onEmailStatsPresetChange() {
+        const preset = document.getElementById('emailStatsPreset').value;
+        const startWrap = document.getElementById('emailStatsStartWrap');
+        const endWrap = document.getElementById('emailStatsEndWrap');
+        const showCustom = preset === 'custom';
+        startWrap.style.display = showCustom ? '' : 'none';
+        endWrap.style.display = showCustom ? '' : 'none';
+
+        if (showCustom) {
+            const today = new Date().toISOString().slice(0, 10);
+            if (!document.getElementById('emailStatsStartDate').value) {
+                document.getElementById('emailStatsStartDate').value = today;
+            }
+            if (!document.getElementById('emailStatsEndDate').value) {
+                document.getElementById('emailStatsEndDate').value = today;
+            }
+        }
+    }
+
+    async function loadEmailAlertStats() {
+        const tbody = document.getElementById('emailAlertStatsBody');
+        const summary = document.getElementById('emailStatsSummary');
+        const preset = document.getElementById('emailStatsPreset').value;
+
+        let query = `preset=${encodeURIComponent(preset)}&limit=20`;
+        if (preset === 'custom') {
+            const startDate = document.getElementById('emailStatsStartDate').value;
+            const endDate = document.getElementById('emailStatsEndDate').value;
+            if (!startDate || !endDate) {
+                summary.textContent = 'Please select both start and end dates for custom range.';
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:#ef4444">Missing custom date range.</td></tr>';
+                return;
+            }
+            query += `&start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`;
+        }
+
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem">Loading…</td></tr>';
+        summary.textContent = 'Loading statistics…';
+
+        try {
+            const res = await fetch(`${API_URL}/api/admin/sendgrid/alert-device-stats?${query}`, {
+                headers: { 'Authorization': 'Bearer ' + authToken }
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.detail || res.statusText);
+            }
+
+            const rows = Array.isArray(data.rows) ? data.rows : [];
+            summary.textContent = `Range: ${data.start_date} to ${data.end_date} • Showing top ${Math.min(rows.length, 20)} of ${data.total_rows || 0} rows`;
+
+            if (!rows.length) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-secondary)">No alert rows found for this date range.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = rows.map(row => {
+                const recipients = Array.isArray(row.recipients) ? row.recipients : [];
+                return `
+                    <tr>
+                        <td>${escH(row.alert_type || '')}</td>
+                        <td>${escH(row.device_label || '')}</td>
+                        <td>${escH(row.device_imei || '')}</td>
+                        <td>${escH(row.usergroup_id || '')}</td>
+                        <td style="text-align:right">${Number(row.alerts || 0).toLocaleString()}</td>
+                        <td style="text-align:right">${Number(row.recipient_count || 0).toLocaleString()}</td>
+                        <td style="text-align:right;font-weight:600">${Number(row.generated_emails || 0).toLocaleString()}</td>
+                        <td style="max-width:420px;word-break:break-word">${escH(recipients.join(', ') || '—')}</td>
+                    </tr>
+                `;
+            }).join('');
+        } catch (e) {
+            summary.textContent = `Error: ${e.message}`;
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:#ef4444">Error: ${escH(e.message)}</td></tr>`;
+        }
     }
 
     // ── SENDGRID STATS ────────────────────────────────────────────────────
