@@ -748,6 +748,9 @@ class HiveEvaluation(Base):
     diameter_m            = Column(Float, nullable=True)
     threshold_m           = Column(Float, nullable=False)
     outlier_tag_id        = get_uuid_nullable()
+    outlier_selection_reason = Column(String(40), nullable=True)
+    breaching_pair_counts = Column(Text, nullable=True)  # JSON map: tag_id -> breaching pair count
+    pairwise_detail       = Column(Text, nullable=True)  # JSON array; populated on state-changing evaluations
     freshness_composition = Column(Text, nullable=True)   # JSON
     alert_state           = Column(String(30), nullable=False, default="OK")
     breach_confidence     = Column(String(10), nullable=True)  # high | low

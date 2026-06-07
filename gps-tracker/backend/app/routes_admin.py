@@ -1032,7 +1032,16 @@ async def export_hive_logs(
         for e in evals:
             evals_data += f"Hive: {e.hive_id}\nTime: {e.evaluated_at}\n"
             evals_data += f"State: {e.alert_state}\nDiameter: {e.diameter_m}m\nThreshold: {e.threshold_m}m\n"
-            evals_data += f"Config V: {e.config_version_number}\nMotion: {e.motion_state or 'N/A'}\n\n"
+            evals_data += f"Config V: {e.config_version_number}\nMotion: {e.motion_state or 'N/A'}\n"
+            evals_data += f"Outlier: {e.outlier_tag_id or 'N/A'}\n"
+            evals_data += f"Outlier reason: {getattr(e, 'outlier_selection_reason', None) or 'none'}\n"
+            evals_data += f"Breaching pair counts: {getattr(e, 'breaching_pair_counts', None) or '{}'}\n"
+            evals_data += f"Pairwise detail: {getattr(e, 'pairwise_detail', None) or 'N/A'}\n"
+            evals_data += f"Positions used: {e.positions_used or 'N/A'}\n"
+            evals_data += f"Max pair dt (s): {e.max_pair_dt_s if e.max_pair_dt_s is not None else 'N/A'}\n"
+            evals_data += f"Coherent pairs: {e.coherent_pair_count if e.coherent_pair_count is not None else 'N/A'}\n"
+            evals_data += f"Incoherent pairs: {e.incoherent_pair_count if e.incoherent_pair_count is not None else 'N/A'}\n"
+            evals_data += f"Breach evidence: {e.breach_evidence or 'N/A'}\n\n"
         
         info = tarfile.TarInfo(name='hive-evaluations.txt')
         info.size = len(evals_data.encode('utf-8'))

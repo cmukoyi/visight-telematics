@@ -17,7 +17,7 @@ import threading
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -126,6 +126,9 @@ def pairwise_temporal_eval(
     int,              # coherent_pair_count
     int,              # incoherent_pair_count
     Optional[float],  # max_pair_dt_s
+    Dict[str, int],   # breaching_pair_counts
+    str,              # outlier_selection_reason
+    List[Dict[str, Any]],  # pairwise_detail
 ]:
     """Evaluate pairwise distances with a temporal coherence gate.
 
@@ -135,7 +138,7 @@ def pairwise_temporal_eval(
       |observed_at(A) - observed_at(B)| <= coherence_window_s
     """
     if len(positions) < 2:
-        return None, None, None, 0, 0, None
+        return None, None, None, 0, 0, None, {}, "none", []
 
     display_max = 0.0
     coherent_max: Optional[float] = None
@@ -143,6 +146,7 @@ def pairwise_temporal_eval(
     incoherent_pair_count = 0
     max_pair_dt_s = 0.0
     breaching_pair_counts: Dict[str, int] = {tid: 0 for tid, _, _, _ in positions}
+    pairwise_detail: List[Dict[str, Any]] = []
 
     for i, (tid_a, lat_a, lon_a, ts_a) in enumerate(positions):
         for tid_b, lat_b, lon_b, ts_b in positions[i + 1:]:
@@ -154,24 +158,50 @@ def pairwise_temporal_eval(
             if dt_s > max_pair_dt_s:
                 max_pair_dt_s = dt_s
 
-            if dt_s <= coherence_window_s:
+            temporally_coherent = dt_s <= coherence_window_s
+            breaching = temporally_coherent and d > threshold_m
+            pairwise_detail.append({
+                "tag_a": str(tid_a),
+                "tag_b": str(tid_b),
+                "distance_m": round(d, 3),
+                "dt_seconds": round(dt_s, 3),
+                "temporally_coherent": temporally_coherent,
+                "breaching": breaching,
+            })
+
+            if temporally_coherent:
                 coherent_pair_count += 1
                 if coherent_max is None or d > coherent_max:
                     coherent_max = d
-                if d > threshold_m:
+                if breaching:
                     breaching_pair_counts[tid_a] += 1
                     breaching_pair_counts[tid_b] += 1
             else:
                 incoherent_pair_count += 1
 
     outlier = None
+    outlier_selection_reason = "none"
     if coherent_pair_count > 0:
         max_count = max(breaching_pair_counts.values())
         if max_count > 0:
             candidates = [tid for tid, cnt in breaching_pair_counts.items() if cnt == max_count]
             outlier = sorted(candidates)[0]
+            if len(candidates) == 1:
+                outlier_selection_reason = "most_breaching_pairs"
+            else:
+                outlier_selection_reason = "tiebreak_alphabetical"
 
-    return display_max, coherent_max, outlier, coherent_pair_count, incoherent_pair_count, max_pair_dt_s
+    return (
+        display_max,
+        coherent_max,
+        outlier,
+        coherent_pair_count,
+        incoherent_pair_count,
+        max_pair_dt_s,
+        breaching_pair_counts,
+        outlier_selection_reason,
+        pairwise_detail,
+    )
 
 
 def _snapshot_fingerprint(positions: List[Tuple[str, float, float, datetime]]) -> Optional[str]:
@@ -314,7 +344,17 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
     threshold_m = cfg.distance_threshold_m
     coherence_window_s = _profile_coherence_window_s(getattr(cfg, "mobility_profile", None))
     if len(candidate_positions) >= 2:
-        display_diameter_m, coherent_diameter_m, outlier_id, coherent_pair_count, incoherent_pair_count, max_pair_dt_s = (
+        (
+            display_diameter_m,
+            coherent_diameter_m,
+            outlier_id,
+            coherent_pair_count,
+            incoherent_pair_count,
+            max_pair_dt_s,
+            breaching_pair_counts,
+            outlier_selection_reason,
+            pairwise_detail,
+        ) = (
             pairwise_temporal_eval(candidate_positions, threshold_m, coherence_window_s)
         )
     else:
@@ -324,6 +364,9 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
         coherent_pair_count = 0
         incoherent_pair_count = 0
         max_pair_dt_s = None
+        breaching_pair_counts = {}
+        outlier_selection_reason = "none"
+        pairwise_detail = []
 
     # Keep UI-facing diameter, but gate state transitions on coherent evidence.
     diameter_m = display_diameter_m
@@ -337,6 +380,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
     # No meaningful spread — clear outlier so UI doesn't flag a tag incorrectly
     if diameter_m is not None and diameter_m < cfg.meaningful_change_m:
         outlier_id = None
+        outlier_selection_reason = "none"
 
     # ── Motion awareness (Phase 3, spec v1.1) ─────────────────────────
     # Roll each tag's velocity vector forward, derive centroid velocity over
@@ -463,6 +507,8 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
                 "threshold_m": threshold,
                 "is_breaching": coherent_diameter_m > threshold if coherent_diameter_m else False,
                 "outlier_tag_id": outlier_id,
+                "outlier_selection_reason": outlier_selection_reason,
+                "breaching_pair_counts": breaching_pair_counts,
                 "coherence_window_s": coherence_window_s,
                 "coherent_pair_count": coherent_pair_count,
                 "incoherent_pair_count": incoherent_pair_count,
@@ -513,6 +559,9 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
         diameter_m=diameter_m,
         threshold_m=threshold,
         outlier_tag_id=outlier_id,
+        outlier_selection_reason=outlier_selection_reason,
+        breaching_pair_counts=json.dumps(breaching_pair_counts) if breaching_pair_counts else None,
+        pairwise_detail=json.dumps(pairwise_detail) if state_changed and pairwise_detail else None,
         freshness_composition=json.dumps(freshness_payload),
         alert_state=new_state,
         breach_confidence=confidence,
@@ -548,6 +597,18 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
         ))
     elif state_changed:
         event_type = _state_transition_event(prev_state, new_state)
+        event_details = {
+            "diameter_m": alert_diameter_m,
+            "display_diameter_m": diameter_m,
+            "confidence": confidence,
+            "breach_evidence": breach_evidence,
+            "outlier_tag_id": str(outlier_id) if outlier_id else None,
+            "outlier_selection_reason": outlier_selection_reason,
+            "breaching_pair_counts": breaching_pair_counts,
+        }
+        if pairwise_detail:
+            event_details["pairwise_detail"] = pairwise_detail
+
         event = HiveEvent(
             id=str(uuid.uuid4()),
             hive_id=hive_id,
@@ -557,12 +618,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
             from_state=prev_state,
             to_state=new_state,
             triggering_tag_id=outlier_id,
-            details=json.dumps({
-                "diameter_m": alert_diameter_m,
-                "display_diameter_m": diameter_m,
-                "confidence": confidence,
-                "breach_evidence": breach_evidence,
-            }),
+            details=json.dumps(event_details),
         )
         db.add(event)
 
