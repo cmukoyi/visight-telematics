@@ -1519,6 +1519,39 @@ def list_end_users_with_tags(db: Session = Depends(get_db)):
     
     return result
 
+@app.post("/api/v1/admin/impersonate/{user_id}")
+def impersonate_user(
+    user_id: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Admin-only: issue a short-lived customer JWT for any end user.
+    Requires a valid admin Authorization header. No user password needed.
+    Token expires in 2 hours (not configurable by client).
+    """
+    from app.routes_admin import get_admin_from_request
+    # Validate caller is a real, active admin
+    admin = get_admin_from_request(request, db)
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not user.is_active:
+        raise HTTPException(status_code=400, detail="Cannot impersonate inactive user")
+
+    token = create_access_token(
+        data={"sub": user.email},
+        expires_delta=timedelta(hours=2)
+    )
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in_minutes": 120,
+        "impersonating": user.email,
+    }
+
+
 @app.get("/api/v1/admin/imei")
 def list_all_imei_details(db: Session = Depends(get_db)):
     """

@@ -3869,6 +3869,23 @@ function getSession() {
     };
 }
 
+// ── Admin impersonation bootstrap ─────────────────────────────────
+// When the admin portal opens the customer dashboard with ?impersonate=<token>
+// we store the token as the session and remove the param from the URL so it
+// never appears in browser history or copy-paste accidents.
+(function _bootstrapImpersonation() {
+    const params = new URLSearchParams(window.location.search);
+    const tok = params.get('impersonate');
+    if (!tok) return;
+    // Store just the token — user/group info will be fetched on first API call
+    // as normal. The backend verifies the JWT on every request anyway.
+    localStorage.setItem(TOKEN_KEY, tok);
+    // Strip param from URL without reload
+    params.delete('impersonate');
+    const clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+    history.replaceState(null, '', clean);
+})();
+
 // True for users the backend treats as full admins. The legacy is_group_admin
 // flag is only set on the bootstrap user created when a tenant is provisioned;
 // portal-created sub-users with role='admin' get the same backend privileges

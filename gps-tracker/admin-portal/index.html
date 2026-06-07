@@ -2159,6 +2159,7 @@
                                             <th>Admin</th>
                                             <th>Tags</th>
                                             <th>Created</th>
+                                            <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="endUsersTableBody">
@@ -4453,6 +4454,9 @@
                     <td>${adminBadge}</td>
                     <td><span style="background:var(--primary);color:white;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">${tagCount}</span></td>
                     <td>${createdDate}</td>
+                    <td onclick="event.stopPropagation()">
+                        <button class="btn btn-small" style="background:#7c3aed;color:white" onclick="impersonateUser('${escH(user.id)}','${escH(user.email)}')">🔑 Login as</button>
+                    </td>
                 </tr>`;
 
                 // Expandable row for tags
@@ -4519,6 +4523,30 @@
         } else {
             tagsRow.style.display = 'none';
             icon.style.transform = 'rotate(0deg)';
+        }
+    }
+
+    async function impersonateUser(userId, email) {
+        if (!confirm(`Login as ${email}?\n\nThis will open the customer dashboard in a new tab with a 2-hour session. No password required.`)) return;
+        try {
+            const res = await fetch(`${API_URL}/api/v1/admin/impersonate/${userId}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            if (res.status === 401) { handle401(); return; }
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to get impersonation token');
+
+            // Derive customer dashboard base from current admin URL
+            const base = window.location.origin;
+            const customerUrl = `${base}/customer/index.html?impersonate=${encodeURIComponent(data.access_token)}`;
+
+            // Copy to clipboard as fallback
+            try { await navigator.clipboard.writeText(customerUrl); } catch(_) {}
+
+            window.open(customerUrl, '_blank');
+        } catch (err) {
+            alert('Impersonation failed: ' + err.message);
         }
     }
 
