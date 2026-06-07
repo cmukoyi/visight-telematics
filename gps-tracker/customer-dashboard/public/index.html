@@ -9340,6 +9340,22 @@ async function sysAdminResetPassword(userId, userEmail, userName) {
                 }
             }
         }).catch(() => { /* silently ignore network errors — dashboard already showing */ });
+    } else if (token) {
+        // Token-only session (e.g., admin impersonation deep-link). Hydrate
+        // portal_user + usergroup from /api/portal/me before deciding login state.
+        apiFetch('/api/portal/me').then(r => r.ok ? r.json() : null).then(me => {
+            if (me && me.portal_user && me.usergroup) {
+                const hydratedFeatures = me.effective_features || null;
+                saveSession(token, me.portal_user, me.usergroup, hydratedFeatures);
+                showDashboard(me.portal_user, me.usergroup, hydratedFeatures);
+                return;
+            }
+            clearSession();
+            document.getElementById('loginPage').style.display = 'flex';
+        }).catch(() => {
+            clearSession();
+            document.getElementById('loginPage').style.display = 'flex';
+        });
     } else {
         document.getElementById('loginPage').style.display = 'flex';
         // Show any message left by session-expiry / logout redirect

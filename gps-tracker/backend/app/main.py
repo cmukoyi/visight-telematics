@@ -10,6 +10,7 @@ from pydantic import BaseModel, EmailStr, field_validator
 import random
 import secrets
 import os
+import jwt
 import logging
 from time import perf_counter
 from sqlalchemy.orm import Session
@@ -1526,13 +1527,16 @@ def impersonate_user(
     db: Session = Depends(get_db)
 ):
     """
-    Admin-only: issue a short-lived customer JWT for any end user.
+    Admin-only: issue a customer-portal JWT for an end user's matching portal account.
     Requires a valid admin Authorization header. No user password needed.
-    Token expires in 2 hours (not configurable by client).
+
+    IMPORTANT:
+    - This endpoint returns a portal token (type='portal') so /api/portal/* can use it.
+    - Per current product request, impersonation token has no expiry.
     """
     from app.routes_admin import get_admin_from_request
     # Validate caller is a real, active admin
-    admin = get_admin_from_request(request, db)
+    _admin = get_admin_from_request(request, db)
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -1540,14 +1544,32 @@ def impersonate_user(
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Cannot impersonate inactive user")
 
-    token = create_access_token(
-        data={"sub": user.email},
-        expires_delta=timedelta(hours=2)
-    )
+    # Portal dashboard uses PortalUser identities (scoped by usergroup), not mobile-user JWTs.
+    portal_user = db.query(PortalUser).filter(
+        PortalUser.email == user.email,
+        PortalUser.is_active == True
+    ).first()
+    if not portal_user:
+        raise HTTPException(
+            status_code=404,
+            detail="No active portal account found for this user email"
+        )
+
+    portal_secret = os.environ.get("PORTAL_SECRET_KEY") or os.environ["ADMIN_SECRET_KEY"]
+    portal_algorithm = "HS256"
+    payload = {
+        "portal_user_id": str(portal_user.id),
+        "usergroup_id": str(portal_user.usergroup_id),
+        "type": "portal",
+        "iat": datetime.utcnow(),
+        # Intentionally no exp: impersonation token is non-expiring by requirement.
+    }
+    token = jwt.encode(payload, portal_secret, algorithm=portal_algorithm)
+
     return {
         "access_token": token,
         "token_type": "bearer",
-        "expires_in_minutes": 120,
+        "expires_in_minutes": None,
         "impersonating": user.email,
     }
 

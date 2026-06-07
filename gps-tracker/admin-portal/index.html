@@ -4527,7 +4527,7 @@
     }
 
     async function impersonateUser(userId, email) {
-        if (!confirm(`Login as ${email}?\n\nThis will open the customer dashboard in a new tab with a 2-hour session. No password required.`)) return;
+        if (!confirm(`Login as ${email}?\n\nThis will open the customer dashboard in a new tab. No password required.`)) return;
         try {
             const res = await fetch(`${API_URL}/api/v1/admin/impersonate/${userId}`, {
                 method: 'POST',
