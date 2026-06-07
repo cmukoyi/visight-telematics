@@ -100,7 +100,73 @@ class TrackSolidTokenManager:
             inst._failure_streak = 0
             inst._last_failure_msg = ""
             cls._instance = inst
+            # Warm the in-memory cache from the DB immediately at first construction
+            # so the first poll cycle after a restart reuses the persisted token
+            # instead of fetching a new one (which triggers TrackSolid rate-limit 1006).
+            inst._warm_from_db()
         return cls._instance
+
+    # ── DB persistence helpers ───────────────────────────────────────────────
+    _PROVIDER_KEY = "tracksolid_open_api"
+
+    def _warm_from_db(self) -> None:
+        """Load a previously persisted token from the api_tokens table.
+
+        Called once at construction — synchronous DB access is fine here
+        because this runs before the asyncio event loop starts polling.
+        """
+        try:
+            from app.database import SessionLocal
+            from app.models import APIToken
+            db = SessionLocal()
+            try:
+                row = db.query(APIToken).filter(
+                    APIToken.provider == self._PROVIDER_KEY
+                ).first()
+                if row and row.access_token and row.expires_at:
+                    # Convert aware datetime → unix timestamp for comparison
+                    import datetime as _dt
+                    exp_ts = row.expires_at.timestamp()
+                    if exp_ts - _TOKEN_REFRESH_BUFFER > time.time():
+                        self._token = row.access_token
+                        self._expires_at = exp_ts
+                        remaining = int(exp_ts - time.time())
+                        logger.info(
+                            "♻️  TrackSolid: restored token from DB (expires in %ds)", remaining
+                        )
+            finally:
+                db.close()
+        except Exception as exc:
+            # Non-fatal — worst case we just fetch a new token on first poll
+            logger.warning("⚠️  TrackSolid: could not warm token from DB: %s", exc)
+
+    def _persist_to_db(self, token: str, expires_at: float) -> None:
+        """Upsert the current token into the api_tokens table."""
+        try:
+            import datetime as _dt
+            from app.database import SessionLocal
+            from app.models import APIToken
+            db = SessionLocal()
+            try:
+                row = db.query(APIToken).filter(
+                    APIToken.provider == self._PROVIDER_KEY
+                ).first()
+                exp_dt = _dt.datetime.fromtimestamp(expires_at, tz=_dt.timezone.utc)
+                if row:
+                    row.access_token = token
+                    row.expires_at = exp_dt
+                else:
+                    db.add(APIToken(
+                        provider=self._PROVIDER_KEY,
+                        access_token=token,
+                        expires_at=exp_dt,
+                    ))
+                db.commit()
+                logger.debug("💾 TrackSolid: token persisted to DB")
+            finally:
+                db.close()
+        except Exception as exc:
+            logger.warning("⚠️  TrackSolid: could not persist token to DB: %s", exc)
 
     def _current_backoff(self) -> int:
         idx = min(self._failure_streak - 1, len(_FAIL_BACKOFF_SCHEDULE) - 1)
@@ -149,6 +215,8 @@ class TrackSolidTokenManager:
             self._failure_streak = 0
             self._last_failure_msg = ""
             logger.info("✅ TrackSolid: new token obtained, valid for ~1 hour")
+            # Persist to DB so the next restart can reuse it without re-fetching
+            self._persist_to_db(self._token, self._expires_at)
             return self._token
 
     async def _fetch_token(self) -> str:
