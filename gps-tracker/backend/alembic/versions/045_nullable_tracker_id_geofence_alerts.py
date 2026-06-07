@@ -12,7 +12,7 @@ from alembic import op
 
 
 # revision identifiers, used by Alembic.
-revision = '045_nullable_tracker_id_geofence_alerts'
+revision = '045_nullable_tracker_id'
 down_revision = '044_allowed_tag_types'
 branch_labels = None
 depends_on = None
