@@ -450,6 +450,23 @@ jobs:
           fi
           echo "✅ All .env files identical before and after rsync"
 
+      - name: Verify Alembic migration chain on server (fail fast)
+        env:
+          DO_SERVER_IP: ${{ secrets.DO_SERVER_IP }}
+          DO_USER: ${{ secrets.DO_USER }}
+        run: |
+          SERVER=$(echo "$DO_SERVER_IP" | tr -d '[:space:]')
+          USER=$(echo "$DO_USER" | tr -d '[:space:]')
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "${USER}@${SERVER}" \
+            "set -e; cd '${SERVER_DIR}/gps-tracker'; \
+             test -f backend/alembic/versions/046_critical_alert_subscriptions.py; \
+             test -f backend/alembic/versions/047_hive_outlier_audit_fields.py; \
+             grep -q \"^revision = '046_critical_alert_subs'\" backend/alembic/versions/046_critical_alert_subscriptions.py; \
+             grep -q \"^down_revision = '046_critical_alert_subs'\" backend/alembic/versions/047_hive_outlier_audit_fields.py; \
+             echo '✅ Alembic chain check passed (046 -> 047)'; \
+             ls -l backend/alembic/versions/046_critical_alert_subscriptions.py backend/alembic/versions/047_hive_outlier_audit_fields.py"
+
       # ── Build and deploy containers ───────────────────────────────
       - name: Deploy containers
         env:
