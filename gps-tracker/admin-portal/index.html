@@ -2153,6 +2153,7 @@
                                             <th style="width: 30px;"></th>
                                             <th>Name</th>
                                             <th>Email</th>
+                                            <th>Type</th>
                                             <th>Phone</th>
                                             <th>Usergroups</th>
                                             <th>Status</th>
@@ -2163,7 +2164,7 @@
                                         </tr>
                                     </thead>
                                     <tbody id="endUsersTableBody">
-                                        <tr><td colspan="9" style="text-align:center;color:var(--gray);padding:2rem">Click ↻ Refresh to load data</td></tr>
+                                        <tr><td colspan="11" style="text-align:center;color:var(--gray);padding:2rem">Click ↻ Refresh to load data</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -4414,7 +4415,7 @@
     // ── END USERS ──────────────────────────────────────────────────────────
     async function loadEndUsers() {
         const tbody = document.getElementById('endUsersTableBody');
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:2rem">Loading…</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:2rem">Loading…</td></tr>';
 
         try {
             const res = await fetch(`${API_URL}/api/v1/admin/end-users`, {
@@ -4424,7 +4425,7 @@
             const users = await res.json();
             
             if (!users || users.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--gray);padding:2rem">No users found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--gray);padding:2rem">No users found</td></tr>';
                 return;
             }
 
@@ -4441,6 +4442,11 @@
                 const usergroups = user.usergroups && user.usergroups.length > 0 
                     ? user.usergroups.join(', ') 
                     : '-';
+                const isPortalUser = !!user.has_portal_account;
+                const userTypeBadge = isPortalUser
+                    ? '<span style="background:#2563eb;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">Portal</span>'
+                    : '<span style="background:#0f766e;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">Flutter</span>';
+                const loginAsLabel = isPortalUser ? '🔑 Login as Portal' : '📱 Login as Flutter';
 
                 let mainRow = `<tr style="cursor:pointer" onclick="toggleUserTags('${userId}')">
                     <td style="text-align:center">
@@ -4448,6 +4454,7 @@
                     </td>
                     <td><strong>${escH(user.full_name)}</strong></td>
                     <td>${escH(user.email)}</td>
+                    <td>${userTypeBadge}</td>
                     <td>${escH(user.phone || '-')}</td>
                     <td>${escH(usergroups)}</td>
                     <td>${statusBadge}</td>
@@ -4455,13 +4462,13 @@
                     <td><span style="background:var(--primary);color:white;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">${tagCount}</span></td>
                     <td>${createdDate}</td>
                     <td onclick="event.stopPropagation()">
-                        <button class="btn btn-small" style="background:#7c3aed;color:white" onclick="impersonateUser('${escH(user.id)}','${escH(user.email)}')">🔑 Login as</button>
+                        <button class="btn btn-small" style="background:#7c3aed;color:white" onclick="impersonateUser('${escH(user.id)}','${escH(user.email)}')">${loginAsLabel}</button>
                     </td>
                 </tr>`;
 
                 // Expandable row for tags
                 let tagsRow = `<tr id="tags-${userId}" style="display:none">
-                    <td colspan="9" style="padding:0;background:#f5f5f5">
+                    <td colspan="11" style="padding:0;background:#f5f5f5">
                         <div style="padding:16px 24px">
                             <h4 style="margin:0 0 12px 0;font-size:14px;color:var(--primary)">📱 Tag Assignments (${tagCount})</h4>`;
 
@@ -4509,7 +4516,7 @@
             }).join('');
 
         } catch (e) {
-            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#ef4444;padding:2rem">Error: ${escH(e.message)}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:#ef4444;padding:2rem">Error: ${escH(e.message)}</td></tr>`;
         }
     }
 
@@ -4527,7 +4534,7 @@
     }
 
     async function impersonateUser(userId, email) {
-        if (!confirm(`Login as ${email}?\n\nThis will open the customer dashboard in a new tab. No password required.`)) return;
+        if (!confirm(`Login as ${email}?\n\nIf the user has a portal account, customer dashboard will open. Otherwise Flutter web app will open.`)) return;
         try {
             const res = await fetch(`${API_URL}/api/v1/admin/impersonate/${userId}`, {
                 method: 'POST',
@@ -4537,14 +4544,18 @@
             const data = await res.json();
             if (!res.ok) throw new Error(data.detail || 'Failed to get impersonation token');
 
-            // Derive customer dashboard base from current admin URL
+            // Route by backend decision: portal users go to customer dashboard,
+            // flutter-only users go to Flutter web.
             const base = window.location.origin;
-            const customerUrl = `${base}/customer/index.html?impersonate=${encodeURIComponent(data.access_token)}`;
+            const targetApp = data.target_app || 'portal';
+            const targetUrl = targetApp === 'flutter'
+                ? `${base}/?impersonate=${encodeURIComponent(data.access_token)}&email=${encodeURIComponent(email)}`
+                : `${base}/customer/index.html?impersonate=${encodeURIComponent(data.access_token)}`;
 
             // Copy to clipboard as fallback
-            try { await navigator.clipboard.writeText(customerUrl); } catch(_) {}
+            try { await navigator.clipboard.writeText(targetUrl); } catch(_) {}
 
-            window.open(customerUrl, '_blank');
+            window.open(targetUrl, '_blank');
         } catch (err) {
             alert('Impersonation failed: ' + err.message);
         }

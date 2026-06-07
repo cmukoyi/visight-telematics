@@ -1515,6 +1515,8 @@ def list_end_users_with_tags(db: Session = Depends(get_db)):
             "created_at": user.created_at.isoformat(),
             "tag_count": len(user.ble_tags),
             "usergroups": usergroups,  # List of usergroup names
+            "has_portal_account": len(portal_users) > 0,
+            "account_type": "Portal" if len(portal_users) > 0 else "Flutter",
             "tags": tags_list
         })
     
@@ -1549,28 +1551,34 @@ def impersonate_user(
         PortalUser.email == user.email,
         PortalUser.is_active == True
     ).first()
-    if not portal_user:
-        raise HTTPException(
-            status_code=404,
-            detail="No active portal account found for this user email"
-        )
+    if portal_user:
+        portal_secret = os.environ.get("PORTAL_SECRET_KEY") or os.environ["ADMIN_SECRET_KEY"]
+        portal_algorithm = "HS256"
+        payload = {
+            "portal_user_id": str(portal_user.id),
+            "usergroup_id": str(portal_user.usergroup_id),
+            "type": "portal",
+            "iat": datetime.utcnow(),
+            # Intentionally no exp: impersonation token is non-expiring by requirement.
+        }
+        token = jwt.encode(payload, portal_secret, algorithm=portal_algorithm)
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "expires_in_minutes": None,
+            "impersonating": user.email,
+            "target_app": "portal",
+        }
 
-    portal_secret = os.environ.get("PORTAL_SECRET_KEY") or os.environ["ADMIN_SECRET_KEY"]
-    portal_algorithm = "HS256"
-    payload = {
-        "portal_user_id": str(portal_user.id),
-        "usergroup_id": str(portal_user.usergroup_id),
-        "type": "portal",
-        "iat": datetime.utcnow(),
-        # Intentionally no exp: impersonation token is non-expiring by requirement.
-    }
-    token = jwt.encode(payload, portal_secret, algorithm=portal_algorithm)
-
+    # Fallback for Flutter-only users (no portal account):
+    # issue a normal app JWT and let admin open Flutter web directly.
+    app_token = create_access_token(data={"sub": str(user.id)})
     return {
-        "access_token": token,
+        "access_token": app_token,
         "token_type": "bearer",
         "expires_in_minutes": None,
         "impersonating": user.email,
+        "target_app": "flutter",
     }
 
 

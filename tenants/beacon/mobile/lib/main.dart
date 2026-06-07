@@ -70,6 +70,18 @@ class _SplashScreenState extends State<SplashScreen> {
     
     // Check for password reset token in URL
     final uri = Uri.base;
+    final impersonateToken = uri.queryParameters['impersonate'];
+    final impersonateEmail = uri.queryParameters['email'];
+
+    if (impersonateToken != null && impersonateToken.isNotEmpty) {
+      print('🔑 Admin impersonation token detected in URL');
+      await _authService.saveImpersonationToken(impersonateToken, email: impersonateEmail);
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/map');
+      }
+      return;
+    }
+
     final resetToken = uri.queryParameters['reset_token'];
     
     if (resetToken != null && resetToken.isNotEmpty) {

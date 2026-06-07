@@ -44,6 +44,11 @@ class AuthService {
     }
     print('✅ Token saved to storage at ${DateTime.now().toIso8601String()}');
   }
+
+  // Used by admin impersonation deep-links on Flutter web.
+  Future<void> saveImpersonationToken(String token, {String? email}) async {
+    await _saveToken(token, email: email);
+  }
   
   // Get current user's email
   Future<String?> getUserEmail() async {
