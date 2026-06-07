@@ -160,3 +160,44 @@ class TagPackage(Base):
     sms_addon     = Column(Boolean, nullable=False, default=False)  # whether this package includes SMS alerts
     created_at    = Column(DateTime(timezone=True), server_default=func.now())
     updated_at    = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class CriticalServiceCategory(str, enum.Enum):
+    POLLER_CORE = "poller_core"
+    TRACKSOLID = "tracksolid"
+    MZONE = "mzone"
+    PARETO_BRIDGE = "pareto_bridge"
+    EMAIL_DELIVERY = "email_delivery"
+    DATABASE_ERRORS = "database_errors"
+    CONTAINER_HEALTH = "container_health"
+
+
+class CriticalServiceAlertSubscription(Base):
+    """Admin-configured email subscriptions for critical backend service failures.
+
+    A category must be explicitly enabled from the admin UI before notifications
+    are sent. Recipient emails are category-specific.
+    """
+
+    __tablename__ = "critical_service_alert_subscriptions"
+
+    id = get_uuid_column()
+    category = Column(
+        Enum(
+            CriticalServiceCategory,
+            name="critical_service_category",
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+            validate_strings=True,
+        ),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    is_enabled = Column(Boolean, nullable=False, default=False)
+    failure_threshold = Column(Integer, nullable=False, default=5)
+    window_minutes = Column(Integer, nullable=False, default=15)
+    cooldown_minutes = Column(Integer, nullable=False, default=60)
+    recipient_emails = Column(JSON, nullable=True)  # list[str]
+    last_alert_sent_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
