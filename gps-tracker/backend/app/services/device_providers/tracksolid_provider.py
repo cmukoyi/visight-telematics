@@ -643,7 +643,15 @@ async def fetch_tracksolid_journey_points(
 
 _OPEN_API_URL = "https://eu-open.tracksolidpro.com/route/rest"
 _OPEN_API_TOKEN_TTL = 7200  # 2 hours per Jimi docs
-_TOKEN_REFRESH_BUFFER = 300  # Refresh 5 min before expiry
+_OPEN_API_TOKEN_REFRESH_BUFFER = 300  # Refresh 5 min before expiry
+_OPEN_API_FAIL_BACKOFF_SCHEDULE = (60, 300, 900, 1800)  # 1m → 5m → 15m → 30m
+
+_open_api_lock = asyncio.Lock()
+_open_api_token: str | None = None
+_open_api_expires_at: float = 0.0
+_open_api_last_failure_at: float = 0.0
+_open_api_failure_streak: int = 0
+_open_api_last_failure_msg: str = ""
 
 
 def _open_api_creds() -> tuple[str, str, str, str]:
@@ -685,7 +693,7 @@ async def _get_cached_access_token(db_session) -> str | None:
         return None
     
     # Check if token is still valid (with buffer)
-    if token_row.expires_at and token_row.expires_at > datetime.now(timezone.utc) + timedelta(seconds=_TOKEN_REFRESH_BUFFER):
+    if token_row.expires_at and token_row.expires_at > datetime.now(timezone.utc) + timedelta(seconds=_OPEN_API_TOKEN_REFRESH_BUFFER):
         return token_row.access_token
     
     return None
@@ -715,6 +723,77 @@ async def _save_access_token(db_session, access_token: str, expires_in: int):
     )
     db_session.execute(stmt)
     # Commit handled by caller (location_poller_service)
+
+
+def _open_api_current_backoff() -> int:
+    idx = min(_open_api_failure_streak - 1, len(_OPEN_API_FAIL_BACKOFF_SCHEDULE) - 1)
+    return _OPEN_API_FAIL_BACKOFF_SCHEDULE[max(idx, 0)]
+
+
+async def _persist_open_api_token_independent(access_token: str, expires_in: int) -> None:
+    """Persist token in its own transaction so outer poll rollbacks can't discard it."""
+    from app.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        await _save_access_token(db, access_token, expires_in)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.warning("⚠️  TrackSolid Open API: token persist failed: %s", exc)
+    finally:
+        db.close()
+
+
+async def _get_open_api_token(db_session=None) -> str:
+    """Return Open API token with memory cache, DB warmup, and failure backoff."""
+    global _open_api_token, _open_api_expires_at
+    global _open_api_last_failure_at, _open_api_failure_streak, _open_api_last_failure_msg
+
+    async with _open_api_lock:
+        now = time.time()
+
+        if _open_api_token and now < (_open_api_expires_at - _OPEN_API_TOKEN_REFRESH_BUFFER):
+            remaining = int(_open_api_expires_at - now)
+            logger.info("♻️  TrackSolid Open API: reusing in-memory token (%ds left)", remaining)
+            return _open_api_token
+
+        if db_session:
+            cached = await _get_cached_access_token(db_session)
+            if cached:
+                _open_api_token = cached
+                _open_api_expires_at = now + _OPEN_API_TOKEN_TTL
+                logger.info("♻️  TrackSolid Open API: using DB-cached token")
+                return _open_api_token
+
+        if _open_api_failure_streak > 0:
+            wait = _open_api_current_backoff() - (now - _open_api_last_failure_at)
+            if wait > 0:
+                raise RuntimeError(
+                    f"TrackSolid Open API in backoff ({int(wait)}s): {_open_api_last_failure_msg}"
+                )
+
+        try:
+            token = await _fetch_open_api_access_token()
+        except Exception as exc:
+            _open_api_failure_streak += 1
+            _open_api_last_failure_at = time.time()
+            _open_api_last_failure_msg = f"{type(exc).__name__}: {exc}" or repr(exc)
+            logger.error(
+                "❌ TrackSolid Open API token fetch failed (streak=%d, next retry in %ds): %s",
+                _open_api_failure_streak,
+                _open_api_current_backoff(),
+                _open_api_last_failure_msg,
+            )
+            raise
+
+        _open_api_token = token
+        _open_api_expires_at = time.time() + _OPEN_API_TOKEN_TTL
+        _open_api_failure_streak = 0
+        _open_api_last_failure_msg = ""
+
+        await _persist_open_api_token_independent(token, _OPEN_API_TOKEN_TTL)
+        return token
 
 
 async def _fetch_open_api_access_token() -> str:
@@ -777,21 +856,12 @@ async def fetch_all_tracksolid_locations_open_api(
     account, password, app_key, app_secret = _open_api_creds()
     timeout = httpx.Timeout(_READ_TIMEOUT_SECONDS, connect=_CONNECT_TIMEOUT_SECONDS)
     
-    # Step 1: Get or refresh OAuth access_token with caching
-    access_token = None
-    if db_session:
-        access_token = await _get_cached_access_token(db_session)
-    
-    if not access_token:
-        try:
-            access_token = await _fetch_open_api_access_token()
-            if db_session:
-                await _save_access_token(db_session, access_token, _OPEN_API_TOKEN_TTL)
-        except Exception as exc:
-            logger.error("🚫 TrackSolid Open API token fetch failed: %s", exc)
-            return {}
-    else:
-        logger.info("♻️  TrackSolid Open API: using cached access_token")
+    # Step 1: Get OAuth access_token (memory+DB cache with backoff)
+    try:
+        access_token = await _get_open_api_token(db_session)
+    except Exception as exc:
+        logger.error("🚫 TrackSolid Open API token fetch failed: %s", exc)
+        return {}
     
     # Step 2: Fetch device metadata via jimi.user.device.list
     try:
