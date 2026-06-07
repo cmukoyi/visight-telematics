@@ -872,6 +872,12 @@
                         </button>
                     </li>
                     <li class="sidebar-item">
+                        <button class="sidebar-link" onclick="switchTab('critical-alerts')">
+                            <span>🚨</span>
+                            <span>Critical Alerts</span>
+                        </button>
+                    </li>
+                    <li class="sidebar-item">
                         <button class="sidebar-link" onclick="switchTab('sendgrid')">
                             <span>📧</span>
                             <span>SendGrid</span>
@@ -1850,6 +1856,42 @@
                     </div>
                     <!-- END HEALTH TAB -->
 
+                    <!-- CRITICAL ALERTS TAB -->
+                    <div id="critical-alerts" class="tab-content">
+                        <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
+                            <div>
+                                <h2 class="page-title">Critical Service Alerts</h2>
+                                <p class="page-subtitle">Choose exactly which categories can email notifications. Categories stay silent until toggled on.</p>
+                            </div>
+                            <button class="btn btn-primary btn-small" onclick="loadCriticalAlerts()">↻ Refresh</button>
+                        </div>
+
+                        <div id="criticalAlertsBanner" class="alert" style="display:none"><span id="criticalAlertsBannerText"></span></div>
+
+                        <div class="card">
+                            <div class="table-wrapper">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Category</th>
+                                            <th>Enabled</th>
+                                            <th>Threshold</th>
+                                            <th>Window (min)</th>
+                                            <th>Cooldown (min)</th>
+                                            <th>Recipients</th>
+                                            <th>Last Sent</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="criticalAlertsBody">
+                                        <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-secondary)">Loading…</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END CRITICAL ALERTS TAB -->
+
                     <div id="audit" class="tab-content">
                         <div class="page-header">
                             <h2 class="page-title">Audit Logs</h2>
@@ -2250,6 +2292,7 @@
                 'packages': 'Tag Packages',
                 'buildings': 'Buildings & Floor Plans',
                 'health': 'System Health',
+                'critical-alerts': 'Critical Service Alerts',
                 'sendgrid': 'SendGrid Email Stats',
                 'endusers': 'End Users',
                 'imei': 'IMEI / Tags'
@@ -2266,9 +2309,131 @@
             if (tabName === 'packages') loadPackages();
             if (tabName === 'buildings') { loadBuildings(); }
             if (tabName === 'health') { healthRefresh(); }
+            if (tabName === 'critical-alerts') { loadCriticalAlerts(); }
             if (tabName === 'sendgrid') { loadSendgridStats(); }
             if (tabName === 'endusers') { loadEndUsers(); }
             if (tabName === 'imei') { loadIMEI(); }
+        }
+
+        // CRITICAL SERVICE ALERTS
+        function _criticalAlertBanner(message, type = 'success') {
+            const el = document.getElementById('criticalAlertsBanner');
+            const txt = document.getElementById('criticalAlertsBannerText');
+            txt.textContent = message;
+            el.className = `alert alert-${type}`;
+            el.style.display = 'block';
+            setTimeout(() => { el.style.display = 'none'; }, 5000);
+        }
+
+        function _fmtDate(dt) {
+            if (!dt) return 'Never';
+            try {
+                return new Date(dt).toLocaleString();
+            } catch (e) {
+                return dt;
+            }
+        }
+
+        function _esc(s) {
+            return String(s || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        async function loadCriticalAlerts() {
+            const body = document.getElementById('criticalAlertsBody');
+            body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-secondary)">Loading…</td></tr>';
+            try {
+                const res = await fetch(`${API_URL}/api/admin/critical-alerts/subscriptions`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (res.status === 401) { handle401(); return; }
+                const rows = await res.json();
+                if (!res.ok) throw new Error(rows.detail || 'Failed to load critical alert subscriptions');
+
+                if (!rows.length) {
+                    body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-secondary)">No categories configured.</td></tr>';
+                    return;
+                }
+
+                body.innerHTML = rows.map((row) => {
+                    const key = _esc(row.category);
+                    const recipients = _esc((row.recipient_emails || []).join(', '));
+                    return `
+                        <tr>
+                            <td>
+                                <div style="font-weight:600">${_esc(row.label)}</div>
+                                <div style="font-size:12px;color:var(--text-secondary)">${_esc(row.description || '')}</div>
+                            </td>
+                            <td>
+                                <input type="checkbox" id="ca_enabled_${key}" ${row.is_enabled ? 'checked' : ''}>
+                            </td>
+                            <td>
+                                <input type="number" min="1" id="ca_threshold_${key}" value="${row.failure_threshold}" style="width:86px;padding:6px;border:1px solid var(--border-color);border-radius:6px;">
+                            </td>
+                            <td>
+                                <input type="number" min="1" id="ca_window_${key}" value="${row.window_minutes}" style="width:86px;padding:6px;border:1px solid var(--border-color);border-radius:6px;">
+                            </td>
+                            <td>
+                                <input type="number" min="1" id="ca_cooldown_${key}" value="${row.cooldown_minutes}" style="width:86px;padding:6px;border:1px solid var(--border-color);border-radius:6px;">
+                            </td>
+                            <td>
+                                <input type="text" id="ca_recipients_${key}" value="${recipients}" placeholder="dev@visightsolutions.co.za, ops@company.com" style="min-width:280px;padding:6px;border:1px solid var(--border-color);border-radius:6px;">
+                            </td>
+                            <td style="font-size:12px;color:var(--text-secondary)">${_esc(_fmtDate(row.last_alert_sent_at))}</td>
+                            <td>
+                                <button class="btn btn-primary btn-small" onclick="saveCriticalAlert('${key}')">Save</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (err) {
+                body.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--danger-color)">Error: ${_esc(err.message)}</td></tr>`;
+            }
+        }
+
+        async function saveCriticalAlert(categoryKey) {
+            const enabled = document.getElementById(`ca_enabled_${categoryKey}`).checked;
+            const failureThreshold = parseInt(document.getElementById(`ca_threshold_${categoryKey}`).value || '5', 10);
+            const windowMinutes = parseInt(document.getElementById(`ca_window_${categoryKey}`).value || '15', 10);
+            const cooldownMinutes = parseInt(document.getElementById(`ca_cooldown_${categoryKey}`).value || '60', 10);
+            const recipientRaw = document.getElementById(`ca_recipients_${categoryKey}`).value || '';
+            const recipientEmails = recipientRaw
+                .split(',')
+                .map(x => x.trim().toLowerCase())
+                .filter(x => x.length > 0);
+
+            if (enabled && recipientEmails.length === 0) {
+                _criticalAlertBanner('Add at least one recipient email before enabling this category.', 'warning');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/critical-alerts/subscriptions/${categoryKey}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        is_enabled: enabled,
+                        failure_threshold: failureThreshold,
+                        window_minutes: windowMinutes,
+                        cooldown_minutes: cooldownMinutes,
+                        recipient_emails: recipientEmails,
+                    }),
+                });
+                if (res.status === 401) { handle401(); return; }
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Failed to save category settings');
+                _criticalAlertBanner(`Saved ${data.label} settings.`, 'success');
+                loadCriticalAlerts();
+            } catch (err) {
+                _criticalAlertBanner(err.message, 'danger');
+            }
         }
 
         // DASHBOARD

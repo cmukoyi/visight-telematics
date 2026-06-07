@@ -10,12 +10,21 @@ from pydantic import BaseModel, EmailStr, field_validator
 import logging
 
 from app.database import get_db
-from app.models_admin import AdminUser, AppLog, AuditLog, BillingData, BillingTransaction
+from app.models_admin import (
+    AdminUser,
+    AppLog,
+    AuditLog,
+    BillingData,
+    BillingTransaction,
+    CriticalServiceAlertSubscription,
+    CriticalServiceCategory,
+)
 from app.models import AppFeatures, UserGroup, UserGroupPackage, PortalUser, Building, Floor, IndoorGateway, Room
 from app.admin_auth import (
     hash_password, verify_password, create_admin_access_token,
     decode_admin_token, check_role_permission
 )
+from app.services.critical_service_alert_service import CATEGORY_DEFS
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 logger = logging.getLogger(__name__)
@@ -89,6 +98,33 @@ class AppLogResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class CriticalServiceAlertSubscriptionOut(BaseModel):
+    category: str
+    label: str
+    description: str
+    is_enabled: bool
+    failure_threshold: int
+    window_minutes: int
+    cooldown_minutes: int
+    recipient_emails: List[str]
+    last_alert_sent_at: Optional[datetime]
+
+
+class CriticalServiceAlertSubscriptionUpdate(BaseModel):
+    is_enabled: bool
+    failure_threshold: int = 5
+    window_minutes: int = 15
+    cooldown_minutes: int = 60
+    recipient_emails: List[EmailStr] = []
+
+    @field_validator("failure_threshold", "window_minutes", "cooldown_minutes")
+    @classmethod
+    def validate_positive(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("must be >= 1")
+        return v
 
 
 class BillingDataResponse(BaseModel):
@@ -478,6 +514,143 @@ async def delete_old_logs(
     )
     
     return {"deleted": deleted}
+
+
+# CRITICAL SERVICE ALERT SUBSCRIPTIONS
+def _ensure_critical_subscriptions(db: Session) -> None:
+    existing = {
+        row.category.value if hasattr(row.category, "value") else str(row.category)
+        for row in db.query(CriticalServiceAlertSubscription).all()
+    }
+    created = False
+    for category_key in CATEGORY_DEFS.keys():
+        if category_key in existing:
+            continue
+        db.add(
+            CriticalServiceAlertSubscription(
+                category=CriticalServiceCategory(category_key),
+                is_enabled=False,
+                failure_threshold=5,
+                window_minutes=15,
+                cooldown_minutes=60,
+                recipient_emails=[],
+            )
+        )
+        created = True
+    if created:
+        db.commit()
+
+
+def _critical_subscription_out(row: CriticalServiceAlertSubscription) -> CriticalServiceAlertSubscriptionOut:
+    key = row.category.value if hasattr(row.category, "value") else str(row.category)
+    cfg = CATEGORY_DEFS[key]
+    return CriticalServiceAlertSubscriptionOut(
+        category=key,
+        label=cfg["label"],
+        description=cfg["description"],
+        is_enabled=bool(row.is_enabled),
+        failure_threshold=int(row.failure_threshold or 5),
+        window_minutes=int(row.window_minutes or 15),
+        cooldown_minutes=int(row.cooldown_minutes or 60),
+        recipient_emails=[e for e in (row.recipient_emails or []) if isinstance(e, str)],
+        last_alert_sent_at=row.last_alert_sent_at,
+    )
+
+
+@router.get("/critical-alerts/subscriptions", response_model=List[CriticalServiceAlertSubscriptionOut])
+async def list_critical_alert_subscriptions(request: Request, db: Session = Depends(get_db)):
+    """List all critical-service categories and their current notification settings."""
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires manager or admin role",
+        )
+
+    _ensure_critical_subscriptions(db)
+    rows = db.query(CriticalServiceAlertSubscription).all()
+    rows_by_key = {
+        (r.category.value if hasattr(r.category, "value") else str(r.category)): r
+        for r in rows
+    }
+
+    result = []
+    for key in CATEGORY_DEFS.keys():
+        row = rows_by_key.get(key)
+        if not row:
+            continue
+        result.append(_critical_subscription_out(row))
+    return result
+
+
+@router.put("/critical-alerts/subscriptions/{category_key}", response_model=CriticalServiceAlertSubscriptionOut)
+async def update_critical_alert_subscription(
+    category_key: str,
+    payload: CriticalServiceAlertSubscriptionUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Update one critical-service category toggle, thresholds, and recipients."""
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires manager or admin role",
+        )
+
+    key = (category_key or "").strip().lower()
+    if key not in CATEGORY_DEFS:
+        raise HTTPException(status_code=404, detail="Unknown category")
+
+    _ensure_critical_subscriptions(db)
+    row = db.query(CriticalServiceAlertSubscription).filter(
+        CriticalServiceAlertSubscription.category == CriticalServiceCategory(key)
+    ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Subscription row not found")
+
+    recipients = []
+    seen = set()
+    for email in payload.recipient_emails:
+        value = str(email).strip().lower()
+        if value in seen:
+            continue
+        seen.add(value)
+        recipients.append(value)
+
+    if payload.is_enabled and not recipients:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one recipient email is required when enabling a category",
+        )
+
+    row.is_enabled = payload.is_enabled
+    row.failure_threshold = payload.failure_threshold
+    row.window_minutes = payload.window_minutes
+    row.cooldown_minutes = payload.cooldown_minutes
+    row.recipient_emails = recipients
+    row.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(row)
+
+    log_audit(
+        db,
+        str(admin.id),
+        "update_critical_alert_subscription",
+        "CriticalServiceAlertSubscription",
+        key,
+        new_value={
+            "is_enabled": row.is_enabled,
+            "failure_threshold": row.failure_threshold,
+            "window_minutes": row.window_minutes,
+            "cooldown_minutes": row.cooldown_minutes,
+            "recipient_emails": row.recipient_emails,
+        },
+        description=f"Updated critical alert subscription for {key}",
+        ip_address=request.client.host if request.client else None,
+    )
+
+    return _critical_subscription_out(row)
 
 
 # BILLING ENDPOINTS

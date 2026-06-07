@@ -23,6 +23,7 @@ from app.services.email_service import EmailService
 from app.services.mzone_service import mzone_service
 from app.services.geofence_service import GeofenceService
 from app.services.location_poller_service import location_poller
+from app.services.critical_service_alert_service import critical_service_alerts
 from app.routes_admin import router as admin_router
 from app.services.device_providers import DeviceProviderFactory
 import asyncio
@@ -353,6 +354,10 @@ async def startup_event():
     asyncio.create_task(_gdpr_cleanup_loop())
     print("📜 GDPR cleanup task started (runs every 24 h)")
 
+    # Start critical-service error monitor (subscriptions drive whether emails send)
+    asyncio.create_task(critical_service_alerts.start())
+    print("🚨 Critical service alert monitor started (60-second cycle)")
+
 @app.on_event("shutdown")
 async def shutdown_event():
     location_poller.stop()
@@ -360,6 +365,7 @@ async def shutdown_event():
     _hive_svc.stop_sweeper()
     from app.services import pareto_bridge as _pareto
     await _pareto.stop_bridge()
+    critical_service_alerts.stop()
     print("🛑 Location Poller Service stopped")
     print("🛑 HIVE sweeper stopped")
     print("🛑 Pareto bridge stopped")
