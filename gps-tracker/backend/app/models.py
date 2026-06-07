@@ -255,7 +255,7 @@ class GeofenceAlert(Base):
     
     id = get_uuid_column()
     poi_id = get_uuid_fk("pois.id")
-    tracker_id = get_uuid_fk("ble_tags.id")
+    tracker_id = get_uuid_fk_nullable("ble_tags.id")  # nullable: old rows pre-date this FK
     user_id = get_uuid_fk("users.id")
     event_type = Column(Enum(GeofenceEventType), nullable=False)
     latitude = Column(Float, nullable=False)
