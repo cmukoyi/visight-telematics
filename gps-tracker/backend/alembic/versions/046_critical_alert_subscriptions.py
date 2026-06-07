@@ -67,26 +67,42 @@ def upgrade() -> None:
         """
     )
 
-    op.create_table(
-        'critical_service_alert_subscriptions',
-        sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
-        sa.Column('category', critical_service_category_col, nullable=False),
-        sa.Column('is_enabled', sa.Boolean(), nullable=False, server_default=sa.text('false')),
-        sa.Column('failure_threshold', sa.Integer(), nullable=False, server_default='5'),
-        sa.Column('window_minutes', sa.Integer(), nullable=False, server_default='15'),
-        sa.Column('cooldown_minutes', sa.Integer(), nullable=False, server_default='60'),
-        sa.Column('recipient_emails', sa.JSON(), nullable=True),
-        sa.Column('last_alert_sent_at', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
-    )
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
 
-    op.create_index(
-        'ix_critical_service_alert_subscriptions_category',
-        'critical_service_alert_subscriptions',
-        ['category'],
-        unique=True,
-    )
+    table_created = False
+    if not inspector.has_table('critical_service_alert_subscriptions'):
+        op.create_table(
+            'critical_service_alert_subscriptions',
+            sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
+            sa.Column('category', critical_service_category_col, nullable=False),
+            sa.Column('is_enabled', sa.Boolean(), nullable=False, server_default=sa.text('false')),
+            sa.Column('failure_threshold', sa.Integer(), nullable=False, server_default='5'),
+            sa.Column('window_minutes', sa.Integer(), nullable=False, server_default='15'),
+            sa.Column('cooldown_minutes', sa.Integer(), nullable=False, server_default='60'),
+            sa.Column('recipient_emails', sa.JSON(), nullable=True),
+            sa.Column('last_alert_sent_at', sa.DateTime(timezone=True), nullable=True),
+            sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now()),
+            sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
+        )
+        table_created = True
+
+    if table_created:
+        op.create_index(
+            'ix_critical_service_alert_subscriptions_category',
+            'critical_service_alert_subscriptions',
+            ['category'],
+            unique=True,
+        )
+    else:
+        indexes = {idx['name'] for idx in inspector.get_indexes('critical_service_alert_subscriptions')}
+        if 'ix_critical_service_alert_subscriptions_category' not in indexes:
+            op.create_index(
+                'ix_critical_service_alert_subscriptions_category',
+                'critical_service_alert_subscriptions',
+                ['category'],
+                unique=True,
+            )
 
 
 def downgrade() -> None:
