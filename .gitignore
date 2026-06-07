@@ -39,6 +39,11 @@ dB_schema.md
 
 # Feature dev docs — keep local only to avoid tenant brand drift
 features_dev/*.md
+features_dev/**/*.md
+
+# macOS Finder metadata
+.DS_Store
+**/.DS_Store
 
 # Python
 __pycache__/
