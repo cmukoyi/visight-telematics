@@ -20,8 +20,10 @@ depends_on = None
 
 def upgrade() -> None:
     op.alter_column('geofence_alerts', 'tracker_id', nullable=True)
+    op.alter_column('poi_tracker_links', 'tracker_id', nullable=True)
 
 
 def downgrade() -> None:
-    # Only safe if all rows actually have a tracker_id value.
+    # Only safe if all rows actually have tracker_id values.
     op.alter_column('geofence_alerts', 'tracker_id', nullable=False)
+    op.alter_column('poi_tracker_links', 'tracker_id', nullable=False)

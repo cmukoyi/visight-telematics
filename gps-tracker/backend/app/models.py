@@ -235,7 +235,7 @@ class POITrackerLink(Base):
     
     id = get_uuid_column()
     poi_id = get_uuid_fk("pois.id")
-    tracker_id = get_uuid_fk("ble_tags.id")
+    tracker_id = get_uuid_fk_nullable("ble_tags.id")  # nullable: old rows pre-date this FK
     is_armed = Column(Boolean, default=True)
     armed_at = Column(DateTime(timezone=True), server_default=func.now())
     disarmed_at = Column(DateTime(timezone=True), nullable=True)
