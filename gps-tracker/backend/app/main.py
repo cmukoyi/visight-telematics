@@ -1164,14 +1164,26 @@ async def validate_ble_tag(
 
 
 @app.get("/api/v1/ble-tags/supported-types")
-async def get_supported_tag_types(_: User = Depends(get_current_user)):
-    """Return the list of supported BLE tag types for the dropdown."""
-    return {
-        "types": [
-            {"value": "tracksolid", "label": "TrackSolid"},
-            {"value": "scope",      "label": "Scope"},
-        ]
-    }
+async def get_supported_tag_types(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Return mobile-supported BLE tag types for the current user.
+
+    Restriction rules:
+      - If user belongs to a usergroup with allowed_tag_types configured, only
+        those types are returned (intersection with mobile-supported types).
+      - If user has no usergroup or no restriction configured, return all
+        mobile-supported types.
+    """
+    all_mobile_types = [
+        {"value": "series2", "label": "Series 2"},
+        {"value": "series1", "label": "Series 1"},
+    ]
+
+    allowed = _get_mobile_allowed_tag_types(db, current_user)
+    if allowed is None:
+        return {"types": all_mobile_types}
+
+    filtered = [t for t in all_mobile_types if t["value"] in allowed]
+    return {"types": filtered}
 
 
 @app.get("/api/v1/ble-tags", response_model=List[BLETagResponse])

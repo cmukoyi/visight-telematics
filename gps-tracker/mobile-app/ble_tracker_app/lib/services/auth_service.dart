@@ -852,15 +852,50 @@ class AuthService {
   }
 
   Future<List<String>?> getAllowedTagTypes() async {
+    if (_token == null) {
+      await isLoggedIn();
+      if (_token == null) throw Exception('Not authenticated');
+    }
+
+    // Primary source: backend-filtered supported types for this user.
+    // If a usergroup restriction exists, backend already applies it.
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/v1/ble-tags/supported-types'),
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        final types = data['types'];
+        if (types is List) {
+          final values = types
+              .map((t) => (t is Map<String, dynamic>) ? t['value'] : null)
+              .whereType<String>()
+              .map((v) => v.toLowerCase())
+              .toList();
+          if (values.isNotEmpty) return values;
+          return <String>[];
+        }
+      }
+    } catch (_) {
+      // Fallback below.
+    }
+
+    // Fallback: user profile metadata (legacy path).
     final userInfo = await getUserInfo();
     final allowedTagTypes = userInfo?['allowed_tag_types'];
-    if (allowedTagTypes is! List || allowedTagTypes.isEmpty) {
-      return null;
+    if (allowedTagTypes is List) {
+      return allowedTagTypes
+          .map((tagType) => tagType.toString().toLowerCase())
+          .where((tagType) => tagType.isNotEmpty)
+          .toList();
     }
-    return allowedTagTypes
-        .map((tagType) => tagType.toString().toLowerCase())
-        .where((tagType) => tagType.isNotEmpty)
-        .toList();
+
+    return null;
   }
   
   // Update user preferences (email alerts, etc.)
