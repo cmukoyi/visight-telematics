@@ -382,6 +382,13 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
         outlier_id = None
         outlier_selection_reason = "none"
 
+    # JSON serialization guard: membership/tag ids can be UUID objects in this
+    # process, so normalize map keys before persisting or emitting payloads.
+    breaching_pair_counts_payload = {
+        str(tag_id): int(count)
+        for tag_id, count in (breaching_pair_counts or {}).items()
+    }
+
     # ── Motion awareness (Phase 3, spec v1.1) ─────────────────────────
     # Roll each tag's velocity vector forward, derive centroid velocity over
     # the rolling anchor window, score group coherence, run the motion
@@ -508,7 +515,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
                 "is_breaching": coherent_diameter_m > threshold if coherent_diameter_m else False,
                 "outlier_tag_id": outlier_id,
                 "outlier_selection_reason": outlier_selection_reason,
-                "breaching_pair_counts": breaching_pair_counts,
+                "breaching_pair_counts": breaching_pair_counts_payload,
                 "coherence_window_s": coherence_window_s,
                 "coherent_pair_count": coherent_pair_count,
                 "incoherent_pair_count": incoherent_pair_count,
@@ -560,7 +567,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
         threshold_m=threshold,
         outlier_tag_id=outlier_id,
         outlier_selection_reason=outlier_selection_reason,
-        breaching_pair_counts=json.dumps(breaching_pair_counts) if breaching_pair_counts else None,
+        breaching_pair_counts=json.dumps(breaching_pair_counts_payload) if breaching_pair_counts_payload else None,
         pairwise_detail=json.dumps(pairwise_detail) if state_changed and pairwise_detail else None,
         freshness_composition=json.dumps(freshness_payload),
         alert_state=new_state,
@@ -604,7 +611,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
             "breach_evidence": breach_evidence,
             "outlier_tag_id": str(outlier_id) if outlier_id else None,
             "outlier_selection_reason": outlier_selection_reason,
-            "breaching_pair_counts": breaching_pair_counts,
+            "breaching_pair_counts": breaching_pair_counts_payload,
         }
         if pairwise_detail:
             event_details["pairwise_detail"] = pairwise_detail
