@@ -130,14 +130,16 @@ class LocationPollerService:
             # tags added by any client version are polled correctly.
             _SERIES2_KEYS = {"series2", "tracksolid"}
             _SERIES1_KEYS = {"series1", "scope"}
+            _SERIES3_KEYS = {"series3"}
 
             def _tag_key(t) -> str:
-                return (t.tag_type or "series1").lower()
+                return (t.tag_type or "series1").lower().replace("_", "").replace("-", "")
 
             series2_trackers = [t for t in live_trackers if _tag_key(t) in _SERIES2_KEYS]
             series1_trackers = [t for t in live_trackers if _tag_key(t) in _SERIES1_KEYS]
+            series3_trackers = [t for t in live_trackers if _tag_key(t) in _SERIES3_KEYS]
             unknown_trackers = [t for t in live_trackers
-                                   if _tag_key(t) not in _SERIES2_KEYS | _SERIES1_KEYS]
+                                   if _tag_key(t) not in _SERIES2_KEYS | _SERIES1_KEYS | _SERIES3_KEYS]
             for t in unknown_trackers:
                 logger.warning("⚠️  Tracker IMEI %s has unrecognised tag_type '%s' — skipping", t.imei, t.tag_type)
 
@@ -336,7 +338,7 @@ class LocationPollerService:
             # Commit all updates
             db.commit()
             logger.info(f"✅ Updated {updated_count} tracker positions and checked geofences "
-                        f"({len(series2_trackers)} Series 2 / TrackSolid, {len(series1_trackers)} Series 1 / MZone)")
+                        f"({len(series2_trackers)} Series 2 / TrackSolid, {len(series1_trackers)} Series 1 / MZone, {len(series3_trackers)} Series 3 / QR-NFC skipped)")
 
             # ── Generate battery-low and offline portal alerts ─────────────
             alert_count = 0

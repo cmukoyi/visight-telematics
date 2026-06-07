@@ -183,7 +183,12 @@ class CriticalServiceAlertSubscription(Base):
 
     id = get_uuid_column()
     category = Column(
-        Enum(CriticalServiceCategory, name="critical_service_category"),
+        Enum(
+            CriticalServiceCategory,
+            name="critical_service_category",
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+            validate_strings=True,
+        ),
         nullable=False,
         unique=True,
         index=True,
