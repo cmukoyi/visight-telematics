@@ -664,7 +664,34 @@ def _get_mobile_usergroup(db: Session, user: User):
         .order_by(PortalUser.created_at.asc())
         .first()
     )
-    return portal_user.usergroup if portal_user and portal_user.usergroup and portal_user.usergroup.is_active else None
+    if portal_user and portal_user.usergroup and portal_user.usergroup.is_active:
+        return portal_user.usergroup
+
+    # Fallback: resolve by user email domain against active user_groups.email_domain.
+    # This covers users that belong to a tenant by domain but were not explicitly
+    # provisioned as PortalUser rows yet.
+    try:
+        email = (user.email or "").strip().lower()
+        if "@" not in email:
+            return None
+        domain = email.split("@", 1)[1]
+
+        from app.models import UserGroup as _UG
+        groups = db.query(_UG).filter(_UG.is_active == True, _UG.email_domain.isnot(None)).all()
+        matches = []
+        for group in groups:
+            domains = [d.strip().lower().lstrip("@") for d in (group.email_domain or "").split(",") if d.strip()]
+            if domain in domains:
+                matches.append(group)
+
+        if matches:
+            # Deterministic selection if multiple groups happen to match.
+            matches.sort(key=lambda g: (str(getattr(g, "created_at", "")), str(getattr(g, "id", ""))))
+            return matches[0]
+    except Exception:
+        return None
+
+    return None
 
 
 def _get_mobile_allowed_tag_types(db: Session, user: User) -> Optional[List[str]]:
