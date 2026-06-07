@@ -1923,7 +1923,17 @@
                                 </div>
                                 <div class="filter-group">
                                     <label>Alert type</label>
-                                    <input type="text" id="emailStatsAlertType" placeholder="e.g. battery_low" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);color:var(--text)">
+                                    <select id="emailStatsAlertType" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);color:var(--text)">
+                                        <option value="">All alert types</option>
+                                        <option value="battery_low">battery_low</option>
+                                        <option value="tag_offline">tag_offline</option>
+                                        <option value="geofence_entry">geofence_entry</option>
+                                        <option value="geofence_exit">geofence_exit</option>
+                                        <option value="gdpr_deletion_warning">gdpr_deletion_warning</option>
+                                        <option value="hive_breach">hive_breach</option>
+                                        <option value="hive_breach_cleared">hive_breach_cleared</option>
+                                        <option value="critical_service_failure">critical_service_failure</option>
+                                    </select>
                                 </div>
                                 <div class="filter-group">
                                     <label>Device IMEI</label>
