@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 from typing import List
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
-from app.models import BLETag, User
+from app.models import BLETag, User, HiveTagMembership, POITrackerLink, GeofenceAlert, PortalAlert
 from app.models_admin import TagPackage
 from app.services.mzone_service import MZoneService
 from app.services.geofence_service import GeofenceService
@@ -94,6 +94,15 @@ class LocationPollerService:
                     delete_after = tag.expiry_date.replace(tzinfo=None) + timedelta(days=pkg.auto_delete_days)
                     if delete_after < now_utc:
                         logger.info("🗑️  Auto-deleting tag IMEI %s (expired %s days ago)", tag.imei, pkg.auto_delete_days)
+                        # Clean dependent rows first to avoid FK violations.
+                        # Some legacy rows still reference expired tags.
+                        db.query(HiveTagMembership).filter(HiveTagMembership.tag_id == tag.id).delete(synchronize_session=False)
+                        db.query(POITrackerLink).filter(POITrackerLink.tracker_id == tag.id).delete(synchronize_session=False)
+                        db.query(GeofenceAlert).filter(GeofenceAlert.tracker_id == tag.id).delete(synchronize_session=False)
+                        db.query(PortalAlert).filter(PortalAlert.tag_id == tag.id).update(
+                            {PortalAlert.tag_id: None},
+                            synchronize_session=False,
+                        )
                         db.delete(tag)
             db.commit()
 
