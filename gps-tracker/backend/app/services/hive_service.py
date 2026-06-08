@@ -147,6 +147,8 @@ def pairwise_temporal_eval(
     max_pair_dt_s = 0.0
     breaching_pair_counts: Dict[str, int] = {tid: 0 for tid, _, _, _ in positions}
     pairwise_detail: List[Dict[str, Any]] = []
+    coherent_tag_ids: set[str] = set()
+    coherent_positions_by_tag: Dict[str, Tuple[float, float]] = {}
 
     for i, (tid_a, lat_a, lon_a, ts_a) in enumerate(positions):
         for tid_b, lat_b, lon_b, ts_b in positions[i + 1:]:
@@ -171,6 +173,10 @@ def pairwise_temporal_eval(
 
             if temporally_coherent:
                 coherent_pair_count += 1
+                coherent_tag_ids.add(str(tid_a))
+                coherent_tag_ids.add(str(tid_b))
+                coherent_positions_by_tag[str(tid_a)] = (lat_a, lon_a)
+                coherent_positions_by_tag[str(tid_b)] = (lat_b, lon_b)
                 if coherent_max is None or d > coherent_max:
                     coherent_max = d
                 if breaching:
@@ -185,11 +191,42 @@ def pairwise_temporal_eval(
         max_count = max(breaching_pair_counts.values())
         if max_count > 0:
             candidates = [tid for tid, cnt in breaching_pair_counts.items() if cnt == max_count]
-            outlier = sorted(candidates)[0]
             if len(candidates) == 1:
+                outlier = str(candidates[0])
                 outlier_selection_reason = "most_breaching_pairs"
             else:
-                outlier_selection_reason = "tiebreak_alphabetical"
+                centroid_source = [
+                    coords for tid, coords in coherent_positions_by_tag.items()
+                    if tid in coherent_tag_ids
+                ]
+                if centroid_source:
+                    centroid_lat = sum(lat for lat, _ in centroid_source) / len(centroid_source)
+                    centroid_lng = sum(lng for _, lng in centroid_source) / len(centroid_source)
+                    dist_by_candidate: Dict[str, float] = {}
+                    for tid in candidates:
+                        coords = coherent_positions_by_tag.get(str(tid))
+                        if not coords:
+                            continue
+                        lat, lng = coords
+                        dist_by_candidate[str(tid)] = haversine_m(lat, lng, centroid_lat, centroid_lng)
+                    if dist_by_candidate:
+                        max_dist = max(dist_by_candidate.values())
+                        distance_winners = [
+                            tid for tid, dist in dist_by_candidate.items()
+                            if dist == max_dist
+                        ]
+                        if len(distance_winners) == 1:
+                            outlier = distance_winners[0]
+                            outlier_selection_reason = "tiebreak_distance"
+                        else:
+                            outlier = sorted(distance_winners)[0]
+                            outlier_selection_reason = "tiebreak_alphabetical"
+                    else:
+                        outlier = sorted(str(tid) for tid in candidates)[0]
+                        outlier_selection_reason = "tiebreak_alphabetical"
+                else:
+                    outlier = sorted(str(tid) for tid in candidates)[0]
+                    outlier_selection_reason = "tiebreak_alphabetical"
 
     return (
         display_max,
@@ -440,6 +477,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
 
         # Rule 2: stale snapshot cannot advance the breach state machine.
         can_advance_breach = not stale_snapshot
+        can_advance_clear = not stale_snapshot
 
         if prev_state == "OK":
             if is_breaching and can_advance_breach:
@@ -464,7 +502,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
             # stale snapshot: hold BREACH_PENDING without incrementing confirms
 
         elif prev_state == "BREACHING":
-            if is_cleared:
+            if is_cleared and can_advance_clear:
                 new_state = "RESOLVING"
                 live.pending_clear_since = now
             # else stays BREACHING
@@ -473,7 +511,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
             if not is_cleared:
                 new_state = "BREACHING"  # dipped back over
                 live.pending_clear_since = None
-            else:
+            elif can_advance_clear:
                 # Require 1 cycle to confirm clear
                 new_state = "OK"
                 live.pending_clear_since = None
@@ -688,6 +726,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
     elif should_alert:
         delivered = _maybe_send_hive_alert(hive, new_state, prev_state, alert_diameter_m,
                                            outlier_id, cfg, db,
+                                           breaching_pair_counts=breaching_pair_counts_payload,
                                            force_renotify=not state_changed)
         if delivered:
             live.last_alert_at = now
@@ -712,6 +751,7 @@ def _maybe_send_hive_alert(hive: Hive, new_state: str, prev_state: str,
                             diameter_m: Optional[float],
                             outlier_tag_id,
                             cfg, db: Session,
+                            breaching_pair_counts: Optional[Dict[str, int]] = None,
                             force_renotify: bool = False) -> bool:
     """Fire a portal alert + email/SMS when a hive enters or clears a breach.
 
@@ -723,6 +763,7 @@ def _maybe_send_hive_alert(hive: Hive, new_state: str, prev_state: str,
 
     gid = str(hive.usergroup_id)
     km = f"{diameter_m/1000:.1f} km" if diameter_m and diameter_m >= 1000 else (f"{diameter_m:.0f} m" if diameter_m else "unknown distance")
+    miles = (diameter_m / 1609.344) if diameter_m else None
 
     outlier_label, outlier_imei = _describe_tag(outlier_tag_id, db)
     # Build a compact "Label / IMEI 1234..." suffix used in the title
@@ -737,12 +778,23 @@ def _maybe_send_hive_alert(hive: Hive, new_state: str, prev_state: str,
         alert_type = "hive_breach"
         prefix = "🔴 HIVE Breach" if not force_renotify else "🔴 HIVE Still in Breach"
         title      = f"{prefix}: {hive.name}{outlier_suffix}"
-        if outlier_label:
+        tags_beyond_threshold = sum(
+            1 for _tid, count in (breaching_pair_counts or {}).items() if int(count or 0) > 0
+        )
+        if tags_beyond_threshold >= 2 and outlier_label:
+            others = tags_beyond_threshold - 1
+            other_word = "other" if others == 1 else "others"
             message = (
-                f"Tag {outlier_label}"
+                f"{hive.name} has split - {tags_beyond_threshold} tags have separated from the group "
+                f"({outlier_label} and {others} {other_word})."
+            )
+        elif outlier_label:
+            message = (
+                f"{outlier_label}"
                 + (f" (IMEI {outlier_imei})" if outlier_imei and outlier_imei != outlier_label else "")
-                + f" has left hive '{hive.name}'. "
-                f"Spread is now {km} (threshold: {cfg.distance_threshold_m:.0f} m)."
+                + f" has separated from {hive.name} - now "
+                + (f"{miles:.1f} mi" if miles is not None else km)
+                + " from the group."
             )
         else:
             message = (
