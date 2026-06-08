@@ -3984,11 +3984,11 @@ function exportClean(callback) {
 function registerAsset(id, typeCode) {
   if (!id) return;
   var normalizedTypeCode = typeCode === 'I' ? 'Q' : typeCode;
-  var PINPLOT_API = 'https://pinplot.me/api/assets';
-  fetch(PINPLOT_API, {
+  // Backend route expects { imei, type_code } at /api/qr-assets/register.
+  fetch('/api/qr-assets/register', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ id: id, type_code: normalizedTypeCode })
+    body:    JSON.stringify({ imei: id, type_code: normalizedTypeCode })
   })
   .then(function(r) {
     if (r.status === 409) return; // already registered — fine
