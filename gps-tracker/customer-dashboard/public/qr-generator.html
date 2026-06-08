@@ -3257,9 +3257,8 @@ function copyNfcUrl() {
   var asset = getActiveAssetInfo();
   if (asset) {
     openConfirmModal(function() {
-      registerAsset(asset.id, asset.typeCode)
-        .then(function() { doCopyNfcUrl(); })
-        .catch(handleRegistrationFailure);
+      registerAsset(asset.id, asset.typeCode);
+      doCopyNfcUrl();
     }, asset);
   } else {
     doCopyNfcUrl();
@@ -3983,47 +3982,21 @@ function exportClean(callback) {
 // Called only when the user downloads a QR/NFC code.
 // Silent fire-and-forget — never blocks or errors the download.
 function registerAsset(id, typeCode) {
-  if (!id) return Promise.reject(new Error('Missing asset ID'));
+  if (!id) return;
   var normalizedTypeCode = typeCode === 'I' ? 'Q' : typeCode;
-  var attempts = [
-    { url: '/api/qr-assets/register', body: { imei: id, type_code: normalizedTypeCode } },
-    { url: '/api/assets', body: { id: id, type_code: normalizedTypeCode } }
-  ];
-
-  function tryRegister(idx) {
-    if (idx >= attempts.length) {
-      return Promise.reject(new Error('No registration endpoint accepted the payload'));
-    }
-    var attempt = attempts[idx];
-    return fetch(attempt.url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(attempt.body)
-    })
-    .then(function(r) {
-      if (r.ok || r.status === 409) return true;
-      if ((r.status === 404 || r.status === 422) && idx < attempts.length - 1) {
-        return tryRegister(idx + 1);
-      }
-      return r.text().then(function(t) {
-        throw new Error('Registration failed (' + r.status + '): ' + (t || 'no body'));
-      });
-    })
-    .catch(function(err) {
-      if (idx < attempts.length - 1) return tryRegister(idx + 1);
-      throw err;
-    });
-  }
-
-  return tryRegister(0);
-}
-
-function handleRegistrationFailure(err) {
-  var msg = 'Asset registration failed, so the code was not downloaded. Please try again.';
-  if (err && err.message) console.warn('[Pinplot] ' + err.message);
-  var st = document.getElementById('status');
-  if (st) st.textContent = msg;
-  alert(msg);
+  // Backend route expects { imei, type_code } at /api/qr-assets/register.
+  fetch('/api/qr-assets/register', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ imei: id, type_code: normalizedTypeCode })
+  })
+  .then(function(r) {
+    if (r.status === 409) return; // already registered — fine
+    if (!r.ok) console.warn('[Pinplot] Asset registration failed:', r.status);
+  })
+  .catch(function(err) {
+    console.warn('[Pinplot] Asset registration skipped (server offline?):', err.message);
+  });
 }
 
 // Returns { id, typeCode } for the currently active mode, or null if not applicable
@@ -4109,27 +4082,24 @@ function dlPNG() {
   if (asset) {
     // Single mode — confirm then download
     openConfirmModal(function() {
-      registerAsset(asset.id, asset.typeCode)
-        .then(function() {
-          var savedId = asset.id;
-          exportClean(function(dataURL) {
-            var filename = slug() + '.png';
-            var a = document.createElement('a');
-            a.href = dataURL; a.download = filename;
-            document.body.appendChild(a); a.click(); document.body.removeChild(a);
-            // Store dataURL for re-download
-            var savedDataURL = dataURL;
-            addHistoryEntry({
-              id: savedId, typeCode: asset.typeCode, format: 'png', qty: 1, time: nowString(),
-              redownload: function() {
-                var a2 = document.createElement('a');
-                a2.href = savedDataURL; a2.download = filename;
-                document.body.appendChild(a2); a2.click(); document.body.removeChild(a2);
-              }
-            });
-          });
+      registerAsset(asset.id, asset.typeCode);
+      var savedId = asset.id;
+      exportClean(function(dataURL) {
+        var filename = slug() + '.png';
+        var a = document.createElement('a');
+        a.href = dataURL; a.download = filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        // Store dataURL for re-download
+        var savedDataURL = dataURL;
+        addHistoryEntry({
+          id: savedId, typeCode: asset.typeCode, format: 'png', qty: 1, time: nowString(),
+          redownload: function() {
+            var a2 = document.createElement('a');
+            a2.href = savedDataURL; a2.download = filename;
+            document.body.appendChild(a2); a2.click(); document.body.removeChild(a2);
+          }
         });
-      }).catch(handleRegistrationFailure);
+      });
     }, asset);
   } else {
     // Non-registerable content (for example invalid IMEI text) still downloads.
@@ -4171,17 +4141,14 @@ function dlSVG() {
 
   if (asset) {
     openConfirmModal(function() {
-      registerAsset(asset.id, asset.typeCode)
-        .then(function() {
-          var savedId = asset.id; var savedTc = asset.typeCode;
-          doSVGDownload(function(svgData, isFile) {
-            addHistoryEntry({
-              id: savedId, typeCode: savedTc, format: 'svg', qty: 1, time: nowString(),
-              redownload: function() { doSVGDownload(); }
-            });
-          });
+      registerAsset(asset.id, asset.typeCode);
+      var savedId = asset.id; var savedTc = asset.typeCode;
+      doSVGDownload(function(svgData, isFile) {
+        addHistoryEntry({
+          id: savedId, typeCode: savedTc, format: 'svg', qty: 1, time: nowString(),
+          redownload: function() { doSVGDownload(); }
         });
-      }).catch(handleRegistrationFailure);
+      });
     }, asset);
   } else {
     // Non-registerable content (for example invalid IMEI text) still downloads.
