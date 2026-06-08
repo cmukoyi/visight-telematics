@@ -201,13 +201,17 @@
   .modal-overlay {
     display: none; position: fixed; inset: 0; z-index: 1000;
     background: rgba(0,0,0,0.55); backdrop-filter: blur(2px);
-    align-items: center; justify-content: center;
+    align-items: safe center; justify-content: center;
+    padding: 20px;
+    overflow-y: auto;
   }
   .modal-overlay.open { display: flex; }
   .modal-box {
     background: var(--bg-panel); border: 1px solid var(--border);
     border-radius: 16px; padding: 24px 24px 20px;
     max-width: 380px; width: calc(100% - 40px);
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
     box-shadow: 0 8px 40px rgba(0,0,0,0.35);
     animation: modal-in 0.18s ease-out;
   }
@@ -3979,11 +3983,12 @@ function exportClean(callback) {
 // Silent fire-and-forget — never blocks or errors the download.
 function registerAsset(id, typeCode) {
   if (!id) return;
+  var normalizedTypeCode = typeCode === 'I' ? 'Q' : typeCode;
   var PINPLOT_API = 'https://pinplot.me/api/assets';
   fetch(PINPLOT_API, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ id: id, type_code: typeCode })
+    body:    JSON.stringify({ id: id, type_code: normalizedTypeCode })
   })
   .then(function(r) {
     if (r.status === 409) return; // already registered — fine
@@ -3998,7 +4003,16 @@ function registerAsset(id, typeCode) {
 function getActiveAssetInfo() {
   if (mode === 'url')  return { id: _currentQId, typeCode: 'Q' };
   if (mode === 'nfc')  return { id: _currentNId, typeCode: 'N' };
-  return null; // IMEI/MAC mode — no asset registration needed
+  if (mode === 'imei') {
+    var raw = (document.getElementById('imei-input').value || '').trim();
+    var imeiOk = /^\d{15}$/.test(raw);
+    var macOk  = /^([0-9A-Fa-f]{2}[:\-]){5}[0-9A-Fa-f]{2}$/.test(raw);
+    if (!imeiOk && !macOk) return null;
+    // Normalize MAC for consistent registration IDs.
+    var normalizedId = macOk ? raw.toUpperCase().replace(/-/g, ':') : raw;
+    return { id: normalizedId, typeCode: 'I', displayType: 'IMEI / MAC' };
+  }
+  return null;
 }
 
 // ── Confirmation modal logic ──────────────────────────────────────────────────
@@ -4006,14 +4020,23 @@ var _pendingAction = null; // stores what to do after confirmation
 
 function openConfirmModal(action, asset) {
   _pendingAction = action;
-  var typeLabels = { Q: 'Asset QR Code', N: 'NFC Tag' };
+  var typeLabels = { Q: 'Asset QR Code', N: 'NFC Tag', I: 'IMEI / MAC' };
+  var isImei = asset.typeCode === 'I';
+  var bodyEl = document.getElementById('modal-body');
+  if (bodyEl) {
+    bodyEl.textContent = isImei
+      ? 'Downloading will register this IMEI/MAC ID with your Pinplot platform. This is a billable action and counts toward your account usage.'
+      : 'Downloading will register the asset ID(s) with your Pinplot platform. This is a billable action — each unique ID registered counts towards your account usage.';
+  }
   document.getElementById('modal-asset-id').textContent   = asset.id;
-  document.getElementById('modal-asset-type').textContent = typeLabels[asset.typeCode] || asset.typeCode;
+  document.getElementById('modal-asset-type').textContent = asset.displayType || typeLabels[asset.typeCode] || asset.typeCode;
 
   // Bulk vs single note
   var isBulk = /^\d+ /.test(String(asset.id));
   var noteEl = document.getElementById('modal-note');
-  if (noteEl) noteEl.textContent = isBulk
+  if (noteEl) noteEl.textContent = isImei
+    ? 'Once registered, this IMEI/MAC can be tracked in your account. Registering the same ID again will not be charged twice.'
+    : isBulk
     ? 'Each ID is unique and will only be charged once even if downloaded again.'
     : 'Once registered, this ID can be scanned and tracked on your map. Downloading the same code again will not be charged twice.';
 
@@ -4079,7 +4102,7 @@ function dlPNG() {
       });
     }, asset);
   } else {
-    // IMEI/MAC — no registration, no confirmation
+    // Non-registerable content (for example invalid IMEI text) still downloads.
     exportClean(function(dataURL) {
       var a = document.createElement('a');
       a.href = dataURL;
@@ -4128,6 +4151,7 @@ function dlSVG() {
       });
     }, asset);
   } else {
+    // Non-registerable content (for example invalid IMEI text) still downloads.
     doSVGDownload();
   }
 }
