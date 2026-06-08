@@ -85,7 +85,6 @@
     <!-- Sketch tool (native integration) — scoped under #sketch-root -->
     <link rel="stylesheet" href="/customer/sketch/styles-scoped.css" />
     <link rel="stylesheet" href="/customer/floorplan/styles-scoped.css" />
-    <link rel="stylesheet" href="/customer/qr/styles-scoped.css" />
 
 </head>
 <body>
@@ -2585,243 +2584,14 @@ input.hive-range::-moz-range-track {
 
             <!-- ═══ QR CODE TAB ═══ -->
             <div id="tab-qr" class="tab-content">
-              <div id="qr-root">
-                <div class="qrg-app">
-
-                  <!-- ── Col 1: Content ─────────────────────────── -->
-                  <div class="qrg-panel">
-                    <p class="qrg-slabel">Content</p>
-                    <div class="qrg-tabs">
-                      <button class="qrg-tab active" data-mode="url"  onclick="QRG.setMode('url')">QR Code <span class="qrg-badge">tracking</span></button>
-                      <button class="qrg-tab"         data-mode="nfc"  onclick="QRG.setMode('nfc')">NFC Tag <span class="qrg-badge">tracking</span></button>
-                      <button class="qrg-tab"         data-mode="imei" onclick="QRG.setMode('imei')">IMEI / MAC <span class="qrg-badge">device</span></button>
-                    </div>
-
-                    <!-- URL mode -->
-                    <div id="qrg-mode-url">
-                      <div class="qrg-field">
-                        <label>Generated asset URL</label>
-                        <div class="qrg-id-row">
-                          <span class="qrg-id-prefix">pinplot.me/asset/</span>
-                          <span id="qrg-url-generated-id" class="qrg-id-value"></span>
-                          <button class="qrg-reset-btn" onclick="QRG.regenerateId('Q')" title="New ID">&#8635; New ID</button>
-                        </div>
-                        <p class="qrg-hint">Auto-generated unique asset identifier. Click "New ID" to regenerate.</p>
-                      </div>
-                    </div>
-
-                    <!-- NFC mode -->
-                    <div id="qrg-mode-nfc" style="display:none">
-                      <div class="qrg-field">
-                        <label>Generated NFC tag URL</label>
-                        <div class="qrg-id-row">
-                          <span class="qrg-id-prefix">pinplot.me/asset/</span>
-                          <span id="qrg-nfc-generated-id" class="qrg-id-value"></span>
-                          <button class="qrg-reset-btn" onclick="QRG.regenerateId('N')" title="New ID">&#8635; New ID</button>
-                        </div>
-                        <p class="qrg-hint">NFC tag identifier (N-prefix). Encode this URL onto your NFC tag.</p>
-                      </div>
-                    </div>
-
-                    <!-- IMEI/MAC mode -->
-                    <div id="qrg-mode-imei" style="display:none">
-                      <div class="qrg-field">
-                        <label>IMEI / MAC Address</label>
-                        <input type="text" id="qrg-imei-input" value="357012345678901" oninput="QRG.generate()">
-                        <div id="qrg-imei-err" class="qrg-err">IMEI = 15 digits. MAC = AA:BB:CC:DD:EE:FF</div>
-                      </div>
-                      <div class="qrg-field">
-                        <label>Label prefix (optional)</label>
-                        <input type="text" id="qrg-imei-label" value="" placeholder="e.g. IMEI or MAC" oninput="QRG.generate()">
-                        <p class="qrg-hint">Scans as plain text. Use Google Lens or a QR scanner app.</p>
-                      </div>
-                    </div>
-
-                    <!-- QR Settings -->
-                    <div class="qrg-section-gap qrg-settings-panel" id="qrg-qr-settings-panel">
-                      <p class="qrg-slabel">QR Settings</p>
-                      <div class="qrg-two-col">
-                        <div class="qrg-field">
-                          <label>Module style</label>
-                          <select id="qrg-mstyle" onchange="QRG.generate()">
-                            <option value="square">Square</option>
-                            <option value="rounded">Rounded</option>
-                            <option value="dots">Dots</option>
-                          </select>
-                        </div>
-                        <div class="qrg-field">
-                          <label>Error correction</label>
-                          <select id="qrg-ecc" onchange="QRG.generate()">
-                            <option value="L">L — 7%</option>
-                            <option value="M">M — 15%</option>
-                            <option value="Q" selected>Q — 25%</option>
-                            <option value="H">H — 30%</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div class="qrg-field">
-                        <label>Export size</label>
-                        <div class="qrg-range-row">
-                          <input type="range" id="qrg-qsize" min="128" max="512" step="32" value="256"
-                                 oninput="document.getElementById('qrg-sv').textContent=this.value+'px';QRG.generate()">
-                          <span class="qrg-range-val" id="qrg-sv">256px</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Centre Icon -->
-                    <div class="qrg-section-gap qrg-settings-panel" id="qrg-icon-settings-panel">
-                      <p class="qrg-slabel">Centre Icon</p>
-                      <div class="qrg-icon-source-tabs">
-                        <div class="qrg-icon-source-tab active" onclick="QRG.setIconSource('preset')" id="qrg-tab-preset">Built-in</div>
-                        <div class="qrg-icon-source-tab"        onclick="QRG.setIconSource('upload')" id="qrg-tab-upload">Upload</div>
-                      </div>
-                      <div id="qrg-icon-preset-panel">
-                        <div class="qrg-icon-grid" id="qrg-icon-grid"></div>
-                        <div class="qrg-field" style="margin-top:8px;margin-bottom:0">
-                          <label>Icon colour</label>
-                          <div class="qrg-color-input-wrap">
-                            <div class="qrg-color-swatch" id="qrg-ic-swatch" style="background:#000000">
-                              <input type="color" id="qrg-ic" value="#000000" oninput="QRG.syncHex('ic')">
+                            <div id="qr-root" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+                                <iframe
+                                    src="/customer/qr-generator.html"
+                                    title="QR / NFC Generator"
+                                    style="width:100%;min-height:1820px;border:none;background:transparent"
+                                    loading="lazy">
+                                </iframe>
                             </div>
-                            <input type="text" id="qrg-ic-hex" value="#000000" maxlength="7" placeholder="#000000"
-                                   oninput="QRG.syncColor('ic')" class="qrg-hex-input">
-                            <button class="qrg-reset-btn" onclick="QRG.setColorValue('ic','#000000');QRG.renderBuiltinIcon()">&#x21BA;</button>
-                          </div>
-                        </div>
-                      </div>
-                      <div id="qrg-icon-upload-panel" style="display:none">
-                        <input type="file" id="qrg-iconfile" accept="image/*" onchange="QRG.loadIconFile(event)">
-                        <div id="qrg-icon-preview-row" style="display:none;align-items:center;gap:8px;margin-top:6px">
-                          <img id="qrg-icon-preview" alt="icon" style="width:32px;height:32px;object-fit:contain;border-radius:5px;border:1px solid #eee">
-                          <button class="qrg-reset-btn" onclick="QRG.removeIcon()">&#x2715; Remove</button>
-                        </div>
-                      </div>
-                      <div id="qrg-isizewrap" style="display:none;margin-top:8px">
-                        <label style="font-size:12px;color:var(--qrg-text-sec);display:block;margin-bottom:3px">Icon size</label>
-                        <div class="qrg-range-row">
-                          <input type="range" id="qrg-isize" min="8" max="30" step="1" value="20"
-                                 oninput="document.getElementById('qrg-iv').textContent=this.value+'%';QRG.generate()">
-                          <span class="qrg-range-val" id="qrg-iv">20%</span>
-                        </div>
-                      </div>
-                      <p class="qrg-hint" style="margin-top:4px">Use Q or H error correction with icons</p>
-                    </div>
-                  </div><!-- /col1 -->
-
-                  <!-- ── Col 2: Style ───────────────────────────── -->
-                  <div class="qrg-panel qrg-settings-panel" id="qrg-style-panel">
-                    <p class="qrg-slabel">Colours</p>
-                    <div class="qrg-field">
-                      <label>QR colours <button class="qrg-reset-btn" onclick="QRG.resetColors()">&#x21BA; Reset</button></label>
-                      <div class="qrg-color-picker-row">
-                        <div class="qrg-color-picker-group">
-                          <span class="qrg-color-picker-label">Foreground</span>
-                          <div class="qrg-color-input-wrap">
-                            <div class="qrg-color-swatch" id="qrg-fg-swatch" style="background:#000000">
-                              <input type="color" id="qrg-fg" value="#000000" oninput="QRG.syncHex('fg')">
-                            </div>
-                            <input type="text" id="qrg-fg-hex" value="#000000" maxlength="7" placeholder="#000000"
-                                   oninput="QRG.syncColor('fg')" class="qrg-hex-input">
-                          </div>
-                        </div>
-                        <div class="qrg-color-picker-group">
-                          <span class="qrg-color-picker-label">Background</span>
-                          <div class="qrg-color-input-wrap">
-                            <div class="qrg-color-swatch" id="qrg-bg-swatch" style="background:#ffffff">
-                              <input type="color" id="qrg-bg" value="#ffffff" oninput="QRG.syncHex('bg')">
-                            </div>
-                            <input type="text" id="qrg-bg-hex" value="#ffffff" maxlength="7" placeholder="#ffffff"
-                                   oninput="QRG.syncColor('bg')" class="qrg-hex-input">
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div class="qrg-field">
-                      <label>Corner colours <button class="qrg-reset-btn" onclick="QRG.resetCornerColors()">&#x21BA; Reset</button></label>
-                      <div class="qrg-color-picker-row">
-                        <div class="qrg-color-picker-group">
-                          <span class="qrg-color-picker-label">Outer ring</span>
-                          <div class="qrg-color-input-wrap">
-                            <div class="qrg-color-swatch" id="qrg-co-swatch" style="background:#000000">
-                              <input type="color" id="qrg-co" value="#000000" oninput="QRG.syncHex('co')">
-                            </div>
-                            <input type="text" id="qrg-co-hex" value="#000000" maxlength="7" placeholder="#000000"
-                                   oninput="QRG.syncColor('co')" class="qrg-hex-input">
-                          </div>
-                        </div>
-                        <div class="qrg-color-picker-group">
-                          <span class="qrg-color-picker-label">Inner dot</span>
-                          <div class="qrg-color-input-wrap">
-                            <div class="qrg-color-swatch" id="qrg-ci-swatch" style="background:#000000">
-                              <input type="color" id="qrg-ci" value="#000000" oninput="QRG.syncHex('ci')">
-                            </div>
-                            <input type="text" id="qrg-ci-hex" value="#000000" maxlength="7" placeholder="#000000"
-                                   oninput="QRG.syncColor('ci')" class="qrg-hex-input">
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div class="qrg-field">
-                      <label>Colour presets</label>
-                      <div class="qrg-preset-grid" id="qrg-preset-grid"></div>
-                    </div>
-
-                    <div class="qrg-section-gap">
-                      <p class="qrg-slabel">Frame</p>
-                      <div class="qrg-frame-grid" id="qrg-frame-grid"></div>
-                      <div class="qrg-frame-label-wrap" id="qrg-frame-label-wrap">
-                        <label style="font-size:12px;color:var(--qrg-text-sec);display:block;margin-bottom:3px">Label text</label>
-                        <input type="text" id="qrg-frame-label-text" value="PinPlot" maxlength="24" oninput="QRG.generate()">
-                      </div>
-                    </div>
-                  </div><!-- /col2 -->
-
-                  <!-- ── Col 3: Preview (sticky) ────────────────── -->
-                  <div class="qrg-preview-col">
-                    <div class="qrg-panel">
-                      <p class="qrg-slabel" id="qrg-preview-label">Preview</p>
-                      <div class="qrg-qr-preview">
-                        <canvas id="qrg-qr-canvas" width="256" height="256"></canvas>
-                        <div id="qrg-preview-wrap">
-                          <canvas id="qrg-composite-canvas" width="256" height="256"></canvas>
-                        </div>
-                        <!-- NFC placeholder -->
-                        <div id="qrg-nfc-placeholder-wrap" style="display:none;width:100%">
-                          <div class="qrg-nfc-placeholder">
-                            <svg width="140" height="140" viewBox="0 0 140 140" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <circle cx="70" cy="70" r="68" fill="var(--qrg-primary)"/>
-                              <circle cx="70" cy="95" r="5" fill="white"/>
-                              <path d="M54 80 Q70 64 86 80" stroke="white" stroke-width="6" stroke-linecap="round" fill="none"/>
-                              <path d="M41 67 Q70 40 99 67" stroke="white" stroke-width="6" stroke-linecap="round" fill="none"/>
-                              <path d="M28 54 Q70 16 112 54" stroke="white" stroke-width="6" stroke-linecap="round" fill="none"/>
-                              <text x="70" y="122" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="16" font-weight="700" fill="white" text-anchor="middle" letter-spacing="2">NFC</text>
-                            </svg>
-                            <p id="qrg-nfc-url-display" style="font-family:monospace;font-size:10px;color:var(--qrg-primary);word-break:break-all;text-align:center;padding:0 4px;margin-top:-4px"></p>
-                            <p style="font-size:10px;color:var(--qrg-text-hint);text-align:center;line-height:1.5">No QR code needed.<br>Copy the URL below and write it to your NFC chip.</p>
-                          </div>
-                        </div>
-
-                        <div id="qrg-status" class="qrg-status">Generating…</div>
-
-                        <!-- Download buttons (QR/IMEI modes) -->
-                        <div id="qrg-dl-buttons" class="qrg-btn-row">
-                          <button class="qrg-btn" onclick="QRG.dlPNG()">⬇ PNG</button>
-                          <button class="qrg-btn" onclick="QRG.dlSVG()">⬇ SVG</button>
-                        </div>
-
-                        <!-- NFC copy button -->
-                        <div id="qrg-nfc-buttons" style="display:none;width:100%">
-                          <button class="qrg-btn-copy" id="qrg-copy-btn" onclick="QRG.copyNfcUrl()">&#128279; Copy NFC URL</button>
-                        </div>
-                      </div>
-                    </div>
-                  </div><!-- /col3 -->
-
-                </div><!-- /qrg-app -->
-              </div><!-- /qr-root -->
             </div>
 
             <!-- ═══ REPORTS — Tag Subscriptions ═══ -->
@@ -4502,8 +4272,6 @@ function applyTheme(theme) {
     if (typeof render === 'function') render();
     // Re-render floor plan canvas
     if (typeof FP !== 'undefined' && FP.drawAll) FP.drawAll();
-    // Re-render QR preview (corner-colour contrast may change)
-    if (typeof QRG !== 'undefined' && QRG.generate) QRG.generate();
     // Swap MapTiler basemap style on all registered Leaflet maps
     _ppRefreshAllBasemaps();
     // Re-apply logo variant for the new theme (dark vs light logo)
@@ -4647,7 +4415,6 @@ function switchTab(name) {
     if (name === 'floorplan')  _runTabTask(FP.onShow(), 'floorplan');
     if (name === 'users')      _runTabTask(loadUsers(), 'users');
     if (name === 'settings')   _runTabTask(loadSettings(), 'settings');
-    if (name === 'qr' && typeof QRG !== 'undefined') _runTabTask(QRG.onShow(), 'qr');
     if (name === 'reports-subscriptions') _runTabTask(loadReports(), 'reports-subscriptions');
     if (name === 'reports-activity')  _runTabTask(loadReportsActivity(), 'reports-activity');
     if (name === 'reports-trips')     _runTabTask(loadReportsTrips(), 'reports-trips');
@@ -10843,8 +10610,6 @@ function downloadBulkTemplate() {
 
 document.addEventListener('DOMContentLoaded', () => { _amInitBulkDropzone(); });
 
-// QR/NFC generator is handled by /customer/qr/app.js (window.QRG)
-
 // ══════════════════════════════════════════
 // HIVE TRACKING
 // ─────────────────────────────────────────────────────────────────────────────
@@ -11796,4 +11561,3 @@ function hiveOpenHelp() {
 <!-- Sub-app JS — must come after their DOM is in place -->
 <script src="/customer/sketch/app.js"></script>
 <script src="/customer/floorplan/app.js"></script>
-<script src="/customer/qr/app.js"></script>
