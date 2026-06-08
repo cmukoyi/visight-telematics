@@ -3365,8 +3365,8 @@ input.hive-range::-moz-range-track {
                 </select>
             </div>
             <div class="form-group">
-                <label>Assign to User *</label>
-                <select id="tagMgmtUser" required>
+                <label>Assign to User</label>
+                <select id="tagMgmtUser">
                     <option value="">Loading users…</option>
                 </select>
             </div>
@@ -3507,7 +3507,7 @@ input.hive-range::-moz-range-track {
             <div class="loc-dropzone" id="am-dropzone">
                 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 <div class="loc-dropzone-title">Drop your file here, or click to browse</div>
-                <div class="loc-dropzone-sub">.xlsx or .csv — columns: imei, owner_email, description, tag_type</div>
+                <div class="loc-dropzone-sub">.xlsx or .csv — columns: imei, owner_email (optional), description, tag_type</div>
                 <input type="file" id="am-bulk-file" accept=".xlsx,.xls,.csv" style="display:none">
             </div>
             <div style="margin-top:10px;padding:8px 12px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:var(--radius);font-size:12px;color:var(--text-2)">
@@ -4628,7 +4628,7 @@ async function _loadMobileUsersIntoSelect() {
         const res = await apiFetch('/api/portal/mobile-users');
         if (!res.ok) throw new Error('Failed to load users');
         _mobileUsersCache = await res.json();
-        sel.innerHTML = '<option value="">— Select user —</option>' +
+        sel.innerHTML = '<option value="">— Optional: assign later —</option>' +
             _mobileUsersCache.map(u => {
                 const name = [u.first_name, u.last_name].filter(Boolean).join(' ');
                 return `<option value="${esc(String(u.id))}">${esc(u.email)}${name ? ' (' + esc(name) + ')' : ''}</option>`;
@@ -4885,7 +4885,15 @@ async function submitTagForm(e) {
     const mode   = document.getElementById('tagMgmtMode').value;
     const userId = document.getElementById('tagMgmtUser').value;
     const btn    = document.getElementById('tagMgmtSubmitBtn');
-    if (!userId) { return; }
+    // Reassign mode requires selecting a user; add/edit modes allow no user.
+    if (tagId && !mode && !userId) {
+        const alertEl = document.getElementById('tagMgmtAlert');
+        const span = document.getElementById('tagMgmtAlertText');
+        span.textContent = 'Please select a user for reassignment.';
+        alertEl.className = 'alert alert-error';
+        alertEl.style.display = 'flex';
+        return;
+    }
     btn.disabled = true;
     const alertEl = document.getElementById('tagMgmtAlert');
     alertEl.style.display = 'none';
@@ -4916,7 +4924,7 @@ async function submitTagForm(e) {
                 body: JSON.stringify({
                     description: document.getElementById('tagMgmtDesc').value.trim() || null,
                     tag_type: document.getElementById('tagMgmtType').value,
-                    user_id: userId,
+                    user_id: userId || null,
                     category: categoryName,
                     package_id: _pkgVal || null,
                 }),
@@ -4941,7 +4949,7 @@ async function submitTagForm(e) {
                     imei: document.getElementById('tagMgmtImei').value.trim(),
                     description: document.getElementById('tagMgmtDesc').value.trim() || null,
                     tag_type: document.getElementById('tagMgmtType').value,
-                    user_id: userId,
+                    user_id: userId || null,
                     package_id: packageId,
                     category: categoryName,
                 }),
@@ -10529,7 +10537,7 @@ function _amHandleBulkFile(file) {
             const ws = wb.Sheets[wb.SheetNames[0]];
             if (!ws) throw new Error('The file appears empty or has no valid sheet.');
             const data = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
-            if (!data.length) throw new Error('No data rows found. Check the file has headers: imei, owner_email, description, tag_type — and at least one data row.');
+            if (!data.length) throw new Error('No data rows found. Check the file has headers: imei, owner_email (optional), description, tag_type — and at least one data row.');
             const rows = data.map(r => ({
                 imei:        String(r['imei'] || r['IMEI'] || '').trim(),
                 owner_email: String(r['owner_email'] || r['Owner Email'] || '').trim(),
@@ -10560,8 +10568,7 @@ function _amValidateBulkPreview(rows) {
             const v = _amValidateImei(row.imei);
             if (!v.ok) errs.push('IMEI ' + v.err);
         }
-        if (!row.owner_email) errs.push('missing email');
-        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.owner_email)) errs.push('invalid email');
+        if (row.owner_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.owner_email)) errs.push('invalid email');
         const valid = errs.length === 0;
         if (valid) { validCount++; _bulkRows.push(row); }
         _amBulkPreview.push({ ...row, valid, errs });

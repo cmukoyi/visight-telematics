@@ -1336,7 +1336,7 @@ class PortalTagCreate(BaseModel):
     imei: str
     description: Optional[str] = None
     tag_type: Optional[str] = "scope"
-    user_id: UUID
+    user_id: Optional[UUID] = None
     package_id: UUID  # mandatory — must select a package when adding a tag
     category: Optional[str] = None  # category name to store in attributes
 
@@ -1472,10 +1472,15 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
     if data.tag_type is not None:
         # Normalise UI aliases ('series1'/'series2') to canonical DB values ('scope'/'tracksolid')
         tag.tag_type = _TAG_TYPE_ALIAS.get(data.tag_type.lower(), data.tag_type.lower())
-    if data.user_id is not None:
-        target_user = db.query(User).filter(User.id == str(data.user_id)).first()
-        _assert_user_in_domain(target_user, _domains(group))
-        tag.user_id = str(data.user_id)
+    fields_set = getattr(data, "model_fields_set", getattr(data, "__fields_set__", set()))
+    if "user_id" in fields_set:
+        if data.user_id:
+            target_user = db.query(User).filter(User.id == str(data.user_id)).first()
+            _assert_user_in_domain(target_user, _domains(group))
+            tag.user_id = str(data.user_id)
+        else:
+            # Explicit null/empty in payload means unassign from user.
+            tag.user_id = None
     if data.category is not None:
         attrs = dict(tag.attributes or {})
         if data.category:
@@ -1555,8 +1560,10 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
         raise HTTPException(status_code=403, detail="You don't have permission to add tags")
     group = _get_group_and_assert_domain(me, db)
 
-    target_user = db.query(User).filter(User.id == str(data.user_id)).first()
-    _assert_user_in_domain(target_user, _domains(group))
+    target_user = None
+    if data.user_id:
+        target_user = db.query(User).filter(User.id == str(data.user_id)).first()
+        _assert_user_in_domain(target_user, _domains(group))
 
     pkg = db.query(TagPackage).filter(TagPackage.id == str(data.package_id), TagPackage.is_active == True).first()
     if not pkg:
@@ -1583,8 +1590,9 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
         init_attrs['category'] = {'value': data.category}
     if data.description:
         init_attrs['_user_named'] = True
+    init_attrs['_created_usergroup_id'] = str(group.id)
     tag = BLETag(
-        user_id=str(data.user_id),
+        user_id=(str(data.user_id) if data.user_id else None),
         imei=imei,
         description=data.description,
         tag_type=canonical_type,
@@ -1596,7 +1604,7 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
     db.add(tag)
     db.commit()
     db.refresh(tag)
-    return _build_tag_out(tag, target_user.email, db)
+    return _build_tag_out(tag, target_user.email if target_user else "unknown@unknown", db)
 
 
 @router.put("/tags/{tag_id}/assign", response_model=PortalTagOut)
@@ -1672,7 +1680,7 @@ class BulkTagRow(BaseModel):
     imei: str
     description: Optional[str] = None
     tag_type: Optional[str] = None
-    owner_email: str
+    owner_email: Optional[str] = None
 
 
 class BulkTagResult(BaseModel):
@@ -1717,25 +1725,28 @@ def bulk_create_tags(rows: List[BulkTagRow], request: Request, db: Session = Dep
             if db.query(BLETag).filter(BLETag.imei == imei).first():
                 results.append(BulkTagResult(imei=imei, success=False, error="IMEI already exists"))
                 continue
-            owner_email = row.owner_email.strip().lower()
-            bulk_domains = _domains(group)
-            if not any(owner_email.endswith(f"@{d}") for d in bulk_domains):
-                results.append(BulkTagResult(imei=imei, success=False,
-                                             error=f"Email must use one of: {', '.join('@'+d for d in bulk_domains)}"))
-                continue
-            owner = db.query(User).filter(User.email == owner_email).first()
-            if not owner:
-                results.append(BulkTagResult(imei=imei, success=False, error="Owner email not found"))
-                continue
+            owner = None
+            owner_email = (row.owner_email or "").strip().lower()
+            if owner_email:
+                bulk_domains = _domains(group)
+                if not any(owner_email.endswith(f"@{d}") for d in bulk_domains):
+                    results.append(BulkTagResult(imei=imei, success=False,
+                                                 error=f"Email must use one of: {', '.join('@'+d for d in bulk_domains)}"))
+                    continue
+                owner = db.query(User).filter(User.email == owner_email).first()
+                if not owner:
+                    results.append(BulkTagResult(imei=imei, success=False, error="Owner email not found"))
+                    continue
             tag = BLETag(
                 id=str(_uuid.uuid4()),
                 imei=imei,
                 description=row.description or None,
                 tag_type=row.tag_type or None,
-                user_id=str(owner.id),
+                user_id=(str(owner.id) if owner else None),
                 is_active=True,
                 package_id=str(pkg.id),
                 expiry_date=expiry_date,
+                attributes={"_created_usergroup_id": str(group.id)},
             )
             db.add(tag)
             db.flush()
