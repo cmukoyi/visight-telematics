@@ -9363,6 +9363,7 @@ async function initLiveMap() {
         _liveMap.invalidateSize();
     }
     await _lmLoadTags();
+    _lmConnectAssetSSE();
     // Legacy QR/NFC asset endpoint (/api/assets) was removed; series_3 assets
     // are now included in /api/portal/tags and rendered with regular markers.
 }
@@ -9513,34 +9514,68 @@ function _lmBuildAssetPopup(asset) {
 }
 
 function _lmConnectAssetSSE() {
+    if (_assetSSEConnected) return;
     if (!window.EventSource) {
         console.warn('EventSource not supported - real-time asset updates disabled');
         return;
     }
-    
+
+    _assetSSEConnected = true;
     const eventSource = new EventSource('/api/scan/events');
+
+    const upsertFromScanEvent = (data) => {
+        if (!data) return;
+        const imei = data.asset_id || data.imei;
+        if (!imei) return;
+
+        const existing = _lmTags.find(t => t.imei === imei);
+        const nextLastSeen = data.timestamp || new Date().toISOString();
+
+        if (existing) {
+            existing.latitude = String(data.lat);
+            existing.longitude = String(data.lng);
+            existing.last_seen = nextLastSeen;
+            if (data.device_name) existing.device_name = data.device_name;
+        } else {
+            _lmTags.unshift({
+                imei: imei,
+                description: data.device_name || ('Asset ' + imei.slice(0, 8)),
+                device_name: data.device_name || ('Asset ' + imei.slice(0, 8)),
+                tag_type: data.tag_type || 'series_3',
+                latitude: String(data.lat),
+                longitude: String(data.lng),
+                last_seen: nextLastSeen,
+                is_active: true,
+                owner_email: 'unknown@unknown'
+            });
+        }
+
+        _lmPlaceMarkers();
+        _lmRenderList();
+        _lmUpdateStats();
+        console.log('Asset updated:', imei);
+    };
     
     eventSource.onopen = () => {
         console.log('✓ Asset SSE connected');
     };
+
+    eventSource.addEventListener('location_update', (e) => {
+        try {
+            const data = JSON.parse(e.data);
+            upsertFromScanEvent(data);
+        } catch (err) {
+            console.error('Error processing named SSE message:', err);
+        }
+    });
     
     eventSource.onmessage = (e) => {
         try {
             const data = JSON.parse(e.data);
-            
+
+            // Backward-compat path for any default-event payloads.
             if (data.type === 'location_update') {
-                // Update asset marker in real-time
-                _lmUpsertAssetMarker({
-                    id: data.asset_id,
-                    name: data.asset_name,
-                    type_code: data.type_code,
-                    lat: data.lat,
-                    lng: data.lng,
-                    accuracy: data.accuracy,
-                    scan_count: data.scan_count,
-                    last_seen: data.timestamp
-                });
-                console.log('Asset updated:', data.asset_id);
+                upsertFromScanEvent(data.data || data);
             }
         } catch (err) {
             console.error('Error processing SSE message:', err);

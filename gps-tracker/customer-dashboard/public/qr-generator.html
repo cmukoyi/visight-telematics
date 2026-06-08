@@ -3984,10 +3984,14 @@ function exportClean(callback) {
 function registerAsset(id, typeCode) {
   if (!id) return;
   var normalizedTypeCode = typeCode === 'I' ? 'Q' : typeCode;
+  var token = null;
+  try { token = localStorage.getItem('pp_portal_token'); } catch (_) {}
+  var headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
   // Backend route expects { imei, type_code } at /api/qr-assets/register.
   fetch('/api/qr-assets/register', {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: headers,
     body:    JSON.stringify({ imei: id, type_code: normalizedTypeCode })
   })
   .then(function(r) {
