@@ -1106,9 +1106,14 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
         if not owner_email:
             owner_email = "unknown@unknown"
         pkg = pkg_map.get(str(tag.package_id)) if tag.package_id else None
+        effective_expiry = tag.expiry_date
+        if not effective_expiry and pkg and (tag.tag_type or "").lower() in ("series3", "series_3"):
+            base = tag.activation_date or tag.added_at
+            if base:
+                effective_expiry = base + timedelta(days=pkg.validity_days)
         days_remaining = None
-        if tag.expiry_date:
-            days_remaining = (tag.expiry_date.replace(tzinfo=None) - datetime.utcnow()).days
+        if effective_expiry:
+            days_remaining = (effective_expiry.replace(tzinfo=None) - datetime.utcnow()).days
         # Resolve category from attributes
         attrs = tag.attributes or {}
         raw_cat_name = (attrs.get('category') or {}).get('value') or None
@@ -1137,7 +1142,7 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
             package_id=str(tag.package_id) if tag.package_id else None,
             package_name=pkg.name if pkg else None,
             added_at=tag.added_at,
-            expiry_date=tag.expiry_date,
+            expiry_date=effective_expiry,
             days_remaining=days_remaining,
             activation_date=tag.activation_date,
             category_id=cat_id,
@@ -1348,9 +1353,14 @@ def _build_tag_out(tag: BLETag, owner_email: str, db: Optional[Session] = None) 
     pkg = None
     if tag.package_id and db:
         pkg = db.query(TagPackage).filter(TagPackage.id == str(tag.package_id)).first()
+    effective_expiry = tag.expiry_date
+    if not effective_expiry and pkg and (tag.tag_type or "").lower() in ("series3", "series_3"):
+        base = tag.activation_date or tag.added_at
+        if base:
+            effective_expiry = base + timedelta(days=pkg.validity_days)
     days_remaining = None
-    if tag.expiry_date:
-        days_remaining = (tag.expiry_date.replace(tzinfo=None) - datetime.utcnow()).days
+    if effective_expiry:
+        days_remaining = (effective_expiry.replace(tzinfo=None) - datetime.utcnow()).days
     return PortalTagOut(
         id=tag.id,
         imei=tag.imei,
@@ -1368,7 +1378,7 @@ def _build_tag_out(tag: BLETag, owner_email: str, db: Optional[Session] = None) 
         package_id=str(tag.package_id) if tag.package_id else None,
         package_name=pkg.name if pkg else None,
         added_at=tag.added_at,
-        expiry_date=tag.expiry_date,
+        expiry_date=effective_expiry,
         days_remaining=days_remaining,
         activation_date=tag.activation_date,
         activity_status=_compute_activity_status(tag.last_seen),

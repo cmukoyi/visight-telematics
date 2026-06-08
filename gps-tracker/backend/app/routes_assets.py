@@ -146,6 +146,16 @@ async def register_qr_asset(
             attrs_existing["category"] = {"value": "QR/NFC", "show_on_map": True}
             existing.attributes = attrs_existing
             changed = True
+        if existing.package_id and not existing.expiry_date:
+            pkg_existing = db.query(TagPackage).filter(
+                TagPackage.id == str(existing.package_id),
+                TagPackage.is_active == True,
+            ).first()
+            if pkg_existing:
+                base = existing.activation_date or existing.added_at or datetime.utcnow()
+                existing.activation_date = existing.activation_date or base
+                existing.expiry_date = base + timedelta(days=pkg_existing.validity_days)
+                changed = True
         if default_pkg and not existing.package_id:
             now = datetime.utcnow()
             existing.package_id = str(default_pkg.id)
