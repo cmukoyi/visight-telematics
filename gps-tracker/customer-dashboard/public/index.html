@@ -4747,7 +4747,14 @@ async function openTagMgmtModal(mode, imei) {
     document.getElementById('tagMgmtDescGroup').style.display = '';
 
     // Tag type — normalise canonical DB values (scope/tracksolid/series3) to select option values (series1/series2/series3)
-    const _typeAliasToSelect = { scope: 'series1', tracksolid: 'series2', series3: 'series3', series1: 'series1', series2: 'series2' };
+    const _typeAliasToSelect = {
+        scope: 'series1',
+        tracksolid: 'series2',
+        series3: 'series3',
+        series_3: 'series3',
+        series1: 'series1',
+        series2: 'series2'
+    };
     const _typeSelect = document.getElementById('tagMgmtType');
     
     // Filter tag type options based on usergroup permissions

@@ -1,5 +1,6 @@
 """QR/NFC asset registration - integrates with existing ble_tags table."""
 import os
+from datetime import datetime, timedelta
 from typing import Optional, Tuple
 
 import jwt
@@ -120,6 +121,12 @@ async def register_qr_asset(
     """
     current_user, creator_usergroup_id = _resolve_registration_identity(credentials, db)
 
+    # Get default package once; reused for create and idempotent updates.
+    default_pkg = db.query(TagPackage).filter(
+        TagPackage.is_default == True,
+        TagPackage.is_active == True,
+    ).first()
+
     # Check if already registered
     existing = db.query(BLETag).filter(BLETag.imei == body.imei).first()
     if existing:
@@ -134,6 +141,17 @@ async def register_qr_asset(
                 attrs.setdefault("_created_by", "portal")
                 existing.attributes = attrs
                 changed = True
+        attrs_existing = dict(existing.attributes or {})
+        if (attrs_existing.get("category") or {}).get("value") == "series_3":
+            attrs_existing["category"] = {"value": "QR/NFC", "show_on_map": True}
+            existing.attributes = attrs_existing
+            changed = True
+        if default_pkg and not existing.package_id:
+            now = datetime.utcnow()
+            existing.package_id = str(default_pkg.id)
+            existing.activation_date = existing.activation_date or now
+            existing.expiry_date = now + timedelta(days=default_pkg.validity_days)
+            changed = True
         if changed:
             db.commit()
         return {
@@ -145,16 +163,10 @@ async def register_qr_asset(
             "usergroup_id": creator_usergroup_id,
         }
 
-    # Get default package
-    default_pkg = db.query(TagPackage).filter(
-        TagPackage.is_default == True,
-        TagPackage.is_active == True,
-    ).first()
-
     # Create ble_tags row for series_3 QR asset
     asset_type = 'QR' if body.type_code == 'Q' else 'NFC'
     attrs = {
-        'category': {'value': 'series_3', 'show_on_map': True},
+        'category': {'value': 'QR/NFC', 'show_on_map': True},
         '_qr_asset': True,
         '_type_code': body.type_code,
     }
@@ -173,7 +185,10 @@ async def register_qr_asset(
     )
 
     if default_pkg:
+        now = datetime.utcnow()
         tag.package_id = str(default_pkg.id)
+        tag.activation_date = now
+        tag.expiry_date = now + timedelta(days=default_pkg.validity_days)
 
     db.add(tag)
     db.commit()

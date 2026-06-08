@@ -27,7 +27,12 @@ from app.services.email_service import EmailService as _EmailService
 _email_svc_portal = _EmailService()
 
 # Alias map shared by create_tag and validate_tag_portal
-_TAG_TYPE_ALIAS = {"series1": "scope", "series2": "tracksolid"}
+_TAG_TYPE_ALIAS = {
+    "series1": "scope",
+    "series2": "tracksolid",
+    "series3": "series_3",
+    "series_3": "series_3",
+}
 
 router = APIRouter(prefix="/api/portal", tags=["portal"])
 logger = logging.getLogger(__name__)
@@ -1113,7 +1118,8 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
             if match:
                 cat_id, cat_name = match
             else:
-                cat_name = raw_cat_name  # preserve even if category was deleted
+                # Keep QR/NFC categories human-friendly in the UI.
+                cat_name = "QR/NFC" if raw_cat_name.lower() in ("series_3", "series3") else raw_cat_name
         result.append(PortalTagOut(
             id=tag.id,
             imei=tag.imei,
@@ -1491,7 +1497,12 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
                     base = datetime.utcnow()
                 tag.expiry_date = base + timedelta(days=pkg.validity_days)
             else:
-                tag.expiry_date = None  # pending first GPS fix
+                if (tag.tag_type or "").lower() in ("series3", "series_3"):
+                    # QR/NFC tags should show an expiry immediately after package assignment.
+                    tag.activation_date = datetime.utcnow()
+                    tag.expiry_date = tag.activation_date + timedelta(days=pkg.validity_days)
+                else:
+                    tag.expiry_date = None  # pending first GPS fix
 
     db.commit()
     db.refresh(tag)

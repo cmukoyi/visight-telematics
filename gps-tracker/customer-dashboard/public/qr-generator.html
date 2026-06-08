@@ -4534,8 +4534,84 @@ function buildXlsx(rows) {
 // ── Download history log ──────────────────────────────────────────────────────
 var _history = []; // { id, typeCode, format, qty, time, redownload }
 
+function _historyKey(entry) {
+  return String(entry.id || '') + '|' + String(entry.format || '');
+}
+
+function _buildHistoryRedownload(entry) {
+  return function() {
+    // Always rebuild as a scannable asset QR by IMEI/ID.
+    mode = 'url';
+    _currentQId = entry.id;
+    var qEl = document.getElementById('url-generated-id');
+    if (qEl) qEl.textContent = _currentQId;
+    generate();
+    dlPNG();
+  };
+}
+
+async function loadDbHistory() {
+  var token = null;
+  try { token = localStorage.getItem('pp_portal_token'); } catch (_) {}
+  if (!token) return;
+
+  try {
+    var res = await fetch('/api/portal/tags', {
+      method: 'GET',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/json'
+      }
+    });
+    if (!res.ok) return;
+    var tags = await res.json();
+    if (!Array.isArray(tags)) return;
+
+    var existingKeys = new Set(_history.map(_historyKey));
+    tags
+      .filter(function(t) {
+        var tt = String(t.tag_type || '').toLowerCase();
+        return tt === 'series_3' || tt === 'series3';
+      })
+      .sort(function(a, b) {
+        var ta = new Date(a.added_at || 0).getTime();
+        var tb = new Date(b.added_at || 0).getTime();
+        return tb - ta;
+      })
+      .slice(0, 100)
+      .forEach(function(t) {
+        var typeCode = String(t.imei || '').toUpperCase().indexOf('HPSN') === 0 ? 'N' : 'Q';
+        var entry = {
+          id: t.imei,
+          typeCode: typeCode,
+          format: 'png',
+          qty: 1,
+          time: t.added_at ? new Date(t.added_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'saved',
+          redownload: null
+        };
+        entry.redownload = _buildHistoryRedownload(entry);
+        var key = _historyKey(entry);
+        if (!existingKeys.has(key)) {
+          _history.push(entry);
+          existingKeys.add(key);
+        }
+      });
+    renderHistory();
+  } catch (_) {
+    // Keep generator usable even if history fetch fails.
+  }
+}
+
 function addHistoryEntry(entry) {
+  if (!entry.redownload) entry.redownload = _buildHistoryRedownload(entry);
   _history.unshift(entry); // newest first
+  var seen = new Set();
+  _history = _history.filter(function(e) {
+    var k = _historyKey(e);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
   renderHistory();
 }
 
@@ -4636,6 +4712,7 @@ window.addEventListener('load', function() {
     }
   } catch(e){}
   generate();
+  loadDbHistory();
 });
 </script>
 </body>
