@@ -128,6 +128,7 @@ def pairwise_temporal_eval(
     Optional[float],  # max_pair_dt_s
     Dict[str, int],   # breaching_pair_counts
     str,              # outlier_selection_reason
+    int,              # separated_tag_count (cluster-based)
     List[Dict[str, Any]],  # pairwise_detail
 ]:
     """Evaluate pairwise distances with a temporal coherence gate.
@@ -138,7 +139,7 @@ def pairwise_temporal_eval(
       |observed_at(A) - observed_at(B)| <= coherence_window_s
     """
     if len(positions) < 2:
-        return None, None, None, 0, 0, None, {}, "none", []
+        return None, None, None, 0, 0, None, {}, "none", 0, []
 
     display_max = 0.0
     coherent_max: Optional[float] = None
@@ -149,6 +150,7 @@ def pairwise_temporal_eval(
     pairwise_detail: List[Dict[str, Any]] = []
     coherent_tag_ids: set[str] = set()
     coherent_positions_by_tag: Dict[str, Tuple[float, float]] = {}
+    coherent_close_neighbors: Dict[str, set[str]] = {str(tid): set() for tid, _, _, _ in positions}
 
     for i, (tid_a, lat_a, lon_a, ts_a) in enumerate(positions):
         for tid_b, lat_b, lon_b, ts_b in positions[i + 1:]:
@@ -177,6 +179,9 @@ def pairwise_temporal_eval(
                 coherent_tag_ids.add(str(tid_b))
                 coherent_positions_by_tag[str(tid_a)] = (lat_a, lon_a)
                 coherent_positions_by_tag[str(tid_b)] = (lat_b, lon_b)
+                if d <= threshold_m:
+                    coherent_close_neighbors[str(tid_a)].add(str(tid_b))
+                    coherent_close_neighbors[str(tid_b)].add(str(tid_a))
                 if coherent_max is None or d > coherent_max:
                     coherent_max = d
                 if breaching:
@@ -228,6 +233,54 @@ def pairwise_temporal_eval(
                     outlier = sorted(str(tid) for tid in candidates)[0]
                     outlier_selection_reason = "tiebreak_alphabetical"
 
+    # Fix 3 correction: separated-tag count is cluster-based, not the number of
+    # non-zero breaching-pair entries (which double-counts both sides of a split).
+    separated_tag_count = 0
+    if coherent_tag_ids and coherent_positions_by_tag:
+        unvisited = set(coherent_tag_ids)
+        components: List[List[str]] = []
+        while unvisited:
+            seed = next(iter(unvisited))
+            stack = [seed]
+            component: List[str] = []
+            while stack:
+                cur = stack.pop()
+                if cur not in unvisited:
+                    continue
+                unvisited.remove(cur)
+                component.append(cur)
+                for nbr in coherent_close_neighbors.get(cur, set()):
+                    if nbr in unvisited:
+                        stack.append(nbr)
+            components.append(component)
+
+        if components:
+            # Deterministic main-cluster choice: largest component, then lexical.
+            main_cluster = sorted(
+                (sorted(comp) for comp in components),
+                key=lambda comp: (-len(comp), comp),
+            )[0]
+
+            cluster_coords = [
+                coherent_positions_by_tag[tid]
+                for tid in main_cluster
+                if tid in coherent_positions_by_tag
+            ]
+            if cluster_coords:
+                cluster_centroid_lat = sum(lat for lat, _ in cluster_coords) / len(cluster_coords)
+                cluster_centroid_lng = sum(lng for _, lng in cluster_coords) / len(cluster_coords)
+                separated_tag_count = sum(
+                    1
+                    for tid in coherent_tag_ids
+                    if tid in coherent_positions_by_tag
+                    and haversine_m(
+                        coherent_positions_by_tag[tid][0],
+                        coherent_positions_by_tag[tid][1],
+                        cluster_centroid_lat,
+                        cluster_centroid_lng,
+                    ) > threshold_m
+                )
+
     return (
         display_max,
         coherent_max,
@@ -237,6 +290,7 @@ def pairwise_temporal_eval(
         max_pair_dt_s,
         breaching_pair_counts,
         outlier_selection_reason,
+        separated_tag_count,
         pairwise_detail,
     )
 
@@ -390,6 +444,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
             max_pair_dt_s,
             breaching_pair_counts,
             outlier_selection_reason,
+            separated_tag_count,
             pairwise_detail,
         ) = (
             pairwise_temporal_eval(candidate_positions, threshold_m, coherence_window_s)
@@ -403,6 +458,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
         max_pair_dt_s = None
         breaching_pair_counts = {}
         outlier_selection_reason = "none"
+        separated_tag_count = 0
         pairwise_detail = []
 
     # Keep UI-facing diameter, but gate state transitions on coherent evidence.
@@ -558,6 +614,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
                 "coherent_pair_count": coherent_pair_count,
                 "incoherent_pair_count": incoherent_pair_count,
                 "max_pair_dt_s": max_pair_dt_s,
+                "separated_tag_count": separated_tag_count,
                 "stale_snapshot": stale_snapshot,
                 "fresh_count": len(fresh_positions),
                 "recent_count": len(fresh_recent_positions) - len(fresh_positions),
@@ -591,6 +648,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
             "coherent_pair_count": coherent_pair_count,
             "incoherent_pair_count": incoherent_pair_count,
             "max_pair_dt_s": max_pair_dt_s,
+            "separated_tag_count": separated_tag_count,
             "stale_snapshot": stale_snapshot,
             "breach_evidence": breach_evidence,
         },
@@ -650,6 +708,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
             "outlier_tag_id": str(outlier_id) if outlier_id else None,
             "outlier_selection_reason": outlier_selection_reason,
             "breaching_pair_counts": breaching_pair_counts_payload,
+            "separated_tag_count": separated_tag_count,
         }
         if pairwise_detail:
             event_details["pairwise_detail"] = pairwise_detail
@@ -727,6 +786,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
         delivered = _maybe_send_hive_alert(hive, new_state, prev_state, alert_diameter_m,
                                            outlier_id, cfg, db,
                                            breaching_pair_counts=breaching_pair_counts_payload,
+                                           separated_tag_count=separated_tag_count,
                                            force_renotify=not state_changed)
         if delivered:
             live.last_alert_at = now
@@ -752,6 +812,7 @@ def _maybe_send_hive_alert(hive: Hive, new_state: str, prev_state: str,
                             outlier_tag_id,
                             cfg, db: Session,
                             breaching_pair_counts: Optional[Dict[str, int]] = None,
+                            separated_tag_count: Optional[int] = None,
                             force_renotify: bool = False) -> bool:
     """Fire a portal alert + email/SMS when a hive enters or clears a breach.
 
@@ -778,14 +839,18 @@ def _maybe_send_hive_alert(hive: Hive, new_state: str, prev_state: str,
         alert_type = "hive_breach"
         prefix = "🔴 HIVE Breach" if not force_renotify else "🔴 HIVE Still in Breach"
         title      = f"{prefix}: {hive.name}{outlier_suffix}"
-        tags_beyond_threshold = sum(
+        fallback_pair_count = sum(
             1 for _tid, count in (breaching_pair_counts or {}).items() if int(count or 0) > 0
         )
-        if tags_beyond_threshold >= 2 and outlier_label:
-            others = tags_beyond_threshold - 1
+        separated_count = int(separated_tag_count or 0)
+        if separated_count <= 0:
+            separated_count = fallback_pair_count
+
+        if separated_count >= 2 and outlier_label:
+            others = separated_count - 1
             other_word = "other" if others == 1 else "others"
             message = (
-                f"{hive.name} has split - {tags_beyond_threshold} tags have separated from the group "
+                f"{hive.name} has split - {separated_count} tags have separated from the group "
                 f"({outlier_label} and {others} {other_word})."
             )
         elif outlier_label:
@@ -818,6 +883,7 @@ def _maybe_send_hive_alert(hive: Hive, new_state: str, prev_state: str,
         "outlier_tag_id": str(outlier_tag_id) if outlier_tag_id else None,
         "outlier_imei": outlier_imei,
         "outlier_label": outlier_label,
+        "separated_tag_count": separated_tag_count,
     }
 
     try:
