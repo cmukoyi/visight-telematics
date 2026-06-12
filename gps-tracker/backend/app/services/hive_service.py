@@ -876,6 +876,18 @@ def _maybe_send_hive_alert(hive: Hive, new_state: str, prev_state: str,
     else:
         return False  # BREACH_PENDING / RESOLVING don't warrant alerts
 
+    # Get GPS coordinates from outlier tag or first tag in hive for map plotting
+    lat, lng = None, None
+    if outlier_tag_id:
+        outlier = db.query(BLETag).filter(BLETag.id == outlier_tag_id).first()
+        if outlier:
+            lat, lng = outlier.latitude, outlier.longitude
+    if lat is None and hive.tags:
+        # Fallback to first tag in hive
+        first_tag = next((t for t in hive.tags if t.latitude), None)
+        if first_tag:
+            lat, lng = first_tag.latitude, first_tag.longitude
+    
     meta_data = {
         "hive_id": str(hive.id),
         "hive_name": hive.name,
@@ -884,6 +896,8 @@ def _maybe_send_hive_alert(hive: Hive, new_state: str, prev_state: str,
         "outlier_imei": outlier_imei,
         "outlier_label": outlier_label,
         "separated_tag_count": separated_tag_count,
+        "latitude": float(lat) if lat else None,
+        "longitude": float(lng) if lng else None,
     }
 
     try:

@@ -347,7 +347,9 @@ def create_geofence_alert(db: Session, tag: BLETag, poi_name: str, poi_id: str,
     #  EXIT row to confuse downstream consumers).
     canonical_event = "entry" if is_entry else "exit"
     _meta = {"poi_name": poi_name, "poi_id": poi_id, "imei": tag.imei,
-             "event_type": canonical_event}
+             "event_type": canonical_event,
+             "latitude": float(tag.latitude) if tag.latitude else None,
+             "longitude": float(tag.longitude) if tag.longitude else None}
     created = False
     for usergroup_id in group_ids:
         # ── Dedupe: skip if same alert already raised in the last 5 min ──
