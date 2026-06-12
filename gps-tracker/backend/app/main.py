@@ -1582,6 +1582,62 @@ def impersonate_user(
     }
 
 
+@app.post("/api/v1/admin/generate-verification-pin")
+def admin_generate_verification_pin(
+    request: Request,
+    email: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Admin-only: Generate a 6-digit verification PIN for a user without sending email.
+    Used when email service is down or for manual user onboarding.
+    Returns the PIN to the admin who can share it with the user manually.
+    """
+    from app.routes_admin import get_admin_from_request
+    from app.services.email_service import EmailService
+    
+    # Validate caller is an admin
+    _admin = get_admin_from_request(request, db)
+    
+    # Check if user already exists and is registered
+    user = db.query(User).filter(User.email == email).first()
+    if user and user.hashed_password is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered. User should sign in instead."
+        )
+    
+    # Generate 6-digit PIN
+    email_service = EmailService()
+    pin = email_service.generate_pin()
+    expires_at = datetime.utcnow() + timedelta(minutes=30)  # 30 min expiry for manual sharing
+    
+    # Invalidate old PINs for this email
+    db.query(VerificationPIN).filter(
+        VerificationPIN.email == email,
+        VerificationPIN.is_used == False
+    ).update({"is_used": True})
+    
+    # Create PIN record
+    verification = VerificationPIN(
+        user_id=user.id if user else None,
+        email=email,
+        pin=pin,
+        expires_at=expires_at
+    )
+    db.add(verification)
+    db.commit()
+    
+    return {
+        "success": True,
+        "email": email,
+        "pin": pin,
+        "expires_at": expires_at.isoformat(),
+        "expires_in_minutes": 30,
+        "message": "PIN generated successfully. Share this code with the user to complete registration."
+    }
+
+
 @app.get("/api/v1/admin/imei")
 def list_all_imei_details(db: Session = Depends(get_db)):
     """

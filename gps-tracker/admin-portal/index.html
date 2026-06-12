@@ -2228,7 +2228,57 @@
 
                         <div class="card">
                             <div class="card-header">
-                                <h3 class="card-title">📋 Active Flutter Users</h3>
+                                <h3 class="card-title">� Generate Verification PIN</h3>
+                                <p style="color:var(--gray);font-size:14px;margin-top:8px">Create a verification code manually when email service is unavailable</p>
+                            </div>
+                            <div class="card-body" style="padding:24px">
+                                <div style="display:flex;flex-direction:column;gap:16px;max-width:600px">
+                                    <div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:12px 16px;border-radius:4px">
+                                        <p style="font-size:14px;color:#92400e;margin:0">
+                                            <strong>📧 Email Service Down?</strong> Use this tool to manually generate a verification PIN. Share the code with the user so they can complete registration.
+                                        </p>
+                                    </div>
+                                    
+                                    <div>
+                                        <label for="pin-gen-email" style="display:block;font-weight:600;margin-bottom:8px;color:var(--text-dark)">User Email Address</label>
+                                        <input 
+                                            type="email" 
+                                            id="pin-gen-email" 
+                                            placeholder="user@example.com" 
+                                            style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;font-size:14px"
+                                        />
+                                    </div>
+                                    
+                                    <div>
+                                        <button class="btn btn-primary" onclick="generateVerificationPIN()" style="padding:12px 24px">
+                                            <span style="margin-right:8px">🔑</span>
+                                            Generate PIN
+                                        </button>
+                                    </div>
+                                    
+                                    <div id="pin-gen-result" style="display:none">
+                                        <div style="background:var(--bg-light);border:2px solid var(--primary);border-radius:8px;padding:20px">
+                                            <p style="font-weight:600;margin-bottom:12px;color:var(--text-dark)">✅ Verification PIN Generated</p>
+                                            <div style="background:white;border:1px solid var(--border);border-radius:6px;padding:16px;margin-bottom:12px">
+                                                <p style="font-size:12px;color:var(--gray);margin-bottom:4px">Email:</p>
+                                                <p style="font-size:16px;font-weight:600;color:var(--text-dark);margin-bottom:12px" id="pin-gen-result-email"></p>
+                                                <p style="font-size:12px;color:var(--gray);margin-bottom:4px">Verification PIN:</p>
+                                                <p style="font-size:32px;font-weight:700;color:var(--primary);letter-spacing:4px;font-family:monospace;margin-bottom:12px" id="pin-gen-result-pin"></p>
+                                                <p style="font-size:12px;color:var(--gray);margin-bottom:4px">Expires:</p>
+                                                <p style="font-size:14px;color:var(--text-dark)" id="pin-gen-result-expires"></p>
+                                            </div>
+                                            <p style="font-size:14px;color:var(--gray);margin:0">
+                                                📋 Share this PIN with the user. They can use it during registration at the PIN verification step. This code expires in 30 minutes.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">�📋 Active Flutter Users</h3>
                                 <p style="color:var(--gray);font-size:14px;margin-top:8px">View all Flutter mobile app users below in the "End Users" section</p>
                             </div>
                             <div class="card-body" style="padding:24px">
@@ -4498,6 +4548,71 @@
         // Check if popup was blocked
         if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
             alert('Popup blocked! Please allow popups for this site and try again.');
+        }
+    }
+
+    async function generateVerificationPIN() {
+        const emailInput = document.getElementById('pin-gen-email');
+        const email = emailInput.value.trim();
+        const resultDiv = document.getElementById('pin-gen-result');
+        
+        // Validate email
+        if (!email || !email.includes('@')) {
+            alert('Please enter a valid email address');
+            emailInput.focus();
+            return;
+        }
+        
+        try {
+            // Show loading state
+            const btn = event.target;
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span style="margin-right:8px">⏳</span>Generating...';
+            
+            // Hide previous result
+            resultDiv.style.display = 'none';
+            
+            // Call admin API to generate PIN
+            const response = await fetch(`${API_URL}/api/v1/admin/generate-verification-pin?email=${encodeURIComponent(email)}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to generate PIN');
+            }
+            
+            const data = await response.json();
+            
+            // Display result
+            document.getElementById('pin-gen-result-email').textContent = data.email;
+            document.getElementById('pin-gen-result-pin').textContent = data.pin;
+            
+            // Format expiry time
+            const expiresAt = new Date(data.expires_at);
+            const expiresFormatted = expiresAt.toLocaleString();
+            document.getElementById('pin-gen-result-expires').textContent = expiresFormatted;
+            
+            resultDiv.style.display = 'block';
+            
+            // Scroll to result
+            resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            
+            // Restore button
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            
+        } catch (error) {
+            alert(`Error: ${error.message}`);
+            // Restore button
+            const btn = event.target;
+            btn.disabled = false;
+            btn.innerHTML = '<span style="margin-right:8px">🔑</span>Generate PIN';
         }
     }
 
