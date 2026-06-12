@@ -4698,17 +4698,32 @@ window.addEventListener('load', function() {
   // Pre-generate IDs so they're ready immediately
   regenerateId('Q');
   regenerateId('N');
+  
   // Sync theme with parent page (index.html uses 'pp-theme' localStorage key)
-  try {
-    var parentTheme = localStorage.getItem('pp-theme') || 'dark';
-    if (parentTheme === 'dark') {
-      document.body.classList.add('dark');
-      applyThemeIconColor(true);
-    } else {
-      document.body.classList.remove('dark');
-      applyThemeIconColor(false);
+  function applyThemeFromStorage() {
+    try {
+      var parentTheme = localStorage.getItem('pp-theme') || 'dark';
+      if (parentTheme === 'dark') {
+        document.body.classList.add('dark');
+        applyThemeIconColor(true);
+      } else {
+        document.body.classList.remove('dark');
+        applyThemeIconColor(false);
+      }
+    } catch(e){}
+  }
+  
+  // Apply theme on load
+  applyThemeFromStorage();
+  
+  // Listen for theme changes from other tabs/windows (when user toggles in main app)
+  window.addEventListener('storage', function(e) {
+    if (e.key === 'pp-theme') {
+      applyThemeFromStorage();
+      generate(); // Regenerate QR to update corner colors for new theme
     }
-  } catch(e){}
+  });
+  
   generate();
   loadDbHistory();
 });
