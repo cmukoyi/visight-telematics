@@ -2906,12 +2906,56 @@ input.hive-range::-moz-range-track {
                         <i class="fa-solid fa-check-double"></i> Mark All Read
                     </button>
                 </div>
+                
+                <!-- Filters -->
+                <div class="card" style="margin:0 20px 12px;padding:14px;background:var(--bg-2);border:1px solid var(--border);border-radius:8px">
+                    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+                        <div style="flex:0 0 auto">
+                            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Date Range</label>
+                            <select id="rpt-alerts-date-preset" onchange="rptAlertsDatePresetChange()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)">
+                                <option value="today">Today</option>
+                                <option value="last_7_days" selected>Last 7 days</option>
+                                <option value="last_30_days">Last 30 days</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                        <div id="rpt-alerts-start-wrap" style="flex:0 0 auto;display:none">
+                            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Start Date</label>
+                            <input type="date" id="rpt-alerts-start-date" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)">
+                        </div>
+                        <div id="rpt-alerts-end-wrap" style="flex:0 0 auto;display:none">
+                            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">End Date</label>
+                            <input type="date" id="rpt-alerts-end-date" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)">
+                        </div>
+                        <div style="flex:0 0 auto">
+                            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Alert Type</label>
+                            <select id="rpt-alerts-type-filter" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)">
+                                <option value="">All types</option>
+                                <option value="battery_low">Battery Low</option>
+                                <option value="tag_offline">Tag Offline</option>
+                                <option value="geofence_entry">Geofence Entry</option>
+                                <option value="geofence_exit">Geofence Exit</option>
+                                <option value="hive_breach">Hive Breach</option>
+                                <option value="hive_breach_cleared">Hive Cleared</option>
+                                <option value="gdpr_deletion_warning">GDPR Warning</option>
+                            </select>
+                        </div>
+                        <div style="flex:1 1 160px">
+                            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">IMEI</label>
+                            <input type="text" id="rpt-alerts-imei-filter" placeholder="Filter by IMEI" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)">
+                        </div>
+                        <button class="btn btn-primary btn-small" onclick="rptAlertsApplyFilters()" style="margin-bottom:0">
+                            <i class="fa-solid fa-filter"></i> Apply
+                        </button>
+                    </div>
+                </div>
+                
                 <div id="rpt-alerts-summary" class="rpt-summary-bar" style="display:none">
                     <span id="rpt-alerts-count"><strong>—</strong> alerts</span>
                     <span class="rpt-sep">·</span>
                     <span id="rpt-alerts-unread" style="color:var(--primary)"><strong>—</strong> unread</span>
                     <span class="rpt-sep">·</span>
-                    <span style="font-size:11px;color:var(--text-3)">last 7 days</span>
+                    <span id="rpt-alerts-date-range" style="font-size:11px;color:var(--text-3)">last 7 days</span>
                 </div>
                 <div id="rpt-alerts-err" class="alert" style="display:none"><span id="rpt-alerts-err-text"></span></div>
                 <div class="rpt-table-wrap">
@@ -6393,18 +6437,99 @@ function _timeAgo(date) {
 
 // ─── Alerts Inbox tab ─────────────────────────────────────────────────────────
 
+let _alertsFullData = [];  // Unfiltered alerts from backend
+
+function rptAlertsDatePresetChange() {
+    const preset = document.getElementById('rpt-alerts-date-preset').value;
+    const startWrap = document.getElementById('rpt-alerts-start-wrap');
+    const endWrap = document.getElementById('rpt-alerts-end-wrap');
+    if (preset === 'custom') {
+        startWrap.style.display = '';
+        endWrap.style.display = '';
+    } else {
+        startWrap.style.display = 'none';
+        endWrap.style.display = 'none';
+    }
+}
+
+function rptAlertsApplyFilters() {
+    const preset = document.getElementById('rpt-alerts-date-preset').value;
+    const alertType = document.getElementById('rpt-alerts-type-filter').value;
+    const imeiFilter = (document.getElementById('rpt-alerts-imei-filter').value || '').trim().toLowerCase();
+    
+    let startDate, endDate;
+    const now = new Date();
+    
+    // Calculate date range based on preset
+    if (preset === 'today') {
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+    } else if (preset === 'last_7_days') {
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        endDate = now;
+    } else if (preset === 'last_30_days') {
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        endDate = now;
+    } else if (preset === 'custom') {
+        const startVal = document.getElementById('rpt-alerts-start-date').value;
+        const endVal = document.getElementById('rpt-alerts-end-date').value;
+        if (!startVal || !endVal) {
+            alert('Please select both start and end dates for custom range.');
+            return;
+        }
+        startDate = new Date(startVal);
+        endDate = new Date(endVal);
+        endDate.setHours(23, 59, 59);
+    }
+    
+    // Filter the full dataset
+    _alertsData = _alertsFullData.filter(a => {
+        // Date filter
+        const alertDate = new Date(a.created_at);
+        if (alertDate < startDate || alertDate > endDate) return false;
+        
+        // Alert type filter
+        if (alertType && a.alert_type !== alertType) return false;
+        
+        // IMEI filter
+        if (imeiFilter && !(a.tag_imei || '').toLowerCase().includes(imeiFilter)) return false;
+        
+        return true;
+    });
+    
+    // Update date range label
+    const dateRangeEl = document.getElementById('rpt-alerts-date-range');
+    if (dateRangeEl) {
+        if (preset === 'today') {
+            dateRangeEl.textContent = 'today';
+        } else if (preset === 'last_7_days') {
+            dateRangeEl.textContent = 'last 7 days';
+        } else if (preset === 'last_30_days') {
+            dateRangeEl.textContent = 'last 30 days';
+        } else {
+            const fmtStart = startDate.toLocaleDateString();
+            const fmtEnd = endDate.toLocaleDateString();
+            dateRangeEl.textContent = `${fmtStart} - ${fmtEnd}`;
+        }
+    }
+    
+    _bellAlerts = _alertsData;   // keep bell in sync
+    _updateBellBadge();
+    _rptAlertsRender();
+}
+
 async function rptAlertsLoad() {
     const tbody = document.getElementById('rpt-alerts-tbody');
     if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-3)"><i class="fa-solid fa-spinner fa-spin"></i> Loading\u2026</td></tr>';
     const errEl = document.getElementById('rpt-alerts-err');
     if (errEl) errEl.style.display = 'none';
     try {
-        const res = await apiFetch('/api/portal/alerts?days=7');
+        // Load all alerts from last 30 days for filtering
+        const res = await apiFetch('/api/portal/alerts?days=30');
         if (!res.ok) throw new Error(await safeJsonDetail(res, 'Failed to load alerts'));
-        _alertsData = await res.json();
-        _bellAlerts = _alertsData;   // keep bell in sync
-        _updateBellBadge();
-        _rptAlertsRender();
+        _alertsFullData = await res.json();
+        // Apply default filter (last 7 days)
+        rptAlertsApplyFilters();
     } catch (err) {
         if (errEl) { document.getElementById('rpt-alerts-err-text').textContent = err.message; errEl.style.display = 'flex'; }
         if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-3)">${esc(err.message)}</td></tr>`;
