@@ -246,15 +246,31 @@ def _notify_group_by_email(db: Session, usergroup_id: str, alert_type: str,
 
 
 def check_battery_alert(db: Session, tag: BLETag) -> bool:
-    """Generate a battery_low alert if battery < threshold and not raised recently."""
+    """Generate a battery_low alert if battery < threshold and not raised recently.
+    
+    Stops generating new alerts after 3 notifications to prevent endless emails
+    when battery reaches 0% and stays there.
+    """
     if tag.battery_level is None or tag.battery_level > BATTERY_LOW_THRESHOLD:
         return False
     group_ids = _groups_for_tag(db, tag)
     if not group_ids:
         logger.debug("No group found for tag %s — battery alert skipped", tag.imei)
         return False
-    label = _tag_label(tag)
+    
+    # Count total battery_low alerts for this tag across all groups
+    # Stop after 3 notifications to prevent endless email spam at 0%
     tag_id = str(tag.id)
+    total_battery_alerts = db.query(PortalAlert).filter(
+        PortalAlert.tag_id == tag_id,
+        PortalAlert.alert_type == "battery_low"
+    ).count()
+    
+    if total_battery_alerts >= 3:
+        logger.debug("🔋 Battery alert limit reached for tag %s (3 notifications sent) — suppressing further alerts", tag.imei)
+        return False
+    
+    label = _tag_label(tag)
     created = False
     for usergroup_id in group_ids:
         if _recent_alert_exists(db, usergroup_id, tag_id, "battery_low", BATTERY_DEDUPE_HOURS):
@@ -266,7 +282,7 @@ def check_battery_alert(db: Session, tag: BLETag) -> bool:
                      title=_title, message=_msg, meta_data=_meta)
         _notify_group_by_email(db, usergroup_id, "battery_low", _title, _msg, _meta)
         _notify_group_by_sms(db, usergroup_id, "battery_low", _title, _msg)
-        logger.info("🔋 Battery-low alert created for tag %s (%d%%) → group %s", tag.imei, tag.battery_level, usergroup_id)
+        logger.info("🔋 Battery-low alert created for tag %s (%d%%) → group %s (count: %d/3)", tag.imei, tag.battery_level, usergroup_id, total_battery_alerts + 1)
         created = True
     return created
 
