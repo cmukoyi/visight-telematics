@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional
 from uuid import UUID
 from pydantic import BaseModel, EmailStr, field_validator
@@ -875,7 +875,7 @@ def verify_pin(request: VerifyPINRequest, db: Session = Depends(get_db)):
         VerificationPIN.email == request.email,
         VerificationPIN.pin == request.pin,
         VerificationPIN.is_used == False,
-        VerificationPIN.expires_at > datetime.utcnow()
+        VerificationPIN.expires_at > datetime.now(timezone.utc)
     ).first()
     
     if not verification:
@@ -1610,7 +1610,7 @@ def admin_generate_verification_pin(
     # Generate 6-digit PIN
     email_service = EmailService()
     pin = email_service.generate_pin()
-    expires_at = datetime.utcnow() + timedelta(minutes=30)  # 30 min expiry for manual sharing
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)  # 30 min expiry for manual sharing
     
     # Invalidate old PINs for this email
     db.query(VerificationPIN).filter(
@@ -1623,6 +1623,7 @@ def admin_generate_verification_pin(
         user_id=user.id if user else None,
         email=email,
         pin=pin,
+        is_used=False,  # Explicitly set to ensure database default is applied
         expires_at=expires_at
     )
     db.add(verification)
