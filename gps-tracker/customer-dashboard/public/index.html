@@ -429,6 +429,13 @@
                         <i class="fa-solid fa-draw-polygon"></i>
                         <span id="lm-poi-toggle-label">Show Geofences</span>
                     </button>
+                    <!-- Clear alert markers button -->
+                    <button onclick="lmClearAlertMarkers()"
+                            title="Clear all plotted alert markers"
+                            style="position:absolute;top:50px;right:10px;z-index:500;background:var(--bg-2);color:var(--text-1);border:1px solid var(--border);border-radius:6px;padding:6px 12px;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;box-shadow:0 2px 6px rgba(0,0,0,.2)">
+                        <i class="fa-solid fa-eraser"></i>
+                        <span>Clear Markers</span>
+                    </button>
                     <div id="liveMap"></div>
                 </div>
             </div>
@@ -9304,6 +9311,7 @@ let _lmMarkers      = {};        // imei → L.marker
 let _lmSelected     = null;      // currently selected imei
 let _lmCatFilter    = 'all';     // 'all' | category UUID from _categoriesCache
 let _lmStatusFilter = 'all';     // 'all' | 'active' | 'inactive' | 'stock'
+let _lmAlertMarkers = [];        // temporary markers from alert navigation
 
 // Asset tracking (QR/NFC scanned assets)
 let _lmAssetMarkers = {};        // asset_id → L.marker
@@ -9908,7 +9916,7 @@ function lmCenterOnCoords(lat, lng) {
     // Center map on specific coordinates (used for alert navigation)
     if (_liveMap && lat != null && lng != null) {
         _liveMap.flyTo([lat, lng], 16, { duration: 0.8 });
-        // Optionally show a temporary marker
+        // Add a permanent marker for this alert location
         const marker = L.marker([lat, lng], {
             icon: L.divIcon({
                 className: 'temp-alert-marker',
@@ -9917,9 +9925,15 @@ function lmCenterOnCoords(lat, lng) {
                 iconAnchor: [12, 12]
             })
         }).addTo(_liveMap);
-        // Remove marker after 5 seconds
-        setTimeout(() => marker.remove(), 5000);
+        // Store marker so it can be cleared later
+        _lmAlertMarkers.push(marker);
     }
+}
+
+function lmClearAlertMarkers() {
+    // Remove all alert markers from the map
+    _lmAlertMarkers.forEach(marker => marker.remove());
+    _lmAlertMarkers = [];
 }
 
 function _lmSelectTag(imei) {
