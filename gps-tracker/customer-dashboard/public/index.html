@@ -6571,15 +6571,21 @@ function _rptAlertsRender() {
         const dot = isUnread
             ? `<span style="width:8px;height:8px;border-radius:50%;background:var(--primary);display:inline-block;flex-shrink:0"></span>`
             : `<span style="width:8px;height:8px;display:inline-block"></span>`;
+        // Show plot icon for geofence and hive alerts with GPS coordinates
+        const hasGps = a.meta_data?.latitude != null && a.meta_data?.longitude != null;
+        const isPlottable = hasGps && (a.alert_type === 'geofence_exit' || a.alert_type === 'geofence_entry' || a.alert_type === 'hive_breach');
+        const plotBtn = isPlottable
+            ? `<button class="btn-icon" style="margin-right:8px" title="Show on map" onclick="event.stopPropagation();switchTab('livemap');setTimeout(()=>{if(window.lmCenterOnCoords){lmCenterOnCoords(${a.meta_data.latitude},${a.meta_data.longitude})}},600)"><i class="fa-solid fa-location-dot"></i></button>`
+            : '';
         return `<tr class="${isUnread ? 'rpt-row-unread' : ''}" data-alert-id="${esc(a.id)}">
             <td style="padding-left:16px">${dot}</td>
             <td style="cursor:pointer" onclick="rptAlertMarkRead('${esc(a.id)}',this.closest('tr'))">
                 <span style="color:${m.color};white-space:nowrap"><i class="fa-solid ${m.icon}"></i> ${esc(m.label)}</span>
             </td>
             <td style="cursor:pointer" onclick="rptAlertMarkRead('${esc(a.id)}',this.closest('tr'))">${esc(subject)}</td>
-            <td style="cursor:pointer;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="rptAlertMarkRead('${esc(a.id)}',this.closest('tr'))" title="${esc(a.message||'')}">${esc(detail||'\u2014')}</td>
-            <td style="white-space:nowrap;color:var(--text-3);font-size:.82rem;cursor:pointer" onclick="rptAlertMarkRead('${esc(a.id)}',this.closest('tr'))">${esc(time)}</td>
-            <td><button class="btn-icon-danger" title="Dismiss alert" onclick="rptAlertDelete('${esc(a.id)}',this.closest('tr'))"><i class="fa-solid fa-xmark"></i></button></td>
+            <td style="cursor:pointer;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="rptAlertMarkRead('${esc(a.id)}',this.closest('tr'))" title="${esc(a.message||'')}">${esc(detail||'\u2014')}</td>
+            <td style="width:160px;white-space:nowrap;color:var(--text-3);font-size:.82rem;cursor:pointer" onclick="rptAlertMarkRead('${esc(a.id)}',this.closest('tr'))">${esc(time)}</td>
+            <td style="white-space:nowrap">${plotBtn}<button class="btn-icon-danger" title="Dismiss alert" onclick="rptAlertDelete('${esc(a.id)}',this.closest('tr'))"><i class="fa-solid fa-xmark"></i></button></td>
         </tr>`;
     }).join('');
 }
@@ -9895,6 +9901,24 @@ function lmSelectFromList(imei) {
     if (_lmMarkers[imei]) {
         _liveMap.flyTo(_lmMarkers[imei].getLatLng(), 16, { duration: 0.8 });
         _lmMarkers[imei].openPopup();
+    }
+}
+
+function lmCenterOnCoords(lat, lng) {
+    // Center map on specific coordinates (used for alert navigation)
+    if (_liveMap && lat != null && lng != null) {
+        _liveMap.flyTo([lat, lng], 16, { duration: 0.8 });
+        // Optionally show a temporary marker
+        const marker = L.marker([lat, lng], {
+            icon: L.divIcon({
+                className: 'temp-alert-marker',
+                html: '<div style="width:24px;height:24px;border-radius:50%;background:var(--danger);border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3)"></div>',
+                iconSize: [24, 24],
+                iconAnchor: [12, 12]
+            })
+        }).addTo(_liveMap);
+        // Remove marker after 5 seconds
+        setTimeout(() => marker.remove(), 5000);
     }
 }
 
