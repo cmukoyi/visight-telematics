@@ -254,12 +254,6 @@
 <body>
 <div class="topbar">
   <h1>QR Code Generator</h1>
-  <div class="theme-toggle" onclick="toggleTheme()" title="Toggle light / dark mode">
-    <span class="theme-toggle-label" id="theme-label">Light</span>
-    <div class="theme-toggle-track">
-      <div class="theme-toggle-thumb" id="theme-thumb">&#9788;</div>
-    </div>
-  </div>
 </div>
 
 <!-- ── Intro / guidance banner ── -->
@@ -4083,8 +4077,8 @@ function dlPNG() {
     return;
   }
 
-  if (asset) {
-    // Single mode — confirm then download
+  if (asset && asset.typeCode !== 'I') {
+    // Single mode — confirm then download (skip modal for IMEI/MAC)
     openConfirmModal(function() {
       registerAsset(asset.id, asset.typeCode);
       var savedId = asset.id;
@@ -4106,7 +4100,7 @@ function dlPNG() {
       });
     }, asset);
   } else {
-    // Non-registerable content (for example invalid IMEI text) still downloads.
+    // IMEI/MAC or non-registerable content — download directly without modal
     exportClean(function(dataURL) {
       var a = document.createElement('a');
       a.href = dataURL;
@@ -4114,6 +4108,17 @@ function dlPNG() {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      if (asset) {
+        var savedDataURL = dataURL;
+        addHistoryEntry({
+          id: asset.id, typeCode: asset.typeCode, format: 'png', qty: 1, time: nowString(),
+          redownload: function() {
+            var a2 = document.createElement('a');
+            a2.href = savedDataURL; a2.download = slug() + '.png';
+            document.body.appendChild(a2); a2.click(); document.body.removeChild(a2);
+          }
+        });
+      }
     });
   }
 }
@@ -4668,15 +4673,6 @@ function nowString() {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-function toggleTheme() {
-  var isDark = document.body.classList.toggle('dark');
-  document.getElementById('theme-label').textContent = isDark ? 'Dark' : 'Light';
-  document.getElementById('theme-thumb').innerHTML = isDark ? '&#9790;' : '&#9788;';
-  try { localStorage.setItem('qr-theme', isDark ? 'dark' : 'light'); } catch(e){}
-  // Auto-adjust icon colour if it's still the default for the opposite theme
-  applyThemeIconColor(isDark);
-}
-
 function applyThemeIconColor(isDark) {
   // Reset icon colour to black (default) so renderBuiltinIcon
   // can recalculate the right contrast colour against the QR background
@@ -4702,13 +4698,15 @@ window.addEventListener('load', function() {
   // Pre-generate IDs so they're ready immediately
   regenerateId('Q');
   regenerateId('N');
-  // Restore saved theme
+  // Sync theme with parent page (index.html uses 'pp-theme' localStorage key)
   try {
-    if (localStorage.getItem('qr-theme') === 'dark') {
+    var parentTheme = localStorage.getItem('pp-theme') || 'dark';
+    if (parentTheme === 'dark') {
       document.body.classList.add('dark');
-      document.getElementById('theme-label').textContent = 'Dark';
-      document.getElementById('theme-thumb').innerHTML = '&#9790;';
       applyThemeIconColor(true);
+    } else {
+      document.body.classList.remove('dark');
+      applyThemeIconColor(false);
     }
   } catch(e){}
   generate();

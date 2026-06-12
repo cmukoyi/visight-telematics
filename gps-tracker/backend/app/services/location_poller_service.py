@@ -335,10 +335,44 @@ class LocationPollerService:
 
                     updated_count += 1
 
+            # ── Reverse-geocode Series 3 (QR/NFC) tags ─────────────────────
+            # Series 3 tags get GPS from mobile app scans. If they have coordinates
+            # but no location_description, reverse geocode them.
+            for tracker in series3_trackers:
+                if not tracker.latitude or not tracker.longitude:
+                    continue
+                try:
+                    lat = float(tracker.latitude)
+                    lng = float(tracker.longitude)
+                except (ValueError, TypeError):
+                    logger.warning("⚠️  Series 3 IMEI %s has invalid coordinates", tracker.imei)
+                    continue
+                
+                # Skip if already has a location description
+                if tracker.location_description:
+                    continue
+                
+                try:
+                    geo_result = self.geocode_service.reverse_geocode(
+                        device_imei=tracker.imei,
+                        lat=lat,
+                        lng=lng
+                    )
+                    tracker.location_description = geo_result["address"]
+                    updated_count += 1
+                    if geo_result.get("cached"):
+                        logger.debug("📍 Series 3 IMEI %s: cached geocode (moved %.1fm)", 
+                                   tracker.imei, geo_result.get("distance_moved", 0))
+                    else:
+                        logger.info("📍 Series 3 IMEI %s: reverse geocoded to '%s'", 
+                                  tracker.imei, geo_result["address"])
+                except Exception as exc:
+                    logger.warning("⚠️  Series 3 IMEI %s geocode failed: %s", tracker.imei, exc)
+
             # Commit all updates
             db.commit()
             logger.info(f"✅ Updated {updated_count} tracker positions and checked geofences "
-                        f"({len(series2_trackers)} Series 2 / TrackSolid, {len(series1_trackers)} Series 1 / MZone, {len(series3_trackers)} Series 3 / QR-NFC skipped)")
+                        f"({len(series2_trackers)} Series 2 / TrackSolid, {len(series1_trackers)} Series 1 / MZone, {len(series3_trackers)} Series 3 / QR-NFC processed)")
 
             # ── Generate battery-low and offline portal alerts ─────────────
             alert_count = 0

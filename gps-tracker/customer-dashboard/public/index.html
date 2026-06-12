@@ -9753,11 +9753,10 @@ function renderLmCategoryFilters() {
     const bar = document.getElementById('lm-cat-filter');
     if (!bar) return;
     // Keep "All" button active state, reset filter if selected category no longer exists
-    if (_lmCatFilter !== 'all' && _lmCatFilter !== '__qr_nfc__' && !_categoriesCache.find(c => c.id === _lmCatFilter)) {
+    if (_lmCatFilter !== 'all' && !_categoriesCache.find(c => c.id === _lmCatFilter)) {
         _lmCatFilter = 'all';
     }
     bar.innerHTML = `<button class="cat-btn ${_lmCatFilter === 'all' ? 'active' : ''}" onclick="lmFilterCat('all', this)">All</button>` +
-        `<button class="cat-btn ${_lmCatFilter === '__qr_nfc__' ? 'active' : ''}" onclick="lmFilterCat('__qr_nfc__', this)">QR/NFC</button>` +
         _categoriesCache.map(c => {
             const icon  = c.icon  ? `<i class="fa-solid ${esc(c.icon)}"></i> ` : '';
             const color = c.color ? ` style="--cat-accent:${esc(c.color)}"` : '';
@@ -9937,7 +9936,7 @@ function alRenderTable() {
             ? `<span class="battery-wrap ${batCls}"><i class="fa-solid fa-battery-full"></i> <small>${batPct}%</small></span>` : '—';
         const hasGPS = !!(t.latitude && t.longitude);
         const locHtml = hasGPS
-            ? `<span style="color:var(--success);font-size:.78rem"><i class="fa-solid fa-location-dot"></i> ${esc(t.location_description || (parseFloat(t.latitude).toFixed(4) + ', ' + parseFloat(t.longitude).toFixed(4)))}</span>`
+            ? `<span style="color:var(--success);font-size:.78rem"><i class="fa-solid fa-location-dot"></i> ${esc(t.location_description || '—')}</span>`
             : `<span style="color:var(--text-3);font-size:.78rem"><i class="fa-solid fa-location-dot"></i> No GPS</span>`;
         const lastSeen = t.last_seen ? new Date(t.last_seen).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
         const pkgHtml = t.package_id

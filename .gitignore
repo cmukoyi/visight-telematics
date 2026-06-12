@@ -37,9 +37,8 @@ gps-tracker/**/.env
 # Local reference files — not for source control
 dB_schema.md
 
-# Feature dev docs — keep local only to avoid tenant brand drift
-features_dev/*.md
-features_dev/**/*.md
+# Feature dev sandbox/instructions — keep fully local
+features_dev/
 
 # macOS Finder metadata
 .DS_Store
