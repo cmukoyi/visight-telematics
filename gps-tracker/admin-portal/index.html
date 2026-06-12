@@ -896,6 +896,12 @@
                         </button>
                     </li>
                     <li class="sidebar-item">
+                        <button class="sidebar-link" onclick="switchTab('flutter-users')">
+                            <span>📲</span>
+                            <span>Manage Flutter Users</span>
+                        </button>
+                    </li>
+                    <li class="sidebar-item">
                         <button class="sidebar-link" onclick="switchTab('imei')">
                             <span>📱</span>
                             <span>IMEI</span>
@@ -2172,6 +2178,73 @@
                     </div>
                     <!-- END END USERS TAB -->
 
+                    <!-- FLUTTER USERS TAB -->
+                    <div id="flutter-users" class="tab-content">
+                        <div class="page-header">
+                            <h2 class="page-title">Manage Flutter Users</h2>
+                            <p class="page-subtitle">Create and manage Flutter mobile app users with tag assignments</p>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">📲 Create Flutter User</h3>
+                                <p style="color:var(--gray);font-size:14px;margin-top:8px">Create a new user account for the Flutter mobile app by opening the registration flow in a new tab</p>
+                            </div>
+                            <div class="card-body" style="padding:24px">
+                                <div style="display:flex;flex-direction:column;gap:16px;max-width:600px">
+                                    <div>
+                                        <label style="display:block;font-weight:600;margin-bottom:8px;color:var(--text-dark)">Registration Flow</label>
+                                        <p style="color:var(--gray);font-size:14px;line-height:1.6;margin-bottom:16px">
+                                            The "Add Flutter User" button below will open the mobile app registration flow in a new tab. 
+                                            The user will need to:
+                                        </p>
+                                        <ul style="color:var(--gray);font-size:14px;line-height:1.8;margin-left:20px;margin-bottom:16px">
+                                            <li>Enter their email address</li>
+                                            <li><strong>Verify email with 6-digit PIN</strong> (sent via email, or use <code style="background:#f3f4f6;padding:2px 6px;border-radius:3px;font-family:monospace">123456</code> if DEBUG mode enabled)</li>
+                                            <li>Enter name and create password</li>
+                                            <li>Access the mobile app</li>
+                                        </ul>
+                                        <div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:12px 16px;border-radius:4px;margin-bottom:12px">
+                                            <p style="font-size:14px;color:#92400e;margin:0">
+                                                <strong>⚡ Quick Bypass:</strong> If the server has <code>DEBUG=true</code>, the PIN <code>123456</code> will automatically work without email verification.
+                                            </p>
+                                        </div>
+                                        <div style="background:var(--bg-light);border-left:4px solid var(--primary);padding:12px 16px;border-radius:4px;margin-bottom:16px">
+                                            <p style="font-size:14px;color:var(--text-dark);margin:0">
+                                                <strong>💡 Tip:</strong> After the user completes registration, you can assign tags to them from the "End Users" section above.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <button class="btn btn-primary" onclick="openFlutterRegistration()" style="padding:12px 24px">
+                                            <span style="margin-right:8px">📱</span>
+                                            Add Flutter User
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">📋 Active Flutter Users</h3>
+                                <p style="color:var(--gray);font-size:14px;margin-top:8px">View all Flutter mobile app users below in the "End Users" section</p>
+                            </div>
+                            <div class="card-body" style="padding:24px">
+                                <p style="color:var(--gray);font-size:14px;margin-bottom:16px">
+                                    All Flutter users appear in the main <strong>End Users</strong> table above. 
+                                    You can manage their tag assignments, view login status, and edit user details from there.
+                                </p>
+                                <button class="btn btn-secondary" onclick="switchTab('endusers')">
+                                    <span style="margin-right:8px">👥</span>
+                                    Go to End Users
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END FLUTTER USERS TAB -->
+
                     <!-- IMEI TAB -->
                     <div id="imei" class="tab-content">
                         <div class="page-header">
@@ -2383,6 +2456,7 @@
                 'sendgrid': 'SendGrid Email Stats',
                 'email-alert-stats': 'Email Alert Stats',
                 'endusers': 'End Users',
+                'flutter-users': 'Manage Flutter Users',
                 'imei': 'IMEI / Tags'
             };
             document.getElementById('pageTitle').textContent = titles[tabName];
@@ -4410,6 +4484,21 @@
         document.getElementById('sgLimitFill').style.cssText = `height:100%;border-radius:5px;width:${used}%;background:${fillColor};transition:width .4s`;
         document.getElementById('sgLimitText').textContent = `${todaySent} / ${LIMIT} today`;
         document.getElementById('sgLimitCard').style.display = 'block';
+    }
+
+    // ── FLUTTER USERS ──────────────────────────────────────────────────────
+    function openFlutterRegistration() {
+        // Open Flutter app registration flow in new tab
+        // The URL uses the hash router format for Flutter web app
+        const registrationUrl = 'https://pinplot.me/#/welcome';
+        
+        // Open in new tab
+        const newWindow = window.open(registrationUrl, '_blank');
+        
+        // Check if popup was blocked
+        if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+            alert('Popup blocked! Please allow popups for this site and try again.');
+        }
     }
 
     // ── END USERS ──────────────────────────────────────────────────────────
