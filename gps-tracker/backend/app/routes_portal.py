@@ -974,10 +974,13 @@ def _normalise_mac(raw: str) -> str:
 
 @router.get("/ble-tags", response_model=List[BLETagOut])
 def list_customer_ble_tags(request: Request, db: Session = Depends(get_db)):
-    """List all BLE tags registered by this customer's usergroup."""
+    """List all BLE tags registered by this customer's usergroup.
+    
+    Performance: Uses 3 queries total regardless of tag count (not N+1).
+    """
     me = get_portal_user_from_request(request, db)
     
-    # Get all floors in this usergroup to determine which tags belong to them
+    # Get all floors in this usergroup (1 query)
     floor_ids = (
         db.query(Floor.id)
         .join(Building)
@@ -986,38 +989,50 @@ def list_customer_ble_tags(request: Request, db: Session = Depends(get_db)):
     )
     floor_id_set = {str(fid[0]) for fid in floor_ids}
     
-    # Get all BLE tags
-    tags = db.query(BLETag).filter(BLETag.tag_type == "ble").all()
+    if not floor_id_set:
+        return []  # No floors = no tags
     
+    # Get all indoor positions on this customer's floors (1 query)
+    positions = (
+        db.query(TagIndoorPosition)
+        .filter(TagIndoorPosition.floor_id.in_(floor_id_set))
+        .all()
+    )
+    
+    # Build MAC → position lookup
+    pos_map = {pos.tag_id: pos for pos in positions}
+    mac_addresses = list(pos_map.keys())
+    
+    if not mac_addresses:
+        return []  # No positions = no tags to show
+    
+    # Get all BLE tags that have positions on customer's floors (1 query)
+    tags = (
+        db.query(BLETag)
+        .filter(
+            BLETag.tag_type == "ble",
+            BLETag.mac_address.in_(mac_addresses)
+        )
+        .all()
+    )
+    
+    # Build results with position data from in-memory lookup
     results = []
     for tag in tags:
-        # Check if this tag has a position on any of the customer's floors
-        pos = None
-        if tag.mac_address:
-            pos = (
-                db.query(TagIndoorPosition)
-                .filter(
-                    TagIndoorPosition.tag_id == tag.mac_address,
-                    TagIndoorPosition.floor_id.in_(floor_id_set) if floor_id_set else False
-                )
-                .first()
-            )
-        
-        # Only include if position exists on customer's floor OR tag has no position yet (new)
-        if pos or not tag.mac_address:
-            out = BLETagOut(
-                id=tag.id,
-                mac_address=tag.mac_address or "",
-                device_name=tag.device_name,
-                description=tag.description,
-                is_active=tag.is_active,
-                last_seen=tag.last_seen,
-                floor_id=UUID(pos.floor_id) if pos and pos.floor_id else None,
-                zone=pos.zone if pos else None,
-                rssi=pos.rssi if pos else None,
-                indoor_last_seen=pos.last_seen if pos else None,
-            )
-            results.append(out)
+        pos = pos_map.get(tag.mac_address)
+        out = BLETagOut(
+            id=tag.id,
+            mac_address=tag.mac_address or "",
+            device_name=tag.device_name,
+            description=tag.description,
+            is_active=tag.is_active,
+            last_seen=tag.last_seen,
+            floor_id=UUID(pos.floor_id) if pos and pos.floor_id else None,
+            zone=pos.zone if pos else None,
+            rssi=pos.rssi if pos else None,
+            indoor_last_seen=pos.last_seen if pos else None,
+        )
+        results.append(out)
     
     return results
 
