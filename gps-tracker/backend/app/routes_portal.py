@@ -1500,24 +1500,29 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
             ).first()
             if not pkg:
                 raise HTTPException(status_code=404, detail="Package not found or inactive")
-            tag.package_id = str(data.package_id)
-            # Expiry = base_date + validity_days.
-            # base_date = activation_date if it exists, else now().
-            # But if activation_date is old enough that the calculated expiry would
-            # already be in the past, use now() instead so expiry is always future.
-            if tag.activation_date:
-                base = tag.activation_date.replace(tzinfo=None)
-                candidate = base + timedelta(days=pkg.validity_days)
-                if candidate <= datetime.utcnow():
-                    base = datetime.utcnow()
-                tag.expiry_date = base + timedelta(days=pkg.validity_days)
-            else:
-                if (tag.tag_type or "").lower() in ("series3", "series_3"):
-                    # QR/NFC tags should show an expiry immediately after package assignment.
-                    tag.activation_date = datetime.utcnow()
-                    tag.expiry_date = tag.activation_date + timedelta(days=pkg.validity_days)
+            current_pkg_id = str(tag.package_id) if tag.package_id else None
+            new_pkg_id = str(data.package_id)
+            # If package was not changed, keep current expiry/activation untouched.
+            # This avoids clearing expiry on edit-save for newly added Series 2 tags.
+            if current_pkg_id != new_pkg_id:
+                tag.package_id = new_pkg_id
+                # Expiry = base_date + validity_days.
+                # base_date = activation_date if it exists, else now().
+                # But if activation_date is old enough that the calculated expiry would
+                # already be in the past, use now() instead so expiry is always future.
+                if tag.activation_date:
+                    base = tag.activation_date.replace(tzinfo=None)
+                    candidate = base + timedelta(days=pkg.validity_days)
+                    if candidate <= datetime.utcnow():
+                        base = datetime.utcnow()
+                    tag.expiry_date = base + timedelta(days=pkg.validity_days)
                 else:
-                    tag.expiry_date = None  # pending first GPS fix
+                    if (tag.tag_type or "").lower() in ("series3", "series_3"):
+                        # QR/NFC tags should show an expiry immediately after package assignment.
+                        tag.activation_date = datetime.utcnow()
+                        tag.expiry_date = tag.activation_date + timedelta(days=pkg.validity_days)
+                    else:
+                        tag.expiry_date = None  # pending first GPS fix
 
     db.commit()
     db.refresh(tag)
