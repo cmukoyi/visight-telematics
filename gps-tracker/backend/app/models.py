@@ -95,7 +95,7 @@ class BLETag(Base):
     
     id = get_uuid_column()
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True)  # Nullable for series_3 QR assets
-    imei = Column(String(50), unique=True, nullable=False, index=True)
+    imei = Column(String(50), unique=True, nullable=True, index=True)  # NULL for tag_type='ble'; NOT NULL for GPS types (enforced by DB check constraint)
     device_name = Column(String(100))
     device_model = Column(String(100))
     description = Column(String(255))  # Vehicle description from MZone API

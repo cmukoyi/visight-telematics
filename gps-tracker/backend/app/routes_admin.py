@@ -30,6 +30,7 @@ from app.models import (
     Room,
     BLETag,
     PortalAlert,
+    TagIndoorPosition,
 )
 from app.admin_auth import (
     hash_password, verify_password, create_admin_access_token,
@@ -2731,3 +2732,267 @@ def get_sendgrid_stats(
                             detail=f"SendGrid error: {exc.response.text}")
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Failed to reach SendGrid: {exc}")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BLE Tag Registration & Discovery
+#
+# Manages pure-BLE tags identified by mac_address (tag_type='ble').
+# These are separate from GPS trackers (tracksolid / scope / series_3) which
+# carry an IMEI.  BLE tags are registered by MAC address and then tracked
+# indoors via the Pareto Anywhere → pareto_bridge pipeline.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class BLETagCreate(BaseModel):
+    mac_address: str                      # e.g. "27:13:C8:6C:41:15" or "2713c86c4115"
+    device_name: Optional[str] = None
+    description: Optional[str] = None
+    usergroup_id: Optional[UUID] = None   # assign to a tenant; defaults to first active group
+    is_active: bool = True
+
+
+class BLETagUpdate(BaseModel):
+    device_name: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class BLETagOut(BaseModel):
+    id: UUID
+    mac_address: str
+    device_name: Optional[str]
+    description: Optional[str]
+    is_active: bool
+    last_seen: Optional[datetime]
+    # current indoor position (if known)
+    floor_id: Optional[UUID] = None
+    zone: Optional[str] = None
+    rssi: Optional[int] = None
+    indoor_last_seen: Optional[datetime] = None
+    class Config: from_attributes = True
+
+
+class BLETagDiscovered(BaseModel):
+    """An unregistered MAC address recently seen by Pareto."""
+    mac_address: str
+    rssi: Optional[int]
+    zone: Optional[str]
+    floor_id: Optional[UUID]
+    last_seen: Optional[datetime]
+
+
+def _normalise_mac(raw: str) -> str:
+    """Normalise a MAC to 12-char lowercase hex with no separators."""
+    return raw.lower().replace(":", "").replace("-", "").replace(".", "").strip()
+
+
+@router.get("/ble-tags", response_model=List[BLETagOut])
+def list_ble_tags(request: Request, db: Session = Depends(get_db)):
+    """List all registered BLE-type tags with their latest indoor position."""
+    get_admin_from_request(request, db)
+    tags = (
+        db.query(BLETag)
+        .filter(BLETag.tag_type == "ble")
+        .order_by(BLETag.added_at.desc())
+        .all()
+    )
+    results = []
+    for tag in tags:
+        pos = (
+            db.query(TagIndoorPosition)
+            .filter(TagIndoorPosition.tag_id == tag.mac_address)
+            .first()
+            if tag.mac_address else None
+        )
+        out = BLETagOut(
+            id=tag.id,
+            mac_address=tag.mac_address or "",
+            device_name=tag.device_name,
+            description=tag.description,
+            is_active=tag.is_active,
+            last_seen=tag.last_seen,
+            floor_id=pos.floor_id if pos else None,
+            zone=pos.zone if pos else None,
+            rssi=pos.rssi if pos else None,
+            indoor_last_seen=pos.last_seen if pos else None,
+        )
+        results.append(out)
+    return results
+
+
+@router.post("/ble-tags", response_model=BLETagOut, status_code=201)
+def register_ble_tag(data: BLETagCreate, request: Request, db: Session = Depends(get_db)):
+    """Register a new BLE tag by MAC address."""
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=403, detail="Requires manager role")
+
+    mac = _normalise_mac(data.mac_address)
+    if not mac or len(mac) != 12:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid MAC address '{data.mac_address}'. "
+                   "Expected 12 hex characters e.g. 2713c86c4115 or 27:13:C8:6C:41:15"
+        )
+
+    # Duplicate check
+    existing = db.query(BLETag).filter(BLETag.mac_address == mac).first()
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A BLE tag with MAC {mac} already exists (id={existing.id})"
+        )
+
+    tag = BLETag(
+        imei=None,           # migration 048 makes imei nullable for tag_type='ble'
+        mac_address=mac,
+        tag_type="ble",
+        device_name=data.device_name,
+        description=data.description,
+        is_active=data.is_active,
+    )
+    db.add(tag)
+    db.commit()
+    db.refresh(tag)
+    return BLETagOut(
+        id=tag.id,
+        mac_address=tag.mac_address,
+        device_name=tag.device_name,
+        description=tag.description,
+        is_active=tag.is_active,
+        last_seen=tag.last_seen,
+    )
+
+
+@router.get("/ble-tags/{tag_id}", response_model=BLETagOut)
+def get_ble_tag(tag_id: str, request: Request, db: Session = Depends(get_db)):
+    """Get a single registered BLE tag by its UUID."""
+    get_admin_from_request(request, db)
+    tag = db.query(BLETag).filter(BLETag.id == tag_id, BLETag.tag_type == "ble").first()
+    if not tag:
+        raise HTTPException(status_code=404, detail="BLE tag not found")
+    pos = (
+        db.query(TagIndoorPosition)
+        .filter(TagIndoorPosition.tag_id == tag.mac_address)
+        .first()
+        if tag.mac_address else None
+    )
+    return BLETagOut(
+        id=tag.id,
+        mac_address=tag.mac_address or "",
+        device_name=tag.device_name,
+        description=tag.description,
+        is_active=tag.is_active,
+        last_seen=tag.last_seen,
+        floor_id=pos.floor_id if pos else None,
+        zone=pos.zone if pos else None,
+        rssi=pos.rssi if pos else None,
+        indoor_last_seen=pos.last_seen if pos else None,
+    )
+
+
+@router.put("/ble-tags/{tag_id}", response_model=BLETagOut)
+def update_ble_tag(tag_id: str, data: BLETagUpdate,
+                   request: Request, db: Session = Depends(get_db)):
+    """Update device_name, description or is_active for a BLE tag."""
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=403, detail="Requires manager role")
+    tag = db.query(BLETag).filter(BLETag.id == tag_id, BLETag.tag_type == "ble").first()
+    if not tag:
+        raise HTTPException(status_code=404, detail="BLE tag not found")
+    if data.device_name is not None: tag.device_name = data.device_name
+    if data.description  is not None: tag.description  = data.description
+    if data.is_active    is not None: tag.is_active    = data.is_active
+    db.commit()
+    db.refresh(tag)
+    pos = (
+        db.query(TagIndoorPosition)
+        .filter(TagIndoorPosition.tag_id == tag.mac_address)
+        .first()
+        if tag.mac_address else None
+    )
+    return BLETagOut(
+        id=tag.id,
+        mac_address=tag.mac_address or "",
+        device_name=tag.device_name,
+        description=tag.description,
+        is_active=tag.is_active,
+        last_seen=tag.last_seen,
+        floor_id=pos.floor_id if pos else None,
+        zone=pos.zone if pos else None,
+        rssi=pos.rssi if pos else None,
+        indoor_last_seen=pos.last_seen if pos else None,
+    )
+
+
+@router.delete("/ble-tags/{tag_id}")
+def delete_ble_tag(tag_id: str, request: Request, db: Session = Depends(get_db)):
+    """Permanently remove a BLE tag registration."""
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=403, detail="Requires manager role")
+    tag = db.query(BLETag).filter(BLETag.id == tag_id, BLETag.tag_type == "ble").first()
+    if not tag:
+        raise HTTPException(status_code=404, detail="BLE tag not found")
+    # Remove associated indoor position so stale data doesn't linger
+    if tag.mac_address:
+        db.query(TagIndoorPosition).filter(
+            TagIndoorPosition.tag_id == tag.mac_address
+        ).delete()
+    db.delete(tag)
+    db.commit()
+    return {"detail": "BLE tag deleted"}
+
+
+@router.get("/ble-tags/discovered", response_model=List[BLETagDiscovered])
+def discovered_ble_tags(
+    minutes: int = Query(10, ge=1, le=60, description="How far back (minutes) to look"),
+    request: Request = None,
+    db: Session = Depends(get_db),
+):
+    """Return MAC addresses recently seen by indoor gateways that are NOT yet registered.
+
+    Pareto Anywhere forwards every raddec it hears to the backend.  The
+    pareto_bridge service rejects unregistered MACs (whitelist filter) but
+    TagIndoorPosition is only written for registered tags.  Instead we
+    query the raw recent sightings from a separate lightweight table — but
+    since we don't have a raw-sightings table yet we fall back to querying
+    TagIndoorPosition rows whose tag_id is NOT in ble_tags.mac_address.
+
+    Note: after migration 048 the pareto_bridge can be relaxed to also
+    write unregistered MACs into a `ble_raw_sightings` staging table (future
+    work).  For now this endpoint returns any position rows that survived
+    the whitelist (i.e. recently registered but without device metadata).
+    """
+    get_admin_from_request(request, db)
+
+    cutoff = datetime.utcnow() - timedelta(minutes=minutes)
+
+    # All MAC addresses that ARE registered
+    registered_macs = {
+        row[0]
+        for row in db.query(BLETag.mac_address)
+        .filter(BLETag.tag_type == "ble", BLETag.mac_address.isnot(None))
+        .all()
+    }
+
+    # Recent indoor positions whose tag_id is not in registered_macs
+    recent_positions = (
+        db.query(TagIndoorPosition)
+        .filter(TagIndoorPosition.last_seen >= cutoff)
+        .all()
+    )
+
+    discovered = [
+        BLETagDiscovered(
+            mac_address=pos.tag_id,
+            rssi=pos.rssi,
+            zone=pos.zone,
+            floor_id=pos.floor_id,
+            last_seen=pos.last_seen,
+        )
+        for pos in recent_positions
+        if pos.tag_id not in registered_macs
+    ]
+    return discovered

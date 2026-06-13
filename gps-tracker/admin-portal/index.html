@@ -866,6 +866,12 @@
                         </button>
                     </li>
                     <li class="sidebar-item">
+                        <button class="sidebar-link" onclick="switchTab('ble-tags')">
+                            <span>📡</span>
+                            <span>BLE Tags</span>
+                        </button>
+                    </li>
+                    <li class="sidebar-item">
                         <button class="sidebar-link" onclick="switchTab('health')">
                             <span>🩺</span>
                             <span>Health</span>
@@ -1790,6 +1796,98 @@
                     </div>
                     <!-- END BUILDINGS TAB -->
 
+                    <!-- BLE TAGS TAB -->
+                    <div id="ble-tags" class="tab-content">
+                        <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
+                            <div>
+                                <h2 class="page-title">BLE Tags</h2>
+                                <p class="page-subtitle">Register and manage indoor BLE beacons tracked by Pareto Anywhere gateways.</p>
+                            </div>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                                <button class="btn btn-secondary" onclick="loadDiscoveredBLETags()" title="Show recently seen unregistered MACs">
+                                    🔍 Discover
+                                </button>
+                                <button class="btn btn-primary" onclick="openRegisterBLETagModal()">
+                                    + Register Tag
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Discovery panel (hidden until Discover is clicked) -->
+                        <div id="bleDiscoverPanel" style="display:none;margin-bottom:20px">
+                            <div class="card" style="padding:16px">
+                                <h3 style="font-size:15px;margin-bottom:10px">Recently Seen (unregistered)</h3>
+                                <p style="font-size:13px;color:var(--gray);margin-bottom:12px">
+                                    MACs seen by your indoor gateways in the last <strong>10 minutes</strong> that are not yet registered.
+                                    Click <em>Register</em> to add one.
+                                </p>
+                                <div id="bleDiscoverTableWrap">
+                                    <table class="data-table">
+                                        <thead><tr>
+                                            <th>MAC Address</th>
+                                            <th>Zone</th>
+                                            <th>RSSI (dBm)</th>
+                                            <th>Last Seen</th>
+                                            <th>Action</th>
+                                        </tr></thead>
+                                        <tbody id="bleDiscoverBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Registered tags table -->
+                        <div class="card" style="padding:0">
+                            <div id="bleTagTableWrap" class="table-wrapper">
+                                <table class="data-table">
+                                    <thead><tr>
+                                        <th>MAC Address</th>
+                                        <th>Name</th>
+                                        <th>Description</th>
+                                        <th>Status</th>
+                                        <th>Zone</th>
+                                        <th>RSSI</th>
+                                        <th>Last Seen (indoor)</th>
+                                        <th>Actions</th>
+                                    </tr></thead>
+                                    <tbody id="bleTagTableBody">
+                                        <tr><td colspan="8" style="text-align:center;color:var(--gray);padding:24px">Loading…</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Register / Edit modal -->
+                        <div id="bleTagModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+                            <div class="card" style="width:420px;max-width:95vw;padding:28px;position:relative">
+                                <button onclick="closeBLETagModal()" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--gray)">×</button>
+                                <h3 id="bleTagModalTitle" style="margin-bottom:20px">Register BLE Tag</h3>
+
+                                <label class="form-label">MAC Address *</label>
+                                <input id="bleTagMac" class="form-input" placeholder="e.g. 27:13:C8:6C:41:15 or 2713c86c4115" />
+
+                                <label class="form-label" style="margin-top:12px">Device Name</label>
+                                <input id="bleTagName" class="form-input" placeholder="e.g. Badge-001" />
+
+                                <label class="form-label" style="margin-top:12px">Description</label>
+                                <input id="bleTagDesc" class="form-input" placeholder="e.g. Staff badge – floor 2" />
+
+                                <div style="display:flex;align-items:center;gap:8px;margin-top:14px">
+                                    <input type="checkbox" id="bleTagActive" checked style="width:16px;height:16px">
+                                    <label for="bleTagActive" style="margin:0;cursor:pointer">Active</label>
+                                </div>
+
+                                <div id="bleTagModalError" style="display:none;color:var(--danger);font-size:13px;margin-top:10px"></div>
+
+                                <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">
+                                    <button class="btn btn-secondary" onclick="closeBLETagModal()">Cancel</button>
+                                    <button id="bleTagModalSaveBtn" class="btn btn-primary" onclick="saveBLETag()">Save</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END BLE TAGS TAB -->
+
                     <!-- HEALTH TAB -->
                     <div id="health" class="tab-content">
                         <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
@@ -2545,6 +2643,7 @@
                 'usergroups': 'User Groups',
                 'packages': 'Tag Packages',
                 'buildings': 'Buildings & Floor Plans',
+                'ble-tags': 'BLE Tag Registration',
                 'health': 'System Health',
                 'critical-alerts': 'Critical Service Alerts',
                 'sendgrid': 'SendGrid Email Stats',
@@ -2564,12 +2663,166 @@
             if (tabName === 'usergroups') loadUsergroups();
             if (tabName === 'packages') loadPackages();
             if (tabName === 'buildings') { loadBuildings(); }
+            if (tabName === 'ble-tags') { loadBLETags(); }
             if (tabName === 'health') { healthRefresh(); }
             if (tabName === 'critical-alerts') { loadCriticalAlerts(); }
             if (tabName === 'sendgrid') { loadSendgridStats(); }
             if (tabName === 'email-alert-stats') { loadEmailAlertStats(); }
             if (tabName === 'endusers') { loadEndUsers(); }
             if (tabName === 'imei') { loadIMEI(); }
+        }
+
+        // ── BLE TAGS ─────────────────────────────────────────────────────────
+        let _bleTagEditId = null;
+
+        function _bleApiFetch(path, opts) {
+            opts = opts || {};
+            opts.headers = Object.assign({ 'Authorization': 'Bearer ' + authToken }, opts.headers || {});
+            return fetch(API_URL + path, opts);
+        }
+
+        async function loadBLETags() {
+            const tbody = document.getElementById('bleTagTableBody');
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--gray);padding:24px">Loading…</td></tr>';
+            try {
+                const r = await _bleApiFetch('/api/admin/ble-tags');
+                if (!r.ok) throw new Error(await r.text());
+                const tags = await r.json();
+                if (!tags.length) {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--gray);padding:24px">No BLE tags registered yet. Click <strong>+ Register Tag</strong> or <strong>🔍 Discover</strong> to get started.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = tags.map(t => `
+                    <tr>
+                        <td><code>${_esc(t.mac_address)}</code></td>
+                        <td>${_esc(t.device_name || '—')}</td>
+                        <td>${_esc(t.description || '—')}</td>
+                        <td><span style="color:${t.is_active ? 'var(--secondary)' : 'var(--danger)'}">${t.is_active ? '● Active' : '● Inactive'}</span></td>
+                        <td>${_esc(t.zone || '—')}</td>
+                        <td>${t.rssi != null ? t.rssi + ' dBm' : '—'}</td>
+                        <td>${t.indoor_last_seen ? _fmtDate(t.indoor_last_seen) : '—'}</td>
+                        <td style="white-space:nowrap">
+                            <button class="btn btn-secondary btn-small" onclick="editBLETag('${_esc(t.id)}','${_esc(t.mac_address)}','${_esc(t.device_name||'')}','${_esc(t.description||'')}',${t.is_active})">Edit</button>
+                            <button class="btn btn-danger btn-small" onclick="deleteBLETag('${_esc(t.id)}','${_esc(t.mac_address)}')">Delete</button>
+                        </td>
+                    </tr>`)
+                    .join('');
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--danger)">${_esc(e.message)}</td></tr>`;
+            }
+        }
+
+        async function loadDiscoveredBLETags() {
+            const panel = document.getElementById('bleDiscoverPanel');
+            const tbody = document.getElementById('bleDiscoverBody');
+            panel.style.display = 'block';
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--gray);padding:16px">Scanning last 10 minutes…</td></tr>';
+            try {
+                const r = await _bleApiFetch('/api/admin/ble-tags/discovered?minutes=10');
+                if (!r.ok) throw new Error(await r.text());
+                const items = await r.json();
+                if (!items.length) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--gray);padding:16px">No unregistered BLE tags seen in the last 10 minutes.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = items.map(d => `
+                    <tr>
+                        <td><code>${_esc(d.mac_address)}</code></td>
+                        <td>${_esc(d.zone || '—')}</td>
+                        <td>${d.rssi != null ? d.rssi + ' dBm' : '—'}</td>
+                        <td>${d.last_seen ? _fmtDate(d.last_seen) : '—'}</td>
+                        <td><button class="btn btn-primary btn-small" onclick="prefillRegisterBLETag('${_esc(d.mac_address)}')">Register</button></td>
+                    </tr>`).join('');
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--danger)">${_esc(e.message)}</td></tr>`;
+            }
+        }
+
+        function openRegisterBLETagModal() {
+            _bleTagEditId = null;
+            document.getElementById('bleTagModalTitle').textContent = 'Register BLE Tag';
+            document.getElementById('bleTagMac').value = '';
+            document.getElementById('bleTagMac').disabled = false;
+            document.getElementById('bleTagName').value = '';
+            document.getElementById('bleTagDesc').value = '';
+            document.getElementById('bleTagActive').checked = true;
+            document.getElementById('bleTagModalError').style.display = 'none';
+            const m = document.getElementById('bleTagModal');
+            m.style.display = 'flex';
+        }
+
+        function prefillRegisterBLETag(mac) {
+            openRegisterBLETagModal();
+            document.getElementById('bleTagMac').value = mac;
+        }
+
+        function editBLETag(id, mac, name, desc, active) {
+            _bleTagEditId = id;
+            document.getElementById('bleTagModalTitle').textContent = 'Edit BLE Tag';
+            document.getElementById('bleTagMac').value = mac;
+            document.getElementById('bleTagMac').disabled = true;
+            document.getElementById('bleTagName').value = name;
+            document.getElementById('bleTagDesc').value = desc;
+            document.getElementById('bleTagActive').checked = active;
+            document.getElementById('bleTagModalError').style.display = 'none';
+            document.getElementById('bleTagModal').style.display = 'flex';
+        }
+
+        function closeBLETagModal() {
+            document.getElementById('bleTagModal').style.display = 'none';
+            _bleTagEditId = null;
+        }
+
+        async function saveBLETag() {
+            const btn = document.getElementById('bleTagModalSaveBtn');
+            const errEl = document.getElementById('bleTagModalError');
+            errEl.style.display = 'none';
+            btn.disabled = true;
+            btn.textContent = 'Saving…';
+            try {
+                const mac = document.getElementById('bleTagMac').value.trim();
+                const name = document.getElementById('bleTagName').value.trim();
+                const desc = document.getElementById('bleTagDesc').value.trim();
+                const active = document.getElementById('bleTagActive').checked;
+
+                let r;
+                if (_bleTagEditId) {
+                    r = await _bleApiFetch(`/api/admin/ble-tags/${_bleTagEditId}`, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({device_name: name || null, description: desc || null, is_active: active})
+                    });
+                } else {
+                    r = await _bleApiFetch('/api/admin/ble-tags', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({mac_address: mac, device_name: name || null, description: desc || null, is_active: active})
+                    });
+                }
+                if (!r.ok) {
+                    const err = await r.json().catch(() => ({detail: 'Unknown error'}));
+                    throw new Error(err.detail || JSON.stringify(err));
+                }
+                closeBLETagModal();
+                loadBLETags();
+            } catch (e) {
+                errEl.textContent = e.message;
+                errEl.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Save';
+            }
+        }
+
+        async function deleteBLETag(id, mac) {
+            if (!confirm(`Delete BLE tag ${mac}?\nThis will also remove its indoor position.`)) return;
+            try {
+                const r = await _bleApiFetch(`/api/admin/ble-tags/${id}`, { method: 'DELETE' });
+                if (!r.ok) throw new Error((await r.json()).detail || 'Delete failed');
+                loadBLETags();
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
         }
 
         // CRITICAL SERVICE ALERTS
