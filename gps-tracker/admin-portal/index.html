@@ -2145,6 +2145,7 @@
                         </div>
 
                         <div class="card">
+                            <div id="endUsersBanner" class="alert" style="display:none;margin-bottom:16px"><span id="endUsersBannerText"></span></div>
                             <div class="card-header">
                                 <h3 class="card-title">📋 User Directory</h3>
                                 <div style="display:flex;gap:8px">
@@ -2207,16 +2208,15 @@
                                 <div class="form-group">
                                     <label class="form-label">Assign User Group <span style="font-weight:normal;color:var(--text-secondary)">(optional)</span></label>
                                     <select id="euUsergroup" class="form-input">
-                                        <option value="">No change</option>
+                                        <option value="__keep__">Keep current group</option>
                                     </select>
-                                    <p style="font-size:12px;color:var(--text-secondary);margin-top:6px">Choose a group only if you want to link this user to a customer tenant.</p>
+                                    <p id="euUsergroupHelp" style="font-size:12px;color:var(--text-secondary);margin-top:6px">Choose a group only if you want to link this user to a customer tenant.</p>
                                 </div>
                                 <div class="form-group">
-                                    <label class="form-label">Assign Unassigned IMEI <span style="font-weight:normal;color:var(--text-secondary)">(optional)</span></label>
-                                    <select id="euTag" class="form-input">
-                                        <option value="">No IMEI assignment</option>
+                                    <label class="form-label">Assign Unassigned IMEIs <span style="font-weight:normal;color:var(--text-secondary)">(optional)</span></label>
+                                    <select id="euTag" class="form-input" multiple size="8">
                                     </select>
-                                    <p style="font-size:12px;color:var(--text-secondary);margin-top:6px">Only IMEIs with no owner are listed here.</p>
+                                    <p style="font-size:12px;color:var(--text-secondary);margin-top:6px">Only IMEIs with no owner are listed here. Hold Command or Ctrl to select multiple.</p>
                                 </div>
                                 <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:8px">
                                     <button type="button" class="btn btn-secondary" onclick="closeModal('editEndUserModal')">Cancel</button>
@@ -4776,8 +4776,8 @@
         document.getElementById('euFirstName').value = '';
         document.getElementById('euLastName').value = '';
         document.getElementById('euPhone').value = '';
-        document.getElementById('euUsergroup').innerHTML = '<option value="">Loading groups…</option>';
-        document.getElementById('euTag').innerHTML = '<option value="">Loading IMEIs…</option>';
+        document.getElementById('euUsergroup').innerHTML = '<option value="__keep__">Loading groups…</option>';
+        document.getElementById('euTag').innerHTML = '';
         openModal('editEndUserModal');
 
         try {
@@ -4793,14 +4793,20 @@
             document.getElementById('euLastName').value = data.user.last_name || '';
             document.getElementById('euPhone').value = data.user.phone || '';
 
-            const groupOptions = ['<option value="">No change</option>'];
+            const currentGroupName = data.user.selected_usergroup_name || 'No group assigned';
+            const groupOptions = [`<option value="__keep__">Keep current: ${escH(currentGroupName)}</option>`];
+            if (data.user.selected_usergroup_id && data.user.can_clear_usergroup) {
+                groupOptions.push('<option value="__clear__">Clear current group</option>');
+            }
             (data.usergroups || []).forEach(group => {
-                const selected = data.user.selected_usergroup_id === group.id ? ' selected' : '';
-                groupOptions.push(`<option value="${escH(group.id)}"${selected}>${escH(group.name)}</option>`);
+                groupOptions.push(`<option value="${escH(group.id)}">${escH(group.name)}</option>`);
             });
             document.getElementById('euUsergroup').innerHTML = groupOptions.join('');
+            document.getElementById('euUsergroupHelp').textContent = data.user.selected_usergroup_id && !data.user.can_clear_usergroup
+                ? 'This user has an active portal account, so the group can be changed but not cleared.'
+                : 'Choose a group only if you want to link this user to a customer tenant.';
 
-            const tagOptions = ['<option value="">No IMEI assignment</option>'];
+            const tagOptions = [];
             (data.unassigned_tags || []).forEach(tag => {
                 tagOptions.push(`<option value="${escH(tag.id)}">${escH(tag.imei)}${tag.label && tag.label !== tag.imei ? ' - ' + escH(tag.label) : ''}</option>`);
             });
@@ -4818,12 +4824,17 @@
     async function submitEndUserEdit(event) {
         event.preventDefault();
         const submitBtn = document.getElementById('euSubmitBtn');
+        const groupValue = document.getElementById('euUsergroup').value;
+        const selectedTagIds = Array.from(document.getElementById('euTag').selectedOptions)
+            .map(option => option.value)
+            .filter(Boolean);
         const payload = {
             first_name: document.getElementById('euFirstName').value.trim(),
             last_name: document.getElementById('euLastName').value.trim(),
             phone: document.getElementById('euPhone').value.trim(),
-            usergroup_id: document.getElementById('euUsergroup').value || null,
-            tag_id: document.getElementById('euTag').value || null,
+            usergroup_id: groupValue && !groupValue.startsWith('__') ? groupValue : null,
+            clear_usergroup: groupValue === '__clear__',
+            tag_ids: selectedTagIds,
         };
 
         submitBtn.disabled = true;
@@ -4846,6 +4857,7 @@
 
             closeModal('editEndUserModal');
             await loadEndUsers();
+            showEndUsersBanner(`Saved changes: ${(data.changes || []).join('; ')}`, 'success');
         } catch (err) {
             document.getElementById('euAlertText').textContent = err.message;
             document.getElementById('euAlert').className = 'alert alert-error';
@@ -4854,6 +4866,17 @@
             submitBtn.disabled = false;
             submitBtn.textContent = 'Save Changes';
         }
+    }
+
+    function showEndUsersBanner(message, type) {
+        const banner = document.getElementById('endUsersBanner');
+        const text = document.getElementById('endUsersBannerText');
+        text.textContent = message;
+        banner.className = `alert alert-${type}`;
+        banner.style.display = 'flex';
+        setTimeout(() => {
+            banner.style.display = 'none';
+        }, 5000);
     }
 
     function toggleUserTags(userId) {

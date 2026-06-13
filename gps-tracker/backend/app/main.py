@@ -60,7 +60,8 @@ class EndUserAdminUpdateRequest(BaseModel):
     last_name: Optional[str] = None
     phone: Optional[str] = None
     usergroup_id: Optional[str] = None
-    tag_id: Optional[str] = None
+    clear_usergroup: bool = False
+    tag_ids: Optional[List[str]] = None
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
@@ -1556,6 +1557,8 @@ def get_end_user_editor_data(
             "last_name": user.last_name,
             "phone": user.phone,
             "selected_usergroup_id": str(portal_user.usergroup_id) if portal_user and portal_user.usergroup_id else None,
+            "selected_usergroup_name": portal_user.usergroup.name if portal_user and portal_user.usergroup else None,
+            "can_clear_usergroup": bool(portal_user and not portal_user.is_active and not portal_user.is_group_admin),
         },
         "usergroups": [
             {"id": str(group.id), "name": group.name}
@@ -1588,11 +1591,32 @@ def update_end_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    prior_first_name = user.first_name
+    prior_last_name = user.last_name
+    prior_phone = user.phone
+
     user.first_name = (payload.first_name or "").strip() or None
     user.last_name = (payload.last_name or "").strip() or None
     user.phone = (payload.phone or "").strip() or None
 
     changes = []
+
+    if prior_first_name != user.first_name or prior_last_name != user.last_name or prior_phone != user.phone:
+        changes.append("updated user details")
+
+    portal_user = db.query(PortalUser).filter(PortalUser.email == user.email).order_by(PortalUser.created_at.desc()).first()
+
+    if payload.clear_usergroup:
+        if portal_user:
+            if portal_user.is_active or portal_user.is_group_admin:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cannot clear group for an active portal account. Change the group instead."
+                )
+            old_group_name = portal_user.usergroup.name if portal_user.usergroup else "current group"
+            db.delete(portal_user)
+            portal_user = None
+            changes.append(f"cleared group '{old_group_name}'")
 
     if payload.usergroup_id:
         group = db.query(UserGroup).filter(
@@ -1602,13 +1626,19 @@ def update_end_user(
         if not group:
             raise HTTPException(status_code=404, detail="Selected user group not found")
 
-        portal_user = db.query(PortalUser).filter(PortalUser.email == user.email).order_by(PortalUser.created_at.desc()).first()
         if portal_user:
+            previous_group_name = portal_user.usergroup.name if portal_user.usergroup else None
             portal_user.usergroup_id = group.id
             if not portal_user.first_name:
                 portal_user.first_name = user.first_name
             if not portal_user.last_name:
                 portal_user.last_name = user.last_name
+            if previous_group_name and previous_group_name != group.name:
+                changes.append(f"changed group to '{group.name}'")
+            elif previous_group_name == group.name:
+                pass
+            else:
+                changes.append(f"assigned to group '{group.name}'")
         else:
             portal_user = PortalUser(
                 usergroup_id=group.id,
@@ -1621,16 +1651,24 @@ def update_end_user(
                 role='reporter',
             )
             db.add(portal_user)
-        changes.append(f"assigned to group '{group.name}'")
+            changes.append(f"assigned to group '{group.name}'")
 
-    if payload.tag_id:
-        tag = db.query(BLETag).filter(BLETag.id == payload.tag_id).first()
-        if not tag:
-            raise HTTPException(status_code=404, detail="Selected IMEI not found")
-        if tag.user_id and str(tag.user_id) != str(user.id):
-            raise HTTPException(status_code=400, detail="Selected IMEI is already assigned")
-        tag.user_id = user.id
-        changes.append(f"assigned IMEI {tag.imei}")
+    tag_ids = [tag_id for tag_id in (payload.tag_ids or []) if tag_id]
+    if tag_ids:
+        tags = db.query(BLETag).filter(BLETag.id.in_(tag_ids)).all()
+        if len(tags) != len(set(tag_ids)):
+            raise HTTPException(status_code=404, detail="One or more selected IMEIs were not found")
+        assigned_imeis = []
+        for tag in tags:
+            if tag.user_id and str(tag.user_id) != str(user.id):
+                raise HTTPException(status_code=400, detail=f"IMEI {tag.imei} is already assigned")
+            tag.user_id = user.id
+            assigned_imeis.append(tag.imei)
+        if assigned_imeis:
+            changes.append("assigned IMEIs " + ", ".join(assigned_imeis))
+
+    if not changes:
+        changes.append("no assignment changes")
 
     db.commit()
 
