@@ -240,6 +240,11 @@ logger = logging.getLogger(__name__)
 _PORTAL_VERBOSE_LOGGING = os.getenv("PORTAL_VERBOSE_LOGGING", "0").strip().lower() in ("1", "true", "yes", "on")
 _PORTAL_VERBOSE_SLOW_MS = int(os.getenv("PORTAL_VERBOSE_SLOW_MS", "800"))
 
+# Floorplan bridge runtime circuit-breaker.
+# Set FLOORPLAN_BRIDGE_ENABLED=0 to keep the API up while disabling the
+# background Pareto bridge tasks (useful for incident mitigation).
+_FLOORPLAN_BRIDGE_ENABLED = os.getenv("FLOORPLAN_BRIDGE_ENABLED", "1").strip().lower() in ("1", "true", "yes", "on")
+
 
 def _is_verbose_path(path: str) -> bool:
     return path.startswith("/api/portal/") or path.startswith("/api/assets")
@@ -354,10 +359,18 @@ async def startup_event():
     _hive_svc.start_sweeper()
     print("🛡️  HIVE sweeper started (2-minute freshness sweep)")
 
-    # Start Pareto Anywhere bridge for floor-plan BLE indoor tracking
-    from app.services import pareto_bridge as _pareto
-    _pareto.start_bridge()
-    print(f"📡 Pareto bridge started (url={_pareto.PARETO_URL})")
+    # Start Pareto Anywhere bridge for floor-plan BLE indoor tracking.
+    # Guarded by an env flag and fail-safe so bridge issues cannot crash app startup.
+    if _FLOORPLAN_BRIDGE_ENABLED:
+        try:
+            from app.services import pareto_bridge as _pareto
+            _pareto.start_bridge()
+            print(f"📡 Pareto bridge started (url={_pareto.PARETO_URL})")
+        except Exception:
+            logger.exception("pareto_bridge: startup failed; continuing with bridge disabled")
+            print("⚠️ Pareto bridge failed to start; continuing without floorplan bridge")
+    else:
+        print("⏭️ Pareto bridge disabled by FLOORPLAN_BRIDGE_ENABLED")
 
     # Start GDPR cleanup task (runs daily)
     asyncio.create_task(_gdpr_cleanup_loop())
@@ -372,12 +385,18 @@ async def shutdown_event():
     location_poller.stop()
     from app.services import hive_service as _hive_svc
     _hive_svc.stop_sweeper()
-    from app.services import pareto_bridge as _pareto
-    await _pareto.stop_bridge()
+    if _FLOORPLAN_BRIDGE_ENABLED:
+        try:
+            from app.services import pareto_bridge as _pareto
+            await _pareto.stop_bridge()
+            print("🛑 Pareto bridge stopped")
+        except Exception:
+            logger.exception("pareto_bridge: shutdown encountered an error")
+    else:
+        print("⏭️ Pareto bridge stop skipped (disabled by FLOORPLAN_BRIDGE_ENABLED)")
     critical_service_alerts.stop()
     print("🛑 Location Poller Service stopped")
     print("🛑 HIVE sweeper stopped")
-    print("🛑 Pareto bridge stopped")
 
 
 # ---------------------------------------------------------------------------
