@@ -18,7 +18,7 @@ import secrets
 import logging
 
 from app.database import get_db
-from app.models import UserGroup, UserGroupPackage, PortalUser, Building, Floor, IndoorGateway, BLETag, User, TagCategory, GeofenceAlert, POI, POITrackerLink, GeofenceState, PortalAlert
+from app.models import UserGroup, UserGroupPackage, PortalUser, Building, Floor, IndoorGateway, Room, BLETag, User, TagCategory, GeofenceAlert, POI, POITrackerLink, GeofenceState, PortalAlert, TagIndoorPosition
 from app.models_admin import TagPackage
 from app.admin_auth import hash_password, verify_password
 from app.services.device_providers.provider_factory import DeviceProviderFactory
@@ -578,6 +578,644 @@ def get_building(building_id: str, request: Request, db: Session = Depends(get_d
     if not bldg:
         raise HTTPException(status_code=404, detail="Building not found")
     return BuildingOut.model_validate(bldg)
+
+
+# ---------------------------------------------------------------------------
+# Building Management (Customer Self-Service)
+# ---------------------------------------------------------------------------
+
+class BuildingCreate(BaseModel):
+    name: str
+    mqtt_url: Optional[str] = None
+    mqtt_topic: str = "position/#"
+
+class BuildingUpdate(BaseModel):
+    name: Optional[str] = None
+    mqtt_url: Optional[str] = None
+    mqtt_topic: Optional[str] = None
+
+
+@router.post("/buildings", response_model=BuildingOut, status_code=201)
+def create_building(data: BuildingCreate, request: Request, db: Session = Depends(get_db)):
+    """Create a new building for the customer's usergroup."""
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Only group admins can create buildings")
+    
+    bldg = Building(
+        usergroup_id=me.usergroup_id,
+        name=data.name,
+        mqtt_url=data.mqtt_url,
+        mqtt_topic=data.mqtt_topic,
+    )
+    db.add(bldg)
+    db.commit()
+    db.refresh(bldg)
+    return BuildingOut.model_validate(bldg)
+
+
+@router.put("/buildings/{building_id}", response_model=BuildingOut)
+def update_building(building_id: str, data: BuildingUpdate, request: Request, db: Session = Depends(get_db)):
+    """Update a building's details."""
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Only group admins can modify buildings")
+    
+    bldg = db.query(Building).filter(
+        Building.id == building_id,
+        Building.usergroup_id == me.usergroup_id,
+    ).first()
+    if not bldg:
+        raise HTTPException(status_code=404, detail="Building not found")
+    
+    if data.name is not None: bldg.name = data.name
+    if data.mqtt_url is not None: bldg.mqtt_url = data.mqtt_url
+    if data.mqtt_topic is not None: bldg.mqtt_topic = data.mqtt_topic
+    
+    db.commit()
+    db.refresh(bldg)
+    return BuildingOut.model_validate(bldg)
+
+
+@router.delete("/buildings/{building_id}", status_code=204)
+def delete_building(building_id: str, request: Request, db: Session = Depends(get_db)):
+    """Delete a building and all its floors, gateways, and rooms."""
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Only group admins can delete buildings")
+    
+    bldg = db.query(Building).filter(
+        Building.id == building_id,
+        Building.usergroup_id == me.usergroup_id,
+    ).first()
+    if not bldg:
+        raise HTTPException(status_code=404, detail="Building not found")
+    
+    db.delete(bldg)
+    db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Floor Management (Customer Self-Service)
+# ---------------------------------------------------------------------------
+
+class FloorCreate(BaseModel):
+    label: str = "Ground Floor"
+    floor_order: int = 0
+    floor_plan: Optional[str] = None  # base64 data-URL of floor plan image
+    map_w: int = 800
+    map_h: int = 500
+
+class FloorUpdate(BaseModel):
+    label: Optional[str] = None
+    floor_order: Optional[int] = None
+    floor_plan: Optional[str] = None
+    map_w: Optional[int] = None
+    map_h: Optional[int] = None
+
+
+@router.post("/buildings/{building_id}/floors", response_model=FloorOut, status_code=201)
+def create_floor(building_id: str, data: FloorCreate, request: Request, db: Session = Depends(get_db)):
+    """Add a new floor to a building."""
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Only group admins can create floors")
+    
+    bldg = db.query(Building).filter(
+        Building.id == building_id,
+        Building.usergroup_id == me.usergroup_id,
+    ).first()
+    if not bldg:
+        raise HTTPException(status_code=404, detail="Building not found")
+    
+    floor = Floor(
+        building_id=building_id,
+        label=data.label,
+        floor_order=data.floor_order,
+        floor_plan=data.floor_plan,
+        map_w=data.map_w,
+        map_h=data.map_h,
+    )
+    db.add(floor)
+    db.commit()
+    db.refresh(floor)
+    return FloorOut.model_validate(floor)
+
+
+@router.put("/floors/{floor_id}", response_model=FloorOut)
+def update_floor(floor_id: str, data: FloorUpdate, request: Request, db: Session = Depends(get_db)):
+    """Update a floor's label, image, or dimensions."""
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Only group admins can modify floors")
+    
+    floor = db.query(Floor).join(Building).filter(
+        Floor.id == floor_id,
+        Building.usergroup_id == me.usergroup_id,
+    ).first()
+    if not floor:
+        raise HTTPException(status_code=404, detail="Floor not found")
+    
+    if data.label is not None: floor.label = data.label
+    if data.floor_order is not None: floor.floor_order = data.floor_order
+    if data.floor_plan is not None: floor.floor_plan = data.floor_plan
+    if data.map_w is not None: floor.map_w = data.map_w
+    if data.map_h is not None: floor.map_h = data.map_h
+    
+    db.commit()
+    db.refresh(floor)
+    return FloorOut.model_validate(floor)
+
+
+@router.delete("/floors/{floor_id}", status_code=204)
+def delete_floor(floor_id: str, request: Request, db: Session = Depends(get_db)):
+    """Delete a floor and all its gateways and rooms."""
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Only group admins can delete floors")
+    
+    floor = db.query(Floor).join(Building).filter(
+        Floor.id == floor_id,
+        Building.usergroup_id == me.usergroup_id,
+    ).first()
+    if not floor:
+        raise HTTPException(status_code=404, detail="Floor not found")
+    
+    db.delete(floor)
+    db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Gateway Management (ESP32 BLE Gateways - Customer Self-Service)
+# ---------------------------------------------------------------------------
+
+class GatewayCreate(BaseModel):
+    receiver_id: str      # e.g. "1cdbd4746ba0" - ESP32 MAC
+    label: Optional[str] = None
+    x: float = 0.0
+    y: float = 0.0
+
+class GatewayUpdate(BaseModel):
+    receiver_id: Optional[str] = None
+    label: Optional[str] = None
+    x: Optional[float] = None
+    y: Optional[float] = None
+
+
+@router.post("/floors/{floor_id}/gateways", response_model=GatewayOut, status_code=201)
+def create_gateway(floor_id: str, data: GatewayCreate, request: Request, db: Session = Depends(get_db)):
+    """Register a new ESP32 BLE gateway on a floor."""
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Only group admins can add gateways")
+    
+    floor = db.query(Floor).join(Building).filter(
+        Floor.id == floor_id,
+        Building.usergroup_id == me.usergroup_id,
+    ).first()
+    if not floor:
+        raise HTTPException(status_code=404, detail="Floor not found")
+    
+    # Normalize receiver_id (lowercase, no colons)
+    receiver_id = data.receiver_id.lower().replace(":", "").replace("-", "").strip()
+    
+    # Check for duplicate
+    existing = db.query(IndoorGateway).filter(IndoorGateway.receiver_id == receiver_id).first()
+    if existing:
+        raise HTTPException(status_code=409, detail=f"Gateway {receiver_id} already registered")
+    
+    gw = IndoorGateway(
+        floor_id=floor_id,
+        receiver_id=receiver_id,
+        label=data.label,
+        x=data.x,
+        y=data.y,
+    )
+    db.add(gw)
+    db.commit()
+    db.refresh(gw)
+    return GatewayOut.model_validate(gw)
+
+
+@router.put("/gateways/{gateway_id}", response_model=GatewayOut)
+def update_gateway(gateway_id: str, data: GatewayUpdate, request: Request, db: Session = Depends(get_db)):
+    """Update a gateway's position or label."""
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Only group admins can modify gateways")
+    
+    gw = db.query(IndoorGateway).join(Floor).join(Building).filter(
+        IndoorGateway.id == gateway_id,
+        Building.usergroup_id == me.usergroup_id,
+    ).first()
+    if not gw:
+        raise HTTPException(status_code=404, detail="Gateway not found")
+    
+    if data.receiver_id is not None:
+        gw.receiver_id = data.receiver_id.lower().replace(":", "").replace("-", "").strip()
+    if data.label is not None: gw.label = data.label
+    if data.x is not None: gw.x = data.x
+    if data.y is not None: gw.y = data.y
+    
+    db.commit()
+    db.refresh(gw)
+    return GatewayOut.model_validate(gw)
+
+
+@router.delete("/gateways/{gateway_id}", status_code=204)
+def delete_gateway(gateway_id: str, request: Request, db: Session = Depends(get_db)):
+    """Delete a gateway."""
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Only group admins can delete gateways")
+    
+    gw = db.query(IndoorGateway).join(Floor).join(Building).filter(
+        IndoorGateway.id == gateway_id,
+        Building.usergroup_id == me.usergroup_id,
+    ).first()
+    if not gw:
+        raise HTTPException(status_code=404, detail="Gateway not found")
+    
+    db.delete(gw)
+    db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Room Management (Customer Self-Service)
+# ---------------------------------------------------------------------------
+
+class RoomCreate(BaseModel):
+    name: str
+    x: float = 0.0
+    y: float = 0.0
+    w: float = 100.0
+    h: float = 80.0
+
+class RoomUpdate(BaseModel):
+    name: Optional[str] = None
+    x: Optional[float] = None
+    y: Optional[float] = None
+    w: Optional[float] = None
+    h: Optional[float] = None
+
+
+@router.post("/floors/{floor_id}/rooms", response_model=RoomOut, status_code=201)
+def create_room(floor_id: str, data: RoomCreate, request: Request, db: Session = Depends(get_db)):
+    """Add a room zone to a floor."""
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Only group admins can create rooms")
+    
+    floor = db.query(Floor).join(Building).filter(
+        Floor.id == floor_id,
+        Building.usergroup_id == me.usergroup_id,
+    ).first()
+    if not floor:
+        raise HTTPException(status_code=404, detail="Floor not found")
+    
+    room = Room(
+        floor_id=floor_id,
+        name=data.name,
+        x=data.x,
+        y=data.y,
+        w=data.w,
+        h=data.h,
+    )
+    db.add(room)
+    db.commit()
+    db.refresh(room)
+    return RoomOut.model_validate(room)
+
+
+@router.put("/rooms/{room_id}", response_model=RoomOut)
+def update_room(room_id: str, data: RoomUpdate, request: Request, db: Session = Depends(get_db)):
+    """Update a room's name or bounds."""
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Only group admins can modify rooms")
+    
+    room = db.query(Room).join(Floor).join(Building).filter(
+        Room.id == room_id,
+        Building.usergroup_id == me.usergroup_id,
+    ).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    if data.name is not None: room.name = data.name
+    if data.x is not None: room.x = data.x
+    if data.y is not None: room.y = data.y
+    if data.w is not None: room.w = data.w
+    if data.h is not None: room.h = data.h
+    
+    db.commit()
+    db.refresh(room)
+    return RoomOut.model_validate(room)
+
+
+@router.delete("/rooms/{room_id}", status_code=204)
+def delete_room(room_id: str, request: Request, db: Session = Depends(get_db)):
+    """Delete a room zone."""
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Only group admins can delete rooms")
+    
+    room = db.query(Room).join(Floor).join(Building).filter(
+        Room.id == room_id,
+        Building.usergroup_id == me.usergroup_id,
+    ).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    db.delete(room)
+    db.commit()
+
+
+# ---------------------------------------------------------------------------
+# BLE Tag Registration (Customer Self-Service)
+# ---------------------------------------------------------------------------
+
+class BLETagCreate(BaseModel):
+    mac_address: str
+    device_name: Optional[str] = None
+    description: Optional[str] = None
+    is_active: bool = True
+
+class BLETagUpdate(BaseModel):
+    device_name: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class BLETagOut(BaseModel):
+    id: UUID
+    mac_address: str
+    device_name: Optional[str]
+    description: Optional[str]
+    is_active: bool
+    last_seen: Optional[datetime]
+    # Indoor position
+    floor_id: Optional[UUID] = None
+    zone: Optional[str] = None
+    rssi: Optional[int] = None
+    indoor_last_seen: Optional[datetime] = None
+    class Config: from_attributes = True
+
+class BLETagDiscovered(BaseModel):
+    mac_address: str
+    rssi: Optional[int]
+    zone: Optional[str]
+    floor_id: Optional[UUID]
+    last_seen: Optional[datetime]
+
+
+def _normalise_mac(raw: str) -> str:
+    """Normalise MAC to 12-char lowercase hex (no separators)."""
+    return raw.lower().replace(":", "").replace("-", "").replace(".", "").strip()
+
+
+@router.get("/ble-tags", response_model=List[BLETagOut])
+def list_customer_ble_tags(request: Request, db: Session = Depends(get_db)):
+    """List all BLE tags registered by this customer's usergroup."""
+    me = get_portal_user_from_request(request, db)
+    
+    # Get all floors in this usergroup to determine which tags belong to them
+    floor_ids = (
+        db.query(Floor.id)
+        .join(Building)
+        .filter(Building.usergroup_id == me.usergroup_id)
+        .all()
+    )
+    floor_id_set = {str(fid[0]) for fid in floor_ids}
+    
+    # Get all BLE tags
+    tags = db.query(BLETag).filter(BLETag.tag_type == "ble").all()
+    
+    results = []
+    for tag in tags:
+        # Check if this tag has a position on any of the customer's floors
+        pos = None
+        if tag.mac_address:
+            pos = (
+                db.query(TagIndoorPosition)
+                .filter(
+                    TagIndoorPosition.tag_id == tag.mac_address,
+                    TagIndoorPosition.floor_id.in_(floor_id_set) if floor_id_set else False
+                )
+                .first()
+            )
+        
+        # Only include if position exists on customer's floor OR tag has no position yet (new)
+        if pos or not tag.mac_address:
+            out = BLETagOut(
+                id=tag.id,
+                mac_address=tag.mac_address or "",
+                device_name=tag.device_name,
+                description=tag.description,
+                is_active=tag.is_active,
+                last_seen=tag.last_seen,
+                floor_id=UUID(pos.floor_id) if pos and pos.floor_id else None,
+                zone=pos.zone if pos else None,
+                rssi=pos.rssi if pos else None,
+                indoor_last_seen=pos.last_seen if pos else None,
+            )
+            results.append(out)
+    
+    return results
+
+
+@router.post("/ble-tags", response_model=BLETagOut, status_code=201)
+def register_customer_ble_tag(data: BLETagCreate, request: Request, db: Session = Depends(get_db)):
+    """Register a new BLE tag by MAC address."""
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Only group admins can register BLE tags")
+    
+    mac = _normalise_mac(data.mac_address)
+    if not mac or len(mac) != 12:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid MAC address '{data.mac_address}'. Expected 12 hex characters."
+        )
+    
+    # Duplicate check
+    existing = db.query(BLETag).filter(BLETag.mac_address == mac).first()
+    if existing:
+        raise HTTPException(status_code=409, detail=f"BLE tag with MAC {mac} already registered")
+    
+    tag = BLETag(
+        imei=None,
+        mac_address=mac,
+        tag_type="ble",
+        device_name=data.device_name,
+        description=data.description,
+        is_active=data.is_active,
+    )
+    db.add(tag)
+    db.commit()
+    db.refresh(tag)
+    
+    return BLETagOut(
+        id=tag.id,
+        mac_address=tag.mac_address,
+        device_name=tag.device_name,
+        description=tag.description,
+        is_active=tag.is_active,
+        last_seen=tag.last_seen,
+    )
+
+
+@router.put("/ble-tags/{tag_id}", response_model=BLETagOut)
+def update_customer_ble_tag(tag_id: str, data: BLETagUpdate, request: Request, db: Session = Depends(get_db)):
+    """Update a BLE tag's name, description, or active status."""
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Only group admins can modify BLE tags")
+    
+    tag = db.query(BLETag).filter(BLETag.id == tag_id, BLETag.tag_type == "ble").first()
+    if not tag:
+        raise HTTPException(status_code=404, detail="BLE tag not found")
+    
+    # Verify the tag belongs to this customer (check if it has position on their floor)
+    if tag.mac_address:
+        floor_ids = (
+            db.query(Floor.id)
+            .join(Building)
+            .filter(Building.usergroup_id == me.usergroup_id)
+            .all()
+        )
+        floor_id_set = {str(fid[0]) for fid in floor_ids}
+        
+        pos = (
+            db.query(TagIndoorPosition)
+            .filter(
+                TagIndoorPosition.tag_id == tag.mac_address,
+                TagIndoorPosition.floor_id.in_(floor_id_set) if floor_id_set else False
+            )
+            .first()
+        )
+        if not pos:
+            raise HTTPException(status_code=403, detail="You can only modify tags on your floors")
+    
+    if data.device_name is not None: tag.device_name = data.device_name
+    if data.description is not None: tag.description = data.description
+    if data.is_active is not None: tag.is_active = data.is_active
+    
+    db.commit()
+    db.refresh(tag)
+    
+    pos = (
+        db.query(TagIndoorPosition)
+        .filter(TagIndoorPosition.tag_id == tag.mac_address)
+        .first()
+        if tag.mac_address else None
+    )
+    
+    return BLETagOut(
+        id=tag.id,
+        mac_address=tag.mac_address or "",
+        device_name=tag.device_name,
+        description=tag.description,
+        is_active=tag.is_active,
+        last_seen=tag.last_seen,
+        floor_id=UUID(pos.floor_id) if pos and pos.floor_id else None,
+        zone=pos.zone if pos else None,
+        rssi=pos.rssi if pos else None,
+        indoor_last_seen=pos.last_seen if pos else None,
+    )
+
+
+@router.delete("/ble-tags/{tag_id}", status_code=204)
+def delete_customer_ble_tag(tag_id: str, request: Request, db: Session = Depends(get_db)):
+    """Delete a BLE tag registration."""
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Only group admins can delete BLE tags")
+    
+    tag = db.query(BLETag).filter(BLETag.id == tag_id, BLETag.tag_type == "ble").first()
+    if not tag:
+        raise HTTPException(status_code=404, detail="BLE tag not found")
+    
+    # Verify ownership
+    if tag.mac_address:
+        floor_ids = (
+            db.query(Floor.id)
+            .join(Building)
+            .filter(Building.usergroup_id == me.usergroup_id)
+            .all()
+        )
+        floor_id_set = {str(fid[0]) for fid in floor_ids}
+        
+        pos = (
+            db.query(TagIndoorPosition)
+            .filter(
+                TagIndoorPosition.tag_id == tag.mac_address,
+                TagIndoorPosition.floor_id.in_(floor_id_set) if floor_id_set else False
+            )
+            .first()
+        )
+        if not pos:
+            raise HTTPException(status_code=403, detail="You can only delete tags on your floors")
+        
+        # Remove position
+        db.query(TagIndoorPosition).filter(TagIndoorPosition.tag_id == tag.mac_address).delete()
+    
+    db.delete(tag)
+    db.commit()
+
+
+@router.get("/ble-tags/discovered", response_model=List[BLETagDiscovered])
+def discover_customer_ble_tags(
+    minutes: int = Query(10, ge=1, le=60),
+    request: Request = None,
+    db: Session = Depends(get_db),
+):
+    """Return unregistered MAC addresses recently seen on this customer's floors."""
+    me = get_portal_user_from_request(request, db)
+    
+    # Get customer's floor IDs
+    floor_ids = (
+        db.query(Floor.id)
+        .join(Building)
+        .filter(Building.usergroup_id == me.usergroup_id)
+        .all()
+    )
+    floor_id_set = {str(fid[0]) for fid in floor_ids}
+    
+    if not floor_id_set:
+        return []
+    
+    cutoff = datetime.utcnow() - timedelta(minutes=minutes)
+    
+    # All registered MACs
+    registered_macs = {
+        row[0]
+        for row in db.query(BLETag.mac_address)
+        .filter(BLETag.tag_type == "ble", BLETag.mac_address.isnot(None))
+        .all()
+    }
+    
+    # Recent positions on customer's floors
+    recent_positions = (
+        db.query(TagIndoorPosition)
+        .filter(
+            TagIndoorPosition.last_seen >= cutoff,
+            TagIndoorPosition.floor_id.in_(floor_id_set)
+        )
+        .all()
+    )
+    
+    discovered = [
+        BLETagDiscovered(
+            mac_address=pos.tag_id,
+            rssi=pos.rssi,
+            zone=pos.zone,
+            floor_id=UUID(pos.floor_id) if pos.floor_id else None,
+            last_seen=pos.last_seen,
+        )
+        for pos in recent_positions
+        if pos.tag_id not in registered_macs
+    ]
+    
+    return discovered
 
 
 # ---------------------------------------------------------------------------
