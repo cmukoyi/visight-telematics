@@ -882,9 +882,9 @@ def _maybe_send_hive_alert(hive: Hive, new_state: str, prev_state: str,
         outlier = db.query(BLETag).filter(BLETag.id == outlier_tag_id).first()
         if outlier:
             lat, lng = outlier.latitude, outlier.longitude
-    if lat is None and hive.tags:
+    if lat is None and hive.memberships:
         # Fallback to first tag in hive
-        first_tag = next((t for t in hive.tags if t.latitude), None)
+        first_tag = next((m.tag for m in hive.memberships if m.tag and m.tag.latitude), None)
         if first_tag:
             lat, lng = first_tag.latitude, first_tag.longitude
     
