@@ -33,7 +33,7 @@ from typing import Optional
 import socketio  # python-socketio[client]
 
 from app.database import SessionLocal
-from app.models import IndoorGateway, Floor, Building, Room, TagIndoorPosition
+from app.models import IndoorGateway, Floor, Building, Room, TagIndoorPosition, BLETag
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +110,15 @@ def _process_raddec_sync(payload: dict) -> None:
 
     db = SessionLocal()
     try:
+        # Only process BLE devices that are registered as trackable assets.
+        # Prevents tracking random phones, watches, and other ambient BLE devices.
+        registered_tag = db.query(BLETag).filter(
+            BLETag.mac_address == tag_id,
+            BLETag.is_active == True
+        ).first()
+        if not registered_tag:
+            return  # Silently ignore unregistered BLE devices
+
         gateway = db.query(IndoorGateway).filter(
             IndoorGateway.receiver_id == receiver_id
         ).first()
