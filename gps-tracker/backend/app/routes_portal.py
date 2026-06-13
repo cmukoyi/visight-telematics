@@ -4,7 +4,7 @@ Customer portal API endpoints — auth and portal-user management.
 Routes are mounted at /api/portal (separate from /api/v1 user routes and
 /api/admin admin routes).  Each PortalUser is scoped to a UserGroup (tenant).
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from datetime import datetime, timedelta
@@ -1164,8 +1164,8 @@ def delete_customer_ble_tag(tag_id: str, request: Request, db: Session = Depends
 
 @router.get("/ble-tags/discovered", response_model=List[BLETagDiscovered])
 def discover_customer_ble_tags(
+    request: Request,
     minutes: int = Query(10, ge=1, le=60),
-    request: Request = None,
     db: Session = Depends(get_db),
 ):
     """Return unregistered MAC addresses recently seen on this customer's floors."""
