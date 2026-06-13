@@ -10663,18 +10663,21 @@ function _amInitBulkDropzone() {
     document.getElementById('am-bulk-template-btn')?.addEventListener('click', downloadBulkTemplate);
 }
 
-// IMEI validation: 14-16 digits; Luhn check for 15-digit IMEIs
-function _amValidateImei(imei) {
+// IMEI validation: 14-16 digits; Luhn check only for series1/series2 (real IMEI)
+// series3 / QR / NFC tags use internal device codes that do not follow the Luhn algorithm
+function _amValidateImei(imei, tagType) {
     const s = String(imei).trim().replace(/\s/g, '');
-    if (!/^\d{14,16}$/.test(s)) return { ok: false, err: 'must be 14–16 digits' };
-    if (s.length === 15) {
+    if (!/^\d{14,16}$/.test(s)) return { ok: false, err: 'must be 14–16 digits (numbers only)' };
+    // Skip Luhn for series3 / QR / NFC — those use internal device codes, not real IMEIs
+    const isSeries3 = tagType && /series.?3|nfc|qr/i.test(String(tagType));
+    if (s.length === 15 && !isSeries3) {
         let sum = 0;
         for (let i = 0; i < 15; i++) {
             let d = parseInt(s[i]);
             if (i % 2 === 1) { d *= 2; if (d > 9) d -= 9; }
             sum += d;
         }
-        if (sum % 10 !== 0) return { ok: false, err: 'fails Luhn check' };
+        if (sum % 10 !== 0) return { ok: false, err: 'fails Luhn check — if this is a QR/NFC tag, use tag_type: series3' };
     }
     return { ok: true };
 }
@@ -10699,12 +10702,21 @@ function _amHandleBulkFile(file) {
             const ws = wb.Sheets[wb.SheetNames[0]];
             if (!ws) throw new Error('The file appears empty or has no valid sheet.');
             const data = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
-            if (!data.length) throw new Error('No data rows found. Check the file has headers: imei, owner_email (optional), description, tag_type — and at least one data row.');
+            if (!data.length) throw new Error('No data rows found. Check the file has headers: imei, tag_type (required), owner_email (optional), description (optional) — and at least one data row.');
+            // Normalise tag_type aliases: "Series 3" / "NFC" / "QR" → "series3" etc.
+            function _normTagType(raw) {
+                const s = String(raw || '').trim().toLowerCase().replace(/[\s_-]/g,'');
+                if (!s) return null;
+                if (s === 'series1' || s === 'mzone' || s === 'gps' || s === 's1') return 'series1';
+                if (s === 'series2' || s === 'tracksolid' || s === 'ts' || s === 's2') return 'series2';
+                if (s === 'series3' || s === 'nfc' || s === 'qr' || s === 's3' || s === 'qrnfc') return 'series3';
+                return String(raw).trim();  // pass through so validation can report the exact value
+            }
             const rows = data.map(r => ({
                 imei:        String(r['imei'] || r['IMEI'] || '').trim(),
                 owner_email: String(r['owner_email'] || r['Owner Email'] || '').trim(),
                 description: String(r['description'] || r['Description'] || '').trim() || null,
-                tag_type:    String(r['tag_type'] || r['Tag Type'] || '').trim() || null,
+                tag_type:    _normTagType(r['tag_type'] || r['Tag Type']),
             })).filter(r => r.imei);
             if (!rows.length) throw new Error('No rows with an IMEI value found. Expected column header: imei (lowercase). Download the template for a correct example.');
             _amValidateBulkPreview(rows);
@@ -10722,15 +10734,21 @@ function _amValidateBulkPreview(rows) {
     tbody.innerHTML = ''; _amBulkPreview = []; _bulkRows = [];
     if (!rows.length) return;
     let validCount = 0;
+    const VALID_TAG_TYPES = ['series1','series2','series3'];
     rows.forEach((row, idx) => {
         const errs = [];
         if (!row.imei) {
-            errs.push('missing IMEI');
+            errs.push('missing IMEI — this column is required');
         } else {
-            const v = _amValidateImei(row.imei);
+            const v = _amValidateImei(row.imei, row.tag_type);
             if (!v.ok) errs.push('IMEI ' + v.err);
         }
-        if (row.owner_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.owner_email)) errs.push('invalid email');
+        if (!row.tag_type) {
+            errs.push('missing tag_type — must be series1, series2, or series3');
+        } else if (!VALID_TAG_TYPES.includes(String(row.tag_type).trim().toLowerCase())) {
+            errs.push(`unknown tag_type "${row.tag_type}" — use series1, series2, or series3`);
+        }
+        if (row.owner_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.owner_email)) errs.push('invalid email format');
         const valid = errs.length === 0;
         if (valid) { validCount++; _bulkRows.push(row); }
         _amBulkPreview.push({ ...row, valid, errs });
@@ -10743,7 +10761,7 @@ function _amValidateBulkPreview(rows) {
             `<td>${esc(row.tag_type || '—')}</td>` +
             `<td>${valid
                 ? '<span class="loc-row-ok">● ready</span>'
-                : `<span class="loc-row-err" title="${esc(errs.join(', '))}">● ${esc(errs[0])}</span>`
+                : `<span class="loc-row-err" title="${esc(errs.join(' | '))}">● ${esc(errs.join('; '))}</span>`
             }</td>`;
         tbody.appendChild(tr);
     });
@@ -10803,19 +10821,36 @@ async function submitBulkUpload() {
 
 function downloadBulkTemplate() {
     const wb = XLSX.utils.book_new();
+    // Main data sheet — imei and tag_type are required; owner_email and description optional
     const rows = [
-        ['imei',              'owner_email',          'description',    'tag_type'],
-        ['867123456789012',   'user@company.com',     'Company Van 1',  'vehicle'],
-        ['780901807533037',   'user2@company.com',    'Company Van 2',  'vehicle'],
+        ['imei',              'owner_email',            'description',    'tag_type'],
+        ['867123456789012',   'user@company.com',       'Company Van 1',  'series1'],
+        ['867987654321012',   'user2@company.com',      'Company Van 2',  'series2'],
+        ['780901807533037',   'qr-user@company.com',    'NFC Asset 1',    'series3'],
     ];
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:D3');
+    // Force IMEI column to text so Excel doesn't mangle leading zeros
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:D4');
     for (let R = 0; R <= range.e.r; R++) {
         const addr = XLSX.utils.encode_cell({ r: R, c: 0 });
         if (ws[addr]) { ws[addr].t = 's'; ws[addr].v = String(ws[addr].v); delete ws[addr].z; }
     }
     ws['!cols'] = [{ wch: 22 }, { wch: 32 }, { wch: 26 }, { wch: 16 }];
-    XLSX.utils.book_append_sheet(wb, ws, 'Tags');
+    // Add a "Notes" sheet to explain accepted tag_type values
+    const notesRows = [
+        ['Column',       'Required?', 'Accepted values / notes'],
+        ['imei',         'YES',       '14–16 digit number (store as text to avoid Excel rounding)'],
+        ['tag_type',     'YES',       'series1  ·  series2  ·  series3'],
+        ['',             '',          'series1 = MZone GPS tracker'],
+        ['',             '',          'series2 = TrackSolid GPS tracker'],
+        ['',             '',          'series3 = QR / NFC asset tag (no Luhn check)'],
+        ['owner_email',  'no',        'Email of the user the tag is assigned to (optional)'],
+        ['description',  'no',        'Free-text label shown in the portal (optional)'],
+    ];
+    const wsNotes = XLSX.utils.aoa_to_sheet(notesRows);
+    wsNotes['!cols'] = [{ wch: 18 }, { wch: 12 }, { wch: 58 }];
+    XLSX.utils.book_append_sheet(wb, ws,      'Tags');
+    XLSX.utils.book_append_sheet(wb, wsNotes, 'Notes');
     XLSX.writeFile(wb, 'bulk_tag_template.xlsx');
 }
 
