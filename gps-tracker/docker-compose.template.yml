@@ -152,6 +152,19 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
+  pareto-anywhere:
+    image: reelyactive/pareto-anywhere:latest
+    container_name: __TENANT_PREFIX___pareto_anywhere
+    networks:
+      - __TENANT_PREFIX___network
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3001"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
   mqtt-bridge:
     build:
       context: ./mqtt-bridge
@@ -170,6 +183,7 @@ services:
       - GATEWAY_POSITIONS={}
     depends_on:
       - mosquitto
+      - pareto-anywhere
     networks:
       - __TENANT_PREFIX___network
     restart: unless-stopped
@@ -191,6 +205,7 @@ services:
       - customer
       - flutter-web
       - mosquitto
+      - pareto-anywhere
     networks:
       - __TENANT_PREFIX___network
     restart: unless-stopped

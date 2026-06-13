@@ -75,6 +75,12 @@ def _normalize_tag_id(raw: str) -> str:
     return (raw or "").replace(":", "").replace("-", "").lower()
 
 
+def _normalize_receiver_id(raw: str) -> str:
+    """Gateway receiver IDs should normalize the same way as admin-side
+    storage to avoid case/colon/dash mismatches."""
+    return (raw or "").strip().lower().replace(":", "").replace("-", "")
+
+
 def _resolve_zone(db, gateway: IndoorGateway) -> Optional[str]:
     """Find the room (if any) on the same floor that contains the gateway's
     (x, y). Returns the room name, or None if the gateway is in a corridor /
@@ -97,7 +103,7 @@ def _process_raddec_sync(payload: dict) -> None:
         return
 
     nearest = sigs[0] or {}
-    receiver_id = (nearest.get("receiverId") or "").strip().lower()
+    receiver_id = _normalize_receiver_id(nearest.get("receiverId") or "")
     rssi = int(nearest.get("rssi", -99))
     if not receiver_id:
         return
