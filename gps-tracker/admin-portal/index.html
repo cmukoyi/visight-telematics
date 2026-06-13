@@ -2176,6 +2176,55 @@
                             </div>
                         </div>
                     </div>
+
+                    <div id="editEndUserModal" class="modal">
+                        <div class="modal-content" style="max-width:640px">
+                            <div class="modal-header">
+                                <h3 class="modal-title">Edit End User</h3>
+                                <button class="modal-close" onclick="closeModal('editEndUserModal')">×</button>
+                            </div>
+                            <div id="euAlert" class="alert" style="display:none"><span id="euAlertText"></span></div>
+                            <form id="editEndUserForm" onsubmit="submitEndUserEdit(event)">
+                                <input type="hidden" id="euUserId">
+                                <div class="form-group">
+                                    <label class="form-label">Email</label>
+                                    <input type="email" id="euEmail" class="form-input" disabled>
+                                </div>
+                                <div style="display:flex;gap:12px">
+                                    <div class="form-group" style="flex:1">
+                                        <label class="form-label">First Name</label>
+                                        <input type="text" id="euFirstName" class="form-input" placeholder="First name">
+                                    </div>
+                                    <div class="form-group" style="flex:1">
+                                        <label class="form-label">Last Name</label>
+                                        <input type="text" id="euLastName" class="form-input" placeholder="Last name">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Phone</label>
+                                    <input type="text" id="euPhone" class="form-input" placeholder="Phone number">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Assign User Group <span style="font-weight:normal;color:var(--text-secondary)">(optional)</span></label>
+                                    <select id="euUsergroup" class="form-input">
+                                        <option value="">No change</option>
+                                    </select>
+                                    <p style="font-size:12px;color:var(--text-secondary);margin-top:6px">Choose a group only if you want to link this user to a customer tenant.</p>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Assign Unassigned IMEI <span style="font-weight:normal;color:var(--text-secondary)">(optional)</span></label>
+                                    <select id="euTag" class="form-input">
+                                        <option value="">No IMEI assignment</option>
+                                    </select>
+                                    <p style="font-size:12px;color:var(--text-secondary);margin-top:6px">Only IMEIs with no owner are listed here.</p>
+                                </div>
+                                <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:8px">
+                                    <button type="button" class="btn btn-secondary" onclick="closeModal('editEndUserModal')">Cancel</button>
+                                    <button type="submit" class="btn btn-primary" id="euSubmitBtn">Save Changes</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
                     <!-- END END USERS TAB -->
 
                     <!-- FLUTTER USERS TAB -->
@@ -4643,7 +4692,7 @@
                     : '-';
                 const isPortalUser = !!user.has_portal_account;
                 const userTypeBadge = isPortalUser
-                    ? '<span style="background:#2563eb;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">Portal</span>'
+                    ? '<span style="background:#2563eb;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">Flutter + Portal</span>'
                     : '<span style="background:#0f766e;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">Flutter</span>';
                 const loginAsLabel = isPortalUser ? '🔑 Login as Portal' : '📱 Login as Flutter';
 
@@ -4661,6 +4710,7 @@
                     <td><span style="background:var(--primary);color:white;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">${tagCount}</span></td>
                     <td>${createdDate}</td>
                     <td onclick="event.stopPropagation()">
+                        <button class="btn btn-small" style="background:#2563eb;color:white;margin-right:6px" onclick="openEndUserEditor('${escH(user.id)}')">Edit</button>
                         <button class="btn btn-small" style="background:#7c3aed;color:white" onclick="impersonateUser('${escH(user.id)}','${escH(user.email)}')">${loginAsLabel}</button>
                     </td>
                 </tr>`;
@@ -4716,6 +4766,93 @@
 
         } catch (e) {
             tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:#ef4444;padding:2rem">Error: ${escH(e.message)}</td></tr>`;
+        }
+    }
+
+    async function openEndUserEditor(userId) {
+        document.getElementById('euAlert').style.display = 'none';
+        document.getElementById('euUserId').value = userId;
+        document.getElementById('euEmail').value = '';
+        document.getElementById('euFirstName').value = '';
+        document.getElementById('euLastName').value = '';
+        document.getElementById('euPhone').value = '';
+        document.getElementById('euUsergroup').innerHTML = '<option value="">Loading groups…</option>';
+        document.getElementById('euTag').innerHTML = '<option value="">Loading IMEIs…</option>';
+        openModal('editEndUserModal');
+
+        try {
+            const res = await fetch(`${API_URL}/api/v1/admin/end-users/${userId}/editor`, {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            if (res.status === 401) { handle401(); return; }
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to load editor data');
+
+            document.getElementById('euEmail').value = data.user.email || '';
+            document.getElementById('euFirstName').value = data.user.first_name || '';
+            document.getElementById('euLastName').value = data.user.last_name || '';
+            document.getElementById('euPhone').value = data.user.phone || '';
+
+            const groupOptions = ['<option value="">No change</option>'];
+            (data.usergroups || []).forEach(group => {
+                const selected = data.user.selected_usergroup_id === group.id ? ' selected' : '';
+                groupOptions.push(`<option value="${escH(group.id)}"${selected}>${escH(group.name)}</option>`);
+            });
+            document.getElementById('euUsergroup').innerHTML = groupOptions.join('');
+
+            const tagOptions = ['<option value="">No IMEI assignment</option>'];
+            (data.unassigned_tags || []).forEach(tag => {
+                tagOptions.push(`<option value="${escH(tag.id)}">${escH(tag.imei)}${tag.label && tag.label !== tag.imei ? ' - ' + escH(tag.label) : ''}</option>`);
+            });
+            if ((data.unassigned_tags || []).length === 0) {
+                tagOptions.push('<option value="" disabled>No unassigned IMEIs available</option>');
+            }
+            document.getElementById('euTag').innerHTML = tagOptions.join('');
+        } catch (err) {
+            document.getElementById('euAlertText').textContent = err.message;
+            document.getElementById('euAlert').className = 'alert alert-error';
+            document.getElementById('euAlert').style.display = 'flex';
+        }
+    }
+
+    async function submitEndUserEdit(event) {
+        event.preventDefault();
+        const submitBtn = document.getElementById('euSubmitBtn');
+        const payload = {
+            first_name: document.getElementById('euFirstName').value.trim(),
+            last_name: document.getElementById('euLastName').value.trim(),
+            phone: document.getElementById('euPhone').value.trim(),
+            usergroup_id: document.getElementById('euUsergroup').value || null,
+            tag_id: document.getElementById('euTag').value || null,
+        };
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving…';
+        document.getElementById('euAlert').style.display = 'none';
+
+        try {
+            const userId = document.getElementById('euUserId').value;
+            const res = await fetch(`${API_URL}/api/v1/admin/end-users/${userId}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            if (res.status === 401) { handle401(); return; }
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to save user changes');
+
+            closeModal('editEndUserModal');
+            await loadEndUsers();
+        } catch (err) {
+            document.getElementById('euAlertText').textContent = err.message;
+            document.getElementById('euAlert').className = 'alert alert-error';
+            document.getElementById('euAlert').style.display = 'flex';
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Changes';
         }
     }
 

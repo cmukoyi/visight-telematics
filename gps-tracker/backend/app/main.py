@@ -16,7 +16,7 @@ from time import perf_counter
 from sqlalchemy.orm import Session
 
 from app.database import get_db, init_db
-from app.models import User, VerificationPIN, BLETag, POI, POITrackerLink, GeofenceAlert, PasswordResetToken, GeofenceState, AppFeatures, PortalUser
+from app.models import User, VerificationPIN, BLETag, POI, POITrackerLink, GeofenceAlert, PasswordResetToken, GeofenceState, AppFeatures, PortalUser, UserGroup
 from app.models_admin import AdminUser, AppLog, AuditLog, BillingData, TagPackage
 from app.auth import verify_password, get_password_hash, create_access_token, decode_token
 from app.admin_auth import hash_password as admin_hash_password
@@ -54,6 +54,13 @@ class SendVerificationCodeRequest(BaseModel):
 class VerifyPINRequest(BaseModel):
     email: EmailStr
     pin: str
+
+class EndUserAdminUpdateRequest(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    usergroup_id: Optional[str] = None
+    tag_id: Optional[str] = None
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
@@ -1521,6 +1528,117 @@ def list_end_users_with_tags(db: Session = Depends(get_db)):
         })
     
     return result
+
+@app.get("/api/v1/admin/end-users/{user_id}/editor")
+def get_end_user_editor_data(
+    user_id: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Admin-only editor payload for end-user profile, group assignment and IMEI assignment."""
+    from app.routes_admin import get_admin_from_request
+
+    get_admin_from_request(request, db)
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    portal_user = db.query(PortalUser).filter(PortalUser.email == user.email).order_by(PortalUser.created_at.desc()).first()
+    groups = db.query(UserGroup).filter(UserGroup.is_active == True).order_by(UserGroup.name.asc()).all()
+    unassigned_tags = db.query(BLETag).filter(BLETag.user_id.is_(None)).order_by(BLETag.imei.asc()).all()
+
+    return {
+        "user": {
+            "id": str(user.id),
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "phone": user.phone,
+            "selected_usergroup_id": str(portal_user.usergroup_id) if portal_user and portal_user.usergroup_id else None,
+        },
+        "usergroups": [
+            {"id": str(group.id), "name": group.name}
+            for group in groups
+        ],
+        "unassigned_tags": [
+            {
+                "id": str(tag.id),
+                "imei": tag.imei,
+                "label": tag.device_name or tag.description or tag.imei,
+                "tag_type": tag.tag_type or "series1",
+            }
+            for tag in unassigned_tags
+        ]
+    }
+
+@app.put("/api/v1/admin/end-users/{user_id}")
+def update_end_user(
+    user_id: str,
+    payload: EndUserAdminUpdateRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Admin-only update for end-user details plus optional group and IMEI assignment."""
+    from app.routes_admin import get_admin_from_request
+
+    get_admin_from_request(request, db)
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.first_name = (payload.first_name or "").strip() or None
+    user.last_name = (payload.last_name or "").strip() or None
+    user.phone = (payload.phone or "").strip() or None
+
+    changes = []
+
+    if payload.usergroup_id:
+        group = db.query(UserGroup).filter(
+            UserGroup.id == payload.usergroup_id,
+            UserGroup.is_active == True
+        ).first()
+        if not group:
+            raise HTTPException(status_code=404, detail="Selected user group not found")
+
+        portal_user = db.query(PortalUser).filter(PortalUser.email == user.email).order_by(PortalUser.created_at.desc()).first()
+        if portal_user:
+            portal_user.usergroup_id = group.id
+            if not portal_user.first_name:
+                portal_user.first_name = user.first_name
+            if not portal_user.last_name:
+                portal_user.last_name = user.last_name
+        else:
+            portal_user = PortalUser(
+                usergroup_id=group.id,
+                email=user.email,
+                hashed_password=get_password_hash(secrets.token_urlsafe(24)),
+                first_name=user.first_name,
+                last_name=user.last_name,
+                is_active=False,
+                is_group_admin=False,
+                role='reporter',
+            )
+            db.add(portal_user)
+        changes.append(f"assigned to group '{group.name}'")
+
+    if payload.tag_id:
+        tag = db.query(BLETag).filter(BLETag.id == payload.tag_id).first()
+        if not tag:
+            raise HTTPException(status_code=404, detail="Selected IMEI not found")
+        if tag.user_id and str(tag.user_id) != str(user.id):
+            raise HTTPException(status_code=400, detail="Selected IMEI is already assigned")
+        tag.user_id = user.id
+        changes.append(f"assigned IMEI {tag.imei}")
+
+    db.commit()
+
+    return {
+        "success": True,
+        "message": "User updated successfully",
+        "changes": changes,
+    }
 
 @app.post("/api/v1/admin/impersonate/{user_id}")
 def impersonate_user(
