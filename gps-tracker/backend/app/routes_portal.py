@@ -1858,7 +1858,7 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
             "portal-tags slow path: usergroup_id=%s domains=%s owners=%d tags=%d elapsed_ms=%.1f",
             group_id,
             ",".join(domains),
-            len(owner_ids),
+            len(all_owner_ids),
             len(result),
             elapsed_ms,
         )
@@ -2126,17 +2126,54 @@ def _domain_filter(domains: list):
     return or_(*(User.email.ilike(f"%@{d}") for d in domains))
 
 
-def _group_tag_scope_filter(group: UserGroup, domains: list):
+def _get_group_owner_ids(group: UserGroup, db: Session) -> list:
+    """Return all user IDs that belong to a group (domain-matched + manually assigned).
+    
+    Includes:
+    1. Users whose email matches the group's email_domain (auto-assigned)
+    2. Users with a PortalUser record in this group (manually assigned)
+    """
+    domains = _domains(group)
+    
+    # Domain-matched users
+    domain_user_ids = []
+    if domains:
+        domain_user_ids = [
+            str(uid) for (uid,) in 
+            db.query(User.id).filter(_domain_filter(domains)).all()
+        ]
+    
+    # Manually assigned users (via PortalUser table)
+    portal_user_ids = [
+        str(uid) for (uid,) in 
+        db.query(User.id)
+        .join(PortalUser, User.email == PortalUser.email)
+        .filter(PortalUser.usergroup_id == group.id)
+        .all()
+    ]
+    
+    return list(set(domain_user_ids + portal_user_ids))
+
+
+def _group_tag_scope_filter(group: UserGroup, all_owner_ids: list):
     """Return a filter clause for tags visible to a portal group.
 
-    Includes tags owned by users in the group's email domain and tags stamped
-    at QR registration with this group's id in attributes._created_usergroup_id.
+    Includes:
+    1. Tags owned by users in all_owner_ids (domain-matched + manually assigned)
+    2. Tags created via QR/NFC registration for this group
+    
+    Args:
+        group: UserGroup object
+        all_owner_ids: List of user IDs from _get_group_owner_ids()
     """
     gid = str(group.id)
-    return or_(
-        _domain_filter(domains),
-        BLETag.attributes.op("->>")("_created_usergroup_id") == gid,
-    )
+    if all_owner_ids:
+        return or_(
+            BLETag.user_id.in_(all_owner_ids),
+            BLETag.attributes.op("->>")("_created_usergroup_id") == gid,
+        )
+    else:
+        return BLETag.attributes.op("->>")("_created_usergroup_id") == gid
 
 
 def _assert_user_in_domain(user: User, domain_or_domains) -> None:
@@ -2167,11 +2204,11 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
     if not _user_can_manage(me, "asset-mgmt"):
         raise HTTPException(status_code=403, detail="You don't have permission to edit tags")
     group = _get_group_and_assert_domain(me, db)
+    all_owner_ids = _get_group_owner_ids(group, db)
 
     tag = (
         db.query(BLETag)
-        .outerjoin(User, User.id == BLETag.user_id)
-        .filter(BLETag.id == tag_id, _group_tag_scope_filter(group, _domains(group)))
+        .filter(BLETag.id == tag_id, _group_tag_scope_filter(group, all_owner_ids))
         .first()
     )
     if not tag:
@@ -2341,12 +2378,12 @@ def assign_tag(tag_id: str, data: PortalTagAssign, request: Request, db: Session
     if not _user_can_manage(me, "asset-mgmt"):
         raise HTTPException(status_code=403, detail="You don't have permission to assign tags")
     group = _get_group_and_assert_domain(me, db)
+    all_owner_ids = _get_group_owner_ids(group, db)
 
     # Tag must belong to a user already in this group's domain
     tag = (
         db.query(BLETag)
-        .outerjoin(User, User.id == BLETag.user_id)
-        .filter(BLETag.id == tag_id, _group_tag_scope_filter(group, _domains(group)))
+        .filter(BLETag.id == tag_id, _group_tag_scope_filter(group, all_owner_ids))
         .first()
     )
     if not tag:
@@ -2369,12 +2406,12 @@ def delete_tags(data: PortalTagDelete, request: Request, db: Session = Depends(g
     if not _user_can_manage(me, "asset-mgmt"):
         raise HTTPException(status_code=403, detail="You don't have permission to delete tags")
     group = _get_group_and_assert_domain(me, db)
+    all_owner_ids = _get_group_owner_ids(group, db)
 
     for tag_id in data.tag_ids:
         tag = (
             db.query(BLETag)
-            .outerjoin(User, User.id == BLETag.user_id)
-            .filter(BLETag.id == tag_id, _group_tag_scope_filter(group, _domains(group)))
+            .filter(BLETag.id == tag_id, _group_tag_scope_filter(group, all_owner_ids))
             .first()
         )
         if tag:
@@ -2390,11 +2427,11 @@ def delete_tag_single(tag_id: str, request: Request, db: Session = Depends(get_d
     if not _user_can_manage(me, "asset-mgmt"):
         raise HTTPException(status_code=403, detail="You don't have permission to delete tags")
     group = _get_group_and_assert_domain(me, db)
+    all_owner_ids = _get_group_owner_ids(group, db)
 
     tag = (
         db.query(BLETag)
-        .outerjoin(User, User.id == BLETag.user_id)
-        .filter(BLETag.id == tag_id, _group_tag_scope_filter(group, _domains(group)))
+        .filter(BLETag.id == tag_id, _group_tag_scope_filter(group, all_owner_ids))
         .first()
     )
     if not tag:
@@ -2506,19 +2543,43 @@ async def portal_get_trips(
     Auth: portal JWT (PortalUser scoped to a UserGroup)."""
     me = get_portal_user_from_request(request, db)
     group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
-    if not group or not group.email_domain:
-        return {"success": False, "error": "Group has no configured domain", "trips": []}
+    if not group:
+        return {"success": False, "error": "Group not found", "trips": []}
 
     domains = _domains(group)
+    group_id = str(group.id)
 
-    # Verify the tag belongs to this group
+    # Get all user IDs that belong to this group (domain-matched + manually assigned)
+    domain_user_ids = []
+    if domains:
+        domain_user_ids = [str(uid) for (uid,) in db.query(User.id).filter(_domain_filter(domains)).all()]
+    
+    portal_user_ids = [
+        str(uid) for (uid,) in 
+        db.query(User.id)
+        .join(PortalUser, User.email == PortalUser.email)
+        .filter(PortalUser.usergroup_id == me.usergroup_id)
+        .all()
+    ]
+    
+    all_owner_ids = list(set(domain_user_ids + portal_user_ids))
+
+    # Verify the tag belongs to this group (domain-matched user, manually assigned user, or created by group)
+    tag_filter = (
+        or_(
+            BLETag.user_id.in_(all_owner_ids),
+            BLETag.attributes.op("->>")("_created_usergroup_id") == group_id,
+        )
+        if all_owner_ids
+        else BLETag.attributes.op("->>")("_created_usergroup_id") == group_id
+    )
+    
     tag = (
         db.query(BLETag)
-        .outerjoin(User, User.id == BLETag.user_id)
         .filter(
             BLETag.id == data.vehicleId,
             BLETag.is_active == True,
-            _group_tag_scope_filter(group, domains),
+            tag_filter,
         )
         .first()
     )
@@ -2814,15 +2875,15 @@ def report_geofence_events(
         return []
 
     domains = _domains(group)
+    all_owner_ids = _get_group_owner_ids(group, db)
     since = datetime.utcnow() - timedelta(days=max(1, min(days, 365)))
 
     q = (
         db.query(GeofenceAlert)
         .join(BLETag, BLETag.id == GeofenceAlert.tracker_id)
-        .outerjoin(User, User.id == BLETag.user_id)
         .join(POI, POI.id == GeofenceAlert.poi_id)
         .filter(
-            _group_tag_scope_filter(group, domains),
+            _group_tag_scope_filter(group, all_owner_ids),
             GeofenceAlert.created_at >= since,
         )
     )
