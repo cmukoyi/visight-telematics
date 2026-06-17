@@ -2588,8 +2588,11 @@ async def portal_get_trips(
 
     print(f"📱 PORTAL TRIPS REQUEST — group={group.slug} tag={tag.imei} {data.startDate}→{data.endDate}")
 
+    # Normalize tag_type aliases ('series2' → 'tracksolid', 'series1' → 'scope')
+    canonical_tag_type = _TAG_TYPE_ALIAS.get((tag.tag_type or "").lower(), (tag.tag_type or "").lower())
+
     # ── TrackSolid ────────────────────────────────────────────────────────────
-    if (tag.tag_type or "").lower() == "tracksolid":
+    if canonical_tag_type == "tracksolid":
         from app.services.device_providers.tracksolid_provider import fetch_tracksolid_journey_points
         from datetime import datetime as _dt
 
