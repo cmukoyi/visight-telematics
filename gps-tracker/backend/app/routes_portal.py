@@ -368,12 +368,38 @@ def list_portal_users(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """List all portal users in the caller's UserGroup."""
+    """List all portal users in the caller's UserGroup.
+    
+    Excludes flutter app users who were manually assigned to the usergroup.
+    Flutter users (those in 'users' table) appear in 'End User App Users' instead.
+    """
     me = get_portal_user_from_request(request, db)
-    users = db.query(PortalUser).filter(
+    
+    # Get all portal_users in this usergroup
+    portal_users_query = db.query(PortalUser).filter(
         PortalUser.usergroup_id == me.usergroup_id,
-    ).order_by(PortalUser.created_at).all()
-    return [PortalUserOut.model_validate(u) for u in users]
+    )
+    
+    # Exclude flutter users (those who exist in 'users' table)
+    # These are mobile app users who were manually assigned via portal_users
+    flutter_user_emails = db.query(User.email).filter(
+        User.email.in_(
+            db.query(PortalUser.email).filter(
+                PortalUser.usergroup_id == me.usergroup_id
+            )
+        )
+    ).all()
+    flutter_user_emails_set = {email for (email,) in flutter_user_emails}
+    
+    users = portal_users_query.order_by(PortalUser.created_at).all()
+    
+    # Filter out flutter users from portal users list
+    pure_portal_users = [
+        u for u in users 
+        if u.email not in flutter_user_emails_set
+    ]
+    
+    return [PortalUserOut.model_validate(u) for u in pure_portal_users]
 
 
 @router.post("/users", response_model=PortalUserCreateResponse)
@@ -1906,19 +1932,39 @@ class MobileUserOut(BaseModel):
 
 @router.get("/mobile-users", response_model=List[MobileUserOut])
 def list_mobile_users(request: Request, db: Session = Depends(get_db)):
-    """Return all mobile-app Users (active and inactive) whose email domain
-    matches the group's configured email_domain, with their assigned tags."""
+    """Return all mobile-app Users (active and inactive) in this usergroup.
+    
+    Includes:
+    1. Domain-matched users (email domain matches group's email_domain)
+    2. Manually assigned users (flutter users added via portal_users table)
+    """
     me = get_portal_user_from_request(request, db)
     group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
-    if not group or not group.email_domain:
+    if not group:
         return []
-    domains = _domains(group)
-    users = (
+    
+    # Source 1: Domain-matched users (if email_domain configured)
+    domains = _domains(group) if group.email_domain else []
+    domain_matched_users = []
+    if domains:
+        domain_matched_users = (
+            db.query(User)
+            .filter(_domain_filter(domains))
+            .all()
+        )
+    
+    # Source 2: Manually assigned users (via portal_users table)
+    manually_assigned_users = (
         db.query(User)
-        .filter(_domain_filter(domains))          # all users, active or not
-        .order_by(User.email)
+        .join(PortalUser, User.email == PortalUser.email)
+        .filter(PortalUser.usergroup_id == me.usergroup_id)
         .all()
     )
+    
+    # Combine and deduplicate by email (union)
+    user_map = {u.email: u for u in domain_matched_users}
+    user_map.update({u.email: u for u in manually_assigned_users})
+    users = sorted(user_map.values(), key=lambda u: u.email)
     # Fetch all tags for these users in one query
     user_ids = [u.id for u in users]
     tags_rows = (
