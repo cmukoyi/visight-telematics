@@ -1687,31 +1687,59 @@ def _compute_activity_status(last_seen: Optional[datetime]) -> str:
 
 @router.get("/tags", response_model=List[PortalTagOut])
 def list_group_tags(request: Request, db: Session = Depends(get_db)):
-    """Return all BLE tags belonging to mobile-app users whose email domain
-    matches the group's configured email_domain.
-
-    Returns an empty list (not an error) when no domain is configured yet.
+    """Return all BLE tags belonging to mobile-app users in this usergroup.
+    
+    Includes tags from:
+    1. Users whose email matches the group's email_domain (auto-assigned)
+    2. Users with a PortalUser record in this group (manually assigned)
+    3. Tags created via portal QR/NFC registration for this group
+    
+    Returns an empty list (not an error) when no users are in the group.
     """
     started_at = perf_counter()
     me = get_portal_user_from_request(request, db)
     group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
-    if not group or not group.email_domain:
+    if not group:
         return []
 
     domains = _domains(group)
     group_id = str(group.id)
 
-    # Resolve domain-scoped owners once, then query BLETag directly.
-    owner_rows = db.query(User.id, User.email).filter(_domain_filter(domains)).all()
-    owner_email_map = {str(uid): email for uid, email in owner_rows}
-    owner_ids = [uid for uid, _ in owner_rows]
+    # Source 1: Domain-matched users (auto-assigned via email domain)
+    domain_user_rows = []
+    domain_user_ids = []
+    if domains:
+        domain_user_rows = db.query(User.id, User.email).filter(_domain_filter(domains)).all()
+        domain_user_ids = [str(uid) for uid, _ in domain_user_rows]
+    
+    # Source 2: Manually assigned users (via PortalUser table)
+    portal_users = db.query(PortalUser.user_id, PortalUser.email).filter(
+        PortalUser.usergroup_id == me.usergroup_id,
+        PortalUser.user_id.isnot(None)
+    ).all()
+    portal_user_ids = [str(uid) for uid, _ in portal_users if uid]
+    
+    # UNION: All users in this group (domain-matched + manually assigned)
+    all_owner_ids = list(set(domain_user_ids + portal_user_ids))
+    
+    # Build email lookup map for display
+    owner_email_map = {str(uid): email for uid, email in domain_user_rows}
+    
+    # Add emails for manually assigned users not already in domain list
+    missing_portal_user_ids = [uid for uid in portal_user_ids if uid not in owner_email_map]
+    if missing_portal_user_ids:
+        extra_user_rows = db.query(User.id, User.email).filter(
+            User.id.in_(missing_portal_user_ids)
+        ).all()
+        owner_email_map.update({str(uid): email for uid, email in extra_user_rows})
 
+    # Tag filter includes all group users (domain-matched + manually assigned)
     tag_scope_filter = (
         or_(
-            BLETag.user_id.in_(owner_ids),
+            BLETag.user_id.in_(all_owner_ids),
             BLETag.attributes.op("->>")("_created_usergroup_id") == group_id,
         )
-        if owner_ids
+        if all_owner_ids
         else BLETag.attributes.op("->>")("_created_usergroup_id") == group_id
     )
 
