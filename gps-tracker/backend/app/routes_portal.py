@@ -1712,26 +1712,21 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
         domain_user_rows = db.query(User.id, User.email).filter(_domain_filter(domains)).all()
         domain_user_ids = [str(uid) for uid, _ in domain_user_rows]
     
-    # Source 2: Manually assigned users (via PortalUser table)
-    portal_users = db.query(PortalUser.user_id, PortalUser.email).filter(
-        PortalUser.usergroup_id == me.usergroup_id,
-        PortalUser.user_id.isnot(None)
-    ).all()
-    portal_user_ids = [str(uid) for uid, _ in portal_users if uid]
+    # Source 2: Manually assigned users (via PortalUser table, joined to User by email)
+    portal_user_rows = (
+        db.query(User.id, User.email)
+        .join(PortalUser, User.email == PortalUser.email)
+        .filter(PortalUser.usergroup_id == me.usergroup_id)
+        .all()
+    )
+    portal_user_ids = [str(uid) for uid, _ in portal_user_rows]
     
     # UNION: All users in this group (domain-matched + manually assigned)
     all_owner_ids = list(set(domain_user_ids + portal_user_ids))
     
-    # Build email lookup map for display
+    # Build email lookup map for display (combine both sources)
     owner_email_map = {str(uid): email for uid, email in domain_user_rows}
-    
-    # Add emails for manually assigned users not already in domain list
-    missing_portal_user_ids = [uid for uid in portal_user_ids if uid not in owner_email_map]
-    if missing_portal_user_ids:
-        extra_user_rows = db.query(User.id, User.email).filter(
-            User.id.in_(missing_portal_user_ids)
-        ).all()
-        owner_email_map.update({str(uid): email for uid, email in extra_user_rows})
+    owner_email_map.update({str(uid): email for uid, email in portal_user_rows})
 
     # Tag filter includes all group users (domain-matched + manually assigned)
     tag_scope_filter = (
