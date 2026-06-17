@@ -182,32 +182,7 @@ class UserWithTags(BaseModel):
 app = FastAPI(
     title="PinPlot API",
     version="1.0.0",
-    description="""
-## PinPlot RESTful API
-
-Real-time BLE tag tracking and asset management platform.
-
-### Authentication
-
-All endpoints require Bearer token authentication (except `/api/v1/auth/login` and `/api/v1/auth/register`).
-
-**Authentication Flow:**
-1. **Login** - POST to `/api/v1/auth/login` with email/password
-2. **Receive Token** - Server returns `access_token`
-3. **Use Token** - Include in `Authorization: Bearer <token>` header for all subsequent requests
-
-**Token Refresh:**
-- Tokens expire after 24 hours
-- Call `/api/v1/auth/refresh` before expiration to get a new token
-
-### Rate Limiting
-- Standard tier: 100 requests/minute
-- Contact support for higher limits
-
-### Support
-- Email: support@pinplot.me
-- Documentation: https://pinplot.me/docs
-    """,
+    description="Real-time BLE tag tracking and asset management platform. Authenticate with POST /api/v1/auth/login to receive a Bearer token, then include it in the Authorization header for all subsequent requests.",
     contact={
         "name": "PinPlot Support",
         "email": "support@pinplot.me",
@@ -219,8 +194,8 @@ All endpoints require Bearer token authentication (except `/api/v1/auth/login` a
     redoc_url="/redoc",
     openapi_url="/openapi.json",
     swagger_ui_parameters={
-        "defaultModelsExpandDepth": -1,  # Hide schemas section by default
-        "persistAuthorization": True,    # Remember token after refresh
+        "defaultModelsExpandDepth": -1,
+        "persistAuthorization": True,
     }
 )
 
