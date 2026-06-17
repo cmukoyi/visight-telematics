@@ -180,9 +180,48 @@ class UserWithTags(BaseModel):
         from_attributes = True
 
 app = FastAPI(
-    title="BLE Tracker API",
-    version="0.1.0",
-    description="Backend API for BLE tag tracking system"
+    title="PinPlot API",
+    version="1.0.0",
+    description="""
+## PinPlot RESTful API
+
+Real-time BLE tag tracking and asset management platform.
+
+### Authentication
+
+All endpoints require Bearer token authentication (except `/api/v1/auth/login` and `/api/v1/auth/register`).
+
+**Authentication Flow:**
+1. **Login** - POST to `/api/v1/auth/login` with email/password
+2. **Receive Token** - Server returns `access_token`
+3. **Use Token** - Include in `Authorization: Bearer <token>` header for all subsequent requests
+
+**Token Refresh:**
+- Tokens expire after 24 hours
+- Call `/api/v1/auth/refresh` before expiration to get a new token
+
+### Rate Limiting
+- Standard tier: 100 requests/minute
+- Contact support for higher limits
+
+### Support
+- Email: support@pinplot.me
+- Documentation: https://pinplot.me/docs
+    """,
+    contact={
+        "name": "PinPlot Support",
+        "email": "support@pinplot.me",
+    },
+    license_info={
+        "name": "Proprietary",
+    },
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+    swagger_ui_parameters={
+        "defaultModelsExpandDepth": -1,  # Hide schemas section by default
+        "persistAuthorization": True,    # Remember token after refresh
+    }
 )
 
 # Include admin router
@@ -735,9 +774,33 @@ def _get_mobile_allowed_tag_types(db: Session, user: User) -> Optional[List[str]
     return [str(tag_type).lower() for tag_type in group.allowed_tag_types if str(tag_type).strip()]
 
 
-@app.post("/api/v1/auth/register", response_model=Token)
+@app.post("/api/v1/auth/register", response_model=Token, tags=["Authentication"])
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
-    """Register a new user — only called after email/PIN verification and details entry"""
+    """
+    ## Register New User
+    
+    Creates a new user account after email verification.
+    
+    **Prerequisites:**
+    - Email must be verified via `/api/v1/auth/send-verification-code` and `/api/v1/auth/verify-pin`
+    
+    **Request Body:**
+    - `email`: Verified email address
+    - `password`: Strong password (min 8 characters recommended)
+    - `first_name`: User's first name (optional)
+    - `last_name`: User's last name (optional)
+    
+    **Returns:**
+    - `access_token`: JWT Bearer token for authentication
+    - `token_type`: Always "bearer"
+    
+    **Usage:**
+    ```bash
+    curl -X POST "https://pinplot.me/api/v1/auth/register" \\
+      -H "Content-Type: application/json" \\
+      -d '{"email":"user@example.com","password":"securepass123"}'
+    ```
+    """
     # Require that a verified PIN exists for this email (proves email ownership)
     verified_pin = db.query(VerificationPIN).filter(
         VerificationPIN.email == user_data.email,
@@ -788,9 +851,45 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     access_token = create_access_token(data={"sub": str(db_user.id)})
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.post("/api/v1/auth/login", response_model=Token)
+@app.post("/api/v1/auth/login", response_model=Token, tags=["Authentication"])
 def login(credentials: UserLogin, db: Session = Depends(get_db)):
-    """Login user"""
+    """
+    ## Login (Get Access Token)
+    
+    Authenticate with email and password to receive a Bearer token.
+    
+    **Request Body:**
+    - `email`: Registered email address
+    - `password`: Account password
+    
+    **Returns:**
+    - `access_token`: JWT token valid for 24 hours
+    - `token_type`: Always "bearer"
+    
+    **Use the token:**
+    Include in Authorization header for all subsequent requests:
+    ```
+    Authorization: Bearer <access_token>
+    ```
+    
+    **Example:**
+    ```bash
+    # 1. Login to get token
+    curl -X POST "https://pinplot.me/api/v1/auth/login" \\
+      -H "Content-Type: application/json" \\
+      -d '{"email":"user@example.com","password":"yourpassword"}'
+    
+    # Response: {"access_token":"eyJ0eXAi...","token_type":"bearer"}
+    
+    # 2. Use token in requests
+    curl "https://pinplot.me/api/v1/ble-tags" \\
+      -H "Authorization: Bearer eyJ0eXAi..."
+    ```
+    
+    **Errors:**
+    - `401`: Invalid credentials
+    - `403`: Account is inactive
+    """
     user = db.query(User).filter(User.email == credentials.email).first()
     
     if not user or not verify_password(credentials.password, user.hashed_password):
@@ -809,12 +908,26 @@ def login(credentials: UserLogin, db: Session = Depends(get_db)):
     
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.post("/api/v1/auth/refresh", response_model=Token)
+@app.post("/api/v1/auth/refresh", response_model=Token, tags=["Authentication"])
 def refresh_token(current_user: User = Depends(get_current_user)):
     """
-    Refresh JWT token for active users.
-    Returns a new token with extended expiration.
-    Call this endpoint before the current token expires.
+    ## Refresh Access Token
+    
+    Get a new JWT token before the current one expires.
+    
+    **Authentication Required:** Yes (Bearer token in Authorization header)
+    
+    **Returns:**
+    - New `access_token` valid for another 24 hours
+    - `token_type`: "bearer"
+    
+    **Best Practice:** Call this endpoint when your token is about to expire to maintain uninterrupted access.
+    
+    **Example:**
+    ```bash
+    curl -X POST "https://pinplot.me/api/v1/auth/refresh" \\
+      -H "Authorization: Bearer <your_current_token>"
+    ```
     """
     # Create new token with same user ID
     access_token = create_access_token(data={"sub": str(current_user.id)})
@@ -1022,9 +1135,23 @@ def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db))
         "message": "Password has been reset successfully"
     }
 
-@app.get("/api/v1/auth/me", response_model=UserResponse)
+@app.get("/api/v1/auth/me", response_model=UserResponse, tags=["User Profile"])
 def get_me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Get current user info"""
+    """
+    ## Get Current User Profile
+    
+    Retrieve authenticated user's account information.
+    
+    **Authentication Required:** Yes
+    
+    **Returns:**
+    - User ID, email, name, phone
+    - Email verification status
+    - Alert preferences
+    - Account status and creation date
+    - Usergroup assignment (if applicable)
+    - Allowed tag types based on subscription
+    """
     group = _get_mobile_usergroup(db, current_user)
     return {
         "id": current_user.id,
@@ -1098,18 +1225,40 @@ def update_user_email(
     return current_user
 
 # BLE Tag Management endpoints
-@app.post("/api/v1/ble-tags", response_model=BLETagResponse)
+@app.post("/api/v1/ble-tags", response_model=BLETagResponse, tags=["BLE Tags"])
 async def add_ble_tag(
     tag_data: BLETagCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Add a new BLE tag to user's account.
-
-    Validation against the vendor platform is enforced here — a tag can never
-    be saved with a tag_type that doesn't match what the vendor API confirms.
-    This prevents a TrackSolid IMEI being silently saved as Scope (or vice versa)
-    if the client sends the wrong type.
+    """
+    ## Register New BLE Tag
+    
+    Add a BLE tracking tag to your account.
+    
+    **Authentication Required:** Yes
+    
+    **Request Body:**
+    - `imei`: Device IMEI number (15 digits)
+    - `tag_type`: Tag series ("series1" or "series2")
+    - `device_name`: Optional friendly name
+    - `device_model`: Optional model identifier
+    - `mac_address`: Optional MAC address
+    
+    **Validation:**
+    - IMEI is verified against vendor platform
+    - Tag type must match vendor records
+    - IMEI must not already be registered
+    
+    **Returns:** Registered tag details including ID, battery level, and activation date
+    
+    **Example:**
+    ```bash
+    curl -X POST "https://pinplot.me/api/v1/ble-tags" \\
+      -H "Authorization: Bearer <token>" \\
+      -H "Content-Type: application/json" \\
+      -d '{"imei":"123456789012345","tag_type":"series2","device_name":"Asset Tracker 1"}'
+    ```
     """
     # Normalise and validate tag_type.
     # Accept both vendor names ('scope'/'tracksolid') and the Flutter app's
@@ -1247,12 +1396,33 @@ async def get_supported_tag_types(current_user: User = Depends(get_current_user)
     return {"types": filtered}
 
 
-@app.get("/api/v1/ble-tags", response_model=List[BLETagResponse])
+@app.get("/api/v1/ble-tags", response_model=List[BLETagResponse], tags=["BLE Tags"])
 def list_user_ble_tags(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get all BLE tags for current user"""
+    """
+    ## List All Tags
+    
+    Retrieve all active BLE tags registered to your account.
+    
+    **Authentication Required:** Yes
+    
+    **Returns:** Array of tag objects with:
+    - Tag ID and IMEI
+    - Device name and model
+    - Tag type (series)
+    - Active status
+    - Battery level
+    - Last seen timestamp
+    - Registration date
+    
+    **Example:**
+    ```bash
+    curl "https://pinplot.me/api/v1/ble-tags" \\
+      -H "Authorization: Bearer <token>"
+    ```
+    """
     tags = db.query(BLETag).filter(
         BLETag.user_id == current_user.id,
         BLETag.is_active == True
@@ -1261,13 +1431,27 @@ def list_user_ble_tags(
     # Convert ORM objects to Pydantic models with UUID serialization
     return [BLETagResponse.from_orm(tag) for tag in tags]
 
-@app.get("/api/v1/ble-tags/{tag_id}", response_model=BLETagResponse)
+@app.get("/api/v1/ble-tags/{tag_id}", response_model=BLETagResponse, tags=["BLE Tags"])
 def get_ble_tag(
     tag_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get specific BLE tag details"""
+    """
+    ## Get Tag Details
+    
+    Retrieve details for a specific BLE tag.
+    
+    **Authentication Required:** Yes (must own the tag)
+    
+    **Path Parameters:**
+    - `tag_id`: UUID of the tag
+    
+    **Returns:** Complete tag information
+    
+    **Errors:**
+    - `404`: Tag not found or not owned by user
+    """
     tag = db.query(BLETag).filter(
         BLETag.id == tag_id,
         BLETag.user_id == current_user.id
@@ -1376,13 +1560,27 @@ def validate_imei(
             }
         )
 
-@app.delete("/api/v1/ble-tags/{tag_id}")
+@app.delete("/api/v1/ble-tags/{tag_id}", tags=["BLE Tags"])
 def remove_ble_tag(
     tag_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Remove BLE tag from user's account"""
+    """
+    ## Deactivate Tag
+    
+    Soft-delete a BLE tag from your account (can be reactivated by support).
+    
+    **Authentication Required:** Yes (must own the tag)
+    
+    **Path Parameters:**
+    - `tag_id`: UUID of the tag to remove
+    
+    **Returns:** Success confirmation
+    
+    **Errors:**
+    - `404`: Tag not found
+    """
     tag = db.query(BLETag).filter(
         BLETag.id == tag_id,
         BLETag.user_id == current_user.id
