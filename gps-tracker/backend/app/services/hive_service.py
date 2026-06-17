@@ -900,6 +900,14 @@ def _maybe_send_hive_alert(hive: Hive, new_state: str, prev_state: str,
         "longitude": float(lng) if lng else None,
     }
 
+    # Check if an alert already exists today to avoid unique constraint violation
+    if _pas._recent_alert_exists(db, gid,
+                                 str(outlier_tag_id) if outlier_tag_id else None,
+                                 alert_type, within_hours=24):
+        log.debug("Skipping duplicate %s alert for hive %s (already sent today)",
+                  alert_type, hive.id)
+        return False
+
     try:
         _pas.create_alert(db, gid,
                           str(outlier_tag_id) if outlier_tag_id else None,
@@ -910,6 +918,7 @@ def _maybe_send_hive_alert(hive: Hive, new_state: str, prev_state: str,
         _pas._notify_group_by_sms(db, gid, alert_type, title, message)
         return True
     except Exception as exc:
+        db.rollback()  # Critical: rollback to prevent PendingRollbackError
         import traceback as _tb
         log.error("Failed to send hive alert for %s: %s\n%s",
                   hive.id, exc, _tb.format_exc())
@@ -937,6 +946,12 @@ def _send_resolved_by_transit_alert(hive: Hive, prev_state: str, db: Session) ->
         "previous_alert_state": prev_state,
         "reason": "RESOLVED_BY_TRANSIT",
     }
+    
+    # Check if an alert already exists today
+    if _pas._recent_alert_exists(db, gid, None, "hive_resolved_by_transit", within_hours=24):
+        log.debug("Skipping duplicate resolved_by_transit alert for hive %s (already sent today)", hive.id)
+        return False
+    
     try:
         _pas.create_alert(db, gid, None, "hive_resolved_by_transit",
                           title, message, meta_data=meta_data)
@@ -945,6 +960,7 @@ def _send_resolved_by_transit_alert(hive: Hive, prev_state: str, db: Session) ->
                                     title, message, meta_data=meta_data)
         return True
     except Exception as exc:
+        db.rollback()  # Critical: rollback to prevent PendingRollbackError
         import traceback as _tb
         log.error("Failed to send resolved-by-transit alert for %s: %s\n%s",
                   hive.id, exc, _tb.format_exc())
