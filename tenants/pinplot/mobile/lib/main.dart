@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:ble_tracker_app/theme/app_theme.dart';
+import 'package:ble_tracker_app/theme/app_brand_config.dart';
 import 'package:ble_tracker_app/screens/auth/welcome_screen.dart';
 import 'package:ble_tracker_app/screens/auth/reset_password_screen.dart';
 import 'package:ble_tracker_app/screens/map_screen.dart';
@@ -8,28 +10,70 @@ import 'package:ble_tracker_app/screens/add_tag_screen.dart';
 import 'package:ble_tracker_app/services/auth_service.dart';
 import 'package:ble_tracker_app/services/token_refresh_manager.dart';
 
+// ─── Brand configuration ──────────────────────────────────────────────────────
+//
+// To white-label this app for a different deployment, change ONLY this line.
+// Everything else — themes, colours, fonts — is derived automatically.
+//
+// Examples:
+//   AppBrandConfig.pinplot()                   ← default PinPlot green
+//   AppBrandConfig.custom(                     ← any brand colour
+//     primaryColor: Color(0xFF1565C0),
+//     appName: 'Beacon Telematics',
+//     logoAsset: 'assets/beacon_logo.png',
+//     tagline: 'Track your assets',
+//   )
+
+const _brand = null; // Set to AppBrandConfig.custom(...) to override
+
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Configure the theme — must happen before runApp
+  AppTheme.configure(_brand ?? AppBrandConfig.pinplot());
+
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  // Expose theme mode so any screen can toggle light/dark
+  ThemeMode _themeMode = ThemeMode.system;
+
+  void _setThemeMode(ThemeMode mode) {
+    setState(() => _themeMode = mode);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return ActivityMonitor(
-      child: MaterialApp(
-        title: 'Pinplot',
-        theme: AppTheme.lightTheme,
-        debugShowCheckedModeBanner: false,
-        home: const SplashScreen(),
-        routes: {
-          '/welcome': (context) => const WelcomeScreen(),
-          '/map': (context) => const MapScreen(),
-          '/poi-management': (context) => const POIManagementScreen(),
-          '/add-tag': (context) => const AddTagScreen(),
-        },
-        builder: (context, child) => child!,
+    return Provider<void Function(ThemeMode)>.value(
+      value: _setThemeMode,
+      child: ActivityMonitor(
+        child: MaterialApp(
+          title: 'PinPlot',
+          debugShowCheckedModeBanner: false,
+          
+          // ── Themes ──────────────────────────────────────────────────────────
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          themeMode: _themeMode,
+          
+          // ── Routes ──────────────────────────────────────────────────────────
+          home: const SplashScreen(),
+          routes: {
+            '/welcome': (context) => const WelcomeScreen(),
+            '/map': (context) => const MapScreen(),
+            '/poi-management': (context) => const POIManagementScreen(),
+            '/add-tag': (context) => const AddTagScreen(),
+          },
+          builder: (context, child) => child!,
+        ),
       ),
     );
   }

@@ -396,7 +396,7 @@ class _AddTagScreenState extends State<AddTagScreen> {
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppTheme.brandPrimary, width: 2),
+        borderSide: BorderSide(color: AppTheme.brandPrimary, width: 2),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     );
