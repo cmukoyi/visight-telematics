@@ -118,20 +118,20 @@ GET /api/admin/translations/export/{lang}   # Export for translators
    - Export untranslated keys ✅
    - Import translated files ✅
 
-3. **Usergroup Editor Enhancement** 🔲 NOT STARTED
+3. **Usergroup Editor Enhancement** ✅ COMPLETE
    - Add "Default Language" dropdown
    - Shows active languages from database
 
 **Files to Create/Modify:**
 - `gps-tracker/admin-portal/translations.html` ✅ (embedded in index.html)
 - `gps-tracker/admin-portal/languages.html` ✅ (embedded in index.html)
-- `gps-tracker/admin-portal/usergroups.html` (modify) 🔲
+- `gps-tracker/admin-portal/usergroups.html` (modify) ✅
 - `gps-tracker/admin-portal/index.html` (add nav links) ✅
 
-**Status:** ⏳ MOSTLY COMPLETE - Deployed to main (commit 35cd7c2)
+**Status:** ✅ COMPLETE - Deployed to main (commit 35ad83e)
 - Translation Manager: ✅ Complete
 - Language Manager: ✅ Complete
-- Usergroup Editor: 🔲 Need to add language selector
+- Usergroup Editor: ✅ Complete with language selector
 
 ---
 
