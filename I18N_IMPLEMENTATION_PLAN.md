@@ -303,10 +303,11 @@ Include in migration 049 with initial English text
 ## 🐛 Known Issues / Notes
 
 ### Phase 1 Deployment Notes:
-- **Commit:** a0f5080 pushed to main (initial), bfec39d (bug fix #1), 93716a6 (bug fix #2)
+- **Commit:** a0f5080 (initial), bfec39d (bug fix #1), 93716a6 (bug fix #2), 4b7f9a1 (bug fix #3)
 - **Deployed:** 2026-06-18
 - **Bug #1 Fixed:** Table name was `usergroups` but should be `user_groups` (with underscore) - Fixed in bfec39d
 - **Bug #2 Fixed:** Column name conflict - `Translation.translation_key` (column) conflicted with `translation_key` (relationship). Renamed column to `key` - Fixed in 93716a6
+- **Bug #3 Fixed:** Missing `get_current_admin_user` dependency function in admin_auth.py - Added FastAPI dependency for admin authentication - Fixed in 4b7f9a1
 - **Migration needed:** Run `docker compose exec backend alembic upgrade head` on pinplot.me server
 - **Test endpoints:** After migration, test with Postman:
   - GET https://pinplot.me/api/languages (should return en, fr)
