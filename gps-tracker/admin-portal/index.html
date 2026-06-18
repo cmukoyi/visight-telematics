@@ -2525,16 +2525,12 @@
                                         <option value="settings">Settings</option>
                                         <option value="auth">Auth</option>
                                     </select>
-                                    <select id="translationLanguageFilter" onchange="loadTranslations()" style="padding:8px;border-radius:6px;border:1px solid var(--border);">
-                                        <option value="">All Languages</option>
-                                    </select>
                                     <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
                                         <input type="checkbox" id="translationMissingOnly" onchange="loadTranslations()">
-                                        Missing only
+                                        Show missing only
                                     </label>
                                     <input type="text" id="translationSearchInput" placeholder="Search keys..." style="padding:8px;border-radius:6px;border:1px solid var(--border);min-width:200px;" oninput="debounceTranslationSearch()">
-                                    <button class="btn btn-secondary btn-small" onclick="exportTranslations()">📥 Export CSV</button>
-                                    <button class="btn btn-secondary btn-small" onclick="openImportTranslationsModal()">📤 Import CSV</button>
+                                    <button class="btn btn-success btn-small" onclick="autoTranslateAll()" title="Auto-translate all missing translations using Google Translate API">🤖 Auto-Translate All</button>
                                     <button class="btn btn-primary btn-small" onclick="openAddTranslationKeyModal()">+ Add Key</button>
                                     <button class="btn btn-primary btn-small" onclick="loadTranslations()">↻ Refresh</button>
                                 </div>
@@ -2547,20 +2543,18 @@
                                     <!-- Populated by JS -->
                                 </div>
                             </div>
-                            <div class="table-wrapper">
-                                <table>
-                                    <thead>
+                            <div class="table-wrapper" style="overflow-x:auto;">
+                                <table id="translationsTable">
+                                    <thead id="translationsTableHead">
                                         <tr>
-                                            <th style="width:20%">Key</th>
-                                            <th style="width:12%">Category</th>
-                                            <th style="width:23%">English (Default)</th>
-                                            <th style="width:23%">Translation</th>
-                                            <th style="width:12%">Language</th>
-                                            <th style="width:10%">Actions</th>
+                                            <th style="width:180px;position:sticky;left:0;background:var(--surface);z-index:2;">Key</th>
+                                            <th style="width:100px;">Category</th>
+                                            <th style="width:220px;">English (Default)</th>
+                                            <!-- Language columns populated by JS -->
                                         </tr>
                                     </thead>
                                     <tbody id="translationsTableBody">
-                                        <tr><td colspan="6" style="text-align:center;color:var(--gray);padding:2rem">Click ↻ Refresh to load translations</td></tr>
+                                        <tr><td colspan="20" style="text-align:center;color:var(--gray);padding:2rem">Click ↻ Refresh to load translations</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -5691,24 +5685,32 @@ dashboard.welcome,Bienvenue</pre>
     }
 
     // ========================================================================
-    // I18N / TRANSLATIONS FUNCTIONS
+    // I18N / TRANSLATIONS FUNCTIONS (REDESIGNED WITH ALL LANGUAGES AS COLUMNS)
     // ========================================================================
 
     let translationSearchTimeout = null;
     let allTranslationKeys = [];
+    let allLanguages = [];
 
     async function loadTranslations() {
         try {
             const category = document.getElementById('translationCategoryFilter').value;
-            const language = document.getElementById('translationLanguageFilter').value;
             const missingOnly = document.getElementById('translationMissingOnly').checked;
             const search = document.getElementById('translationSearchInput').value;
 
-            let url = '/api/admin/i18n/translation-keys?';
-            if (category) url += `category=${encodeURIComponent(category)}&`;
-            if (language) url += `language=${encodeURIComponent(language)}&`;
-            if (missingOnly && language) url += `missing_only=true&`;
-            if (search) url += `search=${encodeURIComponent(search)}&`;
+            // Fetch languages first
+            const langResponse = await fetch('/api/admin/i18n/languages?include_inactive=false', {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            if (!langResponse.ok) throw new Error('Failed to load languages');
+            allLanguages = await langResponse.json();
+
+            // Build URL with filters
+            let url = '/api/admin/i18n/translation-keys';
+            const params = [];
+            if (category) params.push(`category=${encodeURIComponent(category)}`);
+            if (search) params.push(`search=${encodeURIComponent(search)}`);
+            if (params.length > 0) url += '?' + params.join('&');
 
             const response = await fetch(url, {
                 headers: { 'Authorization': `Bearer ${authToken}` }
@@ -5716,71 +5718,289 @@ dashboard.welcome,Bienvenue</pre>
 
             if (!response.ok) throw new Error('Failed to load translations');
 
-            const keys = await response.json();
-            allTranslationKeys = keys;
-
-            const tbody = document.getElementById('translationsTableBody');
-            const totalKeysEl = document.getElementById('translationTotalKeys');
-            const completionStatsEl = document.getElementById('translationCompletionStats');
-
-            if (!keys || keys.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:2rem">No translation keys found</td></tr>';
-                totalKeysEl.textContent = '0';
-                completionStatsEl.innerHTML = '';
-                return;
+            let keys = await response.json();
+            
+            // Apply missing-only filter client-side if needed
+            if (missingOnly) {
+                const nonEnglishLangs = allLanguages.filter(l => l.code !== 'en');
+                keys = keys.filter(key => {
+                    return nonEnglishLangs.some(lang => !key.translations || !key.translations[lang.code]);
+                });
             }
 
+            allTranslationKeys = keys;
+
+            // Update stats
+            const totalKeysEl = document.getElementById('translationTotalKeys');
+            const completionStatsEl = document.getElementById('translationCompletionStats');
             totalKeysEl.textContent = keys.length;
 
             // Calculate completion stats per language
-            const languages = await fetchLanguages();
             let statsHTML = '';
-            for (const lang of languages) {
+            for (const lang of allLanguages) {
                 if (lang.code === 'en') continue; // Skip English (default)
                 let translated = 0;
                 keys.forEach(key => {
                     if (key.translations && key.translations[lang.code]) translated++;
                 });
-                const percent = Math.round((translated / keys.length) * 100);
+                const percent = keys.length > 0 ? Math.round((translated / keys.length) * 100) : 0;
                 const color = percent === 100 ? 'var(--primary)' : percent > 50 ? 'var(--warning)' : 'var(--danger)';
-                statsHTML += `<span style="color:${color};"><strong>${lang.code.toUpperCase()}:</strong> ${percent}% (${translated}/${keys.length})</span>`;
+                statsHTML += `<span style="color:${color};margin-right:16px;"><strong>${lang.code.toUpperCase()}:</strong> ${percent}% (${translated}/${keys.length})</span>`;
             }
             completionStatsEl.innerHTML = statsHTML;
 
-            // Render table
+            // Build table header with all language columns
+            const thead = document.getElementById('translationsTableHead');
+            const nonEnglishLangs = allLanguages.filter(l => l.code !== 'en');
+            const langColumns = nonEnglishLangs.map(lang => 
+                `<th style="width:220px;">
+                    ${escapeHtml(lang.name)} (${lang.code.toUpperCase()})
+                    <button class="btn btn-small" onclick="autoTranslateColumn('${lang.code}')" style="margin-left:8px;font-size:10px;padding:2px 6px;" title="Auto-translate this language">🤖 Auto</button>
+                </th>`
+            ).join('');
+            thead.innerHTML = `
+                <tr>
+                    <th style="width:180px;position:sticky;left:0;background:var(--surface);z-index:2;">Key</th>
+                    <th style="width:100px;">Category</th>
+                    <th style="width:220px;">English (Default)</th>
+                    ${langColumns}
+                </tr>
+            `;
+
+            // Build table rows
+            const tbody = document.getElementById('translationsTableBody');
+            if (!keys || keys.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${3 + nonEnglishLangs.length}" style="text-align:center;color:var(--gray);padding:2rem">No translation keys found</td></tr>`;
+                return;
+            }
+
             tbody.innerHTML = keys.map(key => {
                 const translations = key.translations || {};
-                const languageOptions = languages.filter(l => l.code !== 'en').map(l => {
-                    const hasTranslation = translations[l.code];
-                    return `<option value="${l.code}">${l.name} ${hasTranslation ? '✓' : '⚠️'}</option>`;
+                const translationCells = nonEnglishLangs.map(lang => {
+                    const translation = translations[lang.code] || '';
+                    const isMissing = !translation;
+                    const cellId = `cell-${escapeHtml(key.key).replace(/\./g, '_')}-${lang.code}`;
+                    return `<td 
+                        id="${cellId}"
+                        data-key="${escapeHtml(key.key)}" 
+                        data-lang="${lang.code}"
+                        data-default="${escapeHtml(key.default_text)}"
+                        onclick="editTranslationCell(this)"
+                        style="cursor:pointer;background:${isMissing ? 'var(--danger-light,#fff1f0)' : 'transparent'};font-size:12px;position:relative;padding:8px;"
+                        title="${isMissing ? 'Click to add translation' : 'Click to edit translation'}"
+                    >${translation ? escapeHtml(translation) : '<span style="color:var(--danger);">⚠️ Missing</span>'}</td>`;
                 }).join('');
-
-                // Show the selected language or first non-English language
-                const displayLang = language || languages.find(l => l.code !== 'en')?.code || 'fr';
-                const displayTranslation = translations[displayLang] || '<span style="color:var(--danger);">Missing</span>';
-                const displayLangName = languages.find(l => l.code === displayLang)?.name || displayLang.toUpperCase();
 
                 return `
                     <tr>
-                        <td><code style="font-size:12px;">${escapeHtml(key.key)}</code></td>
-                        <td><span class="badge">${key.category || '-'}</span></td>
+                        <td style="position:sticky;left:0;background:var(--surface);z-index:1;"><code style="font-size:11px;">${escapeHtml(key.key)}</code></td>
+                        <td><span class="badge" style="font-size:11px;">${key.category || '-'}</span></td>
                         <td style="font-size:12px;">${escapeHtml(key.default_text)}</td>
-                        <td style="font-size:12px;">${typeof displayTranslation === 'string' && !displayTranslation.includes('Missing') ? escapeHtml(displayTranslation) : displayTranslation}</td>
-                        <td>
-                            <select onchange="changeTranslationLanguageView(this, '${escapeHtml(key.key)}')" style="font-size:12px;padding:4px;">
-                                ${languageOptions}
-                            </select>
-                        </td>
-                        <td>
-                            <button class="btn btn-small btn-primary" onclick="openEditTranslationModal('${escapeHtml(key.key)}', '${displayLang}')" style="font-size:11px;padding:4px 8px;">Edit</button>
-                        </td>
+                        ${translationCells}
                     </tr>
                 `;
             }).join('');
 
         } catch (e) {
             console.error('Error loading translations:', e);
-            alert('Error loading translations: ' + e.message);
+            const tbody = document.getElementById('translationsTableBody');
+            tbody.innerHTML = `<tr><td colspan="20" style="text-align:center;color:var(--danger);padding:2rem">Error loading translations: ${e.message}</td></tr>`;
+        }
+    }
+
+    // Inline cell editing
+    function editTranslationCell(cell) {
+        const key = cell.getAttribute('data-key');
+        const lang = cell.getAttribute('data-lang');
+        const currentText = cell.textContent.includes('Missing') ? '' : cell.textContent.trim();
+
+        // Replace cell with textarea
+        const textarea = document.createElement('textarea');
+        textarea.value = currentText;
+        textarea.style.width = '100%';
+        textarea.style.minHeight = '60px';
+        textarea.style.padding = '6px';
+        textarea.style.fontSize = '12px';
+        textarea.style.border = '2px solid var(--primary)';
+        textarea.style.borderRadius = '4px';
+        textarea.style.resize = 'vertical';
+
+        const saveBtn = document.createElement('button');
+        saveBtn.textContent = '💾 Save';
+        saveBtn.className = 'btn btn-small btn-primary';
+        saveBtn.style.marginTop = '4px';
+        saveBtn.style.marginRight = '4px';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = '✖ Cancel';
+        cancelBtn.className = 'btn btn-small btn-secondary';
+        cancelBtn.style.marginTop = '4px';
+
+        const container = document.createElement('div');
+        container.appendChild(textarea);
+        container.appendChild(saveBtn);
+        container.appendChild(cancelBtn);
+
+        cell.innerHTML = '';
+        cell.appendChild(container);
+        cell.onclick = null; // Disable click while editing
+        textarea.focus();
+
+        saveBtn.onclick = async () => {
+            const newText = textarea.value.trim();
+            if (!newText) {
+                alert('Translation cannot be empty');
+                return;
+            }
+            await saveTranslation(key, lang, newText, cell);
+        };
+
+        cancelBtn.onclick = () => {
+            loadTranslations(); // Reload to restore original state
+        };
+
+        // Save on Ctrl+Enter
+        textarea.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                saveBtn.click();
+            }
+        });
+    }
+
+    async function saveTranslation(key, langCode, translatedText, cell) {
+        try {
+            const response = await fetch('/api/admin/i18n/translations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({
+                    language_code: langCode,
+                    translation_key: key,
+                    translated_text: translatedText
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to save translation');
+            }
+
+            // Update cell with new text
+            cell.textContent = translatedText;
+            cell.style.background = 'var(--success-light, #d4edda)';
+            cell.onclick = () => editTranslationCell(cell);
+
+            // Reset background after animation
+            setTimeout(() => {
+                cell.style.background = 'transparent';
+            }, 2000);
+
+        } catch (e) {
+            alert('Error saving translation: ' + e.message);
+            loadTranslations(); // Reload on error
+        }
+    }
+
+    // Auto-translate functions using Google Translate API
+    async function autoTranslateColumn(langCode) {
+        if (!confirm(`Auto-translate all missing translations to ${langCode.toUpperCase()}?\n\nThis will use Google Translate API. Review translations after generation.`)) {
+            return;
+        }
+
+        const missingKeys = allTranslationKeys.filter(key => {
+            return !key.translations || !key.translations[langCode];
+        });
+
+        if (missingKeys.length === 0) {
+            alert(`All keys already translated to ${langCode.toUpperCase()}!`);
+            return;
+        }
+
+        const progressDiv = document.createElement('div');
+        progressDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:24px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.3);z-index:10000;';
+        progressDiv.innerHTML = `<h3>🤖 Auto-translating...</h3><p id="autoTranslateProgress">0 / ${missingKeys.length}</p>`;
+        document.body.appendChild(progressDiv);
+
+        let success = 0;
+        let failed = 0;
+
+        for (let i = 0; i < missingKeys.length; i++) {
+            const key = missingKeys[i];
+            try {
+                const translated = await translateText(key.default_text, 'en', langCode);
+                await saveTranslationDirect(key.key, langCode, translated);
+                success++;
+            } catch (e) {
+                console.error(`Failed to translate ${key.key}:`, e);
+                failed++;
+            }
+            document.getElementById('autoTranslateProgress').textContent = `${i + 1} / ${missingKeys.length} (${success} success, ${failed} failed)`;
+        }
+
+        document.body.removeChild(progressDiv);
+        alert(`Auto-translation complete!\n✅ ${success} translations added\n❌ ${failed} failed`);
+        loadTranslations();
+    }
+
+    async function autoTranslateAll() {
+        const nonEnglishLangs = allLanguages.filter(l => l.code !== 'en');
+        if (nonEnglishLangs.length === 0) {
+            alert('No other languages configured. Add languages first.');
+            return;
+        }
+
+        if (!confirm(`Auto-translate ALL missing translations for ALL languages?\n\nThis may take a few minutes.`)) {
+            return;
+        }
+
+        for (const lang of nonEnglishLangs) {
+            await autoTranslateColumn(lang.code);
+        }
+    }
+
+    async function translateText(text, fromLang, toLang) {
+        // Using LibreTranslate API (free, open-source alternative to Google Translate)
+        // You can also use Google Translate API if you have an API key
+        try {
+            const response = await fetch('https://libretranslate.com/translate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    q: text,
+                    source: fromLang,
+                    target: toLang,
+                    format: 'text'
+                })
+            });
+
+            if (!response.ok) throw new Error('Translation API failed');
+            const data = await response.json();
+            return data.translatedText;
+        } catch (e) {
+            // Fallback: just return original text with [AUTO] marker
+            console.error('Translation failed:', e);
+            return `[AUTO-TRANSLATE-FAILED] ${text}`;
+        }
+    }
+
+    async function saveTranslationDirect(key, langCode, translatedText) {
+        const response = await fetch('/api/admin/i18n/translations', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                language_code: langCode,
+                translation_key: key,
+                translated_text: translatedText
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to save translation');
         }
     }
 
