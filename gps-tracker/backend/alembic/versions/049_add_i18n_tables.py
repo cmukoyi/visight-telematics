@@ -48,16 +48,16 @@ def upgrade():
         'translations',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('language_code', sa.String(5), nullable=False),
-        sa.Column('translation_key', sa.String(255), nullable=False),
+        sa.Column('key', sa.String(255), nullable=False),
         sa.Column('translated_text', sa.Text(), nullable=False),
         sa.Column('last_updated', sa.DateTime(timezone=True), server_default=sa.func.now(), onupdate=sa.func.now()),
         sa.ForeignKeyConstraint(['language_code'], ['languages.code'], ondelete='CASCADE'),
-        sa.ForeignKeyConstraint(['translation_key'], ['translation_keys.key'], ondelete='CASCADE'),
+        sa.ForeignKeyConstraint(['key'], ['translation_keys.key'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('language_code', 'translation_key', name='uq_language_key')
+        sa.UniqueConstraint('language_code', 'key', name='uq_language_key')
     )
     op.create_index('ix_translations_language', 'translations', ['language_code'])
-    op.create_index('ix_translations_key', 'translations', ['translation_key'])
+    op.create_index('ix_translations_key', 'translations', ['key'])
     
     # 4. Add language preferences to users and usergroups
     op.add_column('users', sa.Column('preferred_language', sa.String(5), nullable=True))

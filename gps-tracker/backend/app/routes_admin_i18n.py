@@ -283,7 +283,7 @@ def list_translation_keys(
         
         # Get all translations for this key
         all_translations = db.query(Translation).filter(
-            Translation.translation_key == key.key
+            Translation.key == key.key
         ).all()
         
         for trans in all_translations:
@@ -436,7 +436,7 @@ def create_or_update_translation(
     existing = db.query(Translation).filter(
         and_(
             Translation.language_code == translation.language_code,
-            Translation.translation_key == translation.translation_key
+            Translation.key == translation.translation_key
         )
     ).first()
     
@@ -452,7 +452,7 @@ def create_or_update_translation(
         # Create new translation
         new_translation = Translation(
             language_code=translation.language_code,
-            translation_key=translation.translation_key,
+            key=translation.translation_key,
             translated_text=translation.translated_text
         )
         db.add(new_translation)
@@ -490,7 +490,7 @@ def bulk_update_translations(
             existing = db.query(Translation).filter(
                 and_(
                     Translation.language_code == trans.language_code,
-                    Translation.translation_key == trans.translation_key
+                    Translation.key == trans.translation_key
                 )
             ).first()
             
@@ -501,7 +501,7 @@ def bulk_update_translations(
             else:
                 new_translation = Translation(
                     language_code=trans.language_code,
-                    translation_key=trans.translation_key,
+                    key=trans.translation_key,
                     translated_text=trans.translated_text
                 )
                 db.add(new_translation)
@@ -538,7 +538,7 @@ def delete_translation(
             detail="Translation not found"
         )
     
-    key_name = translation.translation_key
+    key_name = translation.key
     lang = translation.language_code
     
     db.delete(translation)
@@ -582,7 +582,7 @@ def export_translations(
         translation = db.query(Translation).filter(
             and_(
                 Translation.language_code == language_code,
-                Translation.translation_key == key.key
+                Translation.key == key.key
             )
         ).first()
         
@@ -679,7 +679,7 @@ async def import_translations(
             existing = db.query(Translation).filter(
                 and_(
                     Translation.language_code == language_code,
-                    Translation.translation_key == key
+                    Translation.key == key
                 )
             ).first()
             
@@ -690,7 +690,7 @@ async def import_translations(
             else:
                 new_translation = Translation(
                     language_code=language_code,
-                    translation_key=key,
+                    key=key,
                     translated_text=translated_text
                 )
                 db.add(new_translation)

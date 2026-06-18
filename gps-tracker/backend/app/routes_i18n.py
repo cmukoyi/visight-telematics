@@ -81,7 +81,7 @@ def get_translations(lang_code: str, db: Session = Depends(get_db)):
         translation = db.query(Translation).filter(
             and_(
                 Translation.language_code == lang_code,
-                Translation.translation_key == key.key
+                Translation.key == key.key
             )
         ).first()
         

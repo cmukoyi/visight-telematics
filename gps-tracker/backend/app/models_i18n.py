@@ -41,13 +41,13 @@ class Translation(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     language_code = Column(String(5), ForeignKey('languages.code', ondelete='CASCADE'), nullable=False, index=True)
-    translation_key = Column(String(255), ForeignKey('translation_keys.key', ondelete='CASCADE'), nullable=False, index=True)
+    key = Column(String(255), ForeignKey('translation_keys.key', ondelete='CASCADE'), nullable=False, index=True)
     translated_text = Column(Text, nullable=False)
     last_updated = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     # Composite unique constraint
     __table_args__ = (
-        UniqueConstraint('language_code', 'translation_key', name='uq_language_key'),
+        UniqueConstraint('language_code', 'key', name='uq_language_key'),
     )
     
     # Relationships
