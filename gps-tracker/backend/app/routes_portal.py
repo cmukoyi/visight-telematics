@@ -2176,8 +2176,13 @@ def _group_tag_scope_filter(group: UserGroup, all_owner_ids: list):
         return BLETag.attributes.op("->>")("_created_usergroup_id") == gid
 
 
-def _assert_user_in_domain(user: User, domain_or_domains) -> None:
-    """Raise 403 if the user's email doesn't match any of the configured domains."""
+def _assert_user_in_domain(user: User, domain_or_domains, db: Session = None, usergroup_id: str = None) -> None:
+    """Raise 403 if the user's email doesn't match any of the configured domains.
+    
+    Fallback: If domain check fails but db and usergroup_id are provided, 
+    check if the user has been explicitly added to the usergroup via portal_users table.
+    This allows manually assigned users (e.g., gmail.com emails) to be managed in the portal.
+    """
     if not user:
         raise HTTPException(status_code=403, detail="User does not belong to this group's domain")
     if isinstance(domain_or_domains, str):
@@ -2185,8 +2190,22 @@ def _assert_user_in_domain(user: User, domain_or_domains) -> None:
     else:
         domains = [d.lower() for d in domain_or_domains]
     email = user.email.lower()
-    if not any(email.endswith(f"@{d}") for d in domains):
-        raise HTTPException(status_code=403, detail="User does not belong to this group's domain")
+    
+    # Primary check: email domain matches
+    if any(email.endswith(f"@{d}") for d in domains):
+        return  # User belongs to domain, allow access
+    
+    # Fallback: check if user has been explicitly added to this usergroup
+    if db and usergroup_id:
+        portal_user = db.query(PortalUser).filter(
+            PortalUser.email == email,
+            PortalUser.usergroup_id == usergroup_id
+        ).first()
+        if portal_user:
+            return  # User explicitly assigned to this usergroup, allow access
+    
+    # Neither domain match nor explicit assignment found
+    raise HTTPException(status_code=403, detail="User does not belong to this group's domain")
 
 
 class PortalTagUpdate(BaseModel):
@@ -2235,7 +2254,7 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
     if "user_id" in fields_set:
         if data.user_id:
             target_user = db.query(User).filter(User.id == str(data.user_id)).first()
-            _assert_user_in_domain(target_user, _domains(group))
+            _assert_user_in_domain(target_user, _domains(group), db=db, usergroup_id=group.id)
             tag.user_id = str(data.user_id)
         else:
             # Explicit null/empty in payload means unassign from user.
@@ -2327,7 +2346,7 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
     target_user = None
     if data.user_id:
         target_user = db.query(User).filter(User.id == str(data.user_id)).first()
-        _assert_user_in_domain(target_user, _domains(group))
+        _assert_user_in_domain(target_user, _domains(group), db=db, usergroup_id=group.id)
 
     pkg = db.query(TagPackage).filter(TagPackage.id == str(data.package_id), TagPackage.is_active == True).first()
     if not pkg:
@@ -2390,7 +2409,7 @@ def assign_tag(tag_id: str, data: PortalTagAssign, request: Request, db: Session
         raise HTTPException(status_code=404, detail="Tag not found in your group")
 
     target_user = db.query(User).filter(User.id == str(data.user_id)).first()
-    _assert_user_in_domain(target_user, _domains(group))
+    _assert_user_in_domain(target_user, _domains(group), db=db, usergroup_id=group.id)
 
     tag.user_id = str(data.user_id)
     db.commit()
