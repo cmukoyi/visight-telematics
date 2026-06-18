@@ -467,6 +467,20 @@ jobs:
              echo '✅ Alembic chain check passed (046 -> 047)'; \
              ls -l backend/alembic/versions/046_critical_alert_subscriptions.py backend/alembic/versions/047_hive_outlier_audit_fields.py"
 
+      # ── Docker Hub Authentication ─────────────────────────────────
+      # Increases pull rate limit from 100 to 200 pulls/6hrs (free account)
+      # Prevents "You have reached your unauthenticated pull rate limit" errors
+      # ─────────────────────────────────────────────────────────────
+      - name: Login to Docker Hub on server
+        env:
+          DO_SERVER_IP: ${{ secrets.DO_SERVER_IP }}
+          DO_USER: ${{ secrets.DO_USER }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          ssh "$DO_USER@$DO_SERVER_IP" \
+            "echo '${{ secrets.DOCKERHUB_TOKEN }}' | docker login -u '${{ secrets.DOCKERHUB_USERNAME }}' --password-stdin"
+
       # ── Build and deploy containers ───────────────────────────────
       - name: Deploy containers
         env:
