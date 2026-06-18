@@ -495,8 +495,10 @@ jobs:
             docker compose build backend customer
 
             echo "━━━ Starting all containers ━━━"
-            docker compose up -d
-            docker compose up -d --force-recreate backend
+            # Only pull images if they don't exist (--pull never for services we built)
+            docker compose up -d --no-deps backend customer flutter-web admin-portal
+            # Start dependent services (db, nginx, etc.) without pulling if already present
+            docker compose up -d --pull missing
 
             echo "━━━ Container status ━━━"
             docker compose ps
@@ -611,7 +613,7 @@ jobs:
             echo "🔁 AUTO-ROLLBACK: redeploying previous image..."
             ssh "$DO_USER@$DO_SERVER_IP" \
               "cd ${SERVER_DIR}/gps-tracker && \
-               docker compose up -d --force-recreate && \
+               docker compose up -d --pull missing --force-recreate && \
                sleep 8 && \
                docker compose ps"
             echo "⚠️  Rollback attempted. Marking deployment as FAILED."
