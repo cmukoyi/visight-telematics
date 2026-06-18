@@ -439,7 +439,7 @@
       </svg>
     </div>
     <div>
-      <div class="app-title">Pinplot</div>
+      <div class="app-title" id="app-title">Pinplot</div>
       <div class="app-sub">Asset QR Scanner</div>
     </div>
   </div>
@@ -473,12 +473,12 @@
     <!-- API endpoint card -->
     <div class="card">
       <div class="card-body">
-        <div class="section-label">Pinplot API</div>
+        <div class="section-label" id="section-label">Pinplot API</div>
         <label class="field-label">Scan endpoint</label>
         <div class="input-row">
           <input class="text-input" id="pa-url" type="text"
-            value="https://pinplot.me/api/scan"
-            placeholder="https://pinplot.me/api/scan" />
+            value=""
+            placeholder="" />
           <button class="btn-sm" onclick="pingServer()">Ping</button>
         </div>
         <div class="field-hint">POST target from spec: <code style="font-family:monospace">POST /api/scan</code></div>
@@ -599,11 +599,28 @@
 </div>
 
 <script>
+  // ── Tenant Configuration ──────────────────────────────────────────────────
+  // Derive all branding dynamically from current hostname (no hardcoded tenant strings)
+  const TENANT_CONFIG = (function() {
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
+    const baseUrl = protocol + '//' + hostname;
+    
+    // Generate display name from hostname (e.g., "pinplot.me" or "beacontelematics.co.uk")
+    const displayName = hostname.split('.')[0].charAt(0).toUpperCase() + hostname.split('.')[0].slice(1);
+    
+    return {
+      name: displayName,
+      baseUrl: baseUrl,
+      apiLabel: 'Scanner API'
+    };
+  })();
+
   // ── Constants ─────────────────────────────────────────────────────────────
   const ASSET_ID_REGEX     = /HPS([QN])[0-9]{11}/;
-  const BASE_URL           = 'https://pinplot.me';
+  const BASE_URL           = TENANT_CONFIG.baseUrl;
   const GPS_ACCURACY_LIMIT = 500;
-  const OFFLINE_QUEUE_KEY  = 'pinplot_scan_queue';
+  const OFFLINE_QUEUE_KEY  = TENANT_CONFIG.name.toLowerCase() + '_scan_queue';
 
   // ── Theme ─────────────────────────────────────────────────────────────────
   let dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -885,6 +902,15 @@
 
   // Check on load for any queued scans from a previous session
   window.addEventListener('load', function() {
+    // Initialize tenant-specific UI
+    document.getElementById('app-title').textContent = TENANT_CONFIG.name;
+    document.getElementById('section-label').textContent = TENANT_CONFIG.apiLabel;
+    const apiInput = document.getElementById('pa-url');
+    const scanEndpoint = TENANT_CONFIG.baseUrl + '/api/scan';
+    apiInput.value = scanEndpoint;
+    apiInput.placeholder = scanEndpoint;
+    document.title = 'QR Scanner — ' + TENANT_CONFIG.name;
+    
     updateOfflineBanner();
     if (navigator.onLine && getOfflineQueue().length) {
       setTimeout(flushOfflineQueue, 2000); // slight delay to let GPS start
@@ -899,7 +925,7 @@
 
     if (!parsed) {
       addLog({ raw: rawText, assetId: null, typeCode: null }, 'skipped');
-      showToast('warn', 'Not a Pinplot asset', rawText.length > 40 ? rawText.slice(0,40)+'…' : rawText);
+      showToast('warn', 'Not a ' + TENANT_CONFIG.name + ' asset', rawText.length > 40 ? rawText.slice(0,40)+'…' : rawText);
       flashViewport('fail');
       return;
     }
