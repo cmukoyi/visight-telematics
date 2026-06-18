@@ -264,7 +264,7 @@
     </svg>
   </div>
   <div class="intro-text">
-    <div class="intro-title">Create scannable codes for your Pinplot assets</div>
+    <div class="intro-title">Create scannable codes for your assets</div>
     <div class="intro-desc">
       Generate QR codes and NFC tags that link physical assets to your tracking platform, or encode device identifiers like IMEI and MAC addresses. Work left to right — choose your content, customise the look, then download.
     </div>
@@ -284,7 +284,7 @@
         <span class="panel-num">1</span>
         <span class="panel-heading-text">Content</span>
       </div>
-      <div class="panel-intro">Choose what the code contains. Asset QR and NFC create Pinplot tracking links; IMEI/MAC encodes a device identifier as plain text.</div>
+      <div class="panel-intro">Choose what the code contains. Asset QR and NFC create tracking links; IMEI/MAC encodes a device identifier as plain text.</div>
       <div class="tabs">
         <button class="tab active" id="tab-url" onclick="setMode('url')">Asset QR <span class="badge bu">URL</span></button>
         <button class="tab" id="tab-nfc" onclick="setMode('nfc')">NFC Tag <span class="badge bu">NFC</span></button>
@@ -294,12 +294,12 @@
       <!-- Asset QR mode: auto-generates HPSQ... URL -->
       <div id="mode-url">
         <div class="tab-hint">
-          <strong>Asset QR</strong> — A unique tracking URL is generated automatically. Print this QR and stick it on an asset. When scanned with any phone camera, it records the asset's location on your Pinplot map.
+          <strong>Asset QR</strong> — A unique tracking URL is generated automatically. Print this QR and stick it on an asset. When scanned with any phone camera, it records the asset's location on your tracking map.
         </div>
         <div class="field">
           <label style="color:var(--text-sec);font-size:12px">Generated asset URL</label>
           <div style="display:flex;align-items:center;gap:6px;background:var(--bg-input);border:1px solid var(--border-ui);border-radius:7px;padding:6px 9px;">
-            <span style="font-size:11px;color:var(--text-hint);white-space:nowrap">pinplot.me/asset/</span>
+            <span id="url-base-display" style="font-size:11px;color:var(--text-hint);white-space:nowrap"></span>
             <span id="url-generated-id" style="font-size:12px;font-family:monospace;font-weight:600;color:var(--primary);flex:1"></span>
             <button class="reset-btn" onclick="regenerateId('Q')" title="Generate new ID" style="margin-left:0;white-space:nowrap">&#8635; New ID</button>
           </div>
@@ -320,7 +320,7 @@
         <div class="field">
           <label style="color:var(--text-sec);font-size:12px">Generated NFC tag URL</label>
           <div style="display:flex;align-items:center;gap:6px;background:var(--bg-input);border:1px solid var(--border-ui);border-radius:7px;padding:6px 9px;">
-            <span style="font-size:11px;color:var(--text-hint);white-space:nowrap">pinplot.me/asset/</span>
+            <span id="nfc-base-display" style="font-size:11px;color:var(--text-hint);white-space:nowrap"></span>
             <span id="nfc-generated-id" style="font-size:12px;font-family:monospace;font-weight:600;color:var(--primary);flex:1"></span>
             <button class="reset-btn" onclick="regenerateId('N')" title="Generate new ID" style="margin-left:0;white-space:nowrap">&#8635; New ID</button>
           </div>
@@ -2881,6 +2881,12 @@ var activeFrame = 'none';
 var activeIconId = null;
 var iconSource = 'preset';
 
+// ── Base URL helper ───────────────────────────────────────────────────────────
+// Dynamically get the base URL based on the current hostname
+function getBaseUrl() {
+  return 'https://' + window.location.hostname + '/asset/';
+}
+
 // ── Built-in SVG icons ────────────────────────────────────────────────────────
 var BUILTIN_ICONS = [
   { id:'box', label:'Box',
@@ -3197,7 +3203,7 @@ function regenerateId(type) {
     if (el) el.textContent = id;
     // Keep NFC placeholder URL display in sync
     var disp = document.getElementById('nfc-url-display');
-    if (disp) disp.textContent = 'https://pinplot.me/asset/' + id;
+    if (disp) disp.textContent = getBaseUrl() + id;
   }
   generate();
 }
@@ -3227,7 +3233,7 @@ function setMode(m) {
 
   // NFC URL display inside placeholder
   if (isNfc) {
-    var nfcUrl = 'https://pinplot.me/asset/' + (_currentNId || '');
+    var nfcUrl = getBaseUrl() + (_currentNId || '');
     var el = document.getElementById('nfc-url-display');
     if (el) el.textContent = nfcUrl;
   }
@@ -3260,12 +3266,12 @@ function copyNfcUrl() {
 }
 
 function doCopyNfcUrl() {
-  var url = 'https://pinplot.me/asset/' + (_currentNId || '');
+  var url = getBaseUrl() + (_currentNId || '');
   var savedId = _currentNId;
   addHistoryEntry({
     id: savedId, typeCode: 'N', format: 'url', qty: 1, time: nowString(),
     redownload: function() {
-      var savedUrl = 'https://pinplot.me/asset/' + savedId;
+      var savedUrl = getBaseUrl() + savedId;
       if (navigator.clipboard) {
         navigator.clipboard.writeText(savedUrl).then(function(){
           var btn = document.getElementById('copy-btn');
@@ -3301,11 +3307,11 @@ function doCopyNfcUrl() {
 function getText() {
   if (mode === 'url') {
     if (!_currentQId) regenerateId('Q');
-    var url = 'https://pinplot.me/asset/' + _currentQId;
+    var url = getBaseUrl() + _currentQId;
     return { text: url, ok: true };
   } else if (mode === 'nfc') {
     if (!_currentNId) regenerateId('N');
-    var url = 'https://pinplot.me/asset/' + _currentNId;
+    var url = getBaseUrl() + _currentNId;
     return { text: url, ok: true };
   } else {
     var raw = document.getElementById('imei-input').value.trim();
@@ -4433,7 +4439,7 @@ function downloadNfcExcel() {
     // Build rows: ID, Full URL, Status
     var rows = [['Asset ID', 'NFC URL', 'Type', 'Status']];
     ids.forEach(function(id) {
-      rows.push([id, 'https://pinplot.me/asset/' + id, 'NFC Tag', 'Not written']);
+      rows.push([id, getBaseUrl() + id, 'NFC Tag', 'Not written']);
     });
 
     var xlsx = buildXlsx(rows);
@@ -4453,7 +4459,7 @@ function downloadNfcExcel() {
       redownload: function() {
         var reRows = [['Asset ID', 'NFC URL', 'Type', 'Status']];
         savedNfcIds.forEach(function(id) {
-          reRows.push([id, 'https://pinplot.me/asset/' + id, 'NFC Tag', 'Not written']);
+          reRows.push([id, getBaseUrl() + id, 'NFC Tag', 'Not written']);
         });
         var reXlsx = buildXlsx(reRows);
         var reBlob = new Blob([reXlsx], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
@@ -4469,7 +4475,7 @@ function downloadNfcExcel() {
     _currentNId = ids[ids.length - 1];
     document.getElementById('nfc-generated-id').textContent = _currentNId;
     var disp = document.getElementById('nfc-url-display');
-    if (disp) disp.textContent = 'https://pinplot.me/asset/' + _currentNId;
+    if (disp) disp.textContent = getBaseUrl() + _currentNId;
   }, confirmAsset);
 }
 
@@ -4695,6 +4701,14 @@ window.addEventListener('load', function() {
   buildFrameGrid();
   buildPresetGrid();
   buildIconGrid();
+  
+  // Set base URL display labels
+  var baseDisplay = window.location.hostname + '/asset/';
+  var urlBaseEl = document.getElementById('url-base-display');
+  var nfcBaseEl = document.getElementById('nfc-base-display');
+  if (urlBaseEl) urlBaseEl.textContent = baseDisplay;
+  if (nfcBaseEl) nfcBaseEl.textContent = baseDisplay;
+  
   // Pre-generate IDs so they're ready immediately
   regenerateId('Q');
   regenerateId('N');
