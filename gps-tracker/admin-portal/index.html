@@ -1360,6 +1360,13 @@
                                         </select>
                                     </div>
                                     <div class="form-group">
+                                        <label class="form-label">Default Language <span style="font-weight:normal;color:var(--text-secondary)">(optional)</span></label>
+                                        <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 10px">Portal users in this group will see the platform in this language. Defaults to English.</p>
+                                        <select id="cgLanguage" class="form-input">
+                                            <option value="en">Loading...</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
                                         <label class="form-label">Allowed Tag Types <span style="font-weight:normal;color:var(--text-secondary)">(optional)</span></label>
                                         <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 10px">Select which tag types this group can add. Leave all unchecked to allow all types.</p>
                                         <div style="display:flex;gap:16px;flex-wrap:wrap">
@@ -1418,6 +1425,13 @@
                                             <span style="font-size:14px;color:var(--text-secondary)">@</span>
                                             <input type="text" id="egDomain" class="form-input" placeholder="e.g. acmecorp.com" style="flex:1">
                                         </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Default Language</label>
+                                        <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 10px">Portal users in this group will see the platform in this language.</p>
+                                        <select id="egLanguage" class="form-input">
+                                            <option value="en">Loading...</option>
+                                        </select>
                                     </div>
                                     <!-- Portal Feature Access -->
                                     <div class="form-group">
@@ -3795,7 +3809,7 @@ dashboard.welcome,Bienvenue</pre>
                         <td>${badge}</td>
                         <td>${date}</td>
                         <td style="display:flex;gap:6px;flex-wrap:wrap">
-                            <button class="btn btn-secondary" style="padding:4px 10px;font-size:12px" onclick="openEditGroupModal('${g.id}','${escHtml(g.name)}','${escHtml(g.email_domain||'')}',${JSON.stringify(g.allowed_sections||null).replace(/"/g,'&quot;')},${JSON.stringify(g.allowed_tag_types||null).replace(/"/g,'&quot;')})">Edit</button>
+                            <button class="btn btn-secondary" style="padding:4px 10px;font-size:12px" onclick="openEditGroupModal('${g.id}','${escHtml(g.name)}','${escHtml(g.email_domain||'')}',${JSON.stringify(g.allowed_sections||null).replace(/"/g,'&quot;')},${JSON.stringify(g.allowed_tag_types||null).replace(/"/g,'&quot;')},'${escHtml(g.default_language||'en')}')">Edit</button>
                             <button class="btn btn-secondary" style="padding:4px 10px;font-size:12px" onclick="openSysAdminModal('${g.id}','${escHtml(g.name)}')" title="Manage Built-in System Admins">🔑 Sys Admins</button>
                             ${deactivateBtn}
                         </td>
@@ -3835,6 +3849,23 @@ dashboard.welcome,Bienvenue</pre>
                     });
                 }
             } catch (_) {}
+            // Populate language dropdown
+            const langSel = document.getElementById('cgLanguage');
+            langSel.innerHTML = '<option value="en">English (default)</option>';
+            try {
+                const res = await fetch(`${API_URL}/api/admin/i18n/languages`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+                if (res.ok) {
+                    const langs = await res.json();
+                    langSel.innerHTML = '';
+                    langs.filter(l => l.is_active).forEach(l => {
+                        const opt = document.createElement('option');
+                        opt.value = l.code;
+                        opt.textContent = l.name;
+                        opt.selected = l.code === 'en';
+                        langSel.appendChild(opt);
+                    });
+                }
+            } catch (_) {}
         }
 
         async function submitCreateGroup(e) {
@@ -3858,6 +3889,7 @@ dashboard.welcome,Bienvenue</pre>
                 email_domain: document.getElementById('cgDomain').value.trim() || null,
                 package_id: document.getElementById('cgPackage').value || null,
                 allowed_tag_types: allowedTypes.length > 0 ? allowedTypes : null,
+                default_language: document.getElementById('cgLanguage').value || 'en',
             };
             try {
                 const res = await fetch(`${API_URL}/api/admin/usergroups`, {
@@ -4035,7 +4067,7 @@ dashboard.welcome,Bienvenue</pre>
             navigator.clipboard.writeText(pwd).catch(() => {});
         }
 
-        async function openEditGroupModal(groupId, groupName, emailDomain, allowedSections, allowedTagTypes) {
+        async function openEditGroupModal(groupId, groupName, emailDomain, allowedSections, allowedTagTypes, defaultLanguage) {
             document.getElementById('egGroupId').value = groupId;
             document.getElementById('egGroupName').textContent = groupName;
             document.getElementById('egDomain').value = emailDomain || '';
@@ -4052,6 +4084,25 @@ dashboard.welcome,Bienvenue</pre>
             document.getElementById('egTypeSeries1').checked = types.includes('series1');
             document.getElementById('egTypeSeries2').checked = types.includes('series2');
             document.getElementById('egTypeSeries3').checked = types.includes('series3');
+            // Populate language dropdown
+            const langSel = document.getElementById('egLanguage');
+            langSel.innerHTML = '<option value="en">Loading...</option>';
+            try {
+                const res = await fetch(`${API_URL}/api/admin/i18n/languages`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+                if (res.ok) {
+                    const langs = await res.json();
+                    langSel.innerHTML = '';
+                    langs.filter(l => l.is_active).forEach(l => {
+                        const opt = document.createElement('option');
+                        opt.value = l.code;
+                        opt.textContent = l.name;
+                        opt.selected = l.code === (defaultLanguage || 'en');
+                        langSel.appendChild(opt);
+                    });
+                }
+            } catch (_) {
+                langSel.innerHTML = '<option value="en">English</option>';
+            }
             document.getElementById('editGroupModal').classList.add('active');
             // Load all packages + this group's assigned packages in parallel
             await _egRefreshPackages(groupId);
@@ -4173,6 +4224,7 @@ dashboard.welcome,Bienvenue</pre>
                         email_domain: domain,
                         allowed_sections: allowedSections.length === 3 ? null : allowedSections,
                         allowed_tag_types: allowedTagTypes.length === 3 ? null : allowedTagTypes,
+                        default_language: document.getElementById('egLanguage').value || 'en',
                     })
                 });
                 if (res.status === 401) { handle401(); return; }
