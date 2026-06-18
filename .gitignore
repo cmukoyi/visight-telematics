@@ -37,6 +37,13 @@ gps-tracker/**/.env
 # Local reference files — not for source control
 dB_schema.md
 
+# Local tracking files — project management, never commit
+*_TRACKER.md
+*_IMPLEMENTATION_TRACKER.md
+
+# Generated extraction output — local only
+extracted_translation_keys.json
+
 # Feature dev sandbox/instructions — keep fully local
 features_dev/
 
