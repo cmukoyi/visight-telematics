@@ -128,10 +128,22 @@ GET /api/admin/translations/export/{lang}   # Export for translators
 - `gps-tracker/admin-portal/usergroups.html` (modify) ✅
 - `gps-tracker/admin-portal/index.html` (add nav links) ✅
 
-**Status:** ✅ COMPLETE - Deployed to main (commit 35ad83e)
-- Translation Manager: ✅ Complete
+**Status:** ✅ COMPLETE - Deployed to main (commit 8ec9187)
+- Translation Manager: ✅ Complete with spreadsheet-style UI redesign
+  - All languages shown as columns (no dropdown confusion)
+  - Inline cell editing (click to edit)
+  - Auto-translate feature using LibreTranslate API
+  - Visual indicators for missing translations
+  - Real-time completion stats
 - Language Manager: ✅ Complete
 - Usergroup Editor: ✅ Complete with language selector
+
+**UX Improvements (commit 8ec9187):**
+- Changed from dropdown-based to spreadsheet-style layout
+- All translations visible at once
+- Inline editing eliminates modal friction
+- Auto-translate reduces manual work
+- Removed CSV import/export (error-prone)
 
 ---
 
