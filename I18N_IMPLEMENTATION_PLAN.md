@@ -320,12 +320,26 @@ Include in migration 049 with initial English text
 - **Bug #1 Fixed:** Table name was `usergroups` but should be `user_groups` (with underscore) - Fixed in bfec39d
 - **Bug #2 Fixed:** Column name conflict - `Translation.translation_key` (column) conflicted with `translation_key` (relationship). Renamed column to `key` - Fixed in 93716a6
 - **Bug #3 Fixed:** Missing `get_current_admin_user` dependency function in admin_auth.py - Added FastAPI dependency for admin authentication - Fixed in 4b7f9a1
+- **Production Issue:** Migration 049 was deployed with buggy code (before fix #2)
+  - Database has column 'translation_key' but code expects 'key'
+  - Error: `column translations.key does not exist`
+  - **Solution:** Migration 050 created (commit 7cf8a8b)
+  - **Status:** ⚠️ NOT YET DEPLOYED - Need to test on pinplot.me first
 - **Migration needed:** Run `docker compose exec backend alembic upgrade head` on pinplot.me server
 - **Test endpoints:** After migration, test with Postman:
   - GET https://pinplot.me/api/languages (should return en, fr)
   - GET https://pinplot.me/api/translations/en (should return 50+ keys)
   - GET https://pinplot.me/api/translations/fr (should return 50 keys with empty translations)
   - Admin endpoints require auth token in header
+
+### Phase 2 Auto-Translate Fix:
+- **Problem:** Auto-translate button showed "0 translations added, 45 failed"
+- **Root Cause:** Browser calling LibreTranslate API directly → CORS blocked requests
+- **Solution (commit 641260c):** Added backend proxy endpoint
+  - New endpoint: `POST /api/admin/i18n/translate`
+  - Backend calls LibreTranslate using httpx (server-side, no CORS)
+  - Frontend now calls backend proxy instead of external API
+- **Status:** ✅ FIXED - pushed to main, ready to deploy
 
 ### Phase 2 Deployment Notes:
 - **Commit:** 35cd7c2 pushed to main
@@ -343,7 +357,12 @@ Include in migration 049 with initial English text
   6. Should see English and French with completion %
   7. Test Export CSV for French
   8. Edit CSV, test Import CSV
-- **Still TODO:** Add language selector to Usergroup editor
+- **Auto-translate Bug Fix (commit 641260c):**
+  - Problem: Direct LibreTranslate API calls from browser failed due to CORS
+  - Solution: Added backend proxy endpoint `/api/admin/i18n/translate`
+  - Now uses httpx to call LibreTranslate server-side
+  - Fixes "0 translations added, 45 failed" error
+  - Test: Click 🤖 Auto button in any language column
 
 ---
 
