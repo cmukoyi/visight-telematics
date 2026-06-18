@@ -14,6 +14,7 @@ from datetime import datetime
 import csv
 import io
 import logging
+import httpx
 
 from app.database import get_db
 from app.models_i18n import Language, TranslationKey, Translation
@@ -709,3 +710,80 @@ async def import_translations(
         "skipped": skipped,
         "errors": errors
     }
+
+
+# ---------------------------------------------------------------------------
+# Auto-translate endpoint (LibreTranslate proxy)
+# ---------------------------------------------------------------------------
+
+class TranslateRequest(BaseModel):
+    """Request to translate text"""
+    text: str = Field(..., description="Text to translate")
+    source_lang: str = Field(..., description="Source language code (e.g., 'en')")
+    target_lang: str = Field(..., description="Target language code (e.g., 'fr')")
+
+
+class TranslateResponse(BaseModel):
+    """Translation result"""
+    translated_text: str
+    source: str = "libretranslate"
+
+
+@router.post("/translate", response_model=TranslateResponse)
+async def translate_text(
+    request: TranslateRequest,
+    admin: AdminUser = Depends(get_current_admin_user)
+):
+    """
+    Proxy endpoint for LibreTranslate API.
+    
+    Translates text from source language to target language using LibreTranslate.
+    This avoids CORS issues when calling from the browser.
+    
+    Admin authentication required.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                'https://libretranslate.com/translate',
+                json={
+                    'q': request.text,
+                    'source': request.source_lang,
+                    'target': request.target_lang,
+                    'format': 'text'
+                },
+                headers={'Content-Type': 'application/json'}
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"LibreTranslate API error: {response.status_code} - {response.text}")
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Translation service error: {response.status_code}"
+                )
+            
+            data = response.json()
+            translated = data.get('translatedText', '')
+            
+            if not translated:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="Translation service returned empty result"
+                )
+            
+            logger.info(f"Admin {admin.email} translated text: {request.source_lang} -> {request.target_lang}")
+            
+            return TranslateResponse(translated_text=translated)
+    
+    except httpx.HTTPError as e:
+        logger.error(f"Translation API network error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Translation service unavailable: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Translation error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Translation failed: {str(e)}"
+        )
