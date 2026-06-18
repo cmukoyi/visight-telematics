@@ -1,0 +1,2948 @@
+[
+  {
+    "key": "alerts.alert_type",
+    "category": "alerts",
+    "context": "Form label",
+    "default_text": "Alert Type"
+  },
+  {
+    "key": "alerts.alerts_inbox",
+    "category": "alerts",
+    "context": "Form label",
+    "default_text": "Alerts Inbox"
+  },
+  {
+    "key": "alerts.total_alerts",
+    "category": "alerts",
+    "context": "Form label",
+    "default_text": "Total Alerts"
+  },
+  {
+    "key": "alerts.no_alerts_in_the_last_7_days",
+    "category": "alerts",
+    "context": "General UI text",
+    "default_text": "No alerts in the last 7 days."
+  },
+  {
+    "key": "alerts.sms_alert_types",
+    "category": "alerts",
+    "context": "General UI text",
+    "default_text": "SMS alert types"
+  },
+  {
+    "key": "alerts.0_hivealert_htotalalerts_",
+    "category": "alerts",
+    "context": "Form label",
+    "default_text": "0 ? 'hive-alert' : ''}\">${h.total_alerts ?? '—'}"
+  },
+  {
+    "key": "alerts.alerts_inbox_1",
+    "category": "alerts",
+    "context": "Tooltip",
+    "default_text": "Alerts inbox"
+  },
+  {
+    "key": "alerts.recent_alerts",
+    "category": "alerts",
+    "context": "General UI text",
+    "default_text": "Recent Alerts"
+  },
+  {
+    "key": "alerts.dismiss_alert",
+    "category": "alerts",
+    "context": "Tooltip",
+    "default_text": "Dismiss alert"
+  },
+  {
+    "key": "alerts.clear_all_plotted_alert_markers",
+    "category": "alerts",
+    "context": "Tooltip",
+    "default_text": "Clear all plotted alert markers"
+  },
+  {
+    "key": "alerts.alerts_amp_notifications",
+    "category": "alerts",
+    "context": "Page heading",
+    "default_text": "Alerts &amp; Notifications"
+  },
+  {
+    "key": "assets.no_tags_found_ensure_a_domain_is_configured_in_set",
+    "category": "assets",
+    "context": "General UI text",
+    "default_text": "No tags found. Ensure a domain is configured in Settings and users have registered tags."
+  },
+  {
+    "key": "assets.notify_me_when_a_tag",
+    "category": "assets",
+    "context": "General UI text",
+    "default_text": "Notify me when a tag…"
+  },
+  {
+    "key": "assets.tag_type",
+    "category": "assets",
+    "context": "Form label",
+    "default_text": "Tag Type"
+  },
+  {
+    "key": "assets.bulk_import_tags_csv",
+    "category": "assets",
+    "context": "Modal dialog",
+    "default_text": "Bulk Import Tags (CSV)"
+  },
+  {
+    "key": "assets.loading_assets",
+    "category": "assets",
+    "context": "General UI text",
+    "default_text": "Loading assets…"
+  },
+  {
+    "key": "assets.search_assets_or_tags",
+    "category": "assets",
+    "context": "Input placeholder",
+    "default_text": "Search assets or tags…"
+  },
+  {
+    "key": "assets.select_an_asset_and_date_range_then_click_load_jou",
+    "category": "assets",
+    "context": "General UI text",
+    "default_text": "Select an asset and date range, then click Load Journeys"
+  },
+  {
+    "key": "assets.search_hives_tag_ids_names",
+    "category": "assets",
+    "context": "Input placeholder",
+    "default_text": "Search hives, tag IDs, names…"
+  },
+  {
+    "key": "assets.all_tags",
+    "category": "assets",
+    "context": "General UI text",
+    "default_text": "All tags"
+  },
+  {
+    "key": "assets.tags",
+    "category": "assets",
+    "context": "Form label",
+    "default_text": "Tags"
+  },
+  {
+    "key": "assets.armed_gfarmedcount_taggfarmedcount1s",
+    "category": "assets",
+    "context": "General UI text",
+    "default_text": "Armed: ${gf.armed_count} tag${gf.armed_count>1?'s':''}"
+  },
+  {
+    "key": "assets.tag_subscriptions",
+    "category": "assets",
+    "context": "Form label",
+    "default_text": "Tag Subscriptions"
+  },
+  {
+    "key": "assets.asset_activity",
+    "category": "assets",
+    "context": "Form label",
+    "default_text": "Asset Activity"
+  },
+  {
+    "key": "assets.failed_to_load_tags_escerrmessage",
+    "category": "assets",
+    "context": "Error message",
+    "default_text": "Failed to load tags: ${esc(err.message)}"
+  },
+  {
+    "key": "assets.hiveesctlabelttagid",
+    "category": "assets",
+    "context": "Tooltip",
+    "default_text": "${hiveEsc(t.label||t.tag_id)}"
+  },
+  {
+    "key": "assets.tag_offline",
+    "category": "assets",
+    "context": "Form label",
+    "default_text": "Tag Offline"
+  },
+  {
+    "key": "assets.no_assets_match_the_current_thresholds",
+    "category": "assets",
+    "context": "General UI text",
+    "default_text": "No assets match the current thresholds."
+  },
+  {
+    "key": "assets.search_tag_user_or_package",
+    "category": "assets",
+    "context": "Input placeholder",
+    "default_text": "Search tag, user or package…"
+  },
+  {
+    "key": "assets.no_assets_found",
+    "category": "assets",
+    "context": "General UI text",
+    "default_text": "No assets found."
+  },
+  {
+    "key": "assets.add_single_tag",
+    "category": "assets",
+    "context": "Modal dialog",
+    "default_text": "Add Single Tag"
+  },
+  {
+    "key": "assets.control_when_you_are_notified_about_your_assets",
+    "category": "assets",
+    "context": "General UI text",
+    "default_text": "Control when you are notified about your assets."
+  },
+  {
+    "key": "assets.asset_list",
+    "category": "assets",
+    "context": "Form label",
+    "default_text": "Asset List"
+  },
+  {
+    "key": "assets.zoom_to_tag",
+    "category": "assets",
+    "context": "Tooltip",
+    "default_text": "Zoom to tag"
+  },
+  {
+    "key": "assets.asset_management",
+    "category": "assets",
+    "context": "Form label",
+    "default_text": "Asset Management"
+  },
+  {
+    "key": "assets.tag",
+    "category": "assets",
+    "context": "Form label",
+    "default_text": "Tag"
+  },
+  {
+    "key": "assets.delete_tag",
+    "category": "assets",
+    "context": "Tooltip",
+    "default_text": "Delete tag"
+  },
+  {
+    "key": "assets.waiting_for_tag_data",
+    "category": "assets",
+    "context": "General UI text",
+    "default_text": "Waiting for tag data…"
+  },
+  {
+    "key": "assets.import_0_tags",
+    "category": "assets",
+    "context": "Button text",
+    "default_text": "Import 0 tags"
+  },
+  {
+    "key": "assets.no_tags_match_the_current_filters",
+    "category": "assets",
+    "context": "General UI text",
+    "default_text": "No tags match the current filters."
+  },
+  {
+    "key": "assets._select_a_tag_",
+    "category": "assets",
+    "context": "General UI text",
+    "default_text": "— Select a tag —"
+  },
+  {
+    "key": "assets.no_assets_match_the_search",
+    "category": "assets",
+    "context": "General UI text",
+    "default_text": "No assets match the search."
+  },
+  {
+    "key": "assets.recreate_this_hive_a_new_60day_clock_will_start_wi",
+    "category": "assets",
+    "context": "Alert/Confirm message",
+    "default_text": "Recreate this hive? A new 60-day clock will start with the same config and tags."
+  },
+  {
+    "key": "assets.no_assets_found_1",
+    "category": "assets",
+    "context": "General UI text",
+    "default_text": "No assets found"
+  },
+  {
+    "key": "assets.toggle_asset_list",
+    "category": "assets",
+    "context": "Tooltip",
+    "default_text": "Toggle asset list"
+  },
+  {
+    "key": "assets.all_assets",
+    "category": "assets",
+    "context": "General UI text",
+    "default_text": "All assets"
+  },
+  {
+    "key": "assets.qr_nfc_tags",
+    "category": "assets",
+    "context": "Form label",
+    "default_text": "QR / NFC Tags"
+  },
+  {
+    "key": "assets.asset_tag",
+    "category": "assets",
+    "context": "Form label",
+    "default_text": "Asset / Tag"
+  },
+  {
+    "key": "assets.no_assets_match_the_current_filters",
+    "category": "assets",
+    "context": "General UI text",
+    "default_text": "No assets match the current filters."
+  },
+  {
+    "key": "assets.loading_tags",
+    "category": "assets",
+    "context": "General UI text",
+    "default_text": "Loading tags…"
+  },
+  {
+    "key": "assets.search_tag_user_category",
+    "category": "assets",
+    "context": "Input placeholder",
+    "default_text": "Search tag, user, category…"
+  },
+  {
+    "key": "assets.bulk_upload_tags",
+    "category": "assets",
+    "context": "Modal dialog",
+    "default_text": "Bulk Upload Tags"
+  },
+  {
+    "key": "assets.devices",
+    "category": "assets",
+    "context": "General UI text",
+    "default_text": "Devices"
+  },
+  {
+    "key": "assets.asset_categories",
+    "category": "assets",
+    "context": "Page heading",
+    "default_text": "Asset Categories"
+  },
+  {
+    "key": "assets.gfarmedcount_taggfarmedcount1",
+    "category": "assets",
+    "context": "Tooltip",
+    "default_text": "${gf.armed_count} tag${gf.armed_count>1?"
+  },
+  {
+    "key": "assets.imei_tag_id_",
+    "category": "assets",
+    "context": "Form label",
+    "default_text": "IMEI / Tag ID *"
+  },
+  {
+    "key": "assets.how_long_movement_history_is_stored_for_your_asset",
+    "category": "assets",
+    "context": "General UI text",
+    "default_text": "How long movement history is stored for your assets. Older data is automatically purged."
+  },
+  {
+    "key": "assets.define_categories_eg_vehicles_equipment_containers",
+    "category": "assets",
+    "context": "General UI text",
+    "default_text": "Define categories (e.g. Vehicles, Equipment, Containers) that can be assigned to assets when adding or editing tags."
+  },
+  {
+    "key": "assets.import_tags",
+    "category": "assets",
+    "context": "Modal dialog",
+    "default_text": "Import Tags"
+  },
+  {
+    "key": "assets.manage_tags",
+    "category": "assets",
+    "context": "Modal dialog",
+    "default_text": "Manage Tags"
+  },
+  {
+    "key": "assets.add_tag",
+    "category": "assets",
+    "context": "Button text",
+    "default_text": "Add Tag"
+  },
+  {
+    "key": "auth.back_to_sign_in",
+    "category": "auth",
+    "context": "Button text",
+    "default_text": "Back to Sign In"
+  },
+  {
+    "key": "auth.login",
+    "category": "auth",
+    "context": "General UI text",
+    "default_text": "(login)"
+  },
+  {
+    "key": "auth.sign_in_to_manage_your_assets",
+    "category": "auth",
+    "context": "General UI text",
+    "default_text": "Sign in to manage your assets"
+  },
+  {
+    "key": "auth.email",
+    "category": "auth",
+    "context": "Form label",
+    "default_text": "Email"
+  },
+  {
+    "key": "auth.reset_your_password",
+    "category": "auth",
+    "context": "Page heading",
+    "default_text": "Reset your password"
+  },
+  {
+    "key": "auth.forgot_password",
+    "category": "auth",
+    "context": "General UI text",
+    "default_text": "Forgot password?"
+  },
+  {
+    "key": "auth.password",
+    "category": "auth",
+    "context": "Form label",
+    "default_text": "Password"
+  },
+  {
+    "key": "auth.you_can_now_sign_in_with_your_new_password",
+    "category": "auth",
+    "context": "General UI text",
+    "default_text": "You can now sign in with your new password."
+  },
+  {
+    "key": "auth.check_your_email_for_a_6digit_pin_valid_15_minutes",
+    "category": "auth",
+    "context": "General UI text",
+    "default_text": "Check your email for a 6-digit PIN (valid 15 minutes)."
+  },
+  {
+    "key": "auth.current_password",
+    "category": "auth",
+    "context": "Form label",
+    "default_text": "Current password"
+  },
+  {
+    "key": "auth.confirm_new_password",
+    "category": "auth",
+    "context": "Form label",
+    "default_text": "Confirm new password"
+  },
+  {
+    "key": "auth.add_email_address",
+    "category": "auth",
+    "context": "Input placeholder",
+    "default_text": "Add email address…"
+  },
+  {
+    "key": "auth.password_updated",
+    "category": "auth",
+    "context": "Page heading",
+    "default_text": "Password updated!"
+  },
+  {
+    "key": "auth.email_",
+    "category": "auth",
+    "context": "Form label",
+    "default_text": "Email *"
+  },
+  {
+    "key": "auth.save_password",
+    "category": "auth",
+    "context": "Button text",
+    "default_text": "Save Password"
+  },
+  {
+    "key": "auth.enter_your_account_email_and_well_send_you_a_6digi",
+    "category": "auth",
+    "context": "General UI text",
+    "default_text": "Enter your account email and we'll send you a 6-digit PIN."
+  },
+  {
+    "key": "auth.search_by_name_or_email",
+    "category": "auth",
+    "context": "Input placeholder",
+    "default_text": "Search by name or email…"
+  },
+  {
+    "key": "auth.logout",
+    "category": "auth",
+    "context": "Button text",
+    "default_text": "Logout"
+  },
+  {
+    "key": "auth.owner_email",
+    "category": "auth",
+    "context": "General UI text",
+    "default_text": "Owner Email"
+  },
+  {
+    "key": "auth.new_password",
+    "category": "auth",
+    "context": "Form label",
+    "default_text": "New password"
+  },
+  {
+    "key": "auth.change_your_login_password",
+    "category": "auth",
+    "context": "General UI text",
+    "default_text": "Change your login password."
+  },
+  {
+    "key": "common.delete_user_permanently",
+    "category": "common",
+    "context": "Tooltip",
+    "default_text": "Delete user permanently"
+  },
+  {
+    "key": "common.add_floor",
+    "category": "common",
+    "context": "Tooltip",
+    "default_text": "Add floor"
+  },
+  {
+    "key": "common._add_user",
+    "category": "common",
+    "context": "Button text",
+    "default_text": "+ Add User"
+  },
+  {
+    "key": "common.save_to_browser_ctrls",
+    "category": "common",
+    "context": "Tooltip",
+    "default_text": "Save to browser (Ctrl+S)"
+  },
+  {
+    "key": "common.must_be_a_future_date_leave_blank_to_remove_any_ex",
+    "category": "common",
+    "context": "General UI text",
+    "default_text": "Must be a future date. Leave blank to remove any existing expiry."
+  },
+  {
+    "key": "common.close_preview",
+    "category": "common",
+    "context": "Tooltip",
+    "default_text": "Close preview"
+  },
+  {
+    "key": "common.add_category",
+    "category": "common",
+    "context": "Modal dialog",
+    "default_text": "Add Category"
+  },
+  {
+    "key": "common.delete",
+    "category": "common",
+    "context": "Button text",
+    "default_text": "Delete"
+  },
+  {
+    "key": "common.close",
+    "category": "common",
+    "context": "Button text",
+    "default_text": "Close"
+  },
+  {
+    "key": "common.save_role",
+    "category": "common",
+    "context": "Button text",
+    "default_text": "Save Role"
+  },
+  {
+    "key": "common.search_imei_name",
+    "category": "common",
+    "context": "Input placeholder",
+    "default_text": "Search IMEI, name…"
+  },
+  {
+    "key": "common.close_1",
+    "category": "common",
+    "context": "Tooltip",
+    "default_text": "Close"
+  },
+  {
+    "key": "common.search_address_or_postcode",
+    "category": "common",
+    "context": "Input placeholder",
+    "default_text": "Search address or postcode…"
+  },
+  {
+    "key": "common.add_portal_user",
+    "category": "common",
+    "context": "Modal dialog",
+    "default_text": "Add Portal User"
+  },
+  {
+    "key": "common.filter_by_imei",
+    "category": "common",
+    "context": "Input placeholder",
+    "default_text": "Filter by IMEI"
+  },
+  {
+    "key": "common.cancel",
+    "category": "common",
+    "context": "Button text",
+    "default_text": "Cancel"
+  },
+  {
+    "key": "common.delete_1",
+    "category": "common",
+    "context": "Tooltip",
+    "default_text": "Delete"
+  },
+  {
+    "key": "common.edit",
+    "category": "common",
+    "context": "Button text",
+    "default_text": "Edit"
+  },
+  {
+    "key": "common.address_latlng",
+    "category": "common",
+    "context": "General UI text",
+    "default_text": "Address / Lat,Lng"
+  },
+  {
+    "key": "common.remove",
+    "category": "common",
+    "context": "Tooltip",
+    "default_text": "Remove"
+  },
+  {
+    "key": "common.save",
+    "category": "common",
+    "context": "Button text",
+    "default_text": "Save"
+  },
+  {
+    "key": "common.data_beyond_this_period_is_automatically_deleted_t",
+    "category": "common",
+    "context": "General UI text",
+    "default_text": "Data beyond this period is automatically deleted to save storage."
+  },
+  {
+    "key": "common.edit_1",
+    "category": "common",
+    "context": "Tooltip",
+    "default_text": "Edit"
+  },
+  {
+    "key": "common.search_archived_hives",
+    "category": "common",
+    "context": "Input placeholder",
+    "default_text": "Search archived hives…"
+  },
+  {
+    "key": "common.search_name_imei",
+    "category": "common",
+    "context": "Input placeholder",
+    "default_text": "Search name, IMEI…"
+  },
+  {
+    "key": "errors.network_error",
+    "category": "errors",
+    "context": "Alert/Confirm message",
+    "default_text": "Network error"
+  },
+  {
+    "key": "errors.archive_failed",
+    "category": "errors",
+    "context": "Alert/Confirm message",
+    "default_text": "Archive failed"
+  },
+  {
+    "key": "errors._error_loading_buildings_",
+    "category": "errors",
+    "context": "Error message",
+    "default_text": "— Error loading buildings —"
+  },
+  {
+    "key": "errors.failed_to_load_hive_detail",
+    "category": "errors",
+    "context": "Alert/Confirm message",
+    "default_text": "Failed to load hive detail"
+  },
+  {
+    "key": "errors.purge_failed",
+    "category": "errors",
+    "context": "Alert/Confirm message",
+    "default_text": "Purge failed"
+  },
+  {
+    "key": "errors.evaluation_failed",
+    "category": "errors",
+    "context": "Alert/Confirm message",
+    "default_text": "Evaluation failed"
+  },
+  {
+    "key": "errors.error_escerrmessage",
+    "category": "errors",
+    "context": "Error message",
+    "default_text": "Error: ${esc(err.message)}"
+  },
+  {
+    "key": "errors.recreate_failed",
+    "category": "errors",
+    "context": "Alert/Confirm message",
+    "default_text": "Recreate failed"
+  },
+  {
+    "key": "general.365_days",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "365 days"
+  },
+  {
+    "key": "general.1000_m",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "1000 m"
+  },
+  {
+    "key": "general.import_floor_plan_image",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Import floor plan image"
+  },
+  {
+    "key": "general.today",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Today"
+  },
+  {
+    "key": "general.no_journeys_recorded_in_this_date_range",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "No journeys recorded in this date range."
+  },
+  {
+    "key": "general._loading_",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "— Loading… —"
+  },
+  {
+    "key": "general.diameter",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Diameter"
+  },
+  {
+    "key": "general.2_years",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "2 years"
+  },
+  {
+    "key": "general.package_",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Package *"
+  },
+  {
+    "key": "general.last_7_days",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Last 7 days"
+  },
+  {
+    "key": "general.50",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "50%"
+  },
+  {
+    "key": "general.last_seen_tlastseen_new_datetlastseentolocalestrin",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Last seen: ${t.last_seen ? new Date(t.last_seen).toLocaleString() : '—'}"
+  },
+  {
+    "key": "general.stairs",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Stairs"
+  },
+  {
+    "key": "general.drywall",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Drywall"
+  },
+  {
+    "key": "general.circle",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Circle"
+  },
+  {
+    "key": "general.remaining_remaining",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "(${remaining} remaining)"
+  },
+  {
+    "key": "general.window",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Window"
+  },
+  {
+    "key": "general._hiveesctrigname_",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "' + hiveEsc(trigName) + '"
+  },
+  {
+    "key": "general.assign_to_user",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Assign to User"
+  },
+  {
+    "key": "general.custom",
+    "category": "general",
+    "context": "Page heading",
+    "default_text": "Custom"
+  },
+  {
+    "key": "general.60_days",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "60 days"
+  },
+  {
+    "key": "general.no_floors_configured_set_them_up_in_the_admin_port",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "No floors configured — set them up in the Admin Portal."
+  },
+  {
+    "key": "general.deactivate_user",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Deactivate user"
+  },
+  {
+    "key": "general.customise_the_portal_colours_and_upload_your_compa",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Customise the portal colours and upload your company logo. Changes apply to all users in your group."
+  },
+  {
+    "key": "general.activated",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Activated"
+  },
+  {
+    "key": "general.loading_packages",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Loading packages…"
+  },
+  {
+    "key": "general.silent_",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Silent ≥"
+  },
+  {
+    "key": "general.not_armed",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Not armed"
+  },
+  {
+    "key": "general.room_name",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "Room name…"
+  },
+  {
+    "key": "general.restore_to_default_10b981",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Restore to default (#10b981)"
+  },
+  {
+    "key": "general.eg_travel_kit",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "e.g. Travel Kit"
+  },
+  {
+    "key": "general.name",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Name"
+  },
+  {
+    "key": "general.export_floor_plan_as_json",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Export floor plan as JSON"
+  },
+  {
+    "key": "general.undo_ctrlz",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Undo (Ctrl+Z)"
+  },
+  {
+    "key": "general.polygon",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Polygon"
+  },
+  {
+    "key": "general.must_match_the_coordinate_space_you_define_for_gat",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Must match the coordinate space you define for gateway positions in Pareto Anywhere chimps."
+  },
+  {
+    "key": "general.shape",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Shape"
+  },
+  {
+    "key": "general.suggested",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Suggested"
+  },
+  {
+    "key": "general.offline",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Offline"
+  },
+  {
+    "key": "general.export_as_svg",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Export as SVG"
+  },
+  {
+    "key": "general.appearance",
+    "category": "general",
+    "context": "Page heading",
+    "default_text": "Appearance"
+  },
+  {
+    "key": "general.1_year",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "1 year"
+  },
+  {
+    "key": "general.enter_your_pin",
+    "category": "general",
+    "context": "Page heading",
+    "default_text": "Enter your PIN"
+  },
+  {
+    "key": "general.eg_john",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "e.g. John"
+  },
+  {
+    "key": "general.expiring_soon",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Expiring soon"
+  },
+  {
+    "key": "general.discard",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Discard"
+  },
+  {
+    "key": "general.last_seen",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Last seen"
+  },
+  {
+    "key": "general.custom_feature_access",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Custom Feature Access"
+  },
+  {
+    "key": "general.smith",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "Smith"
+  },
+  {
+    "key": "general.start_date",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Start Date"
+  },
+  {
+    "key": "general.mobile_moves_regularly_or_in_transit",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Mobile — moves regularly or in transit"
+  },
+  {
+    "key": "general.role",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Role"
+  },
+  {
+    "key": "general.006400",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "#006400"
+  },
+  {
+    "key": "general.pinplot",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "PinPlot"
+  },
+  {
+    "key": "general.all_categories",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "All categories"
+  },
+  {
+    "key": "general.polygon_room",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Polygon Room"
+  },
+  {
+    "key": "general.entry_amp_exit",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Entry &amp; Exit"
+  },
+  {
+    "key": "general.gdpr_warning",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "GDPR Warning"
+  },
+  {
+    "key": "general.admin_only",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Admin only"
+  },
+  {
+    "key": "general.8250",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "&#8250;"
+  },
+  {
+    "key": "general.radius",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Radius"
+  },
+  {
+    "key": "general.time",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Time"
+  },
+  {
+    "key": "general.admin_full_access_to_all_group_features",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Admin — full access to all group features"
+  },
+  {
+    "key": "general.from",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "From"
+  },
+  {
+    "key": "general.seen_24_h",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Seen ≤ 24 h"
+  },
+  {
+    "key": "general.6_months",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "6 months"
+  },
+  {
+    "key": "general.eg_867747079036032",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "e.g. 867747079036032"
+  },
+  {
+    "key": "general.eg_07700900123_or_447700900123",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "e.g. 07700900123 or +447700900123"
+  },
+  {
+    "key": "general.no_members",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "No members"
+  },
+  {
+    "key": "general.category",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Category"
+  },
+  {
+    "key": "general.centre",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Centre"
+  },
+  {
+    "key": "general.123456",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "123456"
+  },
+  {
+    "key": "general.all_levels",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "All levels"
+  },
+  {
+    "key": "general._select_a_building_",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "— Select a building —"
+  },
+  {
+    "key": "general.gateway",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Gateway"
+  },
+  {
+    "key": "general.dbl_door",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Dbl Door"
+  },
+  {
+    "key": "general.expires_hexpiresat_new_datehexpiresattolocaledates",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Expires ${h.expires_at ? new Date(h.expires_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—'}"
+  },
+  {
+    "key": "general.min_8_characters",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "(min 8 characters)"
+  },
+  {
+    "key": "general.snap",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Snap"
+  },
+  {
+    "key": "general.no_packages_available_ask_your_admin",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "No packages available — ask your admin"
+  },
+  {
+    "key": "general.toggle_sidebar",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Toggle sidebar"
+  },
+  {
+    "key": "general.series_3",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Series 3"
+  },
+  {
+    "key": "general.redo_ctrly",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Redo (Ctrl+Y)"
+  },
+  {
+    "key": "general.concrete",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Concrete"
+  },
+  {
+    "key": "general.gps_accuracy",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "GPS accuracy"
+  },
+  {
+    "key": "general.structural_column",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Structural Column"
+  },
+  {
+    "key": "general.rectangles",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Rectangles"
+  },
+  {
+    "key": "general.battery_",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Battery ≤"
+  },
+  {
+    "key": "general.draw_rectangle",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Draw rectangle"
+  },
+  {
+    "key": "general.battery_low",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Battery Low"
+  },
+  {
+    "key": "general.uisactive_",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "${u.is_active ? "
+  },
+  {
+    "key": "general.no_position_in_over_7_days",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "No position in over 7 days"
+  },
+  {
+    "key": "general.toggle_light_dark_mode",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Toggle light / dark mode"
+  },
+  {
+    "key": "general.3_years",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "3 years"
+  },
+  {
+    "key": "general.battery_amp_offline",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Battery &amp; Offline"
+  },
+  {
+    "key": "general.pinplot_hps_customer_portal",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "PinPlot HPS — Customer Portal"
+  },
+  {
+    "key": "general.500_m",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "500 m"
+  },
+  {
+    "key": "general.portal_users",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Portal Users"
+  },
+  {
+    "key": "general.48_hours",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "48 hours"
+  },
+  {
+    "key": "general.300_m",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "300 m"
+  },
+  {
+    "key": "general.mark_all_read",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Mark all read"
+  },
+  {
+    "key": "general.expires",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Expires"
+  },
+  {
+    "key": "general.light_mode",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "(Light Mode)"
+  },
+  {
+    "key": "general.role_",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Role *"
+  },
+  {
+    "key": "general.eg_100",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "e.g. 100"
+  },
+  {
+    "key": "general.battery",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Battery"
+  },
+  {
+    "key": "general.slow_moves_occasionally",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Slow — moves occasionally"
+  },
+  {
+    "key": "general.35",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "35%"
+  },
+  {
+    "key": "general.lifetime",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Lifetime"
+  },
+  {
+    "key": "general.create_user",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Create User"
+  },
+  {
+    "key": "general.jane",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "Jane"
+  },
+  {
+    "key": "general.notes",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Notes"
+  },
+  {
+    "key": "general.distance",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Distance"
+  },
+  {
+    "key": "general.show_overlay",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Show overlay"
+  },
+  {
+    "key": "general.clear_markers",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Clear Markers"
+  },
+  {
+    "key": "general.reassign",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Reassign"
+  },
+  {
+    "key": "general.deactivated",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Deactivated"
+  },
+  {
+    "key": "general.owner",
+    "category": "general",
+    "context": "Modal dialog",
+    "default_text": "Owner"
+  },
+  {
+    "key": "general.series_1",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Series 1"
+  },
+  {
+    "key": "general.expiring_soon_lt30_days",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Expiring soon (&lt;30 days)"
+  },
+  {
+    "key": "general.restore_to_default_3b82f6",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Restore to default (#3b82f6)"
+  },
+  {
+    "key": "general.any_duration",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Any duration"
+  },
+  {
+    "key": "general.fit_to_view",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Fit to view"
+  },
+  {
+    "key": "general.set_user_expiry",
+    "category": "general",
+    "context": "Modal dialog",
+    "default_text": "Set User Expiry"
+  },
+  {
+    "key": "general.100",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "100%"
+  },
+  {
+    "key": "general.last_60_days",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Last 60 days"
+  },
+  {
+    "key": "general.10_m",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "10 m"
+  },
+  {
+    "key": "general.warning",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Warning"
+  },
+  {
+    "key": "general.you",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "You"
+  },
+  {
+    "key": "general.broker_websocket_url",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Broker WebSocket URL"
+  },
+  {
+    "key": "general.building_name",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Building Name"
+  },
+  {
+    "key": "general.eg_head_office_floor_2",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "e.g. Head Office — Floor 2"
+  },
+  {
+    "key": "general.select",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Select"
+  },
+  {
+    "key": "general.active",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Active"
+  },
+  {
+    "key": "general.opacity",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Opacity"
+  },
+  {
+    "key": "general.upload_floor_plan",
+    "category": "general",
+    "context": "Modal dialog",
+    "default_text": "Upload Floor Plan"
+  },
+  {
+    "key": "general.qr_nfc_generator",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "QR / NFC Generator"
+  },
+  {
+    "key": "general.gateways",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Gateways"
+  },
+  {
+    "key": "general.zoom_in",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Zoom in"
+  },
+  {
+    "key": "general.data_retention",
+    "category": "general",
+    "context": "Page heading",
+    "default_text": "Data Retention"
+  },
+  {
+    "key": "general.admin_only_contact_your_administrator_to_change",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "(Admin only — contact your administrator to change)"
+  },
+  {
+    "key": "general.label_name",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Label / Name"
+  },
+  {
+    "key": "general.4px",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "4px"
+  },
+  {
+    "key": "general.90_days",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "90 days"
+  },
+  {
+    "key": "general.glass_wall_curtain",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Glass Wall / Curtain"
+  },
+  {
+    "key": "general.end_user_app_users",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "End User App Users"
+  },
+  {
+    "key": "general.24_hours",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "24 hours"
+  },
+  {
+    "key": "general.eg_facar_fatruck_fabox_faperson",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "e.g. fa-car, fa-truck, fa-box, fa-person"
+  },
+  {
+    "key": "general.distance_mi",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Distance (mi)"
+  },
+  {
+    "key": "general.statuslabelstatus",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "${statusLabel[status]}"
+  },
+  {
+    "key": "general.all_shapes",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "All shapes"
+  },
+  {
+    "key": "general.expiry_date",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Expiry Date"
+  },
+  {
+    "key": "general.duration",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Duration"
+  },
+  {
+    "key": "general.staircase",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Staircase"
+  },
+  {
+    "key": "general._lochtmlerrs0",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "● ${_locHtml(errs[0])}"
+  },
+  {
+    "key": "general.never",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Never"
+  },
+  {
+    "key": "general.eg_vehicles",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "e.g. Vehicles"
+  },
+  {
+    "key": "general.distance_threshold",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Distance Threshold"
+  },
+  {
+    "key": "general.seen_gt_7_days",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Seen &gt; 7 days"
+  },
+  {
+    "key": "general.journey_log",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Journey Log"
+  },
+  {
+    "key": "general.account_menu",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Account menu"
+  },
+  {
+    "key": "general.idle",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Idle"
+  },
+  {
+    "key": "general.2000_m",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "2000 m"
+  },
+  {
+    "key": "general.status",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Status"
+  },
+  {
+    "key": "general.all_packages",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "All packages"
+  },
+  {
+    "key": "general.room_space_rectangle",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Room / Space (Rectangle)"
+  },
+  {
+    "key": "general.upload_a_png_or_jpeg_image_of_the_floor_plan_it_wi",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Upload a PNG or JPEG image of the floor plan. It will be stored in the browser for this building."
+  },
+  {
+    "key": "general.entry_only",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Entry only"
+  },
+  {
+    "key": "general.circle_1",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "circle"
+  },
+  {
+    "key": "general.type",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Type"
+  },
+  {
+    "key": "general.days_left",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Days Left"
+  },
+  {
+    "key": "general.all_statuses",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "All statuses"
+  },
+  {
+    "key": "general.eg_company_van",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "e.g. Company Van"
+  },
+  {
+    "key": "general.janecompanycom",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "jane@company.com"
+  },
+  {
+    "key": "general.30_days",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "30 days"
+  },
+  {
+    "key": "general.package",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Package"
+  },
+  {
+    "key": "general.double_door",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Double Door"
+  },
+  {
+    "key": "general.distance_threshold_metres_",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Distance Threshold (metres) *"
+  },
+  {
+    "key": "general.total",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Total"
+  },
+  {
+    "key": "general.drywall_partition",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Drywall / Partition"
+  },
+  {
+    "key": "general.lochtmlerrsjoin",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "${_locHtml(errs.join("
+  },
+  {
+    "key": "general.name_",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Name *"
+  },
+  {
+    "key": "general.inactive",
+    "category": "general",
+    "context": "Success message",
+    "default_text": "Inactive"
+  },
+  {
+    "key": "general.to",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "To"
+  },
+  {
+    "key": "general.down_",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Down ↓"
+  },
+  {
+    "key": "general.no_gps_fix",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "No GPS fix"
+  },
+  {
+    "key": "general.please_select_both_start_and_end_dates_for_custom_",
+    "category": "general",
+    "context": "Alert/Confirm message",
+    "default_text": "Please select both start and end dates for custom range."
+  },
+  {
+    "key": "general.20",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "20%"
+  },
+  {
+    "key": "general.rectangle",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Rectangle"
+  },
+  {
+    "key": "general.show_all",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Show all"
+  },
+  {
+    "key": "general.change_role",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Change role"
+  },
+  {
+    "key": "general.show",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Show"
+  },
+  {
+    "key": "general.floor_name",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "Floor name…"
+  },
+  {
+    "key": "general.exterior",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Exterior"
+  },
+  {
+    "key": "general.loading_users",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Loading users…"
+  },
+  {
+    "key": "general.new",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "New"
+  },
+  {
+    "key": "general.seen_17_days",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Seen 1–7 days"
+  },
+  {
+    "key": "general.id",
+    "category": "general",
+    "context": "Modal dialog",
+    "default_text": "ID"
+  },
+  {
+    "key": "general.last_update",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Last Update"
+  },
+  {
+    "key": "general.series_2",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Series 2"
+  },
+  {
+    "key": "general._none_",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "— None —"
+  },
+  {
+    "key": "general.demo_mode",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Demo mode"
+  },
+  {
+    "key": "general.ble_gateway",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "BLE Gateway"
+  },
+  {
+    "key": "general.hive_id",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Hive ID"
+  },
+  {
+    "key": "general._optional_assign_later_",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "— Optional: assign later —"
+  },
+  {
+    "key": "general.no_users_yet",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "No users yet."
+  },
+  {
+    "key": "general.description",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Description"
+  },
+  {
+    "key": "general.lift",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Lift"
+  },
+  {
+    "key": "general.last_name",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Last Name"
+  },
+  {
+    "key": "general.done",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Done"
+  },
+  {
+    "key": "general.monitoring",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Monitoring"
+  },
+  {
+    "key": "general.polygons",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Polygons"
+  },
+  {
+    "key": "general.end_date",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "End Date"
+  },
+  {
+    "key": "general.end",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "End"
+  },
+  {
+    "key": "general.15",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "15%"
+  },
+  {
+    "key": "general.how_to_notify_me",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "How to notify me"
+  },
+  {
+    "key": "general.glass",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Glass"
+  },
+  {
+    "key": "general.uploading",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Uploading…"
+  },
+  {
+    "key": "general.expired",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Expired"
+  },
+  {
+    "key": "general.increase_font_size",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Increase font size"
+  },
+  {
+    "key": "general.last_30_days",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Last 30 days"
+  },
+  {
+    "key": "general.total_scans",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Total scans"
+  },
+  {
+    "key": "general.expiry",
+    "category": "general",
+    "context": "Modal dialog",
+    "default_text": "Expiry"
+  },
+  {
+    "key": "general.archived_harchivedat_new_dateharchivedattolocaleda",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Archived ${h.archived_at ? new Date(h.archived_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '—'}"
+  },
+  {
+    "key": "general.actions",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Actions"
+  },
+  {
+    "key": "general.isarmed",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "${isArmed?"
+  },
+  {
+    "key": "general.metric_km_kmh",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Metric (km, km/h)"
+  },
+  {
+    "key": "general.customer_portal",
+    "category": "general",
+    "context": "Page heading",
+    "default_text": "Customer Portal"
+  },
+  {
+    "key": "general.no_gps_waypoints_for_this_journey",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "No GPS waypoints for this journey."
+  },
+  {
+    "key": "general.last_7_days_1",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "last 7 days"
+  },
+  {
+    "key": "general.label",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Label"
+  },
+  {
+    "key": "general.0_0",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "0, 0"
+  },
+  {
+    "key": "general.escamessage",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "${esc(a.message||"
+  },
+  {
+    "key": "general.7_days",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "7 days"
+  },
+  {
+    "key": "general.open_the_hive_user_manual_in_a_new_tab",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Open the HIVE user manual in a new tab"
+  },
+  {
+    "key": "general.reset",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Reset"
+  },
+  {
+    "key": "general.registered",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Registered"
+  },
+  {
+    "key": "general.1a2a1a",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "#1a2a1a"
+  },
+  {
+    "key": "general.lift_elevator",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Lift / Elevator"
+  },
+  {
+    "key": "general.pin",
+    "category": "general",
+    "context": "Page heading",
+    "default_text": "PIN"
+  },
+  {
+    "key": "general.critical",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Critical"
+  },
+  {
+    "key": "general.zoom_out",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Zoom out"
+  },
+  {
+    "key": "general.column",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Column"
+  },
+  {
+    "key": "general.rename",
+    "category": "general",
+    "context": "Modal dialog",
+    "default_text": "Rename"
+  },
+  {
+    "key": "general.imei",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "IMEI"
+  },
+  {
+    "key": "general.hive_name_",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Hive Name *"
+  },
+  {
+    "key": "general.toggle_journeys_panel",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Toggle journeys panel"
+  },
+  {
+    "key": "general.wsspinplotmemqtt",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "wss://pinplot.me/mqtt"
+  },
+  {
+    "key": "general.no_journeys_found_for_the_selected_date_range",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "No journeys found for the selected date range."
+  },
+  {
+    "key": "general.right_",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Right →"
+  },
+  {
+    "key": "general.user_accounts",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "User Accounts"
+  },
+  {
+    "key": "general.floor",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Floor"
+  },
+  {
+    "key": "general.",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "••••••••"
+  },
+  {
+    "key": "general.escerrsjoin",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "${esc(errs.join("
+  },
+  {
+    "key": "general.times",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "&times;"
+  },
+  {
+    "key": "general.labels",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Labels"
+  },
+  {
+    "key": "general.imperial_mi_mph",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Imperial (mi, mph)"
+  },
+  {
+    "key": "general.select_move_v",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Select / Move (V)"
+  },
+  {
+    "key": "general.youcompanycom",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "you@company.com"
+  },
+  {
+    "key": "general.owner_ownershort",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Owner: ${ownerShort}"
+  },
+  {
+    "key": "general.circles",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Circles"
+  },
+  {
+    "key": "general.grid",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Grid"
+  },
+  {
+    "key": "general.exit_only",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Exit only"
+  },
+  {
+    "key": "general.date_range",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Date Range"
+  },
+  {
+    "key": "general.create_building",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Create Building"
+  },
+  {
+    "key": "general.10",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "10%"
+  },
+  {
+    "key": "general.draw_circle",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Draw circle"
+  },
+  {
+    "key": "general.outlier",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Outlier"
+  },
+  {
+    "key": "general.30",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "30%"
+  },
+  {
+    "key": "general.no_logo",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "No logo"
+  },
+  {
+    "key": "general.concrete_wall",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Concrete Wall"
+  },
+  {
+    "key": "general.recreate_this_archived_hive_a_fresh_60day_clock_wi",
+    "category": "general",
+    "context": "Alert/Confirm message",
+    "default_text": "Recreate this archived hive? A fresh 60-day clock will start."
+  },
+  {
+    "key": "general.left_",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Left ←"
+  },
+  {
+    "key": "general.fa_class",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "(FA class)"
+  },
+  {
+    "key": "general.last_seen_1",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Last Seen"
+  },
+  {
+    "key": "general.category_name_",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Category Name *"
+  },
+  {
+    "key": "general.answer",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "Answer"
+  },
+  {
+    "key": "general.custom_choose_features_below",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Custom — choose features below"
+  },
+  {
+    "key": "general.up_",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Up ↑"
+  },
+  {
+    "key": "general.draw_polygon",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Draw polygon"
+  },
+  {
+    "key": "general.door",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Door"
+  },
+  {
+    "key": "general.new_building_floor",
+    "category": "general",
+    "context": "Modal dialog",
+    "default_text": "New Building / Floor"
+  },
+  {
+    "key": "general.first_name",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "First Name"
+  },
+  {
+    "key": "general.no_end_users_found",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "No end users found."
+  },
+  {
+    "key": "general.detail",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Detail"
+  },
+  {
+    "key": "general.builtin",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Built-in"
+  },
+  {
+    "key": "general.floor_1",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Floor 1"
+  },
+  {
+    "key": "general.hive_breach",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Hive Breach"
+  },
+  {
+    "key": "general.registered_via_the_pinplot_mobile_app_amp_matched_",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Registered via the PinPlot mobile app &amp; matched to your domain"
+  },
+  {
+    "key": "general.last_90_days",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Last 90 days"
+  },
+  {
+    "key": "general.label_1",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "${label}"
+  },
+  {
+    "key": "general.coordinates",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Coordinates"
+  },
+  {
+    "key": "general.exterior_wall",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Exterior Wall"
+  },
+  {
+    "key": "general.start",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Start"
+  },
+  {
+    "key": "general.dark_mode",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "(Dark Mode)"
+  },
+  {
+    "key": "general.draft",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Draft"
+  },
+  {
+    "key": "general._ready",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "● ready"
+  },
+  {
+    "key": "general.logo_must_be_under_512_kb",
+    "category": "general",
+    "context": "Alert/Confirm message",
+    "default_text": "Logo must be under 512 KB."
+  },
+  {
+    "key": "general.60",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "60"
+  },
+  {
+    "key": "general.management",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Management"
+  },
+  {
+    "key": "general.no_package",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "No package"
+  },
+  {
+    "key": "general.stationary_items_stay_put",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Stationary — items stay put"
+  },
+  {
+    "key": "general.loading",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Loading…"
+  },
+  {
+    "key": "general.position",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "position/#"
+  },
+  {
+    "key": "general.unknown",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "Unknown"
+  },
+  {
+    "key": "general.hive_cleared",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Hive Cleared"
+  },
+  {
+    "key": "general.window_1",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Window"
+  },
+  {
+    "key": "general.topic",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Topic"
+  },
+  {
+    "key": "general.eg_worsley_depot",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "e.g. Worsley Depot"
+  },
+  {
+    "key": "general.validity_days",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Validity (days)"
+  },
+  {
+    "key": "general.colour",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Colour"
+  },
+  {
+    "key": "general.new_awaiting_first_fix",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "New (awaiting first fix)"
+  },
+  {
+    "key": "general._select_package_",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "— Select package —"
+  },
+  {
+    "key": "general.reset_this_user",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Reset this user"
+  },
+  {
+    "key": "general.activate_user",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Activate user"
+  },
+  {
+    "key": "general.room",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "Room"
+  },
+  {
+    "key": "general.facar",
+    "category": "general",
+    "context": "Input placeholder",
+    "default_text": "fa-car"
+  },
+  {
+    "key": "general.beta",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Beta"
+  },
+  {
+    "key": "general.14px",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "14px"
+  },
+  {
+    "key": "general.single_door",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Single Door"
+  },
+  {
+    "key": "general.decrease_font_size",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Decrease font size"
+  },
+  {
+    "key": "general.preparing",
+    "category": "general",
+    "context": "Form label",
+    "default_text": "Preparing…"
+  },
+  {
+    "key": "general.account_amp_security",
+    "category": "general",
+    "context": "Page heading",
+    "default_text": "Account &amp; Security"
+  },
+  {
+    "key": "general.all_types",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "All types"
+  },
+  {
+    "key": "general.all",
+    "category": "general",
+    "context": "Button text",
+    "default_text": "All"
+  },
+  {
+    "key": "general._escerrsjoin_",
+    "category": "general",
+    "context": "General UI text",
+    "default_text": "● ${esc(errs.join('; '))}"
+  },
+  {
+    "key": "general.text_label",
+    "category": "general",
+    "context": "Tooltip",
+    "default_text": "Text Label"
+  },
+  {
+    "key": "geofences.geofence_entry",
+    "category": "geofences",
+    "context": "Form label",
+    "default_text": "Geofence Entry"
+  },
+  {
+    "key": "geofences.show_geofences",
+    "category": "geofences",
+    "context": "Form label",
+    "default_text": "Show Geofences"
+  },
+  {
+    "key": "geofences.new_geofence",
+    "category": "geofences",
+    "context": "General UI text",
+    "default_text": "New geofence"
+  },
+  {
+    "key": "geofences.no_geofence_events_found_for_the_selected_period",
+    "category": "geofences",
+    "context": "General UI text",
+    "default_text": "No geofence events found for the selected period."
+  },
+  {
+    "key": "geofences.geofence_exit",
+    "category": "geofences",
+    "context": "Form label",
+    "default_text": "Geofence Exit"
+  },
+  {
+    "key": "geofences.geofence_events",
+    "category": "geofences",
+    "context": "Form label",
+    "default_text": "Geofence Events"
+  },
+  {
+    "key": "geofences.all_zones",
+    "category": "geofences",
+    "context": "General UI text",
+    "default_text": "All zones"
+  },
+  {
+    "key": "geofences.search_geofences",
+    "category": "geofences",
+    "context": "Input placeholder",
+    "default_text": "Search geofences…"
+  },
+  {
+    "key": "geofences.geofences",
+    "category": "geofences",
+    "context": "Form label",
+    "default_text": "Geofences"
+  },
+  {
+    "key": "map.show_hide_geofences_on_the_map",
+    "category": "map",
+    "context": "Tooltip",
+    "default_text": "Show / hide geofences on the map"
+  },
+  {
+    "key": "map.always_show_maps_with_the_light_style_even_in_dark",
+    "category": "map",
+    "context": "Tooltip",
+    "default_text": "Always show maps with the light style, even in dark mode"
+  },
+  {
+    "key": "map.view_on_map",
+    "category": "map",
+    "context": "Tooltip",
+    "default_text": "View on map"
+  },
+  {
+    "key": "map.maptiler",
+    "category": "map",
+    "context": "General UI text",
+    "default_text": "MapTiler"
+  },
+  {
+    "key": "map.esctripstartlocationdescription",
+    "category": "map",
+    "context": "Tooltip",
+    "default_text": "${esc(trip.startLocationDescription||"
+  },
+  {
+    "key": "map.optional_upload_later_via_map",
+    "category": "map",
+    "context": "Form label",
+    "default_text": "(optional — upload later via map)"
+  },
+  {
+    "key": "map.save_location",
+    "category": "map",
+    "context": "Button text",
+    "default_text": "Save location"
+  },
+  {
+    "key": "map.hive_tracking",
+    "category": "map",
+    "context": "Form label",
+    "default_text": "Hive Tracking"
+  },
+  {
+    "key": "map.preview_leaflet_map",
+    "category": "map",
+    "context": "Tooltip",
+    "default_text": "Preview Leaflet map"
+  },
+  {
+    "key": "map.location",
+    "category": "map",
+    "context": "Modal dialog",
+    "default_text": "Location"
+  },
+  {
+    "key": "map.toggle_the_switch_on_each_tag_to_arm_or_disarm_geo",
+    "category": "map",
+    "context": "General UI text",
+    "default_text": "Toggle the switch on each tag to arm or disarm geofence alerts for this location.\n                            When armed, entry and exit events generate alerts in the inbox."
+  },
+  {
+    "key": "map.import_0_locations",
+    "category": "map",
+    "context": "Button text",
+    "default_text": "Import 0 locations"
+  },
+  {
+    "key": "map.last_location",
+    "category": "map",
+    "context": "General UI text",
+    "default_text": "Last Location"
+  },
+  {
+    "key": "map.show_on_map",
+    "category": "map",
+    "context": "Tooltip",
+    "default_text": "Show on map"
+  },
+  {
+    "key": "map.bulk_upload_locations",
+    "category": "map",
+    "context": "Modal dialog",
+    "default_text": "Bulk upload locations"
+  },
+  {
+    "key": "map.map_height_px_chimps_units",
+    "category": "map",
+    "context": "Form label",
+    "default_text": "Map Height (px / chimps units)"
+  },
+  {
+    "key": "map.openstreetmap",
+    "category": "map",
+    "context": "General UI text",
+    "default_text": "OpenStreetMap"
+  },
+  {
+    "key": "map.map_width_px_chimps_units",
+    "category": "map",
+    "context": "Form label",
+    "default_text": "Map Width (px / chimps units)"
+  },
+  {
+    "key": "map.manager_tracking_amp_management_only",
+    "category": "map",
+    "context": "General UI text",
+    "default_text": "Manager — Tracking &amp; Management only"
+  },
+  {
+    "key": "map.esctlocationdescription",
+    "category": "map",
+    "context": "Tooltip",
+    "default_text": "${esc(t.location_description||"
+  },
+  {
+    "key": "map.tracking",
+    "category": "map",
+    "context": "Form label",
+    "default_text": "Tracking"
+  },
+  {
+    "key": "map.optional_notes_about_this_location",
+    "category": "map",
+    "context": "Input placeholder",
+    "default_text": "Optional notes about this location…"
+  },
+  {
+    "key": "map.light_maps",
+    "category": "map",
+    "context": "General UI text",
+    "default_text": "Light maps"
+  },
+  {
+    "key": "map.esctripendlocationdescription",
+    "category": "map",
+    "context": "Tooltip",
+    "default_text": "${esc(trip.endLocationDescription||"
+  },
+  {
+    "key": "map.live_map",
+    "category": "map",
+    "context": "Form label",
+    "default_text": "Live Map"
+  },
+  {
+    "key": "reports.reports",
+    "category": "reports",
+    "context": "Form label",
+    "default_text": "Reports"
+  },
+  {
+    "key": "reports.reported_within_last_24_h",
+    "category": "reports",
+    "context": "Tooltip",
+    "default_text": "Reported within last 24 h"
+  },
+  {
+    "key": "reports.reporter_reports_only",
+    "category": "reports",
+    "context": "General UI text",
+    "default_text": "Reporter — Reports only"
+  },
+  {
+    "key": "reports.reported_in_last_7_days_but_not_within_24_h",
+    "category": "reports",
+    "context": "Tooltip",
+    "default_text": "Reported in last 7 days but not within 24 h"
+  },
+  {
+    "key": "settings.mobility_profile",
+    "category": "settings",
+    "context": "Form label",
+    "default_text": "Mobility Profile"
+  },
+  {
+    "key": "settings.profile",
+    "category": "settings",
+    "context": "Form label",
+    "default_text": "Profile"
+  },
+  {
+    "key": "settings.pareto_anywhere_mqtt_settings",
+    "category": "settings",
+    "context": "General UI text",
+    "default_text": "Pareto Anywhere / MQTT Settings"
+  },
+  {
+    "key": "settings.display_preferences_for_this_browser_speeds_distan",
+    "category": "settings",
+    "context": "General UI text",
+    "default_text": "Display preferences for this browser. Speeds, distances and areas are converted on display only — stored data is unchanged."
+  },
+  {
+    "key": "settings.preferences",
+    "category": "settings",
+    "context": "Page heading",
+    "default_text": "Preferences"
+  },
+  {
+    "key": "settings.settings",
+    "category": "settings",
+    "context": "Form label",
+    "default_text": "Settings"
+  },
+  {
+    "key": "settings.review_settings",
+    "category": "settings",
+    "context": "Button text",
+    "default_text": "Review Settings"
+  },
+  {
+    "key": "success.const_bdocumentgetelementbyidcopypwdbtnbtextconten",
+    "category": "success",
+    "context": "Button text",
+    "default_text": "{const b=document.getElementById('copyPwdBtn');b.textContent='Copied!';b.style.color='var(--success,#10b981)';setTimeout(()=>{b.textContent='Copy';b.style.color='';},2000)})\">Copy"
+  },
+  {
+    "key": "trips.movement_history",
+    "category": "trips",
+    "context": "Form label",
+    "default_text": "Movement History"
+  },
+  {
+    "key": "trips.movement_history_1",
+    "category": "trips",
+    "context": "Tooltip",
+    "default_text": "Movement History"
+  },
+  {
+    "key": "trips.view_scan_history",
+    "category": "trips",
+    "context": "General UI text",
+    "default_text": "View scan history"
+  }
+]
