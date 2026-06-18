@@ -5922,29 +5922,60 @@ dashboard.welcome,Bienvenue</pre>
         }
 
         const progressDiv = document.createElement('div');
-        progressDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:24px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.3);z-index:10000;';
-        progressDiv.innerHTML = `<h3>🤖 Auto-translating...</h3><p id="autoTranslateProgress">0 / ${missingKeys.length}</p>`;
+        progressDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:24px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.3);z-index:10000;min-width:300px;';
+        progressDiv.innerHTML = `
+            <h3 style="margin:0 0 12px 0;">🤖 Auto-translating to ${langCode.toUpperCase()}...</h3>
+            <p id="autoTranslateProgress" style="margin:0;font-size:14px;color:var(--gray);">0 / ${missingKeys.length}</p>
+            <div style="margin-top:8px;background:var(--border);border-radius:4px;height:8px;overflow:hidden;">
+                <div id="autoTranslateBar" style="background:var(--primary);height:100%;width:0%;transition:width 0.3s;"></div>
+            </div>
+        `;
         document.body.appendChild(progressDiv);
 
         let success = 0;
         let failed = 0;
+        const failedKeys = [];
 
         for (let i = 0; i < missingKeys.length; i++) {
             const key = missingKeys[i];
             try {
                 const translated = await translateText(key.default_text, 'en', langCode);
+                
+                if (!translated || translated.trim() === '') {
+                    throw new Error('Empty translation returned');
+                }
+                
                 await saveTranslationDirect(key.key, langCode, translated);
                 success++;
+                console.log(`✅ Translated: ${key.key} -> "${translated}"`);
             } catch (e) {
-                console.error(`Failed to translate ${key.key}:`, e);
+                console.error(`❌ Failed to translate ${key.key}:`, e.message);
                 failed++;
+                failedKeys.push(key.key);
             }
-            document.getElementById('autoTranslateProgress').textContent = `${i + 1} / ${missingKeys.length} (${success} success, ${failed} failed)`;
+            
+            // Update progress
+            const percent = Math.round(((i + 1) / missingKeys.length) * 100);
+            document.getElementById('autoTranslateProgress').textContent = `${i + 1} / ${missingKeys.length} (${success} ✅, ${failed} ❌)`;
+            document.getElementById('autoTranslateBar').style.width = `${percent}%`;
         }
 
         document.body.removeChild(progressDiv);
-        alert(`Auto-translation complete!\n✅ ${success} translations added\n❌ ${failed} failed`);
-        loadTranslations();
+        
+        // Show results
+        let message = `Auto-translation complete!\n\n✅ ${success} translations added\n❌ ${failed} failed`;
+        if (failedKeys.length > 0 && failedKeys.length <= 5) {
+            message += `\n\nFailed keys:\n${failedKeys.join('\n')}`;
+        } else if (failedKeys.length > 5) {
+            message += `\n\nFailed keys:\n${failedKeys.slice(0, 5).join('\n')}\n... and ${failedKeys.length - 5} more`;
+        }
+        
+        // Reload translations BEFORE showing alert
+        console.log('Reloading translations...');
+        await loadTranslations();
+        
+        // Show result after refresh
+        alert(message);
     }
 
     async function autoTranslateAll() {
