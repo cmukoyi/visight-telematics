@@ -549,6 +549,38 @@ def delete_translation(
     return {"message": "Translation deleted"}
 
 
+@router.delete("/translations/{language_code}/{translation_key:path}")
+def delete_translation_by_key(
+    language_code: str,
+    translation_key: str,
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin_user)
+):
+    """
+    Delete a translation by language code and key.
+    Used for cleanup (e.g., removing failed auto-translations).
+    Admin only.
+    """
+    translation = db.query(Translation).filter(
+        and_(
+            Translation.language_code == language_code,
+            Translation.key == translation_key
+        )
+    ).first()
+    
+    if not translation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Translation not found for {language_code}/{translation_key}"
+        )
+    
+    db.delete(translation)
+    db.commit()
+    
+    logger.info(f"Admin {admin.email} deleted translation by key: {translation_key} ({language_code})")
+    return {"message": "Translation deleted"}
+
+
 # ---------------------------------------------------------------------------
 # Import/Export
 # ---------------------------------------------------------------------------

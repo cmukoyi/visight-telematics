@@ -5756,6 +5756,7 @@ dashboard.welcome,Bienvenue</pre>
                 `<th style="width:220px;">
                     ${escapeHtml(lang.name)} (${lang.code.toUpperCase()})
                     <button class="btn btn-small" onclick="autoTranslateColumn('${lang.code}')" style="margin-left:8px;font-size:10px;padding:2px 6px;" title="Auto-translate this language">🤖 Auto</button>
+                    <button class="btn btn-small" onclick="cleanFailedTranslations('${lang.code}')" style="margin-left:4px;font-size:10px;padding:2px 6px;background:var(--danger);" title="Delete failed translations">🗑️ Clean</button>
                 </th>`
             ).join('');
             thead.innerHTML = `
@@ -5905,12 +5906,14 @@ dashboard.welcome,Bienvenue</pre>
 
     // Auto-translate functions using Google Translate API
     async function autoTranslateColumn(langCode) {
-        if (!confirm(`Auto-translate all missing translations to ${langCode.toUpperCase()}?\n\nThis will use Google Translate API. Review translations after generation.`)) {
+        if (!confirm(`Auto-translate all missing translations to ${langCode.toUpperCase()}?\n\nThis will use LibreTranslate API. Review translations after generation.`)) {
             return;
         }
 
+        // Filter for missing translations OR failed translations (starting with [AUTO-TRANSLATE-FAILED])
         const missingKeys = allTranslationKeys.filter(key => {
-            return !key.translations || !key.translations[langCode];
+            const translation = key.translations?.[langCode];
+            return !translation || translation.startsWith('[AUTO-TRANSLATE-FAILED]');
         });
 
         if (missingKeys.length === 0) {
@@ -5988,6 +5991,38 @@ dashboard.welcome,Bienvenue</pre>
             console.error('Translation failed:', e);
             throw e; // Re-throw to let calling function handle it
         }
+    }
+
+    async function cleanFailedTranslations(langCode) {
+        if (!confirm(`Delete all failed translations for ${langCode.toUpperCase()}?\\n\\nThis will remove all translations starting with [AUTO-TRANSLATE-FAILED].`)) {
+            return;
+        }
+
+        const failedKeys = allTranslationKeys.filter(key => {
+            const translation = key.translations?.[langCode];
+            return translation && translation.startsWith('[AUTO-TRANSLATE-FAILED]');
+        });
+
+        if (failedKeys.length === 0) {
+            alert('No failed translations found!');
+            return;
+        }
+
+        let deleted = 0;
+        for (const key of failedKeys) {
+            try {
+                await fetch(`/api/admin/i18n/translations/${langCode}/${encodeURIComponent(key.key)}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                deleted++;
+            } catch (e) {
+                console.error(`Failed to delete ${key.key}:`, e);
+            }
+        }
+
+        alert(`Deleted ${deleted} failed translations for ${langCode.toUpperCase()}`);
+        loadTranslations();
     }
 
     async function saveTranslationDirect(key, langCode, translatedText) {
@@ -6249,6 +6284,12 @@ dashboard.welcome,Bienvenue</pre>
 
             const languages = await response.json();
             const tbody = document.getElementById('languagesTableBody');
+            
+            // Safety check - element might not exist if tab isn't visible
+            if (!tbody) {
+                console.warn('languagesTableBody element not found - tab may not be visible');
+                return;
+            }
 
             if (!languages || languages.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:2rem">No languages found</td></tr>';
