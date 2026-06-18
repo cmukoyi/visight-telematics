@@ -600,20 +600,19 @@
 
 <script>
   // ── Tenant Configuration ──────────────────────────────────────────────────
+  // Derive all branding dynamically from current hostname (no hardcoded tenant strings)
   const TENANT_CONFIG = (function() {
     const hostname = window.location.hostname;
-    if (hostname.includes('beacontelematics')) {
-      return {
-        name: 'Beacon Telematics',
-        baseUrl: 'https://beacontelematics.co.uk',
-        apiLabel: 'Beacon Telematics Scanner'
-      };
-    }
-    // Default to Pinplot
+    const protocol = window.location.protocol;
+    const baseUrl = protocol + '//' + hostname;
+    
+    // Generate display name from hostname (e.g., "pinplot.me" or "beacontelematics.co.uk")
+    const displayName = hostname.split('.')[0].charAt(0).toUpperCase() + hostname.split('.')[0].slice(1);
+    
     return {
-      name: 'Pinplot',
-      baseUrl: 'https://pinplot.me',
-      apiLabel: 'Pinplot API'
+      name: displayName,
+      baseUrl: baseUrl,
+      apiLabel: 'Scanner API'
     };
   })();
 
@@ -621,7 +620,7 @@
   const ASSET_ID_REGEX     = /HPS([QN])[0-9]{11}/;
   const BASE_URL           = TENANT_CONFIG.baseUrl;
   const GPS_ACCURACY_LIMIT = 500;
-  const OFFLINE_QUEUE_KEY  = TENANT_CONFIG.name.toLowerCase().replace(/\s+/g, '_') + '_scan_queue';
+  const OFFLINE_QUEUE_KEY  = TENANT_CONFIG.name.toLowerCase() + '_scan_queue';
 
   // ── Theme ─────────────────────────────────────────────────────────────────
   let dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
