@@ -49,6 +49,7 @@ class User(Base):
     is_admin = Column(Boolean, default=False)
     email_verified = Column(Boolean, default=False)
     email_alerts_enabled = Column(Boolean, default=True)  # Enable email alerts for geofence events
+    preferred_language = Column(String(5), nullable=True)  # User language preference (overrides usergroup default)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
@@ -338,6 +339,7 @@ class UserGroup(Base):
     slug         = Column(String(100), nullable=False, unique=True)  # URL-safe identifier
     email_domain = Column(String(500), nullable=True, index=True)   # comma-separated list of domains e.g. "acme.com,acme.co.uk"
     default_package_id = Column(String(36), ForeignKey("tag_packages.id"), nullable=True)  # kept for bulk-import fallback
+    default_language = Column(String(5), nullable=False, server_default='en')  # Default language for usergroup
     is_active    = Column(Boolean, nullable=False, default=True)
     created_at   = Column(DateTime(timezone=True), server_default=func.now())
     updated_at   = Column(DateTime(timezone=True), onupdate=func.now())

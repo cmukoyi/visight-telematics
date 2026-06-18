@@ -229,6 +229,12 @@ app.include_router(assets_router)
 from app.routes_scan import router as scan_router  # noqa: E402
 app.include_router(scan_router)
 
+from app.routes_i18n import router as i18n_router  # noqa: E402
+app.include_router(i18n_router)
+
+from app.routes_admin_i18n import router as admin_i18n_router  # noqa: E402
+app.include_router(admin_i18n_router)
+
 # Static files for asset tracking (baked into Docker image at build time)
 static_dir = "/app/static"
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
