@@ -61,7 +61,7 @@ def upgrade():
     
     # 4. Add language preferences to users and usergroups
     op.add_column('users', sa.Column('preferred_language', sa.String(5), nullable=True))
-    op.add_column('usergroups', sa.Column('default_language', sa.String(5), nullable=False, server_default='en'))
+    op.add_column('user_groups', sa.Column('default_language', sa.String(5), nullable=False, server_default='en'))
     
     # 5. Seed initial languages
     languages_table = table('languages',
@@ -151,7 +151,7 @@ def upgrade():
 
 def downgrade():
     # Remove language columns
-    op.drop_column('usergroups', 'default_language')
+    op.drop_column('user_groups', 'default_language')
     op.drop_column('users', 'preferred_language')
     
     # Drop tables in reverse order (respect foreign keys)
