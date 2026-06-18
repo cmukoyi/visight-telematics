@@ -40,6 +40,10 @@ dB_schema.md
 # Feature dev sandbox/instructions — keep fully local
 features_dev/
 
+# Implementation plans and dev notes — keep local only
+*_IMPLEMENTATION_PLAN.md
+*_DEV_NOTES.md
+
 # macOS Finder metadata
 .DS_Store
 **/.DS_Store
