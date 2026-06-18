@@ -6296,12 +6296,14 @@ dashboard.welcome,Bienvenue</pre>
                 return;
             }
 
-            // Also populate the translation language filter
+            // Also populate the translation language filter (if it exists - only on Translations tab)
             const langFilter = document.getElementById('translationLanguageFilter');
-            langFilter.innerHTML = '<option value="">All Languages</option>' + 
-                languages.filter(l => l.is_active).map(l => 
-                    `<option value="${l.code}">${l.name}</option>`
-                ).join('');
+            if (langFilter) {
+                langFilter.innerHTML = '<option value="">All Languages</option>' + 
+                    languages.filter(l => l.is_active).map(l => 
+                        `<option value="${l.code}">${l.name}</option>`
+                    ).join('');
+            }
 
             tbody.innerHTML = languages.map(lang => {
                 const statusBadge = lang.is_active 

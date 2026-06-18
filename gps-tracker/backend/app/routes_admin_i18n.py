@@ -774,8 +774,12 @@ async def translate_text(
     
     Admin authentication required.
     """
+    # Try multiple translation services with fallback
+    translation_errors = []
+    
+    # Try LibreTranslate first (free, no API key)
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
                 'https://libretranslate.com/translate',
                 json={
@@ -787,35 +791,56 @@ async def translate_text(
                 headers={'Content-Type': 'application/json'}
             )
             
-            if response.status_code != 200:
-                logger.error(f"LibreTranslate API error: {response.status_code} - {response.text}")
-                raise HTTPException(
-                    status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail=f"Translation service error: {response.status_code}"
-                )
+            if response.status_code == 200:
+                data = response.json()
+                translated = data.get('translatedText', '')
+                
+                if translated:
+                    logger.info(f"Admin {admin.email} translated via LibreTranslate: {request.source_lang} -> {request.target_lang}")
+                    return TranslateResponse(translated_text=translated, source="libretranslate")
             
-            data = response.json()
-            translated = data.get('translatedText', '')
-            
-            if not translated:
-                raise HTTPException(
-                    status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail="Translation service returned empty result"
-                )
-            
-            logger.info(f"Admin {admin.email} translated text: {request.source_lang} -> {request.target_lang}")
-            
-            return TranslateResponse(translated_text=translated)
+            # Log but don't fail yet - try alternatives
+            error_msg = f"LibreTranslate: {response.status_code} - {response.text[:200]}"
+            translation_errors.append(error_msg)
+            logger.warning(error_msg)
     
-    except httpx.HTTPError as e:
-        logger.error(f"Translation API network error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Translation service unavailable: {str(e)}"
-        )
     except Exception as e:
-        logger.error(f"Translation error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Translation failed: {str(e)}"
-        )
+        error_msg = f"LibreTranslate failed: {str(e)}"
+        translation_errors.append(error_msg)
+        logger.warning(error_msg)
+    
+    # Try mymemory.translated.net as fallback (free, no API key, generous limits)
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # MyMemory API expects lang pairs like 'en|fr'
+            response = await client.get(
+                'https://api.mymemory.translated.net/get',
+                params={
+                    'q': request.text,
+                    'langpair': f"{request.source_lang}|{request.target_lang}"
+                }
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                translated = data.get('responseData', {}).get('translatedText', '')
+                
+                if translated and not translated.startswith('INVALID'):
+                    logger.info(f"Admin {admin.email} translated via MyMemory: {request.source_lang} -> {request.target_lang}")
+                    return TranslateResponse(translated_text=translated, source="mymemory")
+            
+            error_msg = f"MyMemory: {response.status_code}"
+            translation_errors.append(error_msg)
+            logger.warning(error_msg)
+    
+    except Exception as e:
+        error_msg = f"MyMemory failed: {str(e)}"
+        translation_errors.append(error_msg)
+        logger.warning(error_msg)
+    
+    # All services failed
+    logger.error(f"All translation services failed. Errors: {translation_errors}")
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"All translation services unavailable. Errors: {'; '.join(translation_errors[:2])}"
+    )
