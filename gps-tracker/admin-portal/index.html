@@ -913,6 +913,18 @@
                             <span>IMEI</span>
                         </button>
                     </li>
+                    <li class="sidebar-item">
+                        <button class="sidebar-link" onclick="switchTab('translations')">
+                            <span>🌍</span>
+                            <span>Translations</span>
+                        </button>
+                    </li>
+                    <li class="sidebar-item">
+                        <button class="sidebar-link" onclick="switchTab('languages')">
+                            <span>🗣️</span>
+                            <span>Languages</span>
+                        </button>
+                    </li>
                 </ul>
 
                 <div style="position: absolute; bottom: 24px; left: 24px; right: 24px;">
@@ -2477,6 +2489,107 @@
                     </div>
                     <!-- END IMEI TAB -->
 
+                    <!-- TRANSLATIONS TAB -->
+                    <div id="translations" class="tab-content">
+                        <div class="page-header">
+                            <h2 class="page-title">🌍 Translation Manager</h2>
+                            <p class="page-subtitle">Manage translations for multi-language support</p>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Translation Keys</h3>
+                                <div style="display:flex;gap:8px;align-items:center;">
+                                    <select id="translationCategoryFilter" onchange="loadTranslations()" style="padding:8px;border-radius:6px;border:1px solid var(--border);">
+                                        <option value="">All Categories</option>
+                                        <option value="common">Common</option>
+                                        <option value="dashboard">Dashboard</option>
+                                        <option value="fleet">Fleet</option>
+                                        <option value="geofences">Geofences</option>
+                                        <option value="trips">Trips</option>
+                                        <option value="alerts">Alerts</option>
+                                        <option value="settings">Settings</option>
+                                        <option value="auth">Auth</option>
+                                    </select>
+                                    <select id="translationLanguageFilter" onchange="loadTranslations()" style="padding:8px;border-radius:6px;border:1px solid var(--border);">
+                                        <option value="">All Languages</option>
+                                    </select>
+                                    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+                                        <input type="checkbox" id="translationMissingOnly" onchange="loadTranslations()">
+                                        Missing only
+                                    </label>
+                                    <input type="text" id="translationSearchInput" placeholder="Search keys..." style="padding:8px;border-radius:6px;border:1px solid var(--border);min-width:200px;" oninput="debounceTranslationSearch()">
+                                    <button class="btn btn-secondary btn-small" onclick="exportTranslations()">📥 Export CSV</button>
+                                    <button class="btn btn-secondary btn-small" onclick="openImportTranslationsModal()">📤 Import CSV</button>
+                                    <button class="btn btn-primary btn-small" onclick="openAddTranslationKeyModal()">+ Add Key</button>
+                                    <button class="btn btn-primary btn-small" onclick="loadTranslations()">↻ Refresh</button>
+                                </div>
+                            </div>
+                            <div id="translationStats" style="padding:16px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;gap:24px;">
+                                <div style="font-size:13px;color:var(--gray);">
+                                    <strong id="translationTotalKeys">0</strong> total keys
+                                </div>
+                                <div style="font-size:13px;color:var(--gray);" id="translationCompletionStats">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
+                            <div class="table-wrapper">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th style="width:20%">Key</th>
+                                            <th style="width:12%">Category</th>
+                                            <th style="width:23%">English (Default)</th>
+                                            <th style="width:23%">Translation</th>
+                                            <th style="width:12%">Language</th>
+                                            <th style="width:10%">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="translationsTableBody">
+                                        <tr><td colspan="6" style="text-align:center;color:var(--gray);padding:2rem">Click ↻ Refresh to load translations</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END TRANSLATIONS TAB -->
+
+                    <!-- LANGUAGES TAB -->
+                    <div id="languages" class="tab-content">
+                        <div class="page-header">
+                            <h2 class="page-title">🗣️ Language Manager</h2>
+                            <p class="page-subtitle">Manage available languages and view translation progress</p>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Active Languages</h3>
+                                <div style="display:flex;gap:8px;">
+                                    <button class="btn btn-primary btn-small" onclick="openAddLanguageModal()">+ Add Language</button>
+                                    <button class="btn btn-primary btn-small" onclick="loadLanguages()">↻ Refresh</button>
+                                </div>
+                            </div>
+                            <div class="table-wrapper">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Code</th>
+                                            <th>Language Name</th>
+                                            <th>Status</th>
+                                            <th>Translated Keys</th>
+                                            <th>Completion</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="languagesTableBody">
+                                        <tr><td colspan="6" style="text-align:center;color:var(--gray);padding:2rem">Click ↻ Refresh to load languages</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END LANGUAGES TAB -->
+
                 </div>
             </div>
         </div>
@@ -2527,6 +2640,194 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('addUserModal')">Cancel</button>
                     <button type="submit" class="btn btn-primary">Create User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ADD TRANSLATION KEY MODAL -->
+    <div id="addTranslationKeyModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Add Translation Key</span>
+                    <button class="close-btn" onclick="closeModal('addTranslationKeyModal')">×</button>
+                </div>
+            </div>
+
+            <form id="addTranslationKeyForm" onsubmit="handleAddTranslationKey(event)">
+                <div class="form-group">
+                    <label>Key <span style="color:var(--danger)">*</span></label>
+                    <input type="text" id="addKeyName" required placeholder="e.g. dashboard.welcome" pattern="^[a-z0-9._-]+$">
+                    <small style="color:var(--gray);">Lowercase, dots for namespacing (e.g. category.subcategory.key)</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Category</label>
+                    <select id="addKeyCategory">
+                        <option value="">None</option>
+                        <option value="common">Common</option>
+                        <option value="dashboard">Dashboard</option>
+                        <option value="fleet">Fleet</option>
+                        <option value="geofences">Geofences</option>
+                        <option value="trips">Trips</option>
+                        <option value="alerts">Alerts</option>
+                        <option value="settings">Settings</option>
+                        <option value="auth">Auth</option>
+                        <option value="reports">Reports</option>
+                        <option value="notifications">Notifications</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Default Text (English) <span style="color:var(--danger)">*</span></label>
+                    <textarea id="addKeyDefaultText" required placeholder="Enter the English text" rows="3"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Context (for translators)</label>
+                    <textarea id="addKeyContext" placeholder="Optional: describe where this text appears or how it's used" rows="2"></textarea>
+                </div>
+
+                <div id="addTranslationKeyError" class="error" style="display: none;"></div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('addTranslationKeyModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Key</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- EDIT TRANSLATION MODAL -->
+    <div id="editTranslationModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Edit Translation</span>
+                    <button class="close-btn" onclick="closeModal('editTranslationModal')">×</button>
+                </div>
+            </div>
+
+            <form id="editTranslationForm" onsubmit="handleEditTranslation(event)">
+                <input type="hidden" id="editTranslationKey">
+                
+                <div class="form-group">
+                    <label>Key</label>
+                    <input type="text" id="editTranslationKeyDisplay" disabled style="background:var(--light);cursor:not-allowed;">
+                </div>
+
+                <div class="form-group">
+                    <label>Language</label>
+                    <select id="editTranslationLanguage" required>
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Default Text (English)</label>
+                    <textarea id="editTranslationDefault" disabled rows="2" style="background:var(--light);cursor:not-allowed;"></textarea>
+                    <small style="color:var(--gray);">Reference only - cannot be edited here</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Translated Text <span style="color:var(--danger)">*</span></label>
+                    <textarea id="editTranslationText" required placeholder="Enter the translated text" rows="3"></textarea>
+                </div>
+
+                <div class="form-group" id="editTranslationContextGroup" style="display:none;">
+                    <label>Context</label>
+                    <textarea id="editTranslationContext" disabled rows="2" style="background:var(--light);cursor:not-allowed;font-size:12px;"></textarea>
+                </div>
+
+                <div id="editTranslationError" class="error" style="display: none;"></div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('editTranslationModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Translation</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ADD LANGUAGE MODAL -->
+    <div id="addLanguageModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Add Language</span>
+                    <button class="close-btn" onclick="closeModal('addLanguageModal')">×</button>
+                </div>
+            </div>
+
+            <form id="addLanguageForm" onsubmit="handleAddLanguage(event)">
+                <div class="form-group">
+                    <label>Language Code <span style="color:var(--danger)">*</span></label>
+                    <input type="text" id="addLanguageCode" required placeholder="e.g. fr, es, de" pattern="^[a-z]{2,5}$" maxlength="5">
+                    <small style="color:var(--gray);">2-5 lowercase letters (ISO 639-1 or similar)</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Language Name <span style="color:var(--danger)">*</span></label>
+                    <input type="text" id="addLanguageName" required placeholder="e.g. Français, Español">
+                </div>
+
+                <div class="form-group">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="checkbox" id="addLanguageActive" checked>
+                        Active
+                    </label>
+                    <small style="color:var(--gray);">Only active languages are available to users</small>
+                </div>
+
+                <div id="addLanguageError" class="error" style="display: none;"></div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('addLanguageModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Language</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- IMPORT TRANSLATIONS MODAL -->
+    <div id="importTranslationsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Import Translations</span>
+                    <button class="close-btn" onclick="closeModal('importTranslationsModal')">×</button>
+                </div>
+            </div>
+
+            <form id="importTranslationsForm" onsubmit="handleImportTranslations(event)">
+                <div class="form-group">
+                    <label>Target Language <span style="color:var(--danger)">*</span></label>
+                    <select id="importTranslationLanguage" required>
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>CSV File <span style="color:var(--danger)">*</span></label>
+                    <input type="file" id="importTranslationFile" required accept=".csv">
+                    <small style="color:var(--gray);">Expected columns: key, translated_text</small>
+                </div>
+
+                <div style="padding:12px;background:var(--surface);border-radius:6px;margin-bottom:16px;font-size:13px;">
+                    <strong style="color:var(--dark);">CSV Format:</strong>
+                    <pre style="margin-top:8px;font-size:11px;color:var(--gray);overflow-x:auto;">key,translated_text
+common.save,Enregistrer
+common.cancel,Annuler
+dashboard.welcome,Bienvenue</pre>
+                </div>
+
+                <div id="importTranslationsError" class="error" style="display: none;"></div>
+                <div id="importTranslationsSuccess" style="display: none; padding:12px; background:#d4edda; color:#155724; border-radius:6px; margin-bottom:16px;"></div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('importTranslationsModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Import</button>
                 </div>
             </form>
         </div>
@@ -2650,7 +2951,9 @@
                 'email-alert-stats': 'Email Alert Stats',
                 'endusers': 'End Users',
                 'flutter-users': 'Manage Flutter Users',
-                'imei': 'IMEI / Tags'
+                'imei': 'IMEI / Tags',
+                'translations': 'Translation Manager',
+                'languages': 'Language Manager'
             };
             document.getElementById('pageTitle').textContent = titles[tabName];
 
@@ -2670,6 +2973,8 @@
             if (tabName === 'email-alert-stats') { loadEmailAlertStats(); }
             if (tabName === 'endusers') { loadEndUsers(); }
             if (tabName === 'imei') { loadIMEI(); }
+            if (tabName === 'translations') { loadTranslations(); }
+            if (tabName === 'languages') { loadLanguages(); }
         }
 
         // ── BLE TAGS ─────────────────────────────────────────────────────────
@@ -5331,6 +5636,460 @@
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    }
+
+    // ========================================================================
+    // I18N / TRANSLATIONS FUNCTIONS
+    // ========================================================================
+
+    let translationSearchTimeout = null;
+    let allTranslationKeys = [];
+
+    async function loadTranslations() {
+        try {
+            const category = document.getElementById('translationCategoryFilter').value;
+            const language = document.getElementById('translationLanguageFilter').value;
+            const missingOnly = document.getElementById('translationMissingOnly').checked;
+            const search = document.getElementById('translationSearchInput').value;
+
+            let url = '/api/admin/i18n/translation-keys?';
+            if (category) url += `category=${encodeURIComponent(category)}&`;
+            if (language) url += `language=${encodeURIComponent(language)}&`;
+            if (missingOnly && language) url += `missing_only=true&`;
+            if (search) url += `search=${encodeURIComponent(search)}&`;
+
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+
+            if (!response.ok) throw new Error('Failed to load translations');
+
+            const keys = await response.json();
+            allTranslationKeys = keys;
+
+            const tbody = document.getElementById('translationsTableBody');
+            const totalKeysEl = document.getElementById('translationTotalKeys');
+            const completionStatsEl = document.getElementById('translationCompletionStats');
+
+            if (!keys || keys.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:2rem">No translation keys found</td></tr>';
+                totalKeysEl.textContent = '0';
+                completionStatsEl.innerHTML = '';
+                return;
+            }
+
+            totalKeysEl.textContent = keys.length;
+
+            // Calculate completion stats per language
+            const languages = await fetchLanguages();
+            let statsHTML = '';
+            for (const lang of languages) {
+                if (lang.code === 'en') continue; // Skip English (default)
+                let translated = 0;
+                keys.forEach(key => {
+                    if (key.translations && key.translations[lang.code]) translated++;
+                });
+                const percent = Math.round((translated / keys.length) * 100);
+                const color = percent === 100 ? 'var(--primary)' : percent > 50 ? 'var(--warning)' : 'var(--danger)';
+                statsHTML += `<span style="color:${color};"><strong>${lang.code.toUpperCase()}:</strong> ${percent}% (${translated}/${keys.length})</span>`;
+            }
+            completionStatsEl.innerHTML = statsHTML;
+
+            // Render table
+            tbody.innerHTML = keys.map(key => {
+                const translations = key.translations || {};
+                const languageOptions = languages.filter(l => l.code !== 'en').map(l => {
+                    const hasTranslation = translations[l.code];
+                    return `<option value="${l.code}">${l.name} ${hasTranslation ? '✓' : '⚠️'}</option>`;
+                }).join('');
+
+                // Show the selected language or first non-English language
+                const displayLang = language || languages.find(l => l.code !== 'en')?.code || 'fr';
+                const displayTranslation = translations[displayLang] || '<span style="color:var(--danger);">Missing</span>';
+                const displayLangName = languages.find(l => l.code === displayLang)?.name || displayLang.toUpperCase();
+
+                return `
+                    <tr>
+                        <td><code style="font-size:12px;">${escapeHtml(key.key)}</code></td>
+                        <td><span class="badge">${key.category || '-'}</span></td>
+                        <td style="font-size:12px;">${escapeHtml(key.default_text)}</td>
+                        <td style="font-size:12px;">${typeof displayTranslation === 'string' && !displayTranslation.includes('Missing') ? escapeHtml(displayTranslation) : displayTranslation}</td>
+                        <td>
+                            <select onchange="changeTranslationLanguageView(this, '${escapeHtml(key.key)}')" style="font-size:12px;padding:4px;">
+                                ${languageOptions}
+                            </select>
+                        </td>
+                        <td>
+                            <button class="btn btn-small btn-primary" onclick="openEditTranslationModal('${escapeHtml(key.key)}', '${displayLang}')" style="font-size:11px;padding:4px 8px;">Edit</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+        } catch (e) {
+            console.error('Error loading translations:', e);
+            alert('Error loading translations: ' + e.message);
+        }
+    }
+
+    async function fetchLanguages() {
+        const response = await fetch('/api/admin/i18n/languages?include_inactive=false', {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (!response.ok) return [];
+        return await response.json();
+    }
+
+    function changeTranslationLanguageView(selectEl, keyName) {
+        const lang = selectEl.value;
+        // Update the filter dropdown and reload
+        document.getElementById('translationLanguageFilter').value = lang;
+        loadTranslations();
+    }
+
+    function debounceTranslationSearch() {
+        clearTimeout(translationSearchTimeout);
+        translationSearchTimeout = setTimeout(() => {
+            loadTranslations();
+        }, 500);
+    }
+
+    function openAddTranslationKeyModal() {
+        document.getElementById('addKeyName').value = '';
+        document.getElementById('addKeyCategory').value = '';
+        document.getElementById('addKeyDefaultText').value = '';
+        document.getElementById('addKeyContext').value = '';
+        document.getElementById('addTranslationKeyError').style.display = 'none';
+        document.getElementById('addTranslationKeyModal').classList.add('active');
+    }
+
+    async function handleAddTranslationKey(e) {
+        e.preventDefault();
+        const errorEl = document.getElementById('addTranslationKeyError');
+        errorEl.style.display = 'none';
+
+        try {
+            const key = document.getElementById('addKeyName').value.trim();
+            const category = document.getElementById('addKeyCategory').value || null;
+            const defaultText = document.getElementById('addKeyDefaultText').value.trim();
+            const context = document.getElementById('addKeyContext').value.trim() || null;
+
+            const response = await fetch('/api/admin/i18n/translation-keys', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({ key, category, default_text: defaultText, context })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to create translation key');
+            }
+
+            closeModal('addTranslationKeyModal');
+            await loadTranslations();
+            alert('Translation key created successfully!');
+        } catch (e) {
+            errorEl.textContent = e.message;
+            errorEl.style.display = 'block';
+        }
+    }
+
+    async function openEditTranslationModal(keyName, languageCode) {
+        const errorEl = document.getElementById('editTranslationError');
+        errorEl.style.display = 'none';
+
+        // Find the key details
+        const keyData = allTranslationKeys.find(k => k.key === keyName);
+        if (!keyData) {
+            alert('Translation key not found');
+            return;
+        }
+
+        // Populate form
+        document.getElementById('editTranslationKey').value = keyName;
+        document.getElementById('editTranslationKeyDisplay').value = keyName;
+        document.getElementById('editTranslationDefault').value = keyData.default_text;
+
+        // Show context if available
+        if (keyData.context) {
+            document.getElementById('editTranslationContextGroup').style.display = 'block';
+            document.getElementById('editTranslationContext').value = keyData.context;
+        } else {
+            document.getElementById('editTranslationContextGroup').style.display = 'none';
+        }
+
+        // Populate language dropdown
+        const languages = await fetchLanguages();
+        const langSelect = document.getElementById('editTranslationLanguage');
+        langSelect.innerHTML = languages.filter(l => l.code !== 'en').map(l => 
+            `<option value="${l.code}" ${l.code === languageCode ? 'selected' : ''}>${l.name}</option>`
+        ).join('');
+
+        // Set current translation if exists
+        const currentTranslation = keyData.translations[languageCode] || '';
+        document.getElementById('editTranslationText').value = currentTranslation;
+
+        document.getElementById('editTranslationModal').classList.add('active');
+    }
+
+    async function handleEditTranslation(e) {
+        e.preventDefault();
+        const errorEl = document.getElementById('editTranslationError');
+        errorEl.style.display = 'none';
+
+        try {
+            const key = document.getElementById('editTranslationKey').value;
+            const languageCode = document.getElementById('editTranslationLanguage').value;
+            const translatedText = document.getElementById('editTranslationText').value.trim();
+
+            const response = await fetch('/api/admin/i18n/translations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({
+                    translation_key: key,
+                    language_code: languageCode,
+                    translated_text: translatedText
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to save translation');
+            }
+
+            closeModal('editTranslationModal');
+            await loadTranslations();
+            alert('Translation saved successfully!');
+        } catch (e) {
+            errorEl.textContent = e.message;
+            errorEl.style.display = 'block';
+        }
+    }
+
+    async function exportTranslations() {
+        const languageFilter = document.getElementById('translationLanguageFilter').value;
+        if (!languageFilter) {
+            alert('Please select a language to export');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/admin/i18n/export/${languageFilter}?format=csv&missing_only=false`, {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+
+            if (!response.ok) throw new Error('Failed to export translations');
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `translations_${languageFilter}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (e) {
+            alert('Error exporting translations: ' + e.message);
+        }
+    }
+
+    async function openImportTranslationsModal() {
+        const languages = await fetchLanguages();
+        const select = document.getElementById('importTranslationLanguage');
+        select.innerHTML = languages.filter(l => l.code !== 'en').map(l => 
+            `<option value="${l.code}">${l.name}</option>`
+        ).join('');
+
+        document.getElementById('importTranslationFile').value = '';
+        document.getElementById('importTranslationsError').style.display = 'none';
+        document.getElementById('importTranslationsSuccess').style.display = 'none';
+        document.getElementById('importTranslationsModal').classList.add('active');
+    }
+
+    async function handleImportTranslations(e) {
+        e.preventDefault();
+        const errorEl = document.getElementById('importTranslationsError');
+        const successEl = document.getElementById('importTranslationsSuccess');
+        errorEl.style.display = 'none';
+        successEl.style.display = 'none';
+
+        try {
+            const languageCode = document.getElementById('importTranslationLanguage').value;
+            const fileInput = document.getElementById('importTranslationFile');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                throw new Error('Please select a file');
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await fetch(`/api/admin/i18n/import/${languageCode}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${authToken}` },
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to import translations');
+            }
+
+            const result = await response.json();
+            successEl.textContent = `Import successful! Created: ${result.created}, Updated: ${result.updated}, Skipped: ${result.skipped}`;
+            if (result.errors && result.errors.length > 0) {
+                successEl.textContent += `\nErrors: ${result.errors.slice(0, 3).join(', ')}`;
+            }
+            successEl.style.display = 'block';
+
+            await loadTranslations();
+            setTimeout(() => closeModal('importTranslationsModal'), 3000);
+        } catch (e) {
+            errorEl.textContent = e.message;
+            errorEl.style.display = 'block';
+        }
+    }
+
+    // ========================================================================
+    // LANGUAGES FUNCTIONS
+    // ========================================================================
+
+    async function loadLanguages() {
+        try {
+            const response = await fetch('/api/admin/i18n/languages?include_inactive=true', {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+
+            if (!response.ok) throw new Error('Failed to load languages');
+
+            const languages = await response.json();
+            const tbody = document.getElementById('languagesTableBody');
+
+            if (!languages || languages.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:2rem">No languages found</td></tr>';
+                return;
+            }
+
+            // Also populate the translation language filter
+            const langFilter = document.getElementById('translationLanguageFilter');
+            langFilter.innerHTML = '<option value="">All Languages</option>' + 
+                languages.filter(l => l.is_active).map(l => 
+                    `<option value="${l.code}">${l.name}</option>`
+                ).join('');
+
+            tbody.innerHTML = languages.map(lang => {
+                const statusBadge = lang.is_active 
+                    ? '<span class="badge" style="background:var(--primary);color:white;">Active</span>'
+                    : '<span class="badge" style="background:var(--gray);color:white;">Inactive</span>';
+                
+                const completion = lang.completion_percentage || 0;
+                const completionColor = completion === 100 ? 'var(--primary)' : completion > 50 ? 'var(--warning)' : 'var(--danger)';
+                const completionBar = `
+                    <div style="background:var(--border);border-radius:4px;height:8px;overflow:hidden;">
+                        <div style="background:${completionColor};height:100%;width:${completion}%;transition:width 0.3s;"></div>
+                    </div>
+                    <small style="color:var(--gray);font-size:11px;">${completion}%</small>
+                `;
+
+                const canDelete = lang.code !== 'en';
+
+                return `
+                    <tr>
+                        <td><strong>${lang.code.toUpperCase()}</strong></td>
+                        <td>${escapeHtml(lang.name)}</td>
+                        <td>${statusBadge}</td>
+                        <td>${lang.translation_count || 0}</td>
+                        <td>${completionBar}</td>
+                        <td>
+                            ${canDelete ? `<button class="btn btn-small btn-danger" onclick="toggleLanguageStatus('${lang.code}', ${!lang.is_active})" style="font-size:11px;padding:4px 8px;">${lang.is_active ? 'Deactivate' : 'Activate'}</button>` : '<span style="color:var(--gray);font-size:11px;">System Default</span>'}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+        } catch (e) {
+            console.error('Error loading languages:', e);
+            alert('Error loading languages: ' + e.message);
+        }
+    }
+
+    function openAddLanguageModal() {
+        document.getElementById('addLanguageCode').value = '';
+        document.getElementById('addLanguageName').value = '';
+        document.getElementById('addLanguageActive').checked = true;
+        document.getElementById('addLanguageError').style.display = 'none';
+        document.getElementById('addLanguageModal').classList.add('active');
+    }
+
+    async function handleAddLanguage(e) {
+        e.preventDefault();
+        const errorEl = document.getElementById('addLanguageError');
+        errorEl.style.display = 'none';
+
+        try {
+            const code = document.getElementById('addLanguageCode').value.trim().toLowerCase();
+            const name = document.getElementById('addLanguageName').value.trim();
+            const isActive = document.getElementById('addLanguageActive').checked;
+
+            const response = await fetch('/api/admin/i18n/languages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({ code, name, is_active: isActive })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to create language');
+            }
+
+            closeModal('addLanguageModal');
+            await loadLanguages();
+            alert('Language added successfully!');
+        } catch (e) {
+            errorEl.textContent = e.message;
+            errorEl.style.display = 'block';
+        }
+    }
+
+    async function toggleLanguageStatus(code, activate) {
+        if (!confirm(`Are you sure you want to ${activate ? 'activate' : 'deactivate'} this language?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/admin/i18n/languages/${code}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to update language status');
+            }
+
+            await loadLanguages();
+            alert(`Language ${activate ? 'activated' : 'deactivated'} successfully!`);
+        } catch (e) {
+            alert('Error: ' + e.message);
+        }
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     </script>
