@@ -397,8 +397,8 @@ class AppLocalizations {
 ## 📋 Phase 6: Testing & Deployment
 
 ### 6.1 Integration Testing
-- [ ] Test customer dashboard on pinplot.me (English)
-- [ ] Test customer dashboard on pinplot.me (French)
+- [ ] Test customer dashboard on dev/staging (English)
+- [ ] Test customer dashboard on dev/staging (French)
 - [ ] Test Flutter app (English)
 - [ ] Test Flutter app (French)
 - [ ] Test language switching in dashboard
@@ -436,14 +436,14 @@ class AppLocalizations {
 
 ### 6.5 Production Deployment
 - [ ] Deploy Phase 4 to main branch
-- [ ] Test on pinplot.me
+- [ ] Test on dev/staging environment
 - [ ] Monitor for errors
 - [ ] Collect user feedback
 - [ ] Deploy Phase 5 to main branch
 - [ ] Test Flutter app
 - [ ] Monitor for errors
 - [ ] Merge to prod/beacon
-- [ ] Deploy to beacontelematics.co.uk
+- [ ] Deploy to production (via prod/beacon branch)
 - [ ] Verify production deployment
 - [ ] Monitor production for 48 hours
 
