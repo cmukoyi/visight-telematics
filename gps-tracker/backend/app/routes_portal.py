@@ -394,9 +394,10 @@ def list_portal_users(
     users = portal_users_query.order_by(PortalUser.created_at).all()
     
     # Filter out flutter users from portal users list
+    # Exception: NEVER filter out system_admins (built-in admins), even if they use the Flutter app
     pure_portal_users = [
         u for u in users 
-        if u.email not in flutter_user_emails_set
+        if u.role == 'system_admin' or u.email not in flutter_user_emails_set
     ]
     
     return [PortalUserOut.model_validate(u) for u in pure_portal_users]
