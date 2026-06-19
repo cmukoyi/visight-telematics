@@ -2178,6 +2178,26 @@ input.hive-range::-moz-range-track {
                         </div>
                     </div>
 
+                    <!-- ─── Language ─── -->
+                    <div class="card">
+                        <div class="settings-section-header">
+                            <i class="fa-solid fa-language" style="color:var(--primary)"></i>
+                            <div>
+                                <h3 data-i18n="settings.language">Language</h3>
+                                <p data-i18n="settings.language_hint">Choose your preferred language for the portal interface.</p>
+                            </div>
+                        </div>
+                        <div class="settings-row">
+                            <div>
+                                <div class="settings-row-label" data-i18n="settings.interface_language">Interface language</div>
+                                <div class="settings-row-hint" data-i18n="settings.language_stored_locally">Saved locally in this browser.</div>
+                            </div>
+                            <select id="pref-language" class="form-input" style="max-width:180px" onchange="settingsSaveLanguage(this.value)">
+                                <!-- Options populated by JS -->
+                            </select>
+                        </div>
+                    </div>
+
                     <!-- ─── Appearance ─── -->
                     <div class="card" id="settings-appearance-card">
                         <div class="settings-section-header">
@@ -3669,6 +3689,7 @@ const TOKEN_KEY    = 'pp_portal_token';
 const USER_KEY     = 'pp_portal_user';
 const GROUP_KEY    = 'pp_portal_group';
 const FEATURES_KEY = 'pp_portal_features';
+const LANG_KEY     = 'pp_portal_language';
 
 function saveSession(t, u, g, features) {
     localStorage.setItem(TOKEN_KEY,    t);
@@ -3689,6 +3710,134 @@ function getSession() {
         features: JSON.parse(localStorage.getItem(FEATURES_KEY) || 'null'),
     };
 }
+
+// ── TranslationService (Singleton) ──────────────────────────────────
+// Manages loading and caching translations from the backend API.
+// Implements Gang of Four patterns:
+//   - Singleton: one global instance via TranslationService.getInstance()
+//   - Lazy Loading: translations fetched on first use
+//   - Strategy: can switch languages at runtime
+//   - Observer: notifies UI when language changes (via translateAll())
+class TranslationService {
+    static #instance = null;
+    #translations = {};
+    #currentLang = 'en';
+    #availableLanguages = [];
+    #loadPromise = null;
+
+    constructor() {
+        if (TranslationService.#instance) {
+            return TranslationService.#instance;
+        }
+        TranslationService.#instance = this;
+        this.#currentLang = localStorage.getItem(LANG_KEY) || 'en';
+    }
+
+    static getInstance() {
+        if (!TranslationService.#instance) {
+            TranslationService.#instance = new TranslationService();
+        }
+        return TranslationService.#instance;
+    }
+
+    async loadLanguages() {
+        try {
+            const resp = await fetch('/api/languages', { cache: 'no-store' });
+            if (resp.ok) {
+                this.#availableLanguages = await resp.json();
+            }
+        } catch (e) {
+            console.warn('Failed to load available languages:', e);
+        }
+    }
+
+    async loadTranslations(lang) {
+        // Lazy loading with caching
+        if (this.#translations[lang]) {
+            return this.#translations[lang];
+        }
+
+        // Prevent duplicate loads
+        if (this.#loadPromise) {
+            await this.#loadPromise;
+            return this.#translations[lang] || {};
+        }
+
+        this.#loadPromise = (async () => {
+            try {
+                const resp = await fetch(`/api/translations/${lang}`, { cache: 'no-store' });
+                if (resp.ok) {
+                    this.#translations[lang] = await resp.json();
+                } else {
+                    this.#translations[lang] = {};
+                }
+            } catch (e) {
+                console.warn(`Failed to load translations for ${lang}:`, e);
+                this.#translations[lang] = {};
+            } finally {
+                this.#loadPromise = null;
+            }
+        })();
+
+        await this.#loadPromise;
+        return this.#translations[lang] || {};
+    }
+
+    async setLanguage(lang) {
+        if (lang === this.#currentLang) return;
+        await this.loadTranslations(lang);
+        this.#currentLang = lang;
+        localStorage.setItem(LANG_KEY, lang);
+        this.translateAll(); // Observer pattern: notify UI
+    }
+
+    getCurrentLanguage() {
+        return this.#currentLang;
+    }
+
+    getAvailableLanguages() {
+        return this.#availableLanguages;
+    }
+
+    translate(key, fallback = null) {
+        const translations = this.#translations[this.#currentLang] || {};
+        return translations[key] || fallback || key;
+    }
+
+    // Translate all elements marked with data-i18n="key"
+    translateAll() {
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            const fallback = el.getAttribute('data-i18n-fallback') || el.textContent;
+            el.textContent = this.translate(key, fallback);
+        });
+
+        // Translate placeholders
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+            const key = el.getAttribute('data-i18n-placeholder');
+            const fallback = el.getAttribute('placeholder') || '';
+            el.placeholder = this.translate(key, fallback);
+        });
+
+        // Translate titles
+        document.querySelectorAll('[data-i18n-title]').forEach(el => {
+            const key = el.getAttribute('data-i18n-title');
+            const fallback = el.getAttribute('title') || '';
+            el.title = this.translate(key, fallback);
+        });
+    }
+}
+
+// Global shorthand for translate()
+window.t = (key, fallback) => TranslationService.getInstance().translate(key, fallback);
+
+// Initialize translations on page load
+document.addEventListener('DOMContentLoaded', async () => {
+    const ts = TranslationService.getInstance();
+    await ts.loadLanguages();
+    await ts.loadTranslations(ts.getCurrentLanguage());
+    ts.translateAll();
+});
 
 // ── Admin impersonation bootstrap ─────────────────────────────────
 // When the admin portal opens the customer dashboard with ?impersonate=<token>
@@ -5079,6 +5228,32 @@ function settingsSaveUnits(value){
     showToast && showToast(`Units set to ${value}`);
 }
 
+async function settingsSaveLanguage(lang) {
+    const ts = TranslationService.getInstance();
+    await ts.setLanguage(lang);
+    showToast && showToast(`Language changed to ${lang.toUpperCase()}`);
+    // Refresh any dynamic content that may have i18n keys
+    try { if(typeof locRenderAll==='function') locRenderAll(); } catch(e){}
+}
+
+async function populateLanguageSelector() {
+    const ts = TranslationService.getInstance();
+    const langSel = document.getElementById('pref-language');
+    if (!langSel) return;
+    
+    const languages = ts.getAvailableLanguages();
+    const currentLang = ts.getCurrentLanguage();
+    
+    langSel.innerHTML = '';
+    languages.forEach(lang => {
+        const opt = document.createElement('option');
+        opt.value = lang.code;
+        opt.textContent = lang.name;
+        if (lang.code === currentLang) opt.selected = true;
+        langSel.appendChild(opt);
+    });
+}
+
 let _settingsCache   = null;   // /api/portal/settings (email_domain etc.)
 let _themeCache      = null;   // /api/portal/theme
 let _notifCache      = null;   // /api/portal/notifications
@@ -5091,6 +5266,9 @@ async function loadSettings() {
     // Hydrate per-browser preferences
     const unitsSel = document.getElementById('pref-units');
     if(unitsSel) unitsSel.value = getUnits();
+    
+    // Populate language selector
+    await populateLanguageSelector();
 
     // Load in parallel — non-critical sections show their own spinners
     await Promise.allSettled([
