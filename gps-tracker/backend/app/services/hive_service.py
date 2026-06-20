@@ -45,6 +45,12 @@ UTC = timezone.utc
 import os as _os
 HIVE_BREACH_RENOTIFY_HOURS = float(_os.getenv("HIVE_BREACH_RENOTIFY_HOURS", "24"))
 
+# Duration-based breach persistence thresholds (v1.2 confirmation fix).
+# A breach must persist for at least T_PERSIST_MINUTES AND T_PERSIST_EVALS
+# to confirm, and must be backed by fresh evidence (not a stale snapshot).
+T_PERSIST_MINUTES = float(_os.getenv("HIVE_PERSIST_MINUTES", "6"))
+T_PERSIST_EVALS = int(_os.getenv("HIVE_PERSIST_EVALS", "3"))
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Geometry helpers
 # ──────────────────────────────────────────────────────────────────────────────
@@ -538,24 +544,80 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
         if prev_state == "OK":
             if is_breaching and can_advance_breach:
                 live.pending_breach_since = now
-                live.consecutive_confirms = 1
+                # v1.2 duration-based persistence
+                live.persistence_eval_count = 1
+                live.persistence_snapshot_fp_at_start = snapshot_fp
+                live.persistence_has_new_evidence = False
+                live.consecutive_confirms = 1  # legacy field
                 if confidence == "high" and 1 >= required_confirms:
                     new_state = "BREACHING"
                 else:
                     # Low-confidence (stale GPS) or pending confirmation
-                    # \u2192 surface as a Suspected Breach so the user sees it.
+                    # → surface as a Suspected Breach so the user sees it.
                     new_state = "BREACH_PENDING"
 
         elif prev_state == "BREACH_PENDING":
+            # ─── v1.2 Duration-based persistence confirmation ────────────────
+            # Replaces "two consecutive fixes from separated tag" with:
+            #   1. Persistence duration: ≥T_PERSIST_MINUTES AND ≥T_PERSIST_EVALS
+            #   2. Fresh evidence: at least one eval with new fingerprint
+            #   3. No contradiction: breach still active
+            
             if not is_breaching:
+                # Fresh coherent data shows breach cleared → reset
                 new_state = "OK"
                 live.pending_breach_since = None
-                live.consecutive_confirms = 0
+                live.persistence_eval_count = 0
+                live.persistence_snapshot_fp_at_start = None
+                live.persistence_has_new_evidence = False
+                live.consecutive_confirms = 0  # legacy field
+            
             elif can_advance_breach:
-                live.consecutive_confirms = (live.consecutive_confirms or 0) + 1
-                if live.consecutive_confirms >= required_confirms:
+                # Breach still active and we have fresh (non-stale) evidence
+                live.persistence_eval_count = (live.persistence_eval_count or 0) + 1
+                
+                # Track if new position data has arrived (not same frozen snapshot)
+                if live.persistence_eval_count == 1:
+                    # First evaluation in BREACH_PENDING → record starting fingerprint
+                    live.persistence_snapshot_fp_at_start = snapshot_fp
+                    live.persistence_has_new_evidence = False
+                else:
+                    # Subsequent evaluation → check if fingerprint differs
+                    if snapshot_fp and snapshot_fp != live.persistence_snapshot_fp_at_start:
+                        live.persistence_has_new_evidence = True
+                
+                # Calculate elapsed time since breach started
+                elapsed_minutes = 0.0
+                if live.pending_breach_since:
+                    pending_since = live.pending_breach_since if live.pending_breach_since.tzinfo else live.pending_breach_since.replace(tzinfo=UTC)
+                    elapsed_td = now - pending_since
+                    elapsed_minutes = elapsed_td.total_seconds() / 60.0
+                
+                # Check both persistence conditions
+                duration_met = (elapsed_minutes >= T_PERSIST_MINUTES and 
+                               live.persistence_eval_count >= T_PERSIST_EVALS)
+                
+                fresh_evidence_guard = live.persistence_has_new_evidence
+                
+                # Confirm if both conditions satisfied
+                if duration_met and fresh_evidence_guard:
                     new_state = "BREACHING"
-            # stale snapshot: hold BREACH_PENDING without incrementing confirms
+                    log.info(
+                        f"HIVE {hive_id}: BREACH_PENDING → BREACHING (duration-based persistence)",
+                        extra={
+                            "hive_id": hive_id,
+                            "elapsed_minutes": round(elapsed_minutes, 2),
+                            "eval_count": live.persistence_eval_count,
+                            "has_new_evidence": live.persistence_has_new_evidence,
+                            "persistence_rule": "v1.2_duration_based"
+                        }
+                    )
+                
+                # Legacy field for compatibility (not used in confirmation decision)
+                live.consecutive_confirms = live.persistence_eval_count
+            
+            # else: stale snapshot → hold BREACH_PENDING without advancing
+            # (can_advance_breach is False, so this block doesn't run)
 
         elif prev_state == "BREACHING":
             if is_cleared and can_advance_clear:
@@ -620,6 +682,13 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
                 "recent_count": len(fresh_recent_positions) - len(fresh_positions),
                 "stale_count": composition.get("stale", 0),
                 "lost_count": composition.get("lost", 0),
+                "persistence": {
+                    "eval_count": live.persistence_eval_count if prev_state == "BREACH_PENDING" else 0,
+                    "has_new_evidence": live.persistence_has_new_evidence if prev_state == "BREACH_PENDING" else False,
+                    "snapshot_fp_at_start": live.persistence_snapshot_fp_at_start if prev_state == "BREACH_PENDING" else None,
+                    "elapsed_minutes": round((now - live.pending_breach_since).total_seconds() / 60.0, 2) 
+                                      if live.pending_breach_since else 0.0,
+                },
             },
             "alert_state_before": prev_state,
             "alert_state_after": new_state,

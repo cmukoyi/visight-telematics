@@ -797,11 +797,18 @@ class HiveLiveState(Base):
     outlier_tag_id        = get_uuid_nullable()
     pending_breach_since  = Column(DateTime(timezone=True), nullable=True)
     pending_clear_since   = Column(DateTime(timezone=True), nullable=True)
-    consecutive_confirms  = Column(Integer, nullable=False, default=0)
+    consecutive_confirms  = Column(Integer, nullable=False, default=0)  # DEPRECATED — kept for compatibility
     # Most recent time a hive_breach alert was actually dispatched. Used to
     # re-notify if a hive stays in BREACHING for a long time without a state
     # change (e.g. when the original notification failed silently).
     last_alert_at         = Column(DateTime(timezone=True), nullable=True)
+
+    # ─── Duration-based breach persistence (v1.2 confirmation fix) ────────
+    # Replaces "two consecutive fixes from separated tag" with duration-based
+    # persistence backed by fresh evidence from any tag.
+    persistence_eval_count              = Column(Integer, nullable=False, default=0)
+    persistence_snapshot_fp_at_start    = Column(String(500), nullable=True)
+    persistence_has_new_evidence        = Column(Boolean, nullable=False, default=False)
 
     # ─── Phase 3: motion awareness ────────────────────────────────────────
     # Four-state machine: STATIONARY ↔ PRE_TRANSIT ↔ IN_TRANSIT ↔ SETTLING.
