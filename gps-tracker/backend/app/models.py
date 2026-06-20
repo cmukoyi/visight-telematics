@@ -765,6 +765,7 @@ class HiveEvaluation(Base):
     coherent_pair_count   = Column(Integer, nullable=True)
     incoherent_pair_count = Column(Integer, nullable=True)
     breach_evidence       = Column(String(30), nullable=True)
+    tag_fix_history       = Column(Text, nullable=True)   # JSON map: tag_id -> array of recent fixes for trajectory analysis
 
     hive = relationship("Hive", back_populates="evaluations")
 

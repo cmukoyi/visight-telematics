@@ -309,17 +309,59 @@ def _snapshot_fingerprint(positions: List[Tuple[str, float, float, datetime]]) -
     return "|".join(f"{item['tag_id']}@{item['observed_at']}" for item in payload)
 
 
-def _positions_used_payload(positions: List[Tuple[str, float, float, datetime]]) -> List[Dict[str, str]]:
-    """Canonical JSON-safe representation of the position set used for evaluation."""
-    payload: List[Dict[str, str]] = []
-    for tid, _lat, _lng, ts in positions:
+def _positions_used_payload(positions: List[Tuple[str, float, float, datetime]]) -> List[Dict[str, Any]]:
+    """Canonical JSON-safe representation of the position set used for evaluation.
+    
+    Enhanced in v1.2.1 to include coordinates (lat, lon) for trajectory analysis.
+    source_id and accuracy_m not yet available from upstream ingestion.
+    """
+    payload: List[Dict[str, Any]] = []
+    for tid, lat, lng, ts in positions:
         ts_utc = ts if ts.tzinfo else ts.replace(tzinfo=UTC)
         payload.append({
             "tag_id": str(tid),
             "observed_at": ts_utc.astimezone(UTC).isoformat(),
+            "lat": round(lat, 6),  # 6 decimal places = ~0.11m precision
+            "lon": round(lng, 6),
+            # "source_id": None,  # Not yet tracked in BLETag model
+            # "accuracy_m": None,  # Not yet available from upstream
         })
     payload.sort(key=lambda item: (item["tag_id"], item["observed_at"]))
     return payload
+
+
+def _tag_fix_history_payload(memberships: List, db: Session, now: datetime) -> Dict[str, List[Dict[str, Any]]]:
+    """Capture recent fix history per tag for trajectory analysis.
+    
+    Currently returns only the latest fix per tag. Full history (last 5 fixes
+    or 30 minutes) requires a dedicated position history table not yet implemented.
+    
+    TODO: Once position history table exists, query last 5 fixes or 30 min per tag.
+    """
+    history: Dict[str, List[Dict[str, Any]]] = {}
+    
+    for m in memberships:
+        tag = db.query(BLETag).filter(BLETag.id == m.tag_id).first()
+        if not tag or not tag.latitude or not tag.longitude or not tag.last_seen:
+            continue
+        
+        try:
+            lat, lon = float(tag.latitude), float(tag.longitude)
+        except (TypeError, ValueError):
+            continue
+        
+        ts = tag.last_seen if tag.last_seen.tzinfo else tag.last_seen.replace(tzinfo=UTC)
+        
+        # Current fix only - will be expanded when position history table available
+        history[str(m.tag_id)] = [{
+            "observed_at": ts.astimezone(UTC).isoformat(),
+            "lat": round(lat, 6),
+            "lon": round(lon, 6),
+            # "source_id": None,  # Not yet tracked
+            # "accuracy_m": None,  # Not yet available
+        }]
+    
+    return history
 
 
 def _previous_snapshot_fingerprint(hive_id: str, db: Session) -> Optional[str]:
@@ -720,8 +762,15 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
             "separated_tag_count": separated_tag_count,
             "stale_snapshot": stale_snapshot,
             "breach_evidence": breach_evidence,
+            # Enhanced logging metadata (v1.2.1)
+            "accuracy_available": False,  # Not yet tracked in upstream ingestion
+            "source_id_available": False,  # Not yet tracked in BLETag model
+            "position_history_available": False,  # Requires dedicated history table
         },
     }
+    
+    # Enhanced position logging (v1.2.1) - for trajectory analysis
+    tag_fix_history_payload = _tag_fix_history_payload(memberships, db, now)
 
     eval_rec = HiveEvaluation(
         id=eval_id,
@@ -745,6 +794,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
         coherent_pair_count=coherent_pair_count,
         incoherent_pair_count=incoherent_pair_count,
         breach_evidence=breach_evidence,
+        tag_fix_history=json.dumps(tag_fix_history_payload) if tag_fix_history_payload else None,
     )
     db.add(eval_rec)
 
