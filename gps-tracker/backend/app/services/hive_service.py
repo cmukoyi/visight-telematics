@@ -604,9 +604,19 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
             #   1. Persistence duration: ≥T_PERSIST_MINUTES AND ≥T_PERSIST_EVALS
             #   2. Fresh evidence: at least one eval with new fingerprint
             #   3. No contradiction: breach still active
+            #
+            # v1.2.2 Sparse tag fix: A breach can only clear with fresh coherent
+            # in-range evidence of the outlier tag. Absence of coherent evidence
+            # (due to staleness) HOLDS the state rather than resetting it.
             
-            if not is_breaching:
-                # Fresh coherent data shows breach cleared → reset
+            # Determine if we have fresh coherent evidence about the outlier
+            has_fresh_coherent_evidence = (
+                coherent_pair_count > 0 and
+                not stale_snapshot
+            )
+            
+            if has_fresh_coherent_evidence and not is_breaching:
+                # Fresh coherent data shows breach cleared → reset to OK
                 new_state = "OK"
                 live.pending_breach_since = None
                 live.persistence_eval_count = 0
@@ -614,8 +624,8 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
                 live.persistence_has_new_evidence = False
                 live.consecutive_confirms = 0  # legacy field
             
-            elif can_advance_breach:
-                # Breach still active and we have fresh (non-stale) evidence
+            elif has_fresh_coherent_evidence and is_breaching:
+                # Breach still active with fresh coherent evidence
                 live.persistence_eval_count = (live.persistence_eval_count or 0) + 1
                 
                 # Track if new position data has arrived (not same frozen snapshot)
@@ -658,14 +668,57 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
                 # Legacy field for compatibility (not used in confirmation decision)
                 live.consecutive_confirms = live.persistence_eval_count
             
-            # else: stale snapshot → hold BREACH_PENDING without advancing
-            # (can_advance_breach is False, so this block doesn't run)
+            else:
+                # No fresh coherent evidence (outlier fix is stale/incoherent)
+                # → HOLD state, accumulate persistence, do NOT reset
+                # This is the sparse tag fix: absence of data ≠ reunion
+                live.persistence_eval_count = (live.persistence_eval_count or 0) + 1
+                
+                # Calculate elapsed time for persistence check
+                elapsed_minutes = 0.0
+                if live.pending_breach_since:
+                    pending_since = live.pending_breach_since if live.pending_breach_since.tzinfo else live.pending_breach_since.replace(tzinfo=UTC)
+                    elapsed_td = now - pending_since
+                    elapsed_minutes = elapsed_td.total_seconds() / 60.0
+                
+                # Check persistence conditions even during hold
+                duration_met = (elapsed_minutes >= T_PERSIST_MINUTES and 
+                               live.persistence_eval_count >= T_PERSIST_EVALS)
+                
+                # Can confirm even with stale/incoherent data if persistence met
+                # (the outlier being continuously far + home cluster present = breach)
+                if duration_met:
+                    new_state = "BREACHING"
+                    log.info(
+                        f"HIVE {hive_id}: BREACH_PENDING → BREACHING (sparse tag persistence)",
+                        extra={
+                            "hive_id": hive_id,
+                            "elapsed_minutes": round(elapsed_minutes, 2),
+                            "eval_count": live.persistence_eval_count,
+                            "has_fresh_coherent_evidence": False,
+                            "persistence_rule": "v1.2.2_hold_on_stale"
+                        }
+                    )
+                
+                # Legacy field for compatibility
+                live.consecutive_confirms = live.persistence_eval_count
 
         elif prev_state == "BREACHING":
-            if is_cleared and can_advance_clear:
+            # v1.2.2 Sparse tag fix: Only clear with fresh coherent in-range evidence
+            has_fresh_coherent_evidence = (
+                coherent_pair_count > 0 and
+                not stale_snapshot
+            )
+            
+            if has_fresh_coherent_evidence and is_cleared:
+                # Fresh coherent data shows cleared (within hysteresis) → RESOLVING
                 new_state = "RESOLVING"
                 live.pending_clear_since = now
-            # else stays BREACHING
+            elif not has_fresh_coherent_evidence:
+                # No fresh coherent evidence → HOLD BREACHING state
+                # (outlier fix is stale, home cluster still present)
+                pass  # stays BREACHING
+            # else: stays BREACHING (fresh evidence still shows breach)
 
         elif prev_state == "RESOLVING":
             if not is_cleared:
