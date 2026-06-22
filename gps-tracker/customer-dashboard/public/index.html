@@ -2611,14 +2611,21 @@ input.hive-range::-moz-range-track {
 
             <!-- ═══ QR CODE TAB ═══ -->
             <div id="tab-qr" class="tab-content">
-                            <div id="qr-root" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
-                                <iframe
-                                    src="/customer/qr-generator.html"
-                                    title="QR / NFC Generator"
-                                    style="width:100%;height:min(1820px,calc(100vh - 170px));min-height:820px;border:none;background:transparent"
-                                    loading="lazy">
-                                </iframe>
-                            </div>
+                <!-- QR/NFC Toolbar with How To button -->
+                <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+                    <button class="btn btn-secondary btn-small" style="margin-left:auto" onclick="qrOpenHelp()" title="Open the QR/NFC user guide in a new tab">
+                        <i class="fa-solid fa-circle-question"></i> How To
+                    </button>
+                </div>
+                
+                <div id="qr-root" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+                    <iframe
+                        src="/customer/qr-generator.html"
+                        title="QR / NFC Generator"
+                        style="width:100%;height:min(1820px,calc(100vh - 170px));min-height:820px;border:none;background:transparent"
+                        loading="lazy">
+                    </iframe>
+                </div>
             </div>
 
             <!-- ═══ REPORTS — Tag Subscriptions ═══ -->
@@ -11989,6 +11996,16 @@ document.addEventListener('DOMContentLoaded', () => {
 function hiveOpenHelp() {
     const theme = document.documentElement.getAttribute('data-theme') || 'dark';
     window.open('/customer/help/HIVE_User_Manual.html?theme=' + encodeURIComponent(theme),
+                '_blank', 'noopener,noreferrer');
+}
+
+function qrOpenHelp() {
+    const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+    // Detect tenant from branding - use Beacon guide if tenant name contains 'beacon' (case-insensitive)
+    const brandName = (window.APP_BRANDING && window.APP_BRANDING.name) || 'PinPlot';
+    const isBeacon = brandName.toLowerCase().includes('beacon');
+    const guidePath = isBeacon ? 'QR_NFC_Guide_Beacon.html' : 'QR_NFC_Guide_Pinplot.html';
+    window.open('/customer/help/' + guidePath + '?theme=' + encodeURIComponent(theme),
                 '_blank', 'noopener,noreferrer');
 }
 </script>
