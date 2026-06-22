@@ -40,6 +40,8 @@ MAP=(
   "admin/logo.png:admin-portal/assets/logo.png"
   "customer/logo.png:customer-dashboard/public/assets/logo.png"
   "customer/help/HIVE_User_Manual.html:customer-dashboard/public/help/HIVE_User_Manual.html"
+  "customer/help/QR_NFC_Guide_Pinplot.html:customer-dashboard/public/help/QR_NFC_Guide_Pinplot.html"
+  "customer/help/QR_NFC_Guide_Beacon.html:customer-dashboard/public/help/QR_NFC_Guide_Beacon.html"
   "mobile/assets/MainLogo.png:mobile-app/ble_tracker_app/assets/MainLogo.png"
   "mobile/assets/FullLogowhite.png:mobile-app/ble_tracker_app/assets/FullLogowhite.png"
   "mobile/web/favicon.ico:mobile-app/ble_tracker_app/web/favicon.ico"
