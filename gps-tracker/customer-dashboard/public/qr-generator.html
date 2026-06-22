@@ -4727,14 +4727,72 @@ window.addEventListener('load', function() {
     } catch(e){}
   }
   
+  // Apply custom colors from parent page's branding settings
+  function applyCustomColors() {
+    try {
+      var branding = JSON.parse(localStorage.getItem('pinplot_branding') || 'null');
+      if (branding) {
+        var root = document.documentElement;
+        
+        // Apply primary color
+        if (branding.theme_primary) {
+          var hex = branding.theme_primary;
+          root.style.setProperty('--primary', hex);
+          root.style.setProperty('--primary-mid', hex);
+          root.style.setProperty('--primary-border', hex);
+          // Calculate lighter variant for --primary-light (add alpha transparency)
+          var isDark = document.body.classList.contains('dark');
+          root.style.setProperty('--primary-light', isDark ? (hex + '26') : (hex + '1a'));
+        }
+        
+        // Apply accent color (mapped to success/green elements if used)
+        if (branding.theme_accent) {
+          root.style.setProperty('--accent', branding.theme_accent);
+        }
+      }
+    } catch(e) {
+      console.error('Failed to apply custom colors:', e);
+    }
+  }
+  
   // Apply theme on load
   applyThemeFromStorage();
+  applyCustomColors();
+  
+  // Listen for postMessage from parent window (real-time color updates)
+  window.addEventListener('message', function(e) {
+    // Verify origin for security (same origin only)
+    if (e.origin !== window.location.origin) return;
+    
+    if (e.data && e.data.type === 'brandingUpdate') {
+      // Parent sent us updated branding colors
+      if (e.data.branding) {
+        // Update localStorage so our applyCustomColors function can read it
+        try {
+          var currentBranding = JSON.parse(localStorage.getItem('pinplot_branding') || '{}');
+          if (e.data.branding.theme_primary) currentBranding.theme_primary = e.data.branding.theme_primary;
+          if (e.data.branding.theme_accent) currentBranding.theme_accent = e.data.branding.theme_accent;
+          localStorage.setItem('pinplot_branding', JSON.stringify(currentBranding));
+        } catch(_) {}
+        
+        // Apply the new colors immediately
+        applyCustomColors();
+        generate(); // Regenerate QR to reflect new colors
+      }
+    }
+  });
   
   // Listen for theme changes from other tabs/windows (when user toggles in main app)
   window.addEventListener('storage', function(e) {
     if (e.key === 'pp-theme') {
       applyThemeFromStorage();
+      applyCustomColors(); // Reapply colors for new theme (light/dark affects transparency)
       generate(); // Regenerate QR to update corner colors for new theme
+    }
+    // Listen for branding changes (when user updates colors in Settings)
+    if (e.key === 'pinplot_branding') {
+      applyCustomColors();
+      generate(); // Regenerate QR to reflect new colors
     }
   });
   
