@@ -73,6 +73,8 @@ logs/
 admin-portal/assets/logo.png
 customer-dashboard/public/assets/logo.png
 customer-dashboard/public/help/HIVE_User_Manual.html
+customer-dashboard/public/help/QR_NFC_Guide_Pinplot.html
+customer-dashboard/public/help/QR_NFC_Guide_Beacon.html
 mobile-app/ble_tracker_app/assets/MainLogo.png
 mobile-app/ble_tracker_app/assets/FullLogowhite.png
 mobile-app/ble_tracker_app/web/favicon.ico
