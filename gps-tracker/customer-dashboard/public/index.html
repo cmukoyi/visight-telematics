@@ -5366,6 +5366,17 @@ function applyBranding(theme) {
     }
     // Persist to localStorage for next page load (include both logo variants)
     try { localStorage.setItem('pinplot_branding', JSON.stringify({ theme_primary: theme.theme_primary, theme_accent: theme.theme_accent, logo_data: theme.logo_data, logo_dark_data: theme.logo_dark_data })); } catch (_) {}
+    
+    // Notify QR generator iframe of color changes
+    try {
+        const qrIframe = document.querySelector('#qr-root iframe');
+        if (qrIframe && qrIframe.contentWindow) {
+            qrIframe.contentWindow.postMessage({ 
+                type: 'brandingUpdate', 
+                branding: { theme_primary: theme.theme_primary, theme_accent: theme.theme_accent } 
+            }, window.location.origin);
+        }
+    } catch (_) {}
 }
 
 // Apply any persisted branding immediately (before API call) to avoid flash
