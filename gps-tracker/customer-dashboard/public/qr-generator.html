@@ -336,7 +336,7 @@
       <!-- IMEI / MAC mode -->
       <div id="mode-imei" style="display:none">
         <div class="tab-hint">
-          <strong>IMEI / MAC</strong> — Encodes a device identifier as a plain-text QR (not a Pinplot link). Useful for labelling equipment so the number can be scanned instead of typed by hand. Industrial scanners read it directly; on phones use a QR scanner app like Google Lens.
+          <strong>IMEI / MAC</strong> — Encodes a device identifier as a plain-text QR. Useful for labelling equipment so the number can be scanned instead of typed by hand. Industrial scanners read it directly; on phones use a QR scanner app like Google Lens.
         </div>
         <div class="field">
           <label>IMEI / MAC Address</label>
@@ -4154,7 +4154,8 @@ function dlSVG() {
     });
   }
 
-  if (asset) {
+  if (asset && asset.typeCode !== 'I') {
+    // Asset QR or NFC — show registration confirmation modal
     openConfirmModal(function() {
       registerAsset(asset.id, asset.typeCode);
       var savedId = asset.id; var savedTc = asset.typeCode;
@@ -4166,8 +4167,17 @@ function dlSVG() {
       });
     }, asset);
   } else {
-    // Non-registerable content (for example invalid IMEI text) still downloads.
-    doSVGDownload();
+    // IMEI/MAC or non-registerable content — download directly without modal
+    doSVGDownload(function() {
+      if (asset) {
+        addHistoryEntry({
+          id: asset.id, typeCode: asset.typeCode, format: 'svg', qty: 1, time: nowString(),
+          redownload: function() { doSVGDownload(); }
+        });
+      }
+    });
+  }
+}
   }
 }
 
