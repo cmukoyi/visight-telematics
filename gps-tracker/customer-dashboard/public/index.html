@@ -12002,6 +12002,8 @@ function hiveOpenHelp() {
 function qrOpenHelp() {
     const theme = document.documentElement.getAttribute('data-theme') || 'dark';
     // Detect tenant from branding - use Beacon guide if tenant name contains 'beacon' (case-insensitive)
+    // Note: QR_NFC_Guide_Beacon.html must be deployed separately to Beacon servers at /customer/help/
+    // Only QR_NFC_Guide_Pinplot.html is in the shared PinPlot-HPS repository to avoid tenant brand drift
     const brandName = (window.APP_BRANDING && window.APP_BRANDING.name) || 'PinPlot';
     const isBeacon = brandName.toLowerCase().includes('beacon');
     const guidePath = isBeacon ? 'QR_NFC_Guide_Beacon.html' : 'QR_NFC_Guide_Pinplot.html';
