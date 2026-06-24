@@ -800,6 +800,13 @@ class HiveLiveState(Base):
     # re-notify if a hive stays in BREACHING for a long time without a state
     # change (e.g. when the original notification failed silently).
     last_alert_at         = Column(DateTime(timezone=True), nullable=True)
+    
+    # v1.2 Persistence tracking: duration-based confirmation (Fix 4)
+    # Count of consecutive evaluations in BREACH_PENDING state.
+    breach_persistence_eval_count = Column(Integer, nullable=False, default=0)
+    # Position fingerprint from the evaluation that opened BREACH_PENDING.
+    # Used to detect fresh evidence vs stale re-evaluation.
+    breach_persistence_first_fingerprint = Column(String(64), nullable=True)
 
     # ─── Phase 3: motion awareness ────────────────────────────────────────
     # Four-state machine: STATIONARY ↔ PRE_TRANSIT ↔ IN_TRANSIT ↔ SETTLING.

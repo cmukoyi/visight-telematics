@@ -45,6 +45,12 @@ UTC = timezone.utc
 import os as _os
 HIVE_BREACH_RENOTIFY_HOURS = float(_os.getenv("HIVE_BREACH_RENOTIFY_HOURS", "24"))
 
+# v1.2 Persistence-based confirmation thresholds (Fix 4)
+# Breach confirms when BOTH duration and evaluation count are satisfied.
+# Default: 6 minutes AND at least 3 consecutive evaluations in BREACH_PENDING.
+HIVE_PERSISTENCE_DURATION_SECONDS = int(_os.getenv("HIVE_PERSISTENCE_DURATION_SECONDS", "360"))  # 6 min
+HIVE_PERSISTENCE_MIN_EVALUATIONS = int(_os.getenv("HIVE_PERSISTENCE_MIN_EVALUATIONS", "3"))
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Geometry helpers
 # ──────────────────────────────────────────────────────────────────────────────
@@ -539,23 +545,49 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
             if is_breaching and can_advance_breach:
                 live.pending_breach_since = now
                 live.consecutive_confirms = 1
+                # v1.2 Fix 4: Initialize persistence tracking
+                live.breach_persistence_eval_count = 1
+                live.breach_persistence_first_fingerprint = snapshot_fp
                 if confidence == "high" and 1 >= required_confirms:
                     new_state = "BREACHING"
                 else:
                     # Low-confidence (stale GPS) or pending confirmation
-                    # \u2192 surface as a Suspected Breach so the user sees it.
+                    # → surface as a Suspected Breach so the user sees it.
                     new_state = "BREACH_PENDING"
 
         elif prev_state == "BREACH_PENDING":
             if not is_breaching:
+                # Fresh fix shows reunion (contradiction) — reset persistence
                 new_state = "OK"
                 live.pending_breach_since = None
                 live.consecutive_confirms = 0
+                live.breach_persistence_eval_count = 0
+                live.breach_persistence_first_fingerprint = None
             elif can_advance_breach:
-                live.consecutive_confirms = (live.consecutive_confirms or 0) + 1
-                if live.consecutive_confirms >= required_confirms:
+                # v1.2 Fix 4: Duration-based persistence confirmation
+                # Increment evaluation count
+                live.breach_persistence_eval_count = (live.breach_persistence_eval_count or 0) + 1
+                
+                # Check persistence criteria (BOTH must be satisfied)
+                persistence_duration_met = False
+                if live.pending_breach_since:
+                    elapsed_seconds = (now - live.pending_breach_since).total_seconds()
+                    persistence_duration_met = elapsed_seconds >= HIVE_PERSISTENCE_DURATION_SECONDS
+                
+                persistence_eval_count_met = live.breach_persistence_eval_count >= HIVE_PERSISTENCE_MIN_EVALUATIONS
+                
+                # Fresh evidence guard: position fingerprint must have changed since first breach
+                has_fresh_evidence = (
+                    snapshot_fp is not None
+                    and live.breach_persistence_first_fingerprint is not None
+                    and snapshot_fp != live.breach_persistence_first_fingerprint
+                )
+                
+                # Confirm if duration, evaluation count, and fresh evidence all satisfied
+                if persistence_duration_met and persistence_eval_count_met and has_fresh_evidence:
                     new_state = "BREACHING"
-            # stale snapshot: hold BREACH_PENDING without incrementing confirms
+                # else: stay in BREACH_PENDING, accumulating persistence
+            # stale snapshot: hold BREACH_PENDING without incrementing eval count
 
         elif prev_state == "BREACHING":
             if is_cleared and can_advance_clear:
@@ -572,6 +604,8 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
                 new_state = "OK"
                 live.pending_clear_since = None
                 live.consecutive_confirms = 0
+                live.breach_persistence_eval_count = 0
+                live.breach_persistence_first_fingerprint = None
 
     state_changed = new_state != prev_state
     alert_diameter_m = coherent_diameter_m if coherent_diameter_m is not None else diameter_m
