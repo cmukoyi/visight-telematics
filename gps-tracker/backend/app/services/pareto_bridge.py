@@ -48,6 +48,12 @@ IDLE_RSSI_DBM     = -95   # > -95   → idle, else offline
 OFFLINE_AFTER_SEC = 60    # no sighting within → status='offline'
 OFFLINE_SWEEP_SEC = 15    # how often the detector runs
 
+# Supported tag filtering (DX-Smart CP27/CP28/CP29 tags per spec §3.6)
+# Set to None to allow all tags, or comma-separated UUIDs to filter by iBeacon UUID
+ALLOWED_IBEACON_UUIDS = os.getenv("ALLOWED_IBEACON_UUIDS", None)  # e.g. "uuid1,uuid2,uuid3"
+if ALLOWED_IBEACON_UUIDS:
+    ALLOWED_IBEACON_UUIDS = set(u.strip().lower() for u in ALLOWED_IBEACON_UUIDS.split(",") if u.strip())
+
 # ── In-process state ────────────────────────────────────────────────────────
 _sio: Optional[socketio.AsyncClient] = None
 _reconnect_task: Optional[asyncio.Task] = None
@@ -110,14 +116,35 @@ def _process_raddec_sync(payload: dict) -> None:
 
     db = SessionLocal()
     try:
-        # Only process BLE devices that are registered as trackable assets.
-        # Prevents tracking random phones, watches, and other ambient BLE devices.
+        # Only process BLE devices that are registered as trackable indoor tracking assets.
+        # Filters out:
+        #  - Random ambient BLE (phones, watches, laptops, etc.)
+        #  - GPS trackers (series1, series2, series_3, scope types)
+        #  - Inactive/decommissioned tags
+        # This prevents the 38k+ unregistered device problem.
         registered_tag = db.query(BLETag).filter(
             BLETag.mac_address == tag_id,
+            BLETag.tag_type == "ble",  # Only indoor BLE tags (DX-Smart CP27/CP28/CP29)
             BLETag.is_active == True
         ).first()
         if not registered_tag:
-            return  # Silently ignore unregistered BLE devices
+            return  # Silently ignore unregistered or non-indoor BLE devices
+
+        # Optional: Filter by iBeacon UUID if ALLOWED_IBEACON_UUIDS is configured
+        # This is a secondary filter for deployments that want to restrict to specific
+        # DX-Smart tag batches configured with a particular UUID (per spec §3.6).
+        if ALLOWED_IBEACON_UUIDS:
+            decoded = payload.get("decoded") or {}
+            device_ids = decoded.get("deviceIds") or []
+            # iBeacon UUID is in deviceIds[0] format: "UUID/Major/Minor"
+            ibeacon_uuid = None
+            for device_id in device_ids:
+                if "/" in str(device_id):  # iBeacon format
+                    ibeacon_uuid = str(device_id).split("/")[0].lower().strip()
+                    break
+            if not ibeacon_uuid or ibeacon_uuid not in ALLOWED_IBEACON_UUIDS:
+                logger.debug("pareto_bridge: tag %s rejected by iBeacon UUID filter", tag_id)
+                return
 
         gateway = db.query(IndoorGateway).filter(
             IndoorGateway.receiver_id == receiver_id
