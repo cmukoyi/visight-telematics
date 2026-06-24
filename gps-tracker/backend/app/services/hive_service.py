@@ -125,6 +125,7 @@ def pairwise_temporal_eval(
     positions: List[Tuple[str, float, float, datetime]],
     threshold_m: float,
     coherence_window_s: int,
+    prior_positions_by_tag: Optional[Dict[str, Tuple[float, float]]] = None,
 ) -> Tuple[
     Optional[float],  # display diameter (all candidate pairs)
     Optional[float],  # coherent diameter (only temporally coherent pairs)
@@ -206,38 +207,83 @@ def pairwise_temporal_eval(
                 outlier = str(candidates[0])
                 outlier_selection_reason = "most_breaching_pairs"
             else:
-                centroid_source = [
-                    coords for tid, coords in coherent_positions_by_tag.items()
-                    if tid in coherent_tag_ids
-                ]
-                if centroid_source:
-                    centroid_lat = sum(lat for lat, _ in centroid_source) / len(centroid_source)
-                    centroid_lng = sum(lng for _, lng in centroid_source) / len(centroid_source)
-                    dist_by_candidate: Dict[str, float] = {}
+                # ─── Fix B (v1.3): Movement tiebreak for 2-tag case ───────────────
+                # When only 2 tags are coherent (sparse edge case), centroid sits
+                # between them and cannot identify which moved. Instead, rank by
+                # displacement from each tag's own prior position.
+                
+                # Check if we have a stable cluster (3+ tags) or a 2-tag sparsity case
+                coherent_tag_count = len(coherent_tag_ids)
+                
+                if coherent_tag_count == 2 and prior_positions_by_tag:
+                    # 2-tag case: use movement tiebreak
+                    # Rank candidates by displacement from own prior position
+                    displacement_by_candidate: Dict[str, float] = {}
+                    
                     for tid in candidates:
                         coords = coherent_positions_by_tag.get(str(tid))
-                        if not coords:
-                            continue
-                        lat, lng = coords
-                        dist_by_candidate[str(tid)] = haversine_m(lat, lng, centroid_lat, centroid_lng)
-                    if dist_by_candidate:
-                        max_dist = max(dist_by_candidate.values())
-                        distance_winners = [
-                            tid for tid, dist in dist_by_candidate.items()
-                            if dist == max_dist
+                        prior_coords = prior_positions_by_tag.get(str(tid))
+                        
+                        if coords and prior_coords:
+                            lat, lng = coords
+                            prior_lat, prior_lng = prior_coords
+                            displacement = haversine_m(lat, lng, prior_lat, prior_lng)
+                            displacement_by_candidate[str(tid)] = displacement
+                    
+                    if displacement_by_candidate:
+                        # Tag with largest displacement moved furthest → outlier
+                        max_displacement = max(displacement_by_candidate.values())
+                        movement_winners = [
+                            tid for tid, disp in displacement_by_candidate.items()
+                            if disp == max_displacement
                         ]
-                        if len(distance_winners) == 1:
-                            outlier = distance_winners[0]
-                            outlier_selection_reason = "tiebreak_distance"
+                        
+                        if len(movement_winners) == 1:
+                            outlier = movement_winners[0]
+                            outlier_selection_reason = "tiebreak_movement"
                         else:
-                            outlier = sorted(distance_winners)[0]
+                            # Still tied on movement → alphabetical fallback
+                            outlier = sorted(movement_winners)[0]
+                            outlier_selection_reason = "tiebreak_alphabetical"
+                    else:
+                        # No prior positions for candidates → alphabetical fallback
+                        outlier = sorted(str(tid) for tid in candidates)[0]
+                        outlier_selection_reason = "tiebreak_alphabetical"
+                
+                else:
+                    # 3+ tags (stable cluster exists): use centroid-based tiebreak
+                    centroid_source = [
+                        coords for tid, coords in coherent_positions_by_tag.items()
+                        if tid in coherent_tag_ids
+                    ]
+                    if centroid_source:
+                        centroid_lat = sum(lat for lat, _ in centroid_source) / len(centroid_source)
+                        centroid_lng = sum(lng for _, lng in centroid_source) / len(centroid_source)
+                        dist_by_candidate: Dict[str, float] = {}
+                        for tid in candidates:
+                            coords = coherent_positions_by_tag.get(str(tid))
+                            if not coords:
+                                continue
+                            lat, lng = coords
+                            dist_by_candidate[str(tid)] = haversine_m(lat, lng, centroid_lat, centroid_lng)
+                        if dist_by_candidate:
+                            max_dist = max(dist_by_candidate.values())
+                            distance_winners = [
+                                tid for tid, dist in dist_by_candidate.items()
+                                if dist == max_dist
+                            ]
+                            if len(distance_winners) == 1:
+                                outlier = distance_winners[0]
+                                outlier_selection_reason = "tiebreak_distance"
+                            else:
+                                outlier = sorted(distance_winners)[0]
+                                outlier_selection_reason = "tiebreak_alphabetical"
+                        else:
+                            outlier = sorted(str(tid) for tid in candidates)[0]
                             outlier_selection_reason = "tiebreak_alphabetical"
                     else:
                         outlier = sorted(str(tid) for tid in candidates)[0]
                         outlier_selection_reason = "tiebreak_alphabetical"
-                else:
-                    outlier = sorted(str(tid) for tid in candidates)[0]
-                    outlier_selection_reason = "tiebreak_alphabetical"
 
     # Fix 3 correction: separated-tag count is cluster-based, not the number of
     # non-zero breaching-pair entries (which double-counts both sides of a split).
@@ -482,6 +528,26 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
     # ── Compute diameter with v1.2 temporal coherence rules ───────────
     threshold_m = cfg.distance_threshold_m
     coherence_window_s = _profile_coherence_window_s(getattr(cfg, "mobility_profile", None))
+    
+    # Fix B (v1.3): Get prior positions for movement tiebreak
+    # Query the most recent HiveEvaluation to extract each tag's prior position
+    prior_positions_by_tag: Dict[str, Tuple[float, float]] = {}
+    recent_eval = db.query(HiveEvaluation).filter(
+        HiveEvaluation.hive_id == hive_id
+    ).order_by(HiveEvaluation.evaluated_at.desc()).first()
+    
+    if recent_eval and recent_eval.positions_used:
+        try:
+            positions_used = json.loads(recent_eval.positions_used)
+            for item in positions_used:
+                tag_id = item.get("tag_id")
+                lat = item.get("lat")
+                lng = item.get("lng")
+                if tag_id and lat is not None and lng is not None:
+                    prior_positions_by_tag[str(tag_id)] = (float(lat), float(lng))
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+            pass  # No usable prior positions
+    
     if len(candidate_positions) >= 2:
         (
             display_diameter_m,
@@ -495,7 +561,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
             separated_tag_count,
             pairwise_detail,
         ) = (
-            pairwise_temporal_eval(candidate_positions, threshold_m, coherence_window_s)
+            pairwise_temporal_eval(candidate_positions, threshold_m, coherence_window_s, prior_positions_by_tag)
         )
     else:
         display_diameter_m = None
@@ -685,20 +751,23 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
                 duration_met = (elapsed_minutes >= T_PERSIST_MINUTES and 
                                live.persistence_eval_count >= T_PERSIST_EVALS)
                 
-                # Can confirm even with stale/incoherent data if persistence met
-                # (the outlier being continuously far + home cluster present = breach)
+                # Fix A (v1.3): Persistence may ACCUMULATE during stale/incoherent evals,
+                # but confirmation transition (BREACH_PENDING → BREACHING) may only FIRE
+                # on a coherent evaluation. If persistence is satisfied here (on a stale
+                # evaluation), HOLD in BREACH_PENDING; confirmation will fire on the next
+                # coherent evaluation that still shows breach.
                 if duration_met:
-                    new_state = "BREACHING"
                     log.info(
-                        f"HIVE {hive_id}: BREACH_PENDING → BREACHING (sparse tag persistence)",
+                        f"HIVE {hive_id}: Persistence satisfied but no coherent evidence - HOLD in BREACH_PENDING",
                         extra={
                             "hive_id": hive_id,
                             "elapsed_minutes": round(elapsed_minutes, 2),
                             "eval_count": live.persistence_eval_count,
-                            "has_fresh_coherent_evidence": False,
-                            "persistence_rule": "v1.2.2_hold_on_stale"
+                            "breach_evidence": breach_evidence,
+                            "fix": "v1.3_coherent_confirm_only"
                         }
                     )
+                # stays BREACH_PENDING (persistence met but waiting for coherent evidence)
                 
                 # Legacy field for compatibility
                 live.consecutive_confirms = live.persistence_eval_count
