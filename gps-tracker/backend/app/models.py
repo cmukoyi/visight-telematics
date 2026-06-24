@@ -102,7 +102,7 @@ class BLETag(Base):
     description = Column(String(255))  # Vehicle description from MZone API
     mzone_vehicle_id = Column(String(100), index=True)  # Cached MZone vehicle_Id for faster trips API
     mac_address = Column(String(17))  # Format: XX:XX:XX:XX:XX:XX
-    tag_type = Column(String(50), nullable=True, default='series1')  # 'series2' | 'series1'
+    tag_type = Column(String(50), nullable=True, default='series1')  # 'series1' | 'series2' | 'series_3' | 'series_4' (DX-Smart indoor BLE) | 'scope' | 'ble'
     is_active = Column(Boolean, default=True)
     last_seen = Column(DateTime(timezone=True))
     latitude = Column(String(50))
@@ -468,15 +468,19 @@ class Floor(Base):
     """One floor / level of a building."""
     __tablename__ = "floors"
 
-    id          = get_uuid_column()
-    building_id = get_uuid_fk("buildings.id")
-    label       = Column(String(100), nullable=False, default="Ground Floor")
-    floor_order = Column(Integer, nullable=False, default=0)
-    floor_plan  = Column(Text, nullable=True)   # base64 data-URL PNG
-    map_w       = Column(Integer, nullable=False, default=800)
-    map_h       = Column(Integer, nullable=False, default=500)
-    created_at  = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at  = Column(DateTime(timezone=True), onupdate=func.now())
+    id           = get_uuid_column()
+    building_id  = get_uuid_fk("buildings.id")
+    label        = Column(String(100), nullable=False, default="Ground Floor")
+    floor_order  = Column(Integer, nullable=False, default=0)
+    floor_plan   = Column(Text, nullable=True)   # base64 data-URL PNG
+    map_w        = Column(Integer, nullable=False, default=800)
+    map_h        = Column(Integer, nullable=False, default=500)
+    # Publish workflow (draft vs live floor plans)
+    is_published = Column(Boolean, nullable=False, default=False)
+    published_at = Column(DateTime(timezone=True), nullable=True)
+    published_by = get_uuid_fk_nullable("portal_users.id")
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at   = Column(DateTime(timezone=True), onupdate=func.now())
 
     building = relationship("Building", back_populates="floors")
     gateways = relationship("IndoorGateway", back_populates="floor",
@@ -491,6 +495,7 @@ class IndoorGateway(Base):
 
     id          = get_uuid_column()
     floor_id    = get_uuid_fk("floors.id")
+    room_id     = get_uuid_fk_nullable("rooms.id")  # Link gateway to specific room
     receiver_id = Column(String(50), nullable=False, index=True)  # lowercase hex, no colons
     label       = Column(String(100), nullable=True)
     x           = Column(Float, nullable=False, default=0.0)
@@ -499,6 +504,7 @@ class IndoorGateway(Base):
     updated_at  = Column(DateTime(timezone=True), onupdate=func.now())
 
     floor = relationship("Floor", back_populates="gateways")
+    room  = relationship("Room", foreign_keys=[room_id])
 
 
 class Room(Base):

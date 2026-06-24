@@ -553,6 +553,7 @@ class RoomOut(BaseModel):
 class GatewayOut(BaseModel):
     id: UUID
     floor_id: UUID
+    room_id: Optional[UUID] = None  # Link to specific room
     receiver_id: str
     label: Optional[str]
     x: float
@@ -567,6 +568,8 @@ class FloorOut(BaseModel):
     floor_plan: Optional[str]
     map_w: int
     map_h: int
+    is_published: bool = False
+    published_at: Optional[datetime] = None
     gateways: List[GatewayOut] = []
     rooms: List[RoomOut] = []
     class Config: from_attributes = True
@@ -772,6 +775,73 @@ def delete_floor(floor_id: str, request: Request, db: Session = Depends(get_db))
     db.commit()
 
 
+@router.post("/buildings/{building_id}/floors/{floor_id}/publish", response_model=FloorOut)
+def publish_floor_plan(
+    building_id: str, floor_id: str,
+    request: Request, db: Session = Depends(get_db)
+):
+    """Publish a floor plan - locks it and makes it available in Tracking > Floor Plan.
+    
+    Requirements before publishing:
+    - At least 1 gateway registered
+    - Floor plan image uploaded (optional but recommended)
+    """
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Only group admins can publish floors")
+    
+    # Verify ownership
+    floor = db.query(Floor).join(Building).filter(
+        Floor.id == floor_id,
+        Building.id == building_id,
+        Building.usergroup_id == me.usergroup_id
+    ).first()
+    
+    if not floor:
+        raise HTTPException(status_code=404, detail="Floor not found")
+    
+    # Validation
+    gateways = db.query(IndoorGateway).filter(IndoorGateway.floor_id == floor.id).count()
+    if gateways == 0:
+        raise HTTPException(status_code=400, detail="Cannot publish: At least 1 gateway required")
+    
+    # Publish
+    floor.is_published = True
+    floor.published_at = func.now()
+    floor.published_by = me.id
+    db.commit()
+    db.refresh(floor)
+    
+    return FloorOut.model_validate(floor)
+
+
+@router.post("/buildings/{building_id}/floors/{floor_id}/unpublish", response_model=FloorOut)
+def unpublish_floor_plan(
+    building_id: str, floor_id: str,
+    request: Request, db: Session = Depends(get_db)
+):
+    """Unpublish a floor plan - reverts to draft mode for editing.
+    The floor plan will no longer appear in Tracking > Floor Plan."""
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Only group admins can unpublish floors")
+    
+    floor = db.query(Floor).join(Building).filter(
+        Floor.id == floor_id,
+        Building.id == building_id,
+        Building.usergroup_id == me.usergroup_id
+    ).first()
+    
+    if not floor:
+        raise HTTPException(status_code=404, detail="Floor not found")
+    
+    floor.is_published = False
+    db.commit()
+    db.refresh(floor)
+    
+    return FloorOut.model_validate(floor)
+
+
 # ---------------------------------------------------------------------------
 # Gateway Management (ESP32 BLE Gateways - Customer Self-Service)
 # ---------------------------------------------------------------------------
@@ -785,6 +855,7 @@ class GatewayCreate(BaseModel):
 class GatewayUpdate(BaseModel):
     receiver_id: Optional[str] = None
     label: Optional[str] = None
+    room_id: Optional[str] = None  # Link gateway to specific room
     x: Optional[float] = None
     y: Optional[float] = None
 
@@ -826,7 +897,7 @@ def create_gateway(floor_id: str, data: GatewayCreate, request: Request, db: Ses
 
 @router.put("/gateways/{gateway_id}", response_model=GatewayOut)
 def update_gateway(gateway_id: str, data: GatewayUpdate, request: Request, db: Session = Depends(get_db)):
-    """Update a gateway's position or label."""
+    """Update a gateway's position, label, or room assignment."""
     me = get_portal_user_from_request(request, db)
     if not me.is_group_admin:
         raise HTTPException(status_code=403, detail="Only group admins can modify gateways")
@@ -841,6 +912,7 @@ def update_gateway(gateway_id: str, data: GatewayUpdate, request: Request, db: S
     if data.receiver_id is not None:
         gw.receiver_id = data.receiver_id.lower().replace(":", "").replace("-", "").strip()
     if data.label is not None: gw.label = data.label
+    if data.room_id is not None: gw.room_id = data.room_id if data.room_id else None
     if data.x is not None: gw.x = data.x
     if data.y is not None: gw.y = data.y
     
