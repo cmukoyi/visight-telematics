@@ -1,16 +1,32 @@
+# ============ Build Stage: Compile Python packages ============
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+
+# Install build dependencies (gcc needed to compile packages like psycopg2)
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy and install Python requirements
+COPY ./backend/requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+
+# ============ Runtime Stage: Slim final image ============
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Install ONLY runtime dependencies (postgresql-client for migrations, no gcc!)
 RUN apt-get update && apt-get install -y \
-    gcc \
     postgresql-client \
+    libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
-COPY ./backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy compiled Python packages from builder stage (no gcc in final image)
+COPY --from=builder /root/.local /root/.local
 
 # Copy application code
 COPY ./backend/ .
@@ -20,6 +36,9 @@ COPY ./backend/ .
 RUN mkdir -p /app/static
 COPY ./customer-dashboard/public/asset.html /app/static/asset.html
 COPY ./customer-dashboard/public/scanner.html /app/static/scanner.html
+
+# Make sure scripts in .local are usable
+ENV PATH=/root/.local/bin:$PATH
 
 EXPOSE 8000
 
