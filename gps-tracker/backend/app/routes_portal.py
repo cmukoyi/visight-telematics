@@ -705,6 +705,9 @@ class FloorUpdate(BaseModel):
     map_w: Optional[int] = None
     map_h: Optional[int] = None
 
+class FloorPublish(BaseModel):
+    floor_plan_data: Optional[dict] = None  # JSON with elements array from sketch app
+
 
 @router.post("/buildings/{building_id}/floors", response_model=FloorOut, status_code=201)
 def create_floor(building_id: str, data: FloorCreate, request: Request, db: Session = Depends(get_db)):
@@ -780,13 +783,13 @@ def delete_floor(floor_id: str, request: Request, db: Session = Depends(get_db))
 @router.post("/buildings/{building_id}/floors/{floor_id}/publish", response_model=FloorOut)
 def publish_floor_plan(
     building_id: str, floor_id: str,
+    data: FloorPublish,
     request: Request, db: Session = Depends(get_db)
 ):
     """Publish a floor plan - locks it and makes it available in Tracking > Floor Plan.
     
-    Requirements before publishing:
-    - At least 1 gateway registered
-    - Floor plan image uploaded (optional but recommended)
+    Accepts floor_plan_data (JSON with elements array from sketch app).
+    Gateways are optional - they can be added later.
     """
     me = get_portal_user_from_request(request, db)
     if not me.is_group_admin:
@@ -802,12 +805,10 @@ def publish_floor_plan(
     if not floor:
         raise HTTPException(status_code=404, detail="Floor not found")
     
-    # Validation
-    gateways = db.query(IndoorGateway).filter(IndoorGateway.floor_id == floor.id).count()
-    if gateways == 0:
-        raise HTTPException(status_code=400, detail="Cannot publish: At least 1 gateway required")
+    # TODO: Save floor_plan_data to database (needs migration to add column)
+    # For now, floor plan data lives in browser localStorage
     
-    # Publish
+    # Publish (gateways are optional - can be added later)
     floor.is_published = True
     floor.published_at = func.now()
     floor.published_by = me.id
