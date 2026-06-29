@@ -3418,8 +3418,8 @@ input.hive-range::-moz-range-track {
         <div id="tagMgmtAlert" class="alert" style="display:none"><span id="tagMgmtAlertText"></span></div>
         <form id="tagMgmtForm" onsubmit="submitTagForm(event)">
             <div id="tagMgmtImeiGroup" class="form-group">
-                <label>IMEI / Tag ID *</label>
-                <input type="text" id="tagMgmtImei" placeholder="e.g. 867747079036032" required
+                <label id="tagMgmtImeiLabel">IMEI / MAC Address *</label>
+                <input type="text" id="tagMgmtImei" placeholder="e.g. 867747079036032 or 48872D9DBC66" required
                        oninput="_tagImeiResetValidation()"
                        onblur="_tagImeiValidateOnBlur()">
                 <div id="tagMgmtImeiStatus" style="display:none;margin-top:4px;font-size:12px"></div>
@@ -3430,10 +3430,11 @@ input.hive-range::-moz-range-track {
             </div>
             <div id="tagMgmtTypeGroup" class="form-group">
                 <label>Tag Type</label>
-                <select id="tagMgmtType">
-                    <option value="series1">Series 1</option>
-                    <option value="series2">Series 2</option>
-                    <option value="series3">Series 3</option>
+                <select id="tagMgmtType" onchange="_updateImeiLabelForTagType()">
+                    <option value="series1">Series 1 (GPS)</option>
+                    <option value="series2">Series 2 (GPS)</option>
+                    <option value="series3">Series 3 (QR Code)</option>
+                    <option value="series_4">Series 4 (BLE Indoor)</option>
                 </select>
             </div>
             <div id="tagMgmtCategoryGroup" class="form-group">
@@ -4662,6 +4663,9 @@ function _ppTagTypeLabel(tt) {
         series2: 'Series 2',
         series_3: 'Series 3',
         series3: 'Series 3',
+        series_4: 'Series 4',
+        series4: 'Series 4',
+        ble: 'Series 4',
     };
     const key = (tt || '').toLowerCase();
     return map[key] || (tt || '—');
@@ -4867,6 +4871,23 @@ async function _loadPackagesIntoSelect() {
     }
 }
 
+function _updateImeiLabelForTagType() {
+    const tagType = document.getElementById('tagMgmtType').value;
+    const label = document.getElementById('tagMgmtImeiLabel');
+    const input = document.getElementById('tagMgmtImei');
+    
+    if (tagType === 'series_4' || tagType === 'series4') {
+        label.textContent = 'MAC Address *';
+        input.placeholder = 'e.g. 48872D9DBC66 or AA:BB:CC:DD:EE:FF';
+    } else if (tagType === 'series3' || tagType === 'series_3') {
+        label.textContent = 'QR / NFC ID *';
+        input.placeholder = 'e.g. 4a8b2c3d-1e2f-3g4h-5i6j-7k8l9m0n1o2p';
+    } else {
+        label.textContent = 'IMEI *';
+        input.placeholder = 'e.g. 867747079036032';
+    }
+}
+
 async function openAddTagModal() {
     // Remove activation banner if left from edit mode
     const _b = document.getElementById('tagActivationBanner');
@@ -4887,7 +4908,7 @@ async function openAddTagModal() {
     // Filter tag type options based on usergroup permissions
     const _typeSelAdd = document.getElementById('tagMgmtType');
     const session = getSession();
-    const allowedTypes = session.group?.allowed_tag_types || ['series1', 'series2', 'series3'];
+    const allowedTypes = session.group?.allowed_tag_types || ['series1', 'series2', 'series3', 'series_4'];
     // Show/hide options based on allowed types
     Array.from(_typeSelAdd.options).forEach(opt => {
         opt.style.display = allowedTypes.includes(opt.value) ? '' : 'none';
@@ -4898,6 +4919,9 @@ async function openAddTagModal() {
     _typeSelAdd.style.background = '';
     _typeSelAdd.style.color = '';
     _typeSelAdd.style.cursor = '';
+    
+    // Update IMEI label based on selected tag type
+    _updateImeiLabelForTagType();
     
     document.getElementById('tagMgmtImeiGroup').style.display = '';
     document.getElementById('tagMgmtDescGroup').style.display = '';
@@ -4953,20 +4977,23 @@ async function openTagMgmtModal(mode, imei) {
     document.getElementById('tagMgmtDesc').value = tag.description || tag.device_name || '';
     document.getElementById('tagMgmtDescGroup').style.display = '';
 
-    // Tag type — normalise canonical DB values (scope/tracksolid/series3) to select option values (series1/series2/series3)
+    // Tag type — normalise canonical DB values (scope/tracksolid/series3/ble) to select option values (series1/series2/series3/series_4)
     const _typeAliasToSelect = {
         scope: 'series1',
         tracksolid: 'series2',
         series3: 'series3',
         series_3: 'series3',
         series1: 'series1',
-        series2: 'series2'
+        series2: 'series2',
+        series_4: 'series_4',
+        series4: 'series_4',
+        ble: 'series_4'
     };
     const _typeSelect = document.getElementById('tagMgmtType');
     
     // Filter tag type options based on usergroup permissions
     const session = getSession();
-    const allowedTypes = session.group?.allowed_tag_types || ['series1', 'series2', 'series3'];
+    const allowedTypes = session.group?.allowed_tag_types || ['series1', 'series2', 'series3', 'series_4'];
     Array.from(_typeSelect.options).forEach(opt => {
         opt.style.display = allowedTypes.includes(opt.value) ? '' : 'none';
     });
