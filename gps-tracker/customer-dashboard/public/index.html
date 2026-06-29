@@ -1681,6 +1681,15 @@ input.hive-range::-moz-range-track {
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><circle cx="11" cy="11" r="3"/></svg>
                       Preview
                     </button>
+                    <div class="divider-v"></div>
+                    <button class="btn-icon" id="setupFloorBtn" title="Setup Building & Floor" style="background:var(--primary-dim);color:var(--primary)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+                      Setup
+                    </button>
+                    <button class="btn-icon" id="publishFloorBtn" title="Publish Floor Plan to Database" style="background:#10b981;color:white;display:none">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg>
+                      Publish
+                    </button>
                   </div>
                 </header>
 
@@ -1991,6 +2000,64 @@ input.hive-range::-moz-range-track {
                     <div class="modal-actions">
                       <button class="btn-ghost" id="renameFloorCancel">Cancel</button>
                       <button class="btn-primary" id="renameFloorConfirm">Rename</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Building/Floor Setup Modal -->
+                <div class="modal-overlay" id="sketchSetupModal" style="display:none">
+                  <div class="modal" style="max-width:500px">
+                    <div class="modal-title">Floor Plan Setup</div>
+                    <div style="margin-bottom:16px;padding:12px;background:var(--primary-dim);border-radius:6px;font-size:13px;color:var(--text-muted)">
+                      Link this floor plan to a building and floor in your database.
+                    </div>
+                    <div style="margin-bottom:16px">
+                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">Building</label>
+                      <select id="sketchBuildingSelect" class="prop-input" style="width:100%">
+                        <option value="">Select or create new...</option>
+                      </select>
+                      <div id="sketchNewBuildingFields" style="display:none;margin-top:8px">
+                        <input type="text" id="sketchBuildingName" class="prop-input" placeholder="Building name" style="width:100%;margin-bottom:8px">
+                        <input type="text" id="sketchBuildingAddress" class="prop-input" placeholder="Address (optional)" style="width:100%">
+                      </div>
+                    </div>
+                    <div style="margin-bottom:16px">
+                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">Floor</label>
+                      <select id="sketchFloorSelect" class="prop-input" style="width:100%">
+                        <option value="">Select or create new...</option>
+                      </select>
+                      <div id="sketchNewFloorFields" style="display:none;margin-top:8px">
+                        <input type="text" id="sketchFloorName" class="prop-input" placeholder="Floor name (e.g., Ground Floor)" style="width:100%;margin-bottom:8px">
+                        <input type="number" id="sketchFloorNumber" class="prop-input" placeholder="Floor number (0 = ground, 1 = first, -1 = basement)" style="width:100%">
+                      </div>
+                    </div>
+                    <div class="modal-actions">
+                      <button class="btn-ghost" id="sketchSetupCancel">Cancel</button>
+                      <button class="btn-primary" id="sketchSetupSave">Link Floor Plan</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Gateway Linking Modal -->
+                <div class="modal-overlay" id="sketchGatewayModal" style="display:none">
+                  <div class="modal" style="max-width:450px">
+                    <div class="modal-title">Link BLE Gateway</div>
+                    <div style="margin-bottom:16px;padding:12px;background:var(--primary-dim);border-radius:6px;font-size:13px;color:var(--text-muted)">
+                      Select an ESP32S3 gateway from your database to link to this position.
+                    </div>
+                    <div style="margin-bottom:16px">
+                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">Gateway</label>
+                      <select id="sketchGatewaySelect" class="prop-input" style="width:100%">
+                        <option value="">Select gateway...</option>
+                      </select>
+                    </div>
+                    <div style="margin-bottom:16px">
+                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">Label (Optional)</label>
+                      <input type="text" id="sketchGatewayLabel" class="prop-input" placeholder="Gateway label" style="width:100%">
+                    </div>
+                    <div class="modal-actions">
+                      <button class="btn-ghost" id="sketchGatewayCancel">Cancel</button>
+                      <button class="btn-primary" id="sketchGatewaySave">Link Gateway</button>
                     </div>
                   </div>
                 </div>
@@ -12054,3 +12121,327 @@ function qrOpenHelp() {
 <!-- Sub-app JS — must come after their DOM is in place -->
 <script src="/customer/sketch/app.js"></script>
 <script src="/customer/floorplan/app.js"></script>
+
+<!-- Floor Plan Sketch Database Integration -->
+<script>
+(function() {
+  'use strict';
+
+  // State for building/floor linkage
+  let sketchBuildings = [];
+  let sketchFloors = [];
+  let sketchGateways = [];
+  let linkedBuildingId = null;
+  let linkedFloorId = null;
+  let pendingGatewayElement = null;
+
+  // ─── Setup Button Handler ───────────────────────────────────────────────────
+  const setupBtn = document.getElementById('setupFloorBtn');
+  const publishBtn = document.getElementById('publishFloorBtn');
+  const setupModal = document.getElementById('sketchSetupModal');
+  const buildingSelect = document.getElementById('sketchBuildingSelect');
+  const floorSelect = document.getElementById('sketchFloorSelect');
+  const newBuildingFields = document.getElementById('sketchNewBuildingFields');
+  const newFloorFields = document.getElementById('sketchNewFloorFields');
+
+  if (setupBtn) {
+    setupBtn.addEventListener('click', async () => {
+      await loadBuildingsAndFloors();
+      setupModal.style.display = 'flex';
+    });
+  }
+
+  // Building select change handler
+  if (buildingSelect) {
+    buildingSelect.addEventListener('change', async (e) => {
+      const val = e.target.value;
+      if (val === 'new') {
+        newBuildingFields.style.display = 'block';
+        floorSelect.innerHTML = '<option value="new">Create new floor</option>';
+        newFloorFields.style.display = 'block';
+      } else if (val) {
+        newBuildingFields.style.display = 'none';
+        // Load floors for this building
+        await loadFloorsForBuilding(val);
+      } else {
+        newBuildingFields.style.display = 'none';
+        floorSelect.innerHTML = '<option value="">Select building first...</option>';
+        newFloorFields.style.display = 'none';
+      }
+    });
+  }
+
+  // Floor select change handler
+  if (floorSelect) {
+    floorSelect.addEventListener('change', (e) => {
+      if (e.target.value === 'new') {
+        newFloorFields.style.display = 'block';
+      } else {
+        newFloorFields.style.display = 'none';
+      }
+    });
+  }
+
+  // Setup Save button
+  document.getElementById('sketchSetupSave')?.addEventListener('click', async () => {
+    const buildingVal = buildingSelect.value;
+    const floorVal = floorSelect.value;
+
+    try {
+      let buildingId = buildingVal;
+      let floorId = floorVal;
+
+      // Create new building if needed
+      if (buildingVal === 'new') {
+        const name = document.getElementById('sketchBuildingName').value.trim();
+        const address = document.getElementById('sketchBuildingAddress').value.trim();
+        if (!name) { alert('Please enter a building name'); return; }
+        const res = await apiFetch('/api/portal/buildings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, address: address || null })
+        });
+        if (!res.ok) throw new Error('Failed to create building');
+        const data = await res.json();
+        buildingId = data.building_id || data.id;
+      }
+
+      // Create new floor if needed
+      if (floorVal === 'new') {
+        const floorName = document.getElementById('sketchFloorName').value.trim();
+        const floorNumber = parseInt(document.getElementById('sketchFloorNumber').value, 10);
+        if (!floorName) { alert('Please enter a floor name'); return; }
+        if (isNaN(floorNumber)) { alert('Please enter a valid floor number'); return; }
+        const res = await apiFetch(`/api/portal/buildings/${buildingId}/floors`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: floorName, floor_number: floorNumber })
+        });
+        if (!res.ok) throw new Error('Failed to create floor');
+        const data = await res.json();
+        floorId = data.floor_id || data.id;
+      }
+
+      // Save linkage
+      linkedBuildingId = buildingId;
+      linkedFloorId = floorId;
+      setupModal.style.display = 'none';
+      publishBtn.style.display = '';
+      setupBtn.style.background = '#10b981';
+      setupBtn.style.color = 'white';
+      setupBtn.querySelector('svg').style.stroke = 'white';
+      alert('Floor plan linked successfully! You can now publish it.');
+    } catch (err) {
+      console.error('Setup error:', err);
+      alert('Failed to setup floor plan: ' + err.message);
+    }
+  });
+
+  document.getElementById('sketchSetupCancel')?.addEventListener('click', () => {
+    setupModal.style.display = 'none';
+  });
+
+  // ─── Publish Button Handler ─────────────────────────────────────────────────
+  if (publishBtn) {
+    publishBtn.addEventListener('click', async () => {
+      if (!linkedBuildingId || !linkedFloorId) {
+        alert('Please setup the building and floor first (click Setup button)');
+        return;
+      }
+
+      if (!confirm('Publish this floor plan? It will be locked and visible in Tracking > Floor Plan.')) {
+        return;
+      }
+
+      try {
+        // Get current floor plan data from sketch app
+        const floorPlanData = window.state ? {
+          elements: window.state.floors[window.state.currentFloor]?.elements || [],
+          floor_name: window.state.floors[window.state.currentFloor]?.name || 'Floor Plan'
+        } : null;
+
+        if (!floorPlanData || !floorPlanData.elements.length) {
+          alert('No floor plan elements to publish. Draw something first!');
+          return;
+        }
+
+        // Save gateway positions to database
+        const gateways = floorPlanData.elements.filter(el => el.type === 'gateway');
+        for (const gw of gateways) {
+          if (gw.gateway_id) {
+            await apiFetch(`/api/portal/gateways/${gw.gateway_id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                floor_id: linkedFloorId,
+                position_x: Math.round(gw.x1),
+                position_y: Math.round(gw.y1),
+                name: gw.label || 'Gateway'
+              })
+            });
+          }
+        }
+
+        // Publish the floor
+        const res = await apiFetch(`/api/portal/buildings/${linkedBuildingId}/floors/${linkedFloorId}/publish`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            floor_plan_data: floorPlanData
+          })
+        });
+
+        if (!res.ok) throw new Error('Failed to publish floor plan');
+
+        publishBtn.style.background = '#6b7280';
+        publishBtn.disabled = true;
+        publishBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg> Published';
+        alert('Floor plan published successfully! Go to Tracking > Floor Plan to view.');
+      } catch (err) {
+        console.error('Publish error:', err);
+        alert('Failed to publish floor plan: ' + err.message);
+      }
+    });
+  }
+
+  // ─── Gateway Linking ────────────────────────────────────────────────────────
+  const gatewayModal = document.getElementById('sketchGatewayModal');
+  const gatewaySelect = document.getElementById('sketchGatewaySelect');
+  const gatewayLabel = document.getElementById('sketchGatewayLabel');
+
+  // Hook into gateway placement from sketch app
+  // When user places a gateway, intercept and show linking modal
+  document.addEventListener('sketchGatewayPlaced', async (e) => {
+    pendingGatewayElement = e.detail.element;
+    await loadGateways();
+    gatewayModal.style.display = 'flex';
+  });
+
+  document.getElementById('sketchGatewaySave')?.addEventListener('click', () => {
+    const gatewayId = gatewaySelect.value;
+    const label = gatewayLabel.value.trim();
+
+    if (!gatewayId) {
+      alert('Please select a gateway');
+      return;
+    }
+
+    if (pendingGatewayElement) {
+      pendingGatewayElement.gateway_id = gatewayId;
+      if (label) pendingGatewayElement.label = label;
+      // Find gateway name
+      const gw = sketchGateways.find(g => g.id === gatewayId);
+      if (gw && !label) pendingGatewayElement.label = gw.name || gw.mac_address;
+    }
+
+    gatewayModal.style.display = 'none';
+    gatewaySelect.value = '';
+    gatewayLabel.value = '';
+    pendingGatewayElement = null;
+  });
+
+  document.getElementById('sketchGatewayCancel')?.addEventListener('click', () => {
+    // Remove the gateway element if cancelled
+    if (pendingGatewayElement && window.state) {
+      const idx = window.state.floors[window.state.currentFloor]?.elements.indexOf(pendingGatewayElement);
+      if (idx > -1) {
+        window.state.floors[window.state.currentFloor].elements.splice(idx, 1);
+        if (window.render) window.render();
+      }
+    }
+    gatewayModal.style.display = 'none';
+    pendingGatewayElement = null;
+  });
+
+  // ─── Data Loading Functions ─────────────────────────────────────────────────
+  async function loadBuildingsAndFloors() {
+    try {
+      const res = await apiFetch('/api/portal/buildings');
+      if (!res.ok) throw new Error('Failed to load buildings');
+      sketchBuildings = await res.json();
+
+      buildingSelect.innerHTML = '<option value="">Select existing building...</option>';
+      sketchBuildings.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.id;
+        opt.textContent = b.name;
+        buildingSelect.appendChild(opt);
+      });
+      const newOpt = document.createElement('option');
+      newOpt.value = 'new';
+      newOpt.textContent = '+ Create New Building';
+      buildingSelect.appendChild(newOpt);
+
+      floorSelect.innerHTML = '<option value="">Select building first...</option>';
+    } catch (err) {
+      console.error('Failed to load buildings:', err);
+      alert('Failed to load buildings from database');
+    }
+  }
+
+  async function loadFloorsForBuilding(buildingId) {
+    try {
+      const res = await apiFetch(`/api/portal/buildings/${buildingId}/floors`);
+      if (!res.ok) throw new Error('Failed to load floors');
+      sketchFloors = await res.json();
+
+      floorSelect.innerHTML = '<option value="">Select existing floor...</option>';
+      sketchFloors.forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f.id;
+        opt.textContent = `${f.name} (Floor ${f.floor_number})`;
+        floorSelect.appendChild(opt);
+      });
+      const newOpt = document.createElement('option');
+      newOpt.value = 'new';
+      newOpt.textContent = '+ Create New Floor';
+      floorSelect.appendChild(newOpt);
+      newFloorFields.style.display = 'none';
+    } catch (err) {
+      console.error('Failed to load floors:', err);
+    }
+  }
+
+  async function loadGateways() {
+    try {
+      const res = await apiFetch('/api/portal/gateways');
+      if (!res.ok) throw new Error('Failed to load gateways');
+      sketchGateways = await res.json();
+
+      gatewaySelect.innerHTML = '<option value="">Select gateway...</option>';
+      sketchGateways.forEach(gw => {
+        const opt = document.createElement('option');
+        opt.value = gw.id;
+        opt.textContent = `${gw.name || 'Gateway'} - ${gw.mac_address}`;
+        if (gw.floor_id) opt.textContent += ' (Already assigned)';
+        gatewaySelect.appendChild(opt);
+      });
+    } catch (err) {
+      console.error('Failed to load gateways:', err);
+      alert('Failed to load gateways from database');
+    }
+  }
+
+  // ─── Patch Sketch App to Trigger Gateway Linking ────────────────────────────
+  // Wait for sketch app to load, then hook into its buildElement function
+  setTimeout(() => {
+    if (window.buildElement) {
+      const originalBuildElement = window.buildElement;
+      window.buildElement = function(tool, start, end, extra) {
+        const el = originalBuildElement(tool, start, end, extra);
+        if (tool === 'gateway') {
+          // Dispatch event to trigger linking modal
+          setTimeout(() => {
+            document.dispatchEvent(new CustomEvent('sketchGatewayPlaced', {
+              detail: { element: el }
+            }));
+          }, 50);
+        }
+        return el;
+      };
+    }
+  }, 1000);
+
+  console.log('Floor Plan Sketch database integration loaded');
+})();
+</script>
