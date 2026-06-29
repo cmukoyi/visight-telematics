@@ -12391,10 +12391,35 @@ function qrOpenHelp() {
           return;
         }
 
-        // Save gateway positions to database
+        // Register and save gateways to database
+        publishBtn.textContent = 'Registering gateways...';
         const gateways = floorPlanData.elements.filter(el => el.type === 'gateway');
+        
         for (const gw of gateways) {
-          if (gw.gateway_id) {
+          // If gateway has MAC but not registered yet, register it now
+          if (gw.mac_address && !gw.gateway_id) {
+            try {
+              const res = await apiFetch(`/api/portal/floors/${linkedFloorId}/gateways`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  receiver_id: gw.mac_address.replace(/[:\-]/g, '').toLowerCase(),
+                  label: gw.label || 'Gateway',
+                  x: Math.round(gw.x1),
+                  y: Math.round(gw.y1)
+                })
+              });
+              if (res.ok) {
+                const data = await res.json();
+                gw.gateway_id = data.gateway_id || data.id;
+                console.log('[Floor Plan] ✅ Registered gateway:', gw.mac_address);
+              }
+            } catch (err) {
+              console.warn('[Floor Plan] Failed to register gateway:', gw.mac_address, err);
+            }
+          }
+          // If already registered, update position
+          else if (gw.gateway_id) {
             await apiFetch(`/api/portal/gateways/${gw.gateway_id}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
@@ -12406,8 +12431,19 @@ function qrOpenHelp() {
             });
           }
         }
+        
+        // Check if we have any registered gateways
+        const registeredCount = gateways.filter(gw => gw.gateway_id).length;
+        if (registeredCount === 0) {
+          alert('⚠️ No gateways registered!\n\nYou need to:\n1. Click on each gateway icon\n2. Enter its MAC address in Properties panel\n3. Then click Publish again');
+          publishBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg> Publish';
+          return;
+        }
+        
+        console.log(`[Floor Plan] ✅ ${registeredCount} gateway(s) ready for publishing`);
 
         // Publish the floor
+        publishBtn.textContent = 'Publishing...';
         const res = await apiFetch(`/api/portal/buildings/${linkedBuildingId}/floors/${linkedFloorId}/publish`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

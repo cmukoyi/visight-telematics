@@ -805,10 +805,18 @@ def publish_floor_plan(
     if not floor:
         raise HTTPException(status_code=404, detail="Floor not found")
     
+    # Validation: Must have at least 1 gateway registered
+    gateways = db.query(IndoorGateway).filter(IndoorGateway.floor_id == floor.id).count()
+    if gateways == 0:
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot publish: At least 1 gateway required. Add gateway MAC addresses in the Properties panel."
+        )
+    
     # TODO: Save floor_plan_data to database (needs migration to add column)
     # For now, floor plan data lives in browser localStorage
     
-    # Publish (gateways are optional - can be added later)
+    # Publish
     floor.is_published = True
     floor.published_at = func.now()
     floor.published_by = me.id
