@@ -12337,24 +12337,46 @@ function qrOpenHelp() {
   // ─── Publish Button Handler ─────────────────────────────────────────────────
   if (publishBtn) {
     publishBtn.addEventListener('click', async () => {
-      // If not linked yet, show setup modal first
+      // If not linked yet, ask with simple prompts
       if (!linkedBuildingId || !linkedFloorId) {
-        console.log('[Floor Plan] No building/floor linked, showing setup modal...');
+        console.log('[Floor Plan] No building/floor linked, asking user...');
+        
+        const buildingName = prompt('Enter building name:', 'Main Building');
+        if (!buildingName) return;
+        
+        const floorName = prompt('Enter floor name:', 'Ground Floor');
+        if (!floorName) return;
+        
         try {
-          await loadBuildingsAndFloors();
-          console.log('[Floor Plan] About to open modal...');
-          setupModal.classList.add('modal-open');
-          console.log('[Floor Plan] ✅ Modal class added, modal should be visible');
-          return; // Wait for user to save in modal, then they click Publish again
+          // Create building
+          publishBtn.textContent = 'Creating...';
+          const bRes = await apiFetch('/api/portal/buildings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: buildingName, address: '' })
+          });
+          if (!bRes.ok) throw new Error('Failed to create building');
+          const building = await bRes.json();
+          linkedBuildingId = building.id;
+          
+          // Create floor
+          const fRes = await apiFetch(`/api/portal/buildings/${building.id}/floors`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: floorName, floor_number: 0 })
+          });
+          if (!fRes.ok) throw new Error('Failed to create floor');
+          const floor = await fRes.json();
+          linkedFloorId = floor.id;
+          
+          saveFloorLink(linkedBuildingId, linkedFloorId);
+          console.log('[Floor Plan] ✅ Created building and floor, proceeding to publish...');
         } catch (err) {
-          console.error('[Floor Plan] Failed to load buildings:', err);
-          alert('Failed to open setup: ' + err.message);
+          console.error('[Floor Plan] Failed to create building/floor:', err);
+          alert('Failed to create building/floor: ' + err.message);
+          publishBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg> Publish';
           return;
         }
-      }
-
-      if (!confirm('Publish this floor plan? It will be locked and visible in Tracking > Floor Plan.')) {
-        return;
       }
 
       try {
@@ -12396,10 +12418,19 @@ function qrOpenHelp() {
 
         if (!res.ok) throw new Error('Failed to publish floor plan');
 
-        publishBtn.style.background = '#6b7280';
+        publishBtn.style.background = '#10b981';
+        publishBtn.style.color = 'white';
         publishBtn.disabled = true;
-        publishBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg> Published';
-        alert('Floor plan published successfully! Go to Tracking > Floor Plan to view.');
+        publishBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg> Published ✅';
+        
+        // Show success message in console
+        console.log('%c✅ Floor Plan Published Successfully!', 'color: #10b981; font-size: 16px; font-weight: bold;');
+        console.log('[Floor Plan] Building ID:', linkedBuildingId);
+        console.log('[Floor Plan] Floor ID:', linkedFloorId);
+        console.log('[Floor Plan] Elements:', floorPlanData.elements.length);
+        console.log('[Floor Plan] Gateways:', gateways.length);
+        
+        alert('✅ Floor plan published successfully!\n\nGo to: Tracking → Floor Plan to view it live.');
       } catch (err) {
         console.error('Publish error:', err);
         alert('Failed to publish floor plan: ' + err.message);
