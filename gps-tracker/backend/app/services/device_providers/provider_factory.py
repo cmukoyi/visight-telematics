@@ -10,17 +10,22 @@ Strategy implementation. Adding a new device type means:
 from .base_provider import DeviceTagProvider
 from .tracksolid_provider import TrackSolidTagProvider
 from .scope_provider import ScopeTagProvider
+from .ble_provider import BLEIndoorTagProvider
 
 # Registry: tag_type key → provider class.
-# Both the canonical vendor names ('scope', 'tracksolid') and the
-# user-facing series names ('series1', 'series2') are accepted so that
-# the Flutter app (which sends 'series1'/'series2') and any older DB rows
-# (which store 'scope'/'tracksolid') both resolve correctly.
+# Both the canonical vendor names ('scope', 'tracksolid', 'ble') and the
+# user-facing series names ('series1', 'series2', 'series_3', 'series_4') 
+# are accepted so that the Flutter app and portal both resolve correctly.
 _PROVIDERS: dict[str, type[DeviceTagProvider]] = {
-    "scope":      ScopeTagProvider,       # Series 1
-    "series1":    ScopeTagProvider,       # alias used by the Flutter app
-    "tracksolid": TrackSolidTagProvider,  # Series 2
-    "series2":    TrackSolidTagProvider,  # alias used by the Flutter app
+    "scope":      ScopeTagProvider,         # Series 1
+    "series1":    ScopeTagProvider,         # alias used by the Flutter app
+    "tracksolid": TrackSolidTagProvider,    # Series 2
+    "series2":    TrackSolidTagProvider,    # alias used by the Flutter app
+    "series_3":   ScopeTagProvider,         # Series 3 (QR codes, uses Scope backend)
+    "series3":    ScopeTagProvider,         # alias
+    "ble":        BLEIndoorTagProvider,     # Series 4 (DX-Smart indoor BLE)
+    "series_4":   BLEIndoorTagProvider,     # alias used by portal
+    "series4":    BLEIndoorTagProvider,     # alias
 }
 
 

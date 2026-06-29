@@ -32,6 +32,8 @@ _TAG_TYPE_ALIAS = {
     "series2": "tracksolid",
     "series3": "series_3",
     "series_3": "series_3",
+    "series4": "ble",       # Series 4 (DX-Smart indoor BLE tags)
+    "series_4": "ble",
 }
 
 router = APIRouter(prefix="/api/portal", tags=["portal"])
@@ -1972,6 +1974,33 @@ def list_active_packages(request: Request, db: Session = Depends(get_db)):
     return db.query(TagPackage).filter(TagPackage.is_active == True).order_by(TagPackage.validity_days).all()
 
 
+@router.get("/tag-types")
+def list_supported_tag_types(request: Request, db: Session = Depends(get_db)):
+    """Return supported tag types for Asset Management dropdown.
+    
+    Respects usergroup allowed_tag_types if configured, otherwise returns all types.
+    """
+    me = get_portal_user_from_request(request, db)
+    
+    # All available tag types for portal
+    all_types = [
+        {"value": "series1", "label": "Series 1 (GPS)", "description": "Scope GPS tracker"},
+        {"value": "series2", "label": "Series 2 (GPS)", "description": "TrackSolid GPS tracker"},
+        {"value": "series_3", "label": "Series 3 (QR Code)", "description": "QR code asset tracking"},
+        {"value": "series_4", "label": "Series 4 (BLE Indoor)", "description": "DX-Smart BLE indoor tracking (CP27/CP28/CP29)"},
+    ]
+    
+    # Check if usergroup has restrictions
+    group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
+    if group and group.allowed_tag_types:
+        # Filter to only allowed types
+        allowed_set = set(group.allowed_tag_types)
+        filtered = [t for t in all_types if t["value"] in allowed_set or t["value"].replace("_", "") in allowed_set]
+        return {"types": filtered}
+    
+    return {"types": all_types}
+
+
 # ---------------------------------------------------------------------------
 # Mobile users — list mobile-app Users in the group's email domain
 # ---------------------------------------------------------------------------
@@ -2426,10 +2455,8 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
         raise HTTPException(status_code=404, detail="Package not found or inactive")
 
     imei = data.imei.strip()
-    if db.query(BLETag).filter(BLETag.imei == imei).first():
-        raise HTTPException(status_code=409, detail=f"Tag with IMEI '{imei}' already exists")
-
-    # Validate IMEI against the vendor platform before persisting
+    
+    # Validate IMEI/MAC against the vendor platform before persisting
     canonical_type = _TAG_TYPE_ALIAS.get((data.tag_type or "scope").lower(), (data.tag_type or "scope").lower())
     try:
         provider = DeviceProviderFactory.get_provider(canonical_type)
@@ -2438,6 +2465,22 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
             raise HTTPException(status_code=422, detail=validation.message)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    
+    # For BLE indoor tags (series_4), normalize MAC address and store in both fields
+    mac_address = None
+    if canonical_type == "ble":
+        # Normalize: remove colons/dashes, lowercase
+        normalized_mac = imei.replace(":", "").replace("-", "").lower()
+        imei = normalized_mac  # Store normalized in imei field
+        mac_address = normalized_mac  # Also store in mac_address field for pareto_bridge compatibility
+        
+        # Check for duplicate using mac_address field (case-insensitive)
+        if db.query(BLETag).filter(BLETag.mac_address == normalized_mac).first():
+            raise HTTPException(status_code=409, detail=f"Tag with MAC address '{normalized_mac.upper()}' already exists")
+    else:
+        # For GPS tags, check duplicate using imei field
+        if db.query(BLETag).filter(BLETag.imei == imei).first():
+            raise HTTPException(status_code=409, detail=f"Tag with IMEI '{imei}' already exists")
 
     now = datetime.utcnow()
     # Build attributes — mark _user_named if a description was provided at creation
@@ -2450,6 +2493,7 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
     tag = BLETag(
         user_id=(str(data.user_id) if data.user_id else None),
         imei=imei,
+        mac_address=mac_address,  # Set for BLE tags, None for GPS tags
         description=data.description,
         tag_type=canonical_type,
         is_active=True,
