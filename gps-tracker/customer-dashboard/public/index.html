@@ -1881,6 +1881,21 @@ input.hive-range::-moz-range-track {
                         <div class="prop-label">Label</div>
                         <input type="text" class="prop-input" id="propLabel" placeholder="Room name…">
                       </div>
+                      <div class="prop-group" id="propMacGroup" style="display:none">
+                        <div class="prop-label">MAC Address</div>
+                        <input type="text" class="prop-input mono" id="propMac" placeholder="A4:CF:12:45:AB:CD">
+                        <div style="margin-top:4px;font-size:11px;color:var(--text-muted)">ESP32S3 gateway MAC address</div>
+                      </div>
+                      <div class="prop-group" id="propGatewayIdGroup" style="display:none">
+                        <div class="prop-label">Gateway Status</div>
+                        <div id="propGatewayStatus" style="font-size:12px;padding:6px 10px;border-radius:4px;background:var(--primary-dim);color:var(--text-muted)">
+                          Not registered
+                        </div>
+                        <button class="btn-primary-sm" id="propRegisterGateway" style="margin-top:8px;width:100%">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg>
+                          Register Gateway
+                        </button>
+                      </div>
                       <div class="prop-group" id="propFontSizeGroup" style="display:none">
                         <div class="prop-label">Font Size</div>
                         <div class="font-size-top-row">
@@ -12600,7 +12615,152 @@ function qrOpenHelp() {
         return el;
       };
     }
+
+    // Hook into showProperties to add gateway MAC handling
+    if (window.showProperties) {
+      const originalShowProperties = window.showProperties;
+      window.showProperties = function(el) {
+        originalShowProperties(el);
+        
+        // Show MAC address field for gateways
+        const propMacGroup = document.getElementById('propMacGroup');
+        const propGatewayIdGroup = document.getElementById('propGatewayIdGroup');
+        const propMac = document.getElementById('propMac');
+        const propGatewayStatus = document.getElementById('propGatewayStatus');
+        
+        if (el && el.type === 'gateway') {
+          // Show MAC address field
+          if (propMacGroup) propMacGroup.style.display = 'block';
+          if (propGatewayIdGroup) propGatewayIdGroup.style.display = 'block';
+          
+          // Populate MAC address
+          if (propMac) {
+            propMac.value = el.mac_address || '';
+          }
+          
+          // Update status
+          if (propGatewayStatus) {
+            if (el.gateway_id) {
+              propGatewayStatus.textContent = '✓ Registered to database';
+              propGatewayStatus.style.background = '#10b98120';
+              propGatewayStatus.style.color = '#10b981';
+              document.getElementById('propRegisterGateway').style.display = 'none';
+            } else if (el.mac_address) {
+              propGatewayStatus.textContent = '⚠ Not registered (click Register)';
+              propGatewayStatus.style.background = '#f59e0b20';
+              propGatewayStatus.style.color = '#f59e0b';
+              document.getElementById('propRegisterGateway').style.display = 'block';
+            } else {
+              propGatewayStatus.textContent = 'Enter MAC address below';
+              propGatewayStatus.style.background = 'var(--primary-dim)';
+              propGatewayStatus.style.color = 'var(--text-muted)';
+              document.getElementById('propRegisterGateway').style.display = 'none';
+            }
+          }
+        } else {
+          // Hide MAC fields for non-gateway elements
+          if (propMacGroup) propMacGroup.style.display = 'none';
+          if (propGatewayIdGroup) propGatewayIdGroup.style.display = 'none';
+        }
+      };
+    }
   }, 1000);
+
+  // ─── Properties Panel Event Listeners ───────────────────────────────────────
+  setTimeout(() => {
+    const propMac = document.getElementById('propMac');
+    const propRegisterGateway = document.getElementById('propRegisterGateway');
+    
+    // Update MAC address when changed
+    if (propMac) {
+      propMac.addEventListener('input', (e) => {
+        if (window.state && window.state.selected) {
+          const el = window.state.selected;
+          if (el.type === 'gateway') {
+            el.mac_address = e.target.value.trim();
+            // Update status display
+            const propGatewayStatus = document.getElementById('propGatewayStatus');
+            if (el.mac_address && !el.gateway_id) {
+              propGatewayStatus.textContent = '⚠ Not registered (click Register)';
+              propGatewayStatus.style.background = '#f59e0b20';
+              propGatewayStatus.style.color = '#f59e0b';
+              document.getElementById('propRegisterGateway').style.display = 'block';
+            }
+          }
+        }
+      });
+    }
+
+    // Register gateway button
+    if (propRegisterGateway) {
+      propRegisterGateway.addEventListener('click', async () => {
+        if (!window.state || !window.state.selected) return;
+        const el = window.state.selected;
+        if (el.type !== 'gateway') return;
+
+        const mac = el.mac_address?.trim();
+        if (!mac) {
+          alert('Please enter a MAC address first');
+          return;
+        }
+
+        // Validate MAC format
+        const macNormalized = mac.replace(/[:\-]/g, '').toLowerCase();
+        if (!/^[0-9a-f]{12}$/i.test(macNormalized)) {
+          alert('Invalid MAC address format. Use format: A4:CF:12:45:AB:CD or A4CF1245ABCD');
+          return;
+        }
+
+        if (!linkedFloorId) {
+          alert('Please setup the building and floor first (click Setup button)');
+          return;
+        }
+
+        const name = el.label || 'Gateway';
+
+        try {
+          propRegisterGateway.disabled = true;
+          propRegisterGateway.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Registering...';
+          
+          const res = await apiFetch(`/api/portal/floors/${linkedFloorId}/gateways`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              receiver_id: macNormalized,
+              label: name,
+              x: Math.round(el.x1),
+              y: Math.round(el.y1)
+            })
+          });
+
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to register gateway');
+          }
+
+          const data = await res.json();
+          const gatewayId = data.gateway_id || data.id;
+
+          el.gateway_id = gatewayId;
+          el.mac_address = macNormalized;
+
+          // Update status
+          const propGatewayStatus = document.getElementById('propGatewayStatus');
+          propGatewayStatus.textContent = '✓ Registered to database';
+          propGatewayStatus.style.background = '#10b98120';
+          propGatewayStatus.style.color = '#10b981';
+          propRegisterGateway.style.display = 'none';
+
+          alert(`Gateway registered successfully!`);
+        } catch (err) {
+          console.error('Register gateway error:', err);
+          alert('Failed to register gateway: ' + err.message);
+          propRegisterGateway.disabled = false;
+          propRegisterGateway.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg> Register Gateway';
+        }
+      });
+    }
+  }, 1500);
 
   console.log('Floor Plan Sketch database integration loaded');
 })();
