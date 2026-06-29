@@ -12172,36 +12172,53 @@ function qrOpenHelp() {
 
   // ─── Restore linked floor on page load ──────────────────────────────────────
   function restoreFloorLink() {
+    console.log('[Floor Plan] Attempting to restore floor link...');
     try {
       const saved = localStorage.getItem(FLOOR_LINK_KEY);
+      console.log('[Floor Plan] localStorage value:', saved ? 'EXISTS' : 'NULL');
+      
       if (saved) {
         const data = JSON.parse(saved);
         linkedBuildingId = data.buildingId;
         linkedFloorId = data.floorId;
+        console.log('[Floor Plan] ✅ Restored link:', { buildingId: data.buildingId, floorId: data.floorId, savedAt: data.savedAt });
+        
         // Show Publish button and update Setup button style
-        if (publishBtn) publishBtn.style.display = '';
+        if (publishBtn) {
+          publishBtn.style.display = '';
+          console.log('[Floor Plan] ✅ Publish button shown');
+        } else {
+          console.warn('[Floor Plan] ⚠️ Publish button not found in DOM');
+        }
+        
         if (setupBtn) {
           setupBtn.style.background = '#10b981';
           setupBtn.style.color = 'white';
           const svg = setupBtn.querySelector('svg');
           if (svg) svg.style.stroke = 'white';
+          console.log('[Floor Plan] ✅ Setup button styled (green)');
+        } else {
+          console.warn('[Floor Plan] ⚠️ Setup button not found in DOM');
         }
-        console.log('Restored floor link:', data);
+      } else {
+        console.log('[Floor Plan] ℹ️ No saved link found. User needs to click Setup.');
       }
     } catch (e) {
-      console.warn('Failed to restore floor link:', e);
+      console.error('[Floor Plan] ❌ Failed to restore floor link:', e);
     }
   }
 
   function saveFloorLink(buildingId, floorId) {
     try {
-      localStorage.setItem(FLOOR_LINK_KEY, JSON.stringify({
+      const data = {
         buildingId,
         floorId,
         savedAt: new Date().toISOString()
-      }));
+      };
+      localStorage.setItem(FLOOR_LINK_KEY, JSON.stringify(data));
+      console.log('[Floor Plan] ✅ Floor link saved to localStorage:', data);
     } catch (e) {
-      console.warn('Failed to save floor link:', e);
+      console.error('[Floor Plan] ❌ Failed to save floor link:', e);
     }
   }
 
@@ -12841,9 +12858,10 @@ function qrOpenHelp() {
 
   // Restore floor link from localStorage (persists Publish button visibility)
   setTimeout(() => {
+    console.log('[Floor Plan] Running restoreFloorLink() in 500ms timeout...');
     restoreFloorLink();
   }, 500);
 
-  console.log('Floor Plan Sketch database integration loaded');
+  console.log('[Floor Plan] Floor Plan Sketch database integration loaded');
 })();
 </script>
