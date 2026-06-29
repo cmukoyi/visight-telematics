@@ -4972,6 +4972,9 @@ async function openTagMgmtModal(mode, imei) {
     imeiInput.style.color = 'var(--text-3,#6b7280)';
     imeiInput.removeAttribute('required');
     document.getElementById('tagMgmtImeiGroup').style.display = '';
+    
+    // Reset validation status (clear any previous validation messages)
+    document.getElementById('tagMgmtImeiStatus').style.display = 'none';
 
     // Description — pre-populate with description or device_name (effective display name)
     document.getElementById('tagMgmtDesc').value = tag.description || tag.device_name || '';
@@ -5004,6 +5007,9 @@ async function openTagMgmtModal(mode, imei) {
     _typeSelect.style.color = 'var(--text-3,#6b7280)';
     _typeSelect.style.cursor = 'not-allowed';
     document.getElementById('tagMgmtTypeGroup').style.display = '';
+    
+    // Update IMEI label based on tag type (even though field is readonly)
+    _updateImeiLabelForTagType();
 
     // Category
     document.getElementById('tagMgmtCategoryGroup').style.display = '';
@@ -5104,13 +5110,19 @@ async function _tagImeiValidate(imei, tagType) {
 async function _tagImeiValidateOnBlur() {
     const tagId  = document.getElementById('tagMgmtTagId').value;
     const mode   = document.getElementById('tagMgmtMode').value;
-    // Only validate for new tags (not edit / reassign)
-    if (tagId || mode === 'edit') return;
+    const imeiInput = document.getElementById('tagMgmtImei');
+    
+    // Skip validation if field is readonly (edit mode) or if this is a reassign operation
+    if (tagId || mode === 'edit' || imeiInput.readOnly) return;
+    
     const tagType = document.getElementById('tagMgmtType').value;
-    if (tagType !== 'series1' && tagType !== 'scope') return;
-    const imei = document.getElementById('tagMgmtImei').value.trim();
+    const imei = imeiInput.value.trim();
     if (!imei) return;
-    await _tagImeiValidate(imei, tagType);
+    
+    // Only validate Series 1/2 (GPS) and Series 4 (BLE) - Series 3 (QR) doesn't need external validation
+    if (tagType === 'series1' || tagType === 'scope' || tagType === 'series2' || tagType === 'tracksolid' || tagType === 'series_4' || tagType === 'series4') {
+        await _tagImeiValidate(imei, tagType);
+    }
 }
 
 async function submitTagForm(e) {
