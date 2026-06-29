@@ -12161,6 +12161,14 @@ function qrOpenHelp() {
 (function() {
   'use strict';
 
+  // Check if apiFetch is available
+  if (typeof apiFetch !== 'function') {
+    console.error('[Floor Plan] ❌ CRITICAL: apiFetch function not found!');
+    console.error('[Floor Plan] Integration script cannot work without apiFetch');
+    return; // Exit early
+  }
+  console.log('[Floor Plan] ✅ apiFetch function available');
+
   // State for building/floor linkage
   const FLOOR_LINK_KEY = 'pinplot_floor_link_v1';
   let sketchBuildings = [];
@@ -12241,9 +12249,20 @@ function qrOpenHelp() {
 
   if (setupBtn) {
     setupBtn.addEventListener('click', async () => {
-      await loadBuildingsAndFloors();
-      setupModal.style.display = 'flex';
+      console.log('[Floor Plan] Setup button clicked');
+      try {
+        console.log('[Floor Plan] Loading buildings and floors...');
+        await loadBuildingsAndFloors();
+        console.log('[Floor Plan] ✅ Buildings and floors loaded');
+        setupModal.style.display = 'flex';
+        console.log('[Floor Plan] ✅ Modal opened');
+      } catch (err) {
+        console.error('[Floor Plan] ❌ Setup button error:', err);
+        alert('Failed to open Setup: ' + err.message + '\n\nCheck browser console for details.');
+      }
     });
+  } else {
+    console.warn('[Floor Plan] ⚠️ Setup button not found in DOM');
   }
 
   // Building select change handler
@@ -12548,10 +12567,15 @@ function qrOpenHelp() {
 
   // ─── Data Loading Functions ─────────────────────────────────────────────────
   async function loadBuildingsAndFloors() {
+    console.log('[Floor Plan] loadBuildingsAndFloors() called');
     try {
+      console.log('[Floor Plan] Fetching buildings from /api/portal/buildings...');
       const res = await apiFetch('/api/portal/buildings');
+      console.log('[Floor Plan] Response status:', res.status, res.statusText);
+      
       if (!res.ok) throw new Error('Failed to load buildings');
       sketchBuildings = await res.json();
+      console.log('[Floor Plan] ✅ Loaded', sketchBuildings.length, 'buildings');
 
       buildingSelect.innerHTML = '<option value="">Select existing building...</option>';
       sketchBuildings.forEach(b => {
@@ -12567,8 +12591,9 @@ function qrOpenHelp() {
 
       floorSelect.innerHTML = '<option value="">Select building first...</option>';
     } catch (err) {
-      console.error('Failed to load buildings:', err);
-      alert('Failed to load buildings from database');
+      console.error('[Floor Plan] ❌ loadBuildingsAndFloors error:', err);
+      alert('Failed to load buildings from database: ' + err.message);
+      throw err; // Re-throw to stop modal from opening
     }
   }
 
