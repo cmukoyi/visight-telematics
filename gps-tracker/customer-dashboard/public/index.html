@@ -12342,7 +12342,9 @@ function qrOpenHelp() {
         console.log('[Floor Plan] No building/floor linked, showing setup modal...');
         try {
           await loadBuildingsAndFloors();
+          console.log('[Floor Plan] About to open modal...');
           setupModal.classList.add('modal-open');
+          console.log('[Floor Plan] ✅ Modal class added, modal should be visible');
           return; // Wait for user to save in modal, then they click Publish again
         } catch (err) {
           console.error('[Floor Plan] Failed to load buildings:', err);
