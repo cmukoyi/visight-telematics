@@ -331,7 +331,7 @@ async def portal_request_timing_middleware(request, call_next):
     return response
 
 # CORS middleware - restrict to known origins only
-_cors_origins_env = os.getenv("CORS_ORIGINS", "https://beacontelematics.co.uk,https://www.beacontelematics.co.uk")
+_cors_origins_env = os.getenv("CORS_ORIGINS", "https://pinplot.me")
 _allowed_origins = [o.strip() for o in _cors_origins_env.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,

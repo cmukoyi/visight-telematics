@@ -169,7 +169,7 @@ def get_logger() -> AdminPortalLogger:
     global _logger_instance
     if _logger_instance is None:
         # Default to same domain
-        _logger_instance = AdminPortalLogger(os.getenv('BACKEND_URL', 'https://beacontelematics.co.uk'))
+        _logger_instance = AdminPortalLogger(os.getenv('BACKEND_URL', 'https://pinplot.me'))
     return _logger_instance
 
 # Usage examples:

@@ -119,18 +119,17 @@ jobs:
           )
 
           # Ratchet — grandfathered count as of phase-4 complete.
-          # Known pre-existing tech debt counted here (NOT fixed by this guard):
-          #   - backend/app/main.py CORS default hardcoded to beacon
-          #   - backend/init_admin.py admin email hardcoded to beacon
-          #   - backend/app/admin_logger_service.py BACKEND_URL default
-          #   - backend/.env*.example files
-          #   - gps-tracker/deploy/*.sh and deploy/*.sh legacy scripts
-          #   - mobile-app/ble_tracker_app/web/manifest.json (should join overlay)
-          #   - nginx/pinplot.me.conf (misnamed, contains beacon comment)
-          # New occurrences are blocked. To resolve any of these properly,
-          # move the value to tenants/<slug>/ + scripts/build.sh MAP, or
-          # parameterize via env var, then lower this ratchet.
-          expected=25
+          # As of 2026-06-29: All tenant-specific strings removed from shared code.
+          # - Removed tenant-specific documentation files (BEACON_QR_GUIDE_DEPLOYMENT.md, etc.)
+          # - Removed beacon-specific deploy scripts
+          # - Removed backup files with tenant branding
+          # - Replaced hardcoded tenant URLs/emails with generic examples or env vars
+          # - Updated manifest.json to use generic branding
+          # - Parameterized deploy scripts to use environment variables
+          # New occurrences are blocked. To maintain zero drift:
+          # move tenant values to tenants/<slug>/ + scripts/build.sh MAP, or
+          # parameterize via env var.
+          expected=0
 
           echo "Tenant brand strings in shared code: actual=$actual, ratchet=$expected"
           if [ "$actual" -gt "$expected" ]; then

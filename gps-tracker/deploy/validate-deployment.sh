@@ -47,11 +47,12 @@ fi
 # 4. Check SSL certificate
 echo ""
 echo "✓ Checking SSL certificate..."
-if [ -f "/etc/letsencrypt/live/beacontelematics.co.uk/fullchain.pem" ]; then
-    EXPIRY=$(openssl x509 -in /etc/letsencrypt/live/beacontelematics.co.uk/fullchain.pem -noout -enddate | cut -d= -f2)
+DOMAIN="${DOMAIN:-pinplot.me}"
+if [ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
+    EXPIRY=$(openssl x509 -in /etc/letsencrypt/live/$DOMAIN/fullchain.pem -noout -enddate | cut -d= -f2)
     echo "  ✅ SSL Certificate: Valid until $EXPIRY"
 else
-    echo "  ❌ ERROR: SSL certificate not found!"
+    echo "  ❌ ERROR: SSL certificate not found for $DOMAIN!"
     exit 1
 fi
 

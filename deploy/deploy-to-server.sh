@@ -1,14 +1,11 @@
 #!/bin/bash
 set -e
 
-# Deployment script for Beacon Telematics
+# Deployment script for GPS Tracker
 # Usage: ./deploy-to-server.sh
 
 echo "========================================="
-echo "🚀 Beacon Telematics Deployment Script"
-echo "========================================="
-echo ""
-
+echo "🚀 GPS Tracker Deployment Script"
 # Variables from environment (passed from GitHub Actions)
 SSH_USER="${SSH_USER:-root}"
 SSH_HOST="${SSH_HOST:?SSH_HOST not set}"
