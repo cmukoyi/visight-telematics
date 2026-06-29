@@ -88,6 +88,9 @@ function resizeCanvases() {
 }
 window.addEventListener('resize', resizeCanvases);
 
+// Expose state for debugging and external integration
+window.state = state;
+
 // ─── Coordinate Helpers ───────────────────────────────────────────────────────
 function screenToWorld(sx, sy) {
   return {

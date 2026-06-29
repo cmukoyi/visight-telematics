@@ -4725,7 +4725,15 @@ function switchTab(name) {
     if (name === 'hive')              { _runTabTask(hiveLoadStats(), 'hive-stats'); _runTabTask(hiveLoadList(), 'hive-list'); }
     // Sketch tab: resize canvases now the container is visible
     if (name === 'building' && typeof resizeCanvases === 'function') {
-        requestAnimationFrame(() => { resizeCanvases(); if (typeof render === 'function') render(); });
+        // Use both immediate and requestAnimationFrame to ensure canvas initializes
+        // Immediate call handles tab-already-focused case
+        resizeCanvases();
+        if (typeof render === 'function') render();
+        // RAF handles browser repaint timing
+        requestAnimationFrame(() => { 
+            resizeCanvases(); 
+            if (typeof render === 'function') render(); 
+        });
     }
 }
 
@@ -12762,6 +12770,29 @@ function qrOpenHelp() {
       });
     }
   }, 1500);
+
+  // ═══════════════════════════════════════════════════════════════
+  // Canvas Initialization Fallback
+  // If the Floor Plan Sketch tab is already visible when this script
+  // loads, force canvas initialization. Fixes timing issues with
+  // requestAnimationFrame not firing reliably.
+  // ═══════════════════════════════════════════════════════════════
+  setTimeout(() => {
+    const buildingTab = document.getElementById('tab-building');
+    const isVisible = buildingTab && window.getComputedStyle(buildingTab).display !== 'none';
+    
+    if (isVisible && typeof resizeCanvases === 'function' && typeof render === 'function') {
+      console.log('Floor Plan Sketch: Running canvas initialization fallback');
+      resizeCanvases();
+      render();
+      
+      // Double-check after animation frame
+      requestAnimationFrame(() => {
+        resizeCanvases();
+        render();
+      });
+    }
+  }, 2000);
 
   console.log('Floor Plan Sketch database integration loaded');
 })();
