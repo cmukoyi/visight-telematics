@@ -12162,12 +12162,56 @@ function qrOpenHelp() {
   'use strict';
 
   // State for building/floor linkage
+  const FLOOR_LINK_KEY = 'pinplot_floor_link_v1';
   let sketchBuildings = [];
   let sketchFloors = [];
   let sketchGateways = [];
   let linkedBuildingId = null;
   let linkedFloorId = null;
   let pendingGatewayElement = null;
+
+  // ─── Restore linked floor on page load ──────────────────────────────────────
+  function restoreFloorLink() {
+    try {
+      const saved = localStorage.getItem(FLOOR_LINK_KEY);
+      if (saved) {
+        const data = JSON.parse(saved);
+        linkedBuildingId = data.buildingId;
+        linkedFloorId = data.floorId;
+        // Show Publish button and update Setup button style
+        if (publishBtn) publishBtn.style.display = '';
+        if (setupBtn) {
+          setupBtn.style.background = '#10b981';
+          setupBtn.style.color = 'white';
+          const svg = setupBtn.querySelector('svg');
+          if (svg) svg.style.stroke = 'white';
+        }
+        console.log('Restored floor link:', data);
+      }
+    } catch (e) {
+      console.warn('Failed to restore floor link:', e);
+    }
+  }
+
+  function saveFloorLink(buildingId, floorId) {
+    try {
+      localStorage.setItem(FLOOR_LINK_KEY, JSON.stringify({
+        buildingId,
+        floorId,
+        savedAt: new Date().toISOString()
+      }));
+    } catch (e) {
+      console.warn('Failed to save floor link:', e);
+    }
+  }
+
+  function clearFloorLink() {
+    try {
+      localStorage.removeItem(FLOOR_LINK_KEY);
+    } catch (e) {
+      console.warn('Failed to clear floor link:', e);
+    }
+  }
 
   // ─── Setup Button Handler ───────────────────────────────────────────────────
   const setupBtn = document.getElementById('setupFloorBtn');
@@ -12259,6 +12303,7 @@ function qrOpenHelp() {
       // Save linkage
       linkedBuildingId = buildingId;
       linkedFloorId = floorId;
+      saveFloorLink(buildingId, floorId); // Persist to localStorage
       setupModal.style.display = 'none';
       publishBtn.style.display = '';
       setupBtn.style.background = '#10b981';
@@ -12793,6 +12838,11 @@ function qrOpenHelp() {
       });
     }
   }, 2000);
+
+  // Restore floor link from localStorage (persists Publish button visibility)
+  setTimeout(() => {
+    restoreFloorLink();
+  }, 500);
 
   console.log('Floor Plan Sketch database integration loaded');
 })();
