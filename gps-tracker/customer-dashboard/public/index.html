@@ -2040,24 +2040,34 @@ input.hive-range::-moz-range-track {
 
                 <!-- Gateway Linking Modal -->
                 <div class="modal-overlay" id="sketchGatewayModal" style="display:none">
-                  <div class="modal" style="max-width:450px">
-                    <div class="modal-title">Link BLE Gateway</div>
+                  <div class="modal" style="max-width:500px">
+                    <div class="modal-title">Add ESP32 Gateway</div>
                     <div style="margin-bottom:16px;padding:12px;background:var(--primary-dim);border-radius:6px;font-size:13px;color:var(--text-muted)">
-                      Select an ESP32S3 gateway from your database to link to this position.
+                      <div id="sketchGatewayRoomInfo" style="margin-bottom:6px;font-weight:500"></div>
+                      Register a new ESP32S3 gateway by entering its MAC address.
                     </div>
                     <div style="margin-bottom:16px">
-                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">Gateway</label>
-                      <select id="sketchGatewaySelect" class="prop-input" style="width:100%">
-                        <option value="">Select gateway...</option>
+                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">Gateway Mode</label>
+                      <select id="sketchGatewayMode" class="prop-input" style="width:100%">
+                        <option value="new">Create New Gateway</option>
+                        <option value="existing">Select Existing Gateway</option>
                       </select>
                     </div>
-                    <div style="margin-bottom:16px">
-                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">Label (Optional)</label>
-                      <input type="text" id="sketchGatewayLabel" class="prop-input" placeholder="Gateway label" style="width:100%">
+                    <div id="sketchNewGatewayFields" style="margin-bottom:16px">
+                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">MAC Address</label>
+                      <input type="text" id="sketchGatewayMac" class="prop-input" placeholder="A4:CF:12:45:AB:CD or A4CF1245ABCD" style="width:100%;margin-bottom:8px">
+                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">Gateway Name</label>
+                      <input type="text" id="sketchGatewayName" class="prop-input" placeholder="e.g., Living Room Gateway" style="width:100%">
+                    </div>
+                    <div id="sketchExistingGatewayFields" style="margin-bottom:16px;display:none">
+                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">Gateway</label>
+                      <select id="sketchGatewaySelect" class="prop-input" style="width:100%">
+                        <option value="">Loading...</option>
+                      </select>
                     </div>
                     <div class="modal-actions">
                       <button class="btn-ghost" id="sketchGatewayCancel">Cancel</button>
-                      <button class="btn-primary" id="sketchGatewaySave">Link Gateway</button>
+                      <button class="btn-primary" id="sketchGatewaySave">Add Gateway</button>
                     </div>
                   </div>
                 </div>
@@ -12273,10 +12283,9 @@ function qrOpenHelp() {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                floor_id: linkedFloorId,
-                position_x: Math.round(gw.x1),
-                position_y: Math.round(gw.y1),
-                name: gw.label || 'Gateway'
+                x: Math.round(gw.x1),
+                y: Math.round(gw.y1),
+                label: gw.label || 'Gateway'
               })
             });
           }
@@ -12306,38 +12315,134 @@ function qrOpenHelp() {
 
   // ─── Gateway Linking ────────────────────────────────────────────────────────
   const gatewayModal = document.getElementById('sketchGatewayModal');
+  const gatewayModeSelect = document.getElementById('sketchGatewayMode');
   const gatewaySelect = document.getElementById('sketchGatewaySelect');
-  const gatewayLabel = document.getElementById('sketchGatewayLabel');
+  const gatewayMac = document.getElementById('sketchGatewayMac');
+  const gatewayName = document.getElementById('sketchGatewayName');
+  const newGatewayFields = document.getElementById('sketchNewGatewayFields');
+  const existingGatewayFields = document.getElementById('sketchExistingGatewayFields');
+  const gatewayRoomInfo = document.getElementById('sketchGatewayRoomInfo');
+
+  // Gateway mode toggle
+  if (gatewayModeSelect) {
+    gatewayModeSelect.addEventListener('change', (e) => {
+      if (e.target.value === 'new') {
+        newGatewayFields.style.display = 'block';
+        existingGatewayFields.style.display = 'none';
+      } else {
+        newGatewayFields.style.display = 'none';
+        existingGatewayFields.style.display = 'block';
+      }
+    });
+  }
 
   // Hook into gateway placement from sketch app
   // When user places a gateway, intercept and show linking modal
   document.addEventListener('sketchGatewayPlaced', async (e) => {
     pendingGatewayElement = e.detail.element;
+    
+    // Detect which room this gateway is in
+    const roomEl = detectRoomForGateway(pendingGatewayElement);
+    if (roomEl) {
+      gatewayRoomInfo.textContent = `📍 Placing in room: ${roomEl.label || 'Unnamed Room'}`;
+      pendingGatewayElement.room_name = roomEl.label;
+    } else {
+      gatewayRoomInfo.textContent = '⚠️ Gateway not inside any room area';
+    }
+    
     await loadGateways();
     gatewayModal.style.display = 'flex';
   });
 
-  document.getElementById('sketchGatewaySave')?.addEventListener('click', () => {
-    const gatewayId = gatewaySelect.value;
-    const label = gatewayLabel.value.trim();
-
-    if (!gatewayId) {
-      alert('Please select a gateway');
-      return;
+  document.getElementById('sketchGatewaySave')?.addEventListener('click', async () => {
+    const mode = gatewayModeSelect.value;
+    
+    try {
+      if (mode === 'new') {
+        // Create new gateway
+        const mac = gatewayMac.value.trim();
+        const name = gatewayName.value.trim();
+        
+        if (!mac) {
+          alert('Please enter a MAC address');
+          return;
+        }
+        
+        // Validate MAC format
+        const macNormalized = mac.replace(/[:\-]/g, '').toLowerCase();
+        if (!/^[0-9a-f]{12}$/i.test(macNormalized)) {
+          alert('Invalid MAC address format. Use format: A4:CF:12:45:AB:CD or A4CF1245ABCD');
+          return;
+        }
+        
+        if (!name) {
+          alert('Please enter a gateway name');
+          return;
+        }
+        
+        if (!linkedFloorId) {
+          alert('Please setup the building and floor first (click Setup button)');
+          return;
+        }
+        
+        // Create gateway via API
+        const res = await apiFetch(`/api/portal/floors/${linkedFloorId}/gateways`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            receiver_id: macNormalized,
+            label: name,
+            x: Math.round(pendingGatewayElement.x1),
+            y: Math.round(pendingGatewayElement.y1)
+          })
+        });
+        
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || 'Failed to create gateway');
+        }
+        
+        const data = await res.json();
+        const gatewayId = data.gateway_id || data.id;
+        
+        if (pendingGatewayElement) {
+          pendingGatewayElement.gateway_id = gatewayId;
+          pendingGatewayElement.mac_address = macNormalized;
+          pendingGatewayElement.label = name;
+        }
+        
+        alert(`Gateway "${name}" created successfully!`);
+      } else {
+        // Link existing gateway
+        const gatewayId = gatewaySelect.value;
+        
+        if (!gatewayId) {
+          alert('Please select a gateway');
+          return;
+        }
+        
+        if (pendingGatewayElement) {
+          pendingGatewayElement.gateway_id = gatewayId;
+          const gw = sketchGateways.find(g => g.id === gatewayId);
+          if (gw) {
+            pendingGatewayElement.label = gw.label || 'Gateway';
+            pendingGatewayElement.mac_address = gw.receiver_id;
+          }
+        }
+      }
+      
+      gatewayModal.style.display = 'none';
+      gatewayMac.value = '';
+      gatewayName.value = '';
+      gatewaySelect.value = '';
+      gatewayModeSelect.value = 'new';
+      newGatewayFields.style.display = 'block';
+      existingGatewayFields.style.display = 'none';
+      pendingGatewayElement = null;
+    } catch (err) {
+      console.error('Gateway error:', err);
+      alert('Failed to add gateway: ' + err.message);
     }
-
-    if (pendingGatewayElement) {
-      pendingGatewayElement.gateway_id = gatewayId;
-      if (label) pendingGatewayElement.label = label;
-      // Find gateway name
-      const gw = sketchGateways.find(g => g.id === gatewayId);
-      if (gw && !label) pendingGatewayElement.label = gw.name || gw.mac_address;
-    }
-
-    gatewayModal.style.display = 'none';
-    gatewaySelect.value = '';
-    gatewayLabel.value = '';
-    pendingGatewayElement = null;
   });
 
   document.getElementById('sketchGatewayCancel')?.addEventListener('click', () => {
@@ -12350,6 +12455,8 @@ function qrOpenHelp() {
       }
     }
     gatewayModal.style.display = 'none';
+    gatewayMac.value = '';
+    gatewayName.value = '';
     pendingGatewayElement = null;
   });
 
@@ -12405,21 +12512,74 @@ function qrOpenHelp() {
   async function loadGateways() {
     try {
       const res = await apiFetch('/api/portal/gateways');
-      if (!res.ok) throw new Error('Failed to load gateways');
+      if (!res.ok) {
+        // Gracefully handle no gateways
+        console.warn('No gateways found or API error');
+        sketchGateways = [];
+        gatewaySelect.innerHTML = '<option value="">No existing gateways</option>';
+        return;
+      }
       sketchGateways = await res.json();
 
       gatewaySelect.innerHTML = '<option value="">Select gateway...</option>';
       sketchGateways.forEach(gw => {
         const opt = document.createElement('option');
         opt.value = gw.id;
-        opt.textContent = `${gw.name || 'Gateway'} - ${gw.mac_address}`;
-        if (gw.floor_id) opt.textContent += ' (Already assigned)';
+        opt.textContent = `${gw.label || 'Gateway'} - ${gw.receiver_id}`;
+        if (gw.floor_id && gw.floor_id !== linkedFloorId) {
+          opt.textContent += ' (On another floor)';
+        }
         gatewaySelect.appendChild(opt);
       });
     } catch (err) {
       console.error('Failed to load gateways:', err);
-      alert('Failed to load gateways from database');
+      sketchGateways = [];
+      gatewaySelect.innerHTML = '<option value="">No existing gateways</option>';
     }
+  }
+
+  // Detect which room (AREA element) contains the gateway position
+  function detectRoomForGateway(gatewayEl) {
+    if (!window.state || !gatewayEl) return null;
+    
+    const elements = window.state.floors[window.state.currentFloor]?.elements || [];
+    const gx = gatewayEl.x1;
+    const gy = gatewayEl.y1;
+    
+    // Find room elements that contain this point
+    for (const el of elements) {
+      if (el.type === 'room') {
+        const x1 = Math.min(el.x1, el.x2);
+        const x2 = Math.max(el.x1, el.x2);
+        const y1 = Math.min(el.y1, el.y2);
+        const y2 = Math.max(el.y1, el.y2);
+        
+        if (gx >= x1 && gx <= x2 && gy >= y1 && gy <= y2) {
+          return el;
+        }
+      }
+      // Also check polygon rooms if they exist
+      if (el.type === 'polygon' && el.points && el.points.length > 0) {
+        if (pointInPolygon(gx, gy, el.points)) {
+          return el;
+        }
+      }
+    }
+    return null;
+  }
+
+  // Point in polygon test (ray casting algorithm)
+  function pointInPolygon(x, y, points) {
+    let inside = false;
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+      const xi = points[i].x, yi = points[i].y;
+      const xj = points[j].x, yj = points[j].y;
+      
+      const intersect = ((yi > y) !== (yj > y)) &&
+        (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
   }
 
   // ─── Patch Sketch App to Trigger Gateway Linking ────────────────────────────
