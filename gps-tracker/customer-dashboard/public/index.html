@@ -1682,11 +1682,11 @@ input.hive-range::-moz-range-track {
                       Preview
                     </button>
                     <div class="divider-v"></div>
-                    <button class="btn-icon" id="setupFloorBtn" title="Setup Building & Floor" style="background:var(--primary-dim);color:var(--primary)">
+                    <button class="btn-icon" id="setupFloorBtn" title="Setup Building & Floor" style="background:var(--primary-dim);color:var(--primary);display:none">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
                       Setup
                     </button>
-                    <button class="btn-icon" id="publishFloorBtn" title="Publish Floor Plan to Database" style="background:#10b981;color:white;display:none">
+                    <button class="btn-icon" id="publishFloorBtn" title="Publish Floor Plan to Database" style="background:#10b981;color:white">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg>
                       Publish
                     </button>
@@ -12190,26 +12190,8 @@ function qrOpenHelp() {
         linkedBuildingId = data.buildingId;
         linkedFloorId = data.floorId;
         console.log('[Floor Plan] ✅ Restored link:', { buildingId: data.buildingId, floorId: data.floorId, savedAt: data.savedAt });
-        
-        // Show Publish button and update Setup button style
-        if (publishBtn) {
-          publishBtn.style.display = '';
-          console.log('[Floor Plan] ✅ Publish button shown');
-        } else {
-          console.warn('[Floor Plan] ⚠️ Publish button not found in DOM');
-        }
-        
-        if (setupBtn) {
-          setupBtn.style.background = '#10b981';
-          setupBtn.style.color = 'white';
-          const svg = setupBtn.querySelector('svg');
-          if (svg) svg.style.stroke = 'white';
-          console.log('[Floor Plan] ✅ Setup button styled (green)');
-        } else {
-          console.warn('[Floor Plan] ⚠️ Setup button not found in DOM');
-        }
       } else {
-        console.log('[Floor Plan] ℹ️ No saved link found. User needs to click Setup.');
+        console.log('[Floor Plan] ℹ️ No saved link found. Click Publish to link and publish.');
       }
     } catch (e) {
       console.error('[Floor Plan] ❌ Failed to restore floor link:', e);
@@ -12341,11 +12323,7 @@ function qrOpenHelp() {
       linkedFloorId = floorId;
       saveFloorLink(buildingId, floorId); // Persist to localStorage
       setupModal.classList.remove('modal-open');
-      publishBtn.style.display = '';
-      setupBtn.style.background = '#10b981';
-      setupBtn.style.color = 'white';
-      setupBtn.querySelector('svg').style.stroke = 'white';
-      alert('Floor plan linked successfully! You can now publish it.');
+      alert('Floor plan linked to ' + buildingSelect.options[buildingSelect.selectedIndex].text + ' successfully!\n\nNow click Publish to make it live.');
     } catch (err) {
       console.error('Setup error:', err);
       alert('Failed to setup floor plan: ' + err.message);
@@ -12359,9 +12337,18 @@ function qrOpenHelp() {
   // ─── Publish Button Handler ─────────────────────────────────────────────────
   if (publishBtn) {
     publishBtn.addEventListener('click', async () => {
+      // If not linked yet, show setup modal first
       if (!linkedBuildingId || !linkedFloorId) {
-        alert('Please setup the building and floor first (click Setup button)');
-        return;
+        console.log('[Floor Plan] No building/floor linked, showing setup modal...');
+        try {
+          await loadBuildingsAndFloors();
+          setupModal.classList.add('modal-open');
+          return; // Wait for user to save in modal, then they click Publish again
+        } catch (err) {
+          console.error('[Floor Plan] Failed to load buildings:', err);
+          alert('Failed to open setup: ' + err.message);
+          return;
+        }
       }
 
       if (!confirm('Publish this floor plan? It will be locked and visible in Tracking > Floor Plan.')) {
