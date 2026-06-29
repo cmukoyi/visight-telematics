@@ -1947,6 +1947,19 @@ input.hive-range::-moz-range-track {
                           <button class="rot-btn" data-rot="270" title="Up ↑"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="6 11 12 5 18 11"/></svg></button>
                         </div>
                       </div>
+                      <!-- Gateway-specific properties -->
+                      <div class="prop-group" id="propGatewayGroup" style="display:none">
+                        <div class="prop-label" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                          <span>ESP32 Gateway</span>
+                          <span id="propGatewayStatus" style="font-size:9px;padding:2px 6px;border-radius:4px;font-weight:600;text-transform:uppercase"></span>
+                        </div>
+                        <input type="text" class="prop-input mono" id="propGatewayMac" placeholder="A4:CF:12:45:AB:CD" style="margin-bottom:8px;font-size:11px">
+                        <button class="btn-primary-sm" id="propGatewayRegister" style="width:100%;font-size:11px">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M6.3 6.3a8 8 0 000 11.4"/><path d="M17.7 6.3a8 8 0 010 11.4"/></svg>
+                          Register Gateway
+                        </button>
+                      </div>
+                      
                       <div class="prop-group">
                         <div class="prop-label">ID</div>
                         <div class="prop-value mono small" id="propId">—</div>
