@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Floor Plan Buttons Diagnostic</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #fff; }
+    .test { margin: 10px 0; padding: 10px; border-radius: 5px; }
+    .pass { background: #065f46; border-left: 4px solid #10b981; }
+    .fail { background: #7f1d1d; border-left: 4px solid #ef4444; }
+    .warn { background: #78350f; border-left: 4px solid #f59e0b; }
+    .info { background: #1e3a8a; border-left: 4px solid #3b82f6; }
+    pre { background: #000; padding: 10px; border-radius: 4px; overflow-x: auto; }
+    button { margin: 10px 5px; padding: 10px 15px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>🔍 Floor Plan Sketch - Button Diagnostic</h1>
+  <div id="results"></div>
+  
+  <h2>🧪 Manual Tests</h2>
+  <button onclick="testSetupFlow()">Test Setup Flow</button>
+  <button onclick="testGatewayFlow()">Test Gateway Registration</button>
+  <button onclick="testPublishFlow()">Test Publish Flow</button>
+  <button onclick="window.location.reload()">Reload Test</button>
+
+  <script>
+    const results = document.getElementById('results');
+    
+    function log(type, title, message, data) {
+      const div = document.createElement('div');
+      div.className = `test ${type}`;
+      div.innerHTML = `
+        <strong>${type.toUpperCase()}: ${title}</strong><br>
+        ${message}
+        ${data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : ''}
+      `;
+      results.appendChild(div);
+    }
+
+    // Test 1: Check if buttons exist in DOM
+    log('info', 'Test 1: Button Existence', 'Checking if buttons are in DOM...');
+    
+    const setupBtn = document.getElementById('setupFloorBtn');
+    const publishBtn = document.getElementById('publishFloorBtn');
+    const propGatewayMac = document.getElementById('propGatewayMac');
+    const propGatewayRegister = document.getElementById('propGatewayRegister');
+    const propGatewayGroup = document.getElementById('propGatewayGroup');
+    const propGatewayStatus = document.getElementById('propGatewayStatus');
+    
+    if (setupBtn) {
+      log('pass', 'Setup Button', `Found! Visible: ${setupBtn.offsetParent !== null}, Display: ${getComputedStyle(setupBtn).display}`);
+    } else {
+      log('fail', 'Setup Button', 'NOT FOUND in DOM');
+    }
+    
+    if (publishBtn) {
+      log('pass', 'Publish Button', `Found! Visible: ${publishBtn.offsetParent !== null}, Display: ${getComputedStyle(publishBtn).display}`, {
+        hint: 'This button is initially hidden until Setup is complete'
+      });
+    } else {
+      log('fail', 'Publish Button', 'NOT FOUND in DOM');
+    }
+    
+    if (propGatewayGroup) {
+      log('pass', 'Gateway Properties Panel', `Found! Visible: ${propGatewayGroup.offsetParent !== null}, Display: ${getComputedStyle(propGatewayGroup).display}`, {
+        hint: 'This panel shows when a gateway element is selected in the sketch'
+      });
+    } else {
+      log('fail', 'Gateway Properties Panel', 'NOT FOUND in DOM');
+    }
+    
+    if (propGatewayRegister) {
+      log('pass', 'Register Gateway Button', `Found! Parent visible: ${propGatewayGroup ? propGatewayGroup.offsetParent !== null : 'N/A'}`);
+    } else {
+      log('fail', 'Register Gateway Button', 'NOT FOUND in DOM');
+    }
+
+    // Test 2: Check integration script
+    log('info', 'Test 2: Integration Script', 'Checking if database integration loaded...');
+    
+    setTimeout(() => {
+      // Check if integration script modified showProperties
+      if (window.showProperties && window.showProperties.toString().includes('propGatewayGroup')) {
+        log('pass', 'showProperties Hook', 'Integration script successfully hooked into showProperties');
+      } else if (window.showProperties) {
+        log('warn', 'showProperties Hook', 'showProperties exists but not hooked by integration', {
+          hint: 'Integration script may not have loaded or failed to hook'
+        });
+      } else {
+        log('fail', 'showProperties Hook', 'showProperties function does not exist', {
+          hint: 'Sketch app (app.js) may not have loaded'
+        });
+      }
+    }, 2000);
+
+    // Test 3: Check API accessibility
+    log('info', 'Test 3: API Access', 'Testing backend connectivity...');
+    
+    fetch('/api/portal/buildings')
+      .then(res => res.json())
+      .then(data => {
+        log('pass', 'API Connection', `Successfully fetched ${data.length} buildings`, {
+          buildings: data.map(b => ({ id: b.id, name: b.name, floors: b.floors.length }))
+        });
+      })
+      .catch(err => {
+        log('fail', 'API Connection', `Failed to fetch buildings: ${err.message}`);
+      });
+
+    // Test 4: Check sketch app state
+    log('info', 'Test 4: Sketch App State', 'Checking if sketch app loaded...');
+    
+    setTimeout(() => {
+      if (window.state) {
+        log('pass', 'Sketch App State', 'Sketch app state object exists', {
+          floors: window.state.floors?.length || 0,
+          currentFloor: window.state.currentFloor,
+          tool: window.state.tool
+        });
+      } else {
+        log('fail', 'Sketch App State', 'window.state not found - sketch app may not have loaded');
+      }
+    }, 2000);
+
+    // Test 5: Check modal elements
+    log('info', 'Test 5: Modal Elements', 'Checking if modals exist...');
+    
+    const setupModal = document.getElementById('sketchSetupModal');
+    const gatewayModal = document.getElementById('sketchGatewayModal');
+    
+    if (setupModal) {
+      log('pass', 'Setup Modal', `Found! Display: ${getComputedStyle(setupModal).display}`);
+    } else {
+      log('fail', 'Setup Modal', 'NOT FOUND - Setup flow will fail');
+    }
+    
+    if (gatewayModal) {
+      log('pass', 'Gateway Modal', `Found! Display: ${getComputedStyle(gatewayModal).display}`);
+    } else {
+      log('warn', 'Gateway Modal', 'NOT FOUND - Gateway modal flow unavailable (Properties panel should still work)');
+    }
+
+    // Interactive test functions
+    function testSetupFlow() {
+      log('info', 'Setup Flow Test', 'Simulating Setup button click...');
+      if (setupBtn) {
+        setupBtn.click();
+        setTimeout(() => {
+          if (setupModal && setupModal.style.display !== 'none') {
+            log('pass', 'Setup Flow', 'Setup modal opened successfully');
+          } else {
+            log('fail', 'Setup Flow', 'Setup modal did not open after button click');
+          }
+        }, 500);
+      } else {
+        log('fail', 'Setup Flow', 'Setup button not found');
+      }
+    }
+
+    function testGatewayFlow() {
+      log('info', 'Gateway Flow Test', 'Testing gateway registration...');
+      
+      if (!propGatewayMac || !propGatewayRegister) {
+        log('fail', 'Gateway Flow', 'Gateway properties elements not found');
+        return;
+      }
+      
+      // Simulate gateway selection
+      if (propGatewayGroup) {
+        propGatewayGroup.style.display = 'block';
+        propGatewayMac.value = 'A4:CF:12:45:AB:CD';
+        log('pass', 'Gateway Flow', 'Gateway properties panel displayed and MAC entered', {
+          hint: 'Now click "Register Gateway" button to test API call'
+        });
+      }
+    }
+
+    function testPublishFlow() {
+      log('info', 'Publish Flow Test', 'Testing publish workflow...');
+      
+      if (!publishBtn) {
+        log('fail', 'Publish Flow', 'Publish button not found');
+        return;
+      }
+      
+      // Make publish button visible for testing
+      publishBtn.style.display = '';
+      log('pass', 'Publish Flow', 'Publish button made visible', {
+        hint: 'Click the Publish button in the header to test'
+      });
+    }
+
+    // Summary
+    setTimeout(() => {
+      log('info', 'Diagnostic Complete', 'All automatic tests finished. Use manual test buttons above for interactive testing.');
+    }, 3000);
+  </script>
+</body>
+</html>
