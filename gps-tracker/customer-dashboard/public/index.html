@@ -12254,7 +12254,7 @@ function qrOpenHelp() {
         console.log('[Floor Plan] Loading buildings and floors...');
         await loadBuildingsAndFloors();
         console.log('[Floor Plan] ✅ Buildings and floors loaded');
-        setupModal.style.display = 'flex';
+        setupModal.classList.add('modal-open');
         console.log('[Floor Plan] ✅ Modal opened');
       } catch (err) {
         console.error('[Floor Plan] ❌ Setup button error:', err);
@@ -12340,7 +12340,7 @@ function qrOpenHelp() {
       linkedBuildingId = buildingId;
       linkedFloorId = floorId;
       saveFloorLink(buildingId, floorId); // Persist to localStorage
-      setupModal.style.display = 'none';
+      setupModal.classList.remove('modal-open');
       publishBtn.style.display = '';
       setupBtn.style.background = '#10b981';
       setupBtn.style.color = 'white';
@@ -12353,7 +12353,7 @@ function qrOpenHelp() {
   });
 
   document.getElementById('sketchSetupCancel')?.addEventListener('click', () => {
-    setupModal.style.display = 'none';
+    setupModal.classList.remove('modal-open');
   });
 
   // ─── Publish Button Handler ─────────────────────────────────────────────────
