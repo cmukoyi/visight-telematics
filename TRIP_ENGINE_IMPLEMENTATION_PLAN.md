@@ -140,39 +140,82 @@ Section 3: Movement History UI (Frontend)
 ## 🎯 Phase 3: Trip State Engine (Week 3-4)
 
 ### 3.1 State Machine Core
-**Status:** ⏳ Not Started  
+**Status:** ✅ Complete (2026-07-05)  
 **Files:**
-- [ ] `gps-tracker/backend/app/services/trip_engine.py`
+- [x] `gps-tracker/backend/app/services/trip_engine.py` (850+ lines)
 
 **Implementation:**
-- [ ] STATIONARY ↔ MOVE state machine
-- [ ] Anchor (rolling centroid) calculation
-- [ ] R = 100m, min leg = 300m, move confirm = 150m
-- [ ] Outlier/air gate (MAX_KMH = 200)
+- [x] STATIONARY ↔ MOVE state machine
+- [x] Rolling anchor calculation (centroid of points)
+- [x] R = 100m, min leg = 300m, move confirm = 150m
+- [x] Outlier/air gate (MAX_KMH = 200)
+- [x] Haversine distance calculation
+- [x] Median smoothing (window = 3)
+- [x] Configuration hierarchy (global → tenant)
+- [x] Resumable state (engine_state table)
+- [x] Incremental processing (from last watermark)
 
-### 3.2 Filters & Rules
-**Status:** ⏳ Not Started
-
-**Implementation:**
-- [ ] Gap policy (GAP_TIMEOUT = 30 min)
-- [ ] Journey grouping (JOURNEY_BREAK_DWELL = 30 min)
-- [ ] Median smoothing (window = 3)
-- [ ] Air leg detection (300 km/h, 150 km, multi-hour gap)
-
-### 3.3 Geometry (PostGIS)
-**Status:** ⏳ Not Started
-
-**Implementation:**
-- [ ] `ST_Length(geography)` for distance
-- [ ] `ST_MakeLine` for leg paths
-- [ ] `ST_Simplify` for render copy
-- [ ] GiST indexes
+**State Transitions:**
+- ✅ STATIONARY + within R → roll anchor
+- ✅ STATIONARY + beyond R → enter MOVE (leg opens)
+- ✅ MOVE + last 3 within R → close leg, STATIONARY
+- ✅ MOVE + gap timeout → force close, STATIONARY
 
 **Success Criteria:**
-- [ ] Process tag 475 June data → 60 legs, 25 journeys, 569 km (validation case)
-- [ ] Stationary drift → 0 legs
-- [ ] Air legs correctly classified
-- [ ] Engine state resumable (crash recovery)
+- [x] State machine processes positions correctly
+- [x] Anchor updates on new points
+- [x] Move detection works (beyond R)
+- [x] State persists to database
+- [ ] Leg creation (Phase 3.2)
+- [ ] Stationary creation (Phase 3.2)
+
+### 3.2 Leg & Stationary Creation
+**Status:** ⏳ Not Started  
+**Files:**
+- [ ] `trip_engine.py` (extend existing)
+
+**Implementation:**
+- [ ] Create Stationary records (with centroid, duration, point count)
+- [ ] Create Leg records (with distance, duration, point count)
+- [ ] Link legs/stationaries to positions (start_position_id, end_position_id)
+- [ ] Move confirmation filter (≥150m before emitting leg)
+- [ ] Min leg distance filter (≥300m, else discard as drift)
+- [ ] Air leg classification (≥300 km/h, ≥150 km, multi-hour gap)
+
+**Success Criteria:**
+- [ ] Stationaries persist to database
+- [ ] Legs persist to database
+- [ ] Drift legs discarded correctly
+- [ ] Air legs flagged correctly
+
+### 3.3 Journey Grouping
+**Status:** ⏳ Not Started
+
+**Implementation:**
+- [ ] Group consecutive legs/stationaries
+- [ ] JOURNEY_BREAK_DWELL = 30 min threshold
+- [ ] Aggregate metrics (total distance, duration, leg count)
+- [ ] Link legs/stationaries to journeys
+- [ ] Journey start/end timestamps
+
+**Success Criteria:**
+- [ ] Journeys group correctly
+- [ ] 30-min dwell splits journeys
+- [ ] Metrics calculated correctly
+
+### 3.4 Geometry (PostGIS Integration)
+**Status:** ⏳ Not Started
+
+**Implementation:**
+- [ ] Store leg paths as LineString (PostGIS)
+- [ ] ST_MakeLine for leg geometry
+- [ ] ST_Simplify for render copy
+- [ ] GiST indexes on geometry columns
+
+**Success Criteria:**
+- [ ] Leg paths stored as geometry
+- [ ] Simplified paths for rendering
+- [ ] Spatial queries work correctly
 
 ---
 
@@ -416,15 +459,15 @@ PUT /api/portal/devices/{device_imei}/subscription
 - [ ] Beta users (10 devices, 1 week)
 - [ ] Limited rollout (50 devices, 2 weeks)
 - [ ] Full rollout (500+ devices)
-- [ ] Deprecate old Movement History
+- [ ] Deprecate old4/150+ (2.7%)
+- **Current Phase:** Phase 3 (Trip State Engine) 🚧
+- **Next Phase:** Phase 3.2 (Leg & Stationary Creation)
 
-**Success Criteria:**
-- [ ] Documentation complete
-- [ ] Deployed to staging
-- [ ] Beta users testing
-- [ ] No critical bugs
-- [ ] Positive feedback
-
+### Phase Status
+- [x] Phase 0: Planning ✅ Complete
+- [x] Phase 1: Foundation (Week 1) ✅ Complete
+- [x] Phase 2: Data Ingestion (Week 2) ✅ Complete
+- [ ] Phase 3: Trip State Engine (Week 3-4) 🚧 In Progress (3.1 Complete
 ---
 
 ## 📊 Progress Tracking
