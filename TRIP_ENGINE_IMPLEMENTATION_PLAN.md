@@ -200,19 +200,33 @@ Section 3: Movement History UI (Frontend)
 - [ ] End-to-end testing with real data (pending)
 
 ### 3.3 Journey Grouping
-**Status:** ⏳ Not Started
+**Status:** ✅ Complete (2026-07-05)  
+**Files:**
+- [x] `trip_engine.py` (extended with journey management)
 
 **Implementation:**
-- [ ] Group consecutive legs/stationaries
-- [ ] JOURNEY_BREAK_DWELL = 30 min threshold
-- [ ] Aggregate metrics (total distance, duration, leg count)
-- [ ] Link legs/stationaries to journeys
-- [ ] Journey start/end timestamps
+- [x] Group consecutive legs/stationaries by 30-min dwell threshold
+- [x] JOURNEY_BREAK_DWELL = 30 min threshold
+- [x] Aggregate metrics (total distance, duration, leg count, stationary count)
+- [x] Link legs/stationaries to journeys
+- [x] Journey start/end timestamps
+
+**Methods Added:**
+- `_ensure_journey_open()`: Creates journey if none exists
+- `_close_journey()`: Finalizes journey with aggregated metrics
+- Integrated into state machine:
+  - Before creating legs: ensures journey is open
+  - Before creating stationaries: checks dwell threshold
+  - Stationary >30 min: closes current journey, creates journey-breaking stationary with journey_id=NULL
+  - Stationary ≤30 min: keeps journey open, links stationary to journey
 
 **Success Criteria:**
-- [ ] Journeys group correctly
-- [ ] 30-min dwell splits journeys
-- [ ] Metrics calculated correctly
+- [x] Journeys group correctly
+- [x] 30-min dwell splits journeys
+- [x] Metrics calculated correctly (distance, duration, leg_count, stationary_count)
+- [x] Journey-breaking stationaries have journey_id=NULL
+- [x] Journeys remain open across processing batches
+- [ ] End-to-end testing with real data (pending)
 
 ### 3.4 Geometry (PostGIS Integration)
 **Status:** ⏳ Not Started

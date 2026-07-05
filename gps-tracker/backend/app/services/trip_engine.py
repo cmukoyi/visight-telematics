@@ -354,6 +354,121 @@ class TripEngine:
         self.db.execute(stmt)
         self.db.commit()
     
+    def _ensure_journey_open(self, timestamp: datetime) -> str:
+        """
+        Ensure a journey is open. Creates one if needed.
+        
+        Args:
+            timestamp: Current timestamp (for journey start)
+        
+        Returns:
+            Journey ID (UUID as string)
+        """
+        if self.context.current_journey_id:
+            return self.context.current_journey_id
+        
+        # Create new journey
+        journey = Journey(
+            device_imei=self.device_imei,
+            started_at=timestamp,
+            ended_at=timestamp,  # Will be updated as journey progresses
+            total_distance_m=0,
+            total_duration_seconds=0,
+            leg_count=0,
+            stationary_count=0,
+            created_at=datetime.now(timezone.utc),
+        )
+        
+        self.db.add(journey)
+        self.db.flush()  # Get ID
+        
+        self.context.current_journey_id = str(journey.id)
+        
+        logger.info(
+            "🆕 IMEI %s: Journey %s started at %s",
+            self.device_imei, journey.id, timestamp.isoformat()
+        )
+        
+        return self.context.current_journey_id
+    
+    def _close_journey(self) -> Optional[Journey]:
+        """
+        Close the current journey and calculate aggregate metrics.
+        
+        Returns:
+            Closed Journey object or None if no journey was open
+        """
+        if not self.context.current_journey_id:
+            return None
+        
+        # Get journey from DB
+        journey = self.db.execute(
+            select(Journey).where(Journey.id == self.context.current_journey_id)
+        ).scalar_one_or_none()
+        
+        if not journey:
+            logger.warning(
+                "⚠️  IMEI %s: Journey %s not found in DB",
+                self.device_imei, self.context.current_journey_id
+            )
+            self.context.current_journey_id = None
+            return None
+        
+        # Aggregate legs
+        legs = self.db.execute(
+            select(Leg).where(
+                and_(
+                    Leg.device_imei == self.device_imei,
+                    Leg.journey_id == self.context.current_journey_id
+                )
+            ).order_by(Leg.started_at)
+        ).scalars().all()
+        
+        # Aggregate stationaries
+        stationaries = self.db.execute(
+            select(Stationary).where(
+                and_(
+                    Stationary.device_imei == self.device_imei,
+                    Stationary.journey_id == self.context.current_journey_id
+                )
+            ).order_by(Stationary.started_at)
+        ).scalars().all()
+        
+        # Calculate totals
+        total_distance_m = sum(leg.distance_m for leg in legs)
+        leg_count = len(legs)
+        stationary_count = len(stationaries)
+        
+        # Update journey end time and metrics
+        all_timestamps = []
+        if legs:
+            all_timestamps.extend([leg.started_at, leg.ended_at] for leg in legs)
+        if stationaries:
+            all_timestamps.extend([s.started_at, s.ended_at] for s in stationaries)
+        
+        if all_timestamps:
+            flat_timestamps = [t for pair in all_timestamps for t in pair]
+            journey.ended_at = max(flat_timestamps)
+            journey.started_at = min(flat_timestamps)  # Ensure started_at is earliest
+            journey.total_duration_seconds = int((journey.ended_at - journey.started_at).total_seconds())
+        
+        journey.total_distance_m = total_distance_m
+        journey.leg_count = leg_count
+        journey.stationary_count = stationary_count
+        
+        self.db.flush()
+        
+        logger.info(
+            "✅ IMEI %s: Journey %s closed: %.2f km, %d legs, %d stationaries, %.0f min",
+            self.device_imei, journey.id, total_distance_m / 1000,
+            leg_count, stationary_count, journey.total_duration_seconds / 60
+        )
+        
+        # Clear journey context
+        self.context.current_journey_id = None
+        
+        return journey
+    
     def _create_stationary(
         self,
         points: List[Tuple[float, float, datetime, Optional[int]]],
@@ -383,6 +498,21 @@ class TripEngine:
         start_position_id = points[0][3] if len(points) > 0 and points[0][3] else None
         end_position_id = points[-1][3] if len(points) > 0 and points[-1][3] else None
         
+        # Journey grouping: Check if this stationary breaks the journey (dwell > 30 min)
+        breaks_journey = duration_seconds > (self.config.journey_break_dwell_min * 60)
+        
+        if breaks_journey and self.context.current_journey_id:
+            # Close current journey before creating the stationary
+            logger.info(
+                "🔚 IMEI %s: Journey break detected (stationary %.0f min > threshold %.0f min)",
+                self.device_imei, duration_seconds / 60, self.config.journey_break_dwell_min
+            )
+            self._close_journey()
+        
+        # Ensure journey is open (unless this is a journey-breaking stationary)
+        if not breaks_journey:
+            self._ensure_journey_open(started_at)
+        
         # Create record
         stationary = Stationary(
             device_imei=self.device_imei,
@@ -394,7 +524,7 @@ class TripEngine:
             point_count=point_count,
             start_position_id=start_position_id,
             end_position_id=end_position_id,
-            journey_id=self.context.current_journey_id,
+            journey_id=self.context.current_journey_id,  # NULL for journey-breaking stationaries
             created_at=datetime.now(timezone.utc),
         )
         
@@ -402,9 +532,10 @@ class TripEngine:
         self.db.flush()  # Get ID without committing
         
         logger.info(
-            "🟠 IMEI %s: Stationary created at (%.4f, %.4f) for %.0f min (%d points)",
+            "🟠 IMEI %s: Stationary created at (%.4f, %.4f) for %.0f min (%d points)%s",
             self.device_imei, centroid_lat, centroid_lng,
-            duration_seconds / 60, point_count
+            duration_seconds / 60, point_count,
+            " [JOURNEY BREAK]" if breaks_journey else ""
         )
         
         # Update journey context
@@ -468,6 +599,9 @@ class TripEngine:
         # Get start/end position IDs
         start_position_id = leg_buffer[0][3] if leg_buffer[0][3] else None
         end_position_id = leg_buffer[-1][3] if leg_buffer[-1][3] else None
+        
+        # Ensure journey is open
+        self._ensure_journey_open(started_at)
         
         # Create record
         leg = Leg(
