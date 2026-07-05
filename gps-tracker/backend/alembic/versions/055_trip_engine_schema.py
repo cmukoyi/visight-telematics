@@ -25,8 +25,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import text
 
-revision = "055"
-down_revision = "054"
+revision = "055_trip_engine_schema"
+down_revision = "054_add_floor_publish_workflow"
 branch_labels = None
 depends_on = None
 
