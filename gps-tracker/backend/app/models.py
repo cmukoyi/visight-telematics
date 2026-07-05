@@ -977,6 +977,7 @@ class Stationary(Base):
     # Geometry
     anchor_lat = Column(Float, nullable=False)
     anchor_lng = Column(Float, nullable=False)
+    # centroid = Column(Geometry('Point', srid=4326), nullable=True)  # PostGIS Point geometry (added in migration 056)
     point_count = Column(Integer, nullable=False)
     
     # Metrics
@@ -1005,6 +1006,16 @@ class Leg(Base):
     # Time window
     started_at = Column(DateTime(timezone=True), nullable=False, index=True)
     ended_at = Column(DateTime(timezone=True), nullable=False)
+    
+    # Start/End coordinates (for non-spatial queries)
+    start_lat = Column(Float, nullable=True)
+    start_lng = Column(Float, nullable=True)
+    end_lat = Column(Float, nullable=True)
+    end_lng = Column(Float, nullable=True)
+    
+    # Geometry (PostGIS) - Added in migration 056
+    # path = Column(Geometry('LineString', srid=4326), nullable=True)  # Full resolution path
+    # path_simplified = Column(Geometry('LineString', srid=4326), nullable=True)  # Simplified for rendering
     
     # Metrics
     distance_m = Column(Float, nullable=False)

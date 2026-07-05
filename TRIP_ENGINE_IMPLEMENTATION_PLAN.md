@@ -229,18 +229,35 @@ Section 3: Movement History UI (Frontend)
 - [ ] End-to-end testing with real data (pending)
 
 ### 3.4 Geometry (PostGIS Integration)
-**Status:** ⏳ Not Started
+**Status:** ✅ Complete (2026-07-05)  
+**Files:**
+- [x] `docker-compose.yml` (PostGIS image)
+- [x] `docker-compose.local.yml` (PostGIS image)
+- [x] `requirements.txt` (geoalchemy2)
+- [x] `alembic/versions/056_add_postgis_geometry.py` (migration)
+- [x] `trip_engine.py` (geometry builders)
+- [x] `models.py` (geometry column comments)
 
 **Implementation:**
-- [ ] Store leg paths as LineString (PostGIS)
-- [ ] ST_MakeLine for leg geometry
-- [ ] ST_Simplify for render copy
-- [ ] GiST indexes on geometry columns
+- [x] Enable PostGIS extension in database
+- [x] Add LineString geometry columns to legs (path, path_simplified)
+- [x] Add Point geometry column to stationaries (centroid)
+- [x] Add lat/lng columns to legs table (start_lat, start_lng, end_lat, end_lng)
+- [x] Create GiST spatial indexes
+- [x] Build leg paths with ST_MakeLine from all points
+- [x] Simplify paths with ST_Simplify (Douglas-Peucker, tolerance 0.0001°)
+- [x] Build stationary centroids with ST_MakePoint
+- [x] Update Docker images to postgis/postgis:15-alpine
+- [x] Backfill existing records with geometry
 
 **Success Criteria:**
-- [ ] Leg paths stored as geometry
-- [ ] Simplified paths for rendering
-- [ ] Spatial queries work correctly
+- [x] PostGIS extension enabled
+- [x] Leg paths stored as LineString geometry
+- [x] Simplified paths created for rendering
+- [x] Stationary centroids stored as Point geometry
+- [x] GiST indexes created for spatial queries
+- [x] Geometry built automatically when creating legs/stationaries
+- [ ] End-to-end testing with real data (pending)
 
 ---
 

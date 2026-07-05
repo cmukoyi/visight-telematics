@@ -43,6 +43,7 @@ from statistics import median
 
 from sqlalchemy import select, and_
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.models import (
     DevicePosition,
@@ -531,6 +532,29 @@ class TripEngine:
         self.db.add(stationary)
         self.db.flush()  # Get ID without committing
         
+        # Build PostGIS Point geometry for the centroid
+        try:
+            self.db.execute(text("""
+                UPDATE stationaries 
+                SET centroid = ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)
+                WHERE id = :stationary_id
+            """), {
+                "lng": centroid_lng,
+                "lat": centroid_lat,
+                "stationary_id": str(stationary.id)
+            })
+            
+            logger.debug(
+                "📐 IMEI %s: Stationary %s geometry created",
+                self.device_imei, stationary.id
+            )
+        except Exception as exc:
+            logger.warning(
+                "⚠️  IMEI %s: Failed to create geometry for stationary %s: %s",
+                self.device_imei, stationary.id, exc
+            )
+            # Don't fail the stationary creation if geometry fails
+        
         logger.info(
             "🟠 IMEI %s: Stationary created at (%.4f, %.4f) for %.0f min (%d points)%s",
             self.device_imei, centroid_lat, centroid_lng,
@@ -624,6 +648,45 @@ class TripEngine:
         
         self.db.add(leg)
         self.db.flush()  # Get ID without committing
+        
+        # Build PostGIS geometry for the leg path
+        # Create LineString from all points in leg_buffer using ST_MakeLine
+        try:
+            # Build array of points for ST_MakeLine: ARRAY[ST_MakePoint(lng, lat), ...]
+            # Note: PostGIS uses (lng, lat) order, not (lat, lng)
+            points_array = ", ".join([
+                f"ST_MakePoint({p[1]}, {p[0]})"  # lng, lat
+                for p in leg_buffer
+            ])
+            
+            # Create full-resolution path
+            self.db.execute(text(f"""
+                UPDATE legs 
+                SET path = ST_SetSRID(ST_MakeLine(ARRAY[{points_array}]), 4326)
+                WHERE id = :leg_id
+            """), {"leg_id": str(leg.id)})
+            
+            # Create simplified path using Douglas-Peucker algorithm
+            # Tolerance of 0.0001 degrees ≈ 11m at equator (good for zoom level 12-15)
+            self.db.execute(text(f"""
+                UPDATE legs 
+                SET path_simplified = ST_Simplify(
+                    ST_SetSRID(ST_MakeLine(ARRAY[{points_array}]), 4326),
+                    0.0001
+                )
+                WHERE id = :leg_id
+            """), {"leg_id": str(leg.id)})
+            
+            logger.debug(
+                "📐 IMEI %s: Leg %s geometry created (%d points → simplified)",
+                self.device_imei, leg.id, point_count
+            )
+        except Exception as exc:
+            logger.warning(
+                "⚠️  IMEI %s: Failed to create geometry for leg %s: %s",
+                self.device_imei, leg.id, exc
+            )
+            # Don't fail the leg creation if geometry fails
         
         emoji = "✈️ " if is_air_leg else "🔵"
         logger.info(
