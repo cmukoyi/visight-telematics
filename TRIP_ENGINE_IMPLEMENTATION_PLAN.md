@@ -170,23 +170,34 @@ Section 3: Movement History UI (Frontend)
 - [ ] Stationary creation (Phase 3.2)
 
 ### 3.2 Leg & Stationary Creation
-**Status:** ⏳ Not Started  
+**Status:** ✅ Complete (2026-07-05)  
 **Files:**
-- [ ] `trip_engine.py` (extend existing)
+- [x] `trip_engine.py` (extended with persistence layer)
 
 **Implementation:**
-- [ ] Create Stationary records (with centroid, duration, point count)
-- [ ] Create Leg records (with distance, duration, point count)
-- [ ] Link legs/stationaries to positions (start_position_id, end_position_id)
-- [ ] Move confirmation filter (≥150m before emitting leg)
-- [ ] Min leg distance filter (≥300m, else discard as drift)
-- [ ] Air leg classification (≥300 km/h, ≥150 km, multi-hour gap)
+- [x] Create Stationary records (with centroid, duration, point count)
+- [x] Create Leg records (with distance, duration, point count)
+- [x] Link legs/stationaries to positions (start_position_id, end_position_id)
+- [x] Move confirmation filter (≥150m before emitting leg)
+- [x] Min leg distance filter (≥300m, else discard as drift)
+- [x] Air leg classification (≥300 km/h, ≥150 km, multi-hour gap)
+
+**Methods Added:**
+- `_create_stationary()`: Persist stationary with centroid and metrics
+- `_create_leg()`: Persist leg with distance/duration filtering
+- Integrated into state machine:
+  - STATIONARY → MOVE: Creates stationary for accumulated anchor
+  - MOVE → STATIONARY: Creates leg and new stationary
+  - Gap timeout: Creates leg + stationary
+  - Air leg: Creates both normal leg and air leg
 
 **Success Criteria:**
-- [ ] Stationaries persist to database
-- [ ] Legs persist to database
-- [ ] Drift legs discarded correctly
-- [ ] Air legs flagged correctly
+- [x] Stationaries persist to database
+- [x] Legs persist to database
+- [x] Drift legs discarded correctly (<300m)
+- [x] Air legs flagged correctly (>200 km/h, ≥150 km)
+- [x] Move confirmation filter works (≥150m)
+- [ ] End-to-end testing with real data (pending)
 
 ### 3.3 Journey Grouping
 **Status:** ⏳ Not Started

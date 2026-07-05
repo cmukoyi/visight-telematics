@@ -354,6 +354,152 @@ class TripEngine:
         self.db.execute(stmt)
         self.db.commit()
     
+    def _create_stationary(
+        self,
+        points: List[Tuple[float, float, datetime, Optional[int]]],
+        reason: str = "anchor_formed"
+    ) -> Optional[Stationary]:
+        """
+        Create a Stationary record from accumulated anchor points.
+        
+        Args:
+            points: List of (lat, lng, observed_at, position_id) tuples
+            reason: Creation reason ("anchor_formed", "trip_end", etc.)
+        
+        Returns:
+            Created Stationary object or None if filtered out
+        """
+        if not points:
+            return None
+        
+        # Calculate centroid and metrics
+        centroid_lat, centroid_lng = calculate_centroid([(p[0], p[1]) for p in points])
+        started_at = points[0][2]
+        ended_at = points[-1][2]
+        duration_seconds = (ended_at - started_at).total_seconds()
+        point_count = len(points)
+        
+        # Get start/end position IDs (if available)
+        start_position_id = points[0][3] if len(points) > 0 and points[0][3] else None
+        end_position_id = points[-1][3] if len(points) > 0 and points[-1][3] else None
+        
+        # Create record
+        stationary = Stationary(
+            device_imei=self.device_imei,
+            centroid_lat=centroid_lat,
+            centroid_lng=centroid_lng,
+            started_at=started_at,
+            ended_at=ended_at,
+            duration_seconds=int(duration_seconds),
+            point_count=point_count,
+            start_position_id=start_position_id,
+            end_position_id=end_position_id,
+            journey_id=self.context.current_journey_id,
+            created_at=datetime.now(timezone.utc),
+        )
+        
+        self.db.add(stationary)
+        self.db.flush()  # Get ID without committing
+        
+        logger.info(
+            "🟠 IMEI %s: Stationary created at (%.4f, %.4f) for %.0f min (%d points)",
+            self.device_imei, centroid_lat, centroid_lng,
+            duration_seconds / 60, point_count
+        )
+        
+        # Update journey context
+        self.context.last_stationary_ended_at = ended_at
+        
+        return stationary
+    
+    def _create_leg(
+        self,
+        leg_buffer: List[Tuple[float, float, datetime, Optional[int]]],
+        is_air_leg: bool = False
+    ) -> Optional[Leg]:
+        """
+        Create a Leg record from movement buffer with filtering.
+        
+        Filters:
+        - Move confirmation: Leg must be ≥ move_confirm_m (150m) to emit
+        - Min leg distance: Leg must be ≥ min_leg_distance_m (300m) to emit (drift rejection)
+        - Air leg classification: ≥ air_min_distance_km with high speed
+        
+        Args:
+            leg_buffer: List of (lat, lng, observed_at, position_id) tuples
+            is_air_leg: Whether this is an air leg (teleport)
+        
+        Returns:
+            Created Leg object or None if filtered out
+        """
+        if len(leg_buffer) < 2:
+            logger.debug("⏭️  IMEI %s: Leg has <2 points, skipping", self.device_imei)
+            return None
+        
+        # Calculate total distance
+        total_distance_m = 0.0
+        for i in range(len(leg_buffer) - 1):
+            p1 = leg_buffer[i]
+            p2 = leg_buffer[i + 1]
+            total_distance_m += haversine_distance(p1[0], p1[1], p2[0], p2[1])
+        
+        # Filter: Move confirmation (must travel at least move_confirm_m)
+        if total_distance_m < self.config.move_confirm_m:
+            logger.debug(
+                "⏭️  IMEI %s: Leg %.0f m < move_confirm %.0f m, discarding",
+                self.device_imei, total_distance_m, self.config.move_confirm_m
+            )
+            return None
+        
+        # Filter: Min leg distance (drift rejection)
+        if not is_air_leg and total_distance_m < self.config.min_leg_distance_m:
+            logger.debug(
+                "⏭️  IMEI %s: Leg %.0f m < min_leg_distance %.0f m (drift), discarding",
+                self.device_imei, total_distance_m, self.config.min_leg_distance_m
+            )
+            return None
+        
+        # Calculate duration
+        started_at = leg_buffer[0][2]
+        ended_at = leg_buffer[-1][2]
+        duration_seconds = (ended_at - started_at).total_seconds()
+        point_count = len(leg_buffer)
+        
+        # Get start/end position IDs
+        start_position_id = leg_buffer[0][3] if leg_buffer[0][3] else None
+        end_position_id = leg_buffer[-1][3] if leg_buffer[-1][3] else None
+        
+        # Create record
+        leg = Leg(
+            device_imei=self.device_imei,
+            distance_m=int(total_distance_m),
+            duration_seconds=int(duration_seconds),
+            point_count=point_count,
+            started_at=started_at,
+            ended_at=ended_at,
+            start_lat=leg_buffer[0][0],
+            start_lng=leg_buffer[0][1],
+            end_lat=leg_buffer[-1][0],
+            end_lng=leg_buffer[-1][1],
+            start_position_id=start_position_id,
+            end_position_id=end_position_id,
+            is_air_leg=is_air_leg,
+            journey_id=self.context.current_journey_id,
+            created_at=datetime.now(timezone.utc),
+        )
+        
+        self.db.add(leg)
+        self.db.flush()  # Get ID without committing
+        
+        emoji = "✈️ " if is_air_leg else "🔵"
+        logger.info(
+            "%s IMEI %s: Leg created: %.2f km over %.0f min (%d points)%s",
+            emoji, self.device_imei, total_distance_m / 1000, duration_seconds / 60,
+            point_count, " [AIR]" if is_air_leg else ""
+        )
+        
+        return leg
+    
     def process_positions(self, limit: Optional[int] = None) -> Dict:
         """
         Process unprocessed positions for this device.
@@ -481,13 +627,35 @@ class TripEngine:
         # Step 1: Outlier/air gate
         if implied_speed_kmh > self.config.max_speed_kmh:
             if distance_m >= self.config.air_min_distance_km * 1000:
-                # Air leg: Create leg from last to this with is_air_leg=True
+                # Air leg: Create leg from last to current with is_air_leg=True
                 logger.info(
                     "✈️  IMEI %s: Air leg detected: %.0f km @ %.0f km/h",
                     self.device_imei, distance_m / 1000, implied_speed_kmh
                 )
-                # TODO: Implement air leg creation
-                result['air_leg_detected'] = True
+                
+                # If in MOVE state, close current leg first
+                if self.context.current_state == "MOVE" and len(self.context.leg_buffer) >= 2:
+                    leg = self._create_leg(self.context.leg_buffer, is_air_leg=False)
+                    if leg:
+                        result['leg_created'] = True
+                    self.context.leg_buffer = []
+                
+                # Create air leg
+                air_leg_buffer = [
+                    (self.context.last_position_lat, self.context.last_position_lng, 
+                     self.context.last_position_time, None),
+                    (lat, lng, observed_at, position_id)
+                ]
+                air_leg = self._create_leg(air_leg_buffer, is_air_leg=True)
+                if air_leg:
+                    result['leg_created'] = True
+                    result['air_leg_detected'] = True
+                
+                # Start new stationary at destination
+                self.context.current_state = "STATIONARY"
+                self.context.anchor_lat = lat
+                self.context.anchor_lng = lng
+                self.context.anchor_points = [(lat, lng, observed_at)]
             else:
                 # Glitch: Discard point
                 logger.warning(
@@ -502,12 +670,28 @@ class TripEngine:
                 "⏱️  IMEI %s: Gap timeout (%.0f min) → force close leg",
                 self.device_imei, time_diff_seconds / 60
             )
-            # Close current leg, return to STATIONARY
-            # TODO: Implement leg close
+            # Close current leg
+            if len(self.context.leg_buffer) >= 2:
+                leg = self._create_leg(self.context.leg_buffer, is_air_leg=False)
+                if leg:
+                    result['leg_created'] = True
+            
+            # Create stationary from last position until now
+            gap_stationary_points = [
+                (self.context.last_position_lat, self.context.last_position_lng, 
+                 self.context.last_position_time, None),
+                (lat, lng, observed_at, position_id)
+            ]
+            stationary = self._create_stationary(gap_stationary_points, reason="gap_timeout")
+            if stationary:
+                result['stationary_created'] = True
+            
+            # Return to STATIONARY state
             self.context.current_state = "STATIONARY"
             self.context.anchor_lat = lat
             self.context.anchor_lng = lng
             self.context.anchor_points = [(lat, lng, observed_at)]
+            self.context.leg_buffer = []
         
         # Step 3: State-specific logic
         if self.context.current_state == "STATIONARY":
@@ -533,6 +717,14 @@ class TripEngine:
                     "🚀 IMEI %s: Leaving stationary (%.0f m from anchor) → MOVE",
                     self.device_imei, anchor_dist
                 )
+                
+                # Create stationary record from accumulated anchor points
+                if len(self.context.anchor_points) >= 1:
+                    stationary = self._create_stationary(self.context.anchor_points, reason="leaving_anchor")
+                    if stationary:
+                        result['stationary_created'] = True
+                
+                # Enter MOVE state
                 self.context.current_state = "MOVE"
                 self.context.leg_buffer = [
                     (self.context.anchor_lat, self.context.anchor_lng, 
@@ -558,9 +750,23 @@ class TripEngine:
                         "🛑 IMEI %s: New stationary detected (last 3 points within %.0f m) → close leg",
                         self.device_imei, self.config.anchor_radius_m
                     )
-                    # TODO: Implement leg close and stationary creation
-                    result['leg_created'] = True
-                    result['stationary_created'] = True
+                    
+                    # Close the leg (excluding the last 3 points which form the new stationary)
+                    leg_points = self.context.leg_buffer[:-2]  # Keep all but last 2 (last point is current)
+                    if len(leg_points) >= 2:
+                        leg = self._create_leg(leg_points, is_air_leg=False)
+                        if leg:
+                            result['leg_created'] = True
+                    
+                    # Create new stationary from last 3 points
+                    new_anchor_points = [
+                        (last_3[0][0], last_3[0][1], last_3[0][2], last_3[0][3]),
+                        (last_3[1][0], last_3[1][1], last_3[1][2], last_3[1][3]),
+                        (last_3[2][0], last_3[2][1], last_3[2][2], last_3[2][3]),
+                    ]
+                    stationary = self._create_stationary(new_anchor_points, reason="anchor_formed")
+                    if stationary:
+                        result['stationary_created'] = True
                     
                     # Return to STATIONARY
                     self.context.current_state = "STATIONARY"
