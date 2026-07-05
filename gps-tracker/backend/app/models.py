@@ -835,3 +835,254 @@ class HiveLiveState(Base):
     centroid_anchor_at      = Column(DateTime(timezone=True), nullable=True)
 
     hive = relationship("Hive", back_populates="live_state")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TRIP ENGINE MODELS (Movement History Advanced)
+# ═══════════════════════════════════════════════════════════════════════════
+
+class DevicePosition(Base):
+    """
+    Single source of truth for GPS breadcrumbs from TrackSolid.
+    
+    Section 1 (Ingestion): Raw positions from batch sweep + track.list calls.
+    Unique constraint on (device_imei, observed_at) prevents duplicates.
+    """
+    __tablename__ = "device_positions"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    device_imei = Column(String(20), nullable=False, index=True)
+    
+    # Core position data
+    lat = Column(Float, nullable=False)
+    lng = Column(Float, nullable=False)
+    observed_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    
+    # Movement metadata
+    direction = Column(Integer, nullable=True)           # 0-360 degrees
+    gps_speed = Column(Float, nullable=True)             # km/h
+    pos_type = Column(Integer, nullable=True)            # 1=GPS, 2=LBS, 3=WIFI, 5=unknown
+    satellite = Column(Integer, nullable=True)           # GPS satellite count
+    ignition = Column(String(10), nullable=True)         # ON/OFF
+    acc_status = Column(String(10), nullable=True)       # ON/OFF
+    gps_mode = Column(Integer, nullable=True)
+    confidence = Column(Integer, nullable=True)          # 1-3 (NEVER use for classification per spec)
+    
+    # Metadata
+    source = Column(String(20), nullable=False, default="batch")  # 'batch' or 'tracklist'
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class DeviceState(Base):
+    """
+    Per-device trigger tracking for smart API calling.
+    
+    Section 1 (Ingestion): Implements 3-condition trigger logic:
+    - last_batch_ts: Latest batch sweep timestamp (new data detection)
+    - last_position_ts: Latest GPS point (forward-only window boundary)
+    - last_tracklist_pull_at: Last track.list call (coalesce throttling)
+    """
+    __tablename__ = "device_state"
+    
+    device_imei = Column(String(20), primary_key=True)
+    
+    # Trigger detection timestamps
+    last_batch_ts = Column(DateTime(timezone=True), nullable=True)
+    last_position_ts = Column(DateTime(timezone=True), nullable=True)
+    last_tracklist_pull_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Subscription model (premium opt-in)
+    trip_subscribed = Column(Boolean, nullable=False, default=False, index=True)
+    
+    # Per-device config override (NULL = use global/tenant default)
+    coalesce_floor_minutes = Column(Integer, nullable=True)
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class TrackSolidSyncState(Base):
+    """
+    Global sync metadata (singleton row).
+    
+    Section 1 (Ingestion): Rate limiting counters and sweep timestamps.
+    """
+    __tablename__ = "tracksolid_sync_state"
+    
+    id = Column(Integer, primary_key=True, default=1)
+    
+    # Last sync timestamps
+    last_batch_sweep_at = Column(DateTime(timezone=True), nullable=True)
+    last_selective_sweep_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Rate limiting (TrackSolid limit: 86,400 calls/day)
+    api_calls_today = Column(Integer, nullable=False, default=0)
+    api_calls_reset_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Metadata
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class EngineState(Base):
+    """
+    Per-device state machine (STATIONARY ↔ MOVE).
+    
+    Section 2 (Engine): Maintains rolling anchor and current trip context.
+    """
+    __tablename__ = "engine_state"
+    
+    device_imei = Column(String(20), primary_key=True)
+    
+    # State machine
+    current_state = Column(String(20), nullable=False, default="STATIONARY")  # STATIONARY or MOVE
+    
+    # Rolling anchor (for STATIONARY state)
+    anchor_lat = Column(Float, nullable=True)
+    anchor_lng = Column(Float, nullable=True)
+    anchor_count = Column(Integer, nullable=False, default=0)
+    
+    # Current trip context (for MOVE state)
+    current_leg_id = get_uuid_nullable()
+    current_journey_id = get_uuid_nullable()
+    
+    # Processing watermark
+    last_processed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class Stationary(Base):
+    """
+    Idle periods with anchor centroids.
+    
+    Section 2 (Engine): Created when device remains within R=100m radius.
+    """
+    __tablename__ = "stationaries"
+    
+    id = get_uuid_column()
+    device_imei = Column(String(20), nullable=False, index=True)
+    journey_id = get_uuid_nullable()  # NULL if ungrouped
+    
+    # Position references
+    start_position_id = Column(Integer, nullable=False)
+    end_position_id = Column(Integer, nullable=False)
+    
+    # Time window
+    started_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    ended_at = Column(DateTime(timezone=True), nullable=False)
+    
+    # Geometry
+    anchor_lat = Column(Float, nullable=False)
+    anchor_lng = Column(Float, nullable=False)
+    point_count = Column(Integer, nullable=False)
+    
+    # Metrics
+    duration_seconds = Column(Integer, nullable=False)
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Leg(Base):
+    """
+    Movement segments between stationaries.
+    
+    Section 2 (Engine): Created when device moves >150m from anchor.
+    """
+    __tablename__ = "legs"
+    
+    id = get_uuid_column()
+    device_imei = Column(String(20), nullable=False, index=True)
+    journey_id = get_uuid_nullable()  # NULL if ungrouped
+    
+    # Position references
+    start_position_id = Column(Integer, nullable=False)
+    end_position_id = Column(Integer, nullable=False)
+    
+    # Time window
+    started_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    ended_at = Column(DateTime(timezone=True), nullable=False)
+    
+    # Metrics
+    distance_m = Column(Float, nullable=False)
+    duration_seconds = Column(Integer, nullable=False)
+    point_count = Column(Integer, nullable=False)
+    
+    # Classification
+    is_air_leg = Column(Boolean, nullable=False, default=False, index=True)
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Journey(Base):
+    """
+    Grouped trips (legs + stationaries within 30-min dwell threshold).
+    
+    Section 2 (Engine): Journey grouping with aggregate metrics.
+    """
+    __tablename__ = "journeys"
+    
+    id = get_uuid_column()
+    device_imei = Column(String(20), nullable=False, index=True)
+    
+    # Time window
+    started_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    ended_at = Column(DateTime(timezone=True), nullable=False)
+    
+    # Journey structure references
+    first_leg_id = get_uuid_nullable()
+    last_leg_id = get_uuid_nullable()
+    
+    # Metrics
+    leg_count = Column(Integer, nullable=False, default=0)
+    stationary_count = Column(Integer, nullable=False, default=0)
+    total_distance_m = Column(Float, nullable=False, default=0)
+    total_duration_seconds = Column(Integer, nullable=False)
+    
+    # Classification
+    is_air_journey = Column(Boolean, nullable=False, default=False, index=True)
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class TripConfig(Base):
+    """
+    Admin configuration (global + per-tenant overrides).
+    
+    Configuration hierarchy: Global (tenant_id=NULL) → Tenant → Device
+    """
+    __tablename__ = "trip_config"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id = get_uuid_nullable()  # NULL = global default
+    
+    # Ingestion parameters
+    batch_sweep_interval_minutes = Column(Integer, nullable=False, default=10)
+    tracklist_delay_minutes = Column(Integer, nullable=False, default=5)
+    coalesce_floor_minutes = Column(Integer, nullable=False, default=120)
+    
+    # Engine geometry parameters
+    engine_anchor_radius_m = Column(Integer, nullable=False, default=100)
+    engine_min_leg_distance_m = Column(Integer, nullable=False, default=300)
+    engine_move_confirm_m = Column(Integer, nullable=False, default=150)
+    
+    # Engine thresholds
+    engine_max_speed_kmh = Column(Integer, nullable=False, default=200)
+    engine_gap_timeout_min = Column(Integer, nullable=False, default=30)
+    engine_smoothing_window = Column(Integer, nullable=False, default=3)
+    
+    # Air leg detection
+    engine_air_speed_kmh = Column(Integer, nullable=False, default=300)
+    engine_air_min_distance_km = Column(Integer, nullable=False, default=150)
+    
+    # Journey grouping
+    engine_journey_break_dwell_min = Column(Integer, nullable=False, default=30)
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

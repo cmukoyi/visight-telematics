@@ -60,15 +60,33 @@ Section 3: Movement History UI (Frontend)
 ## 🎯 Phase 2: Data Ingestion (Week 2)
 
 ### 2.1 TrackSolid Batch Sweep
-**Status:** ⏳ Not Started  
+**Status:** ✅ Complete (2026-07-05)  
 **Files:**
-- [ ] `gps-tracker/backend/app/services/tracksolid_batch_service.py`
+- [x] `gps-tracker/backend/app/services/tracksolid_batch_service.py` (515 lines)
+- [x] `gps-tracker/backend/app/models.py` (Trip Engine models added)
 
 **Implementation:**
-- [ ] Call `latest-points/batch` every 10 minutes
-- [ ] Persist to `device_positions` table
-- [ ] Update `device_state.last_batch_ts`
-- [ ] Trigger detection logic (3 conditions from spec)
+- [x] Call `jimi.user.device.location.list` every 10 minutes
+- [x] Persist to `device_positions` table with ON CONFLICT DO NOTHING
+- [x] Update `device_state.last_batch_ts` (trigger detection)
+- [x] Rate limiting counters in `tracksolid_sync_state`
+- [x] Database-backed token caching (upgrades from file-based)
+- [x] OAuth token management with 60s refresh buffer
+
+**Features:**
+- ✅ Single API call returns ALL devices (~500 IMEIs)
+- ✅ UNIQUE constraint prevents duplicates
+- ✅ Idempotent upserts (safe to retry)
+- ✅ Auto-creates `device_state` rows with `trip_subscribed=false` default
+- ✅ Resets API counter at midnight UTC
+- ✅ Warns at 90% rate limit threshold
+
+**Success Criteria:**
+- [x] Batch sweep runs without errors
+- [x] Positions stored in `device_positions` table
+- [x] Device states updated with `last_batch_ts`
+- [x] API call counter tracks usage
+- [ ] Scheduled via cron/celery (pending Phase 2 completion)
 
 ### 2.2 Selective track.list Pull
 **Status:** ⏳ Not Started  
@@ -393,14 +411,14 @@ PUT /api/portal/devices/{device_imei}/subscription
 ## 📊 Progress Tracking
 
 ### Overall Progress
-- **Total Tasks:** 1/150+ (0.7%)
-- **Current Phase:** Phase 1 (Foundation) 🚧
-- **Next Phase:** Phase 2 (Data Ingestion)
+- **Total Tasks:** 2/150+ (1.3%)
+- **Current Phase:** Phase 2 (Data Ingestion) 🚧
+- **Next Phase:** Phase 2.2 (Selective Track Service)
 
 ### Phase Status
 - [x] Phase 0: Planning ✅ Complete
-- [ ] Phase 1: Foundation (Week 1) 🚧 In Progress (1.1 Complete)
-- [ ] Phase 2: Data Ingestion (Week 2)
+- [x] Phase 1: Foundation (Week 1) ✅ Complete (1.1 Complete)
+- [ ] Phase 2: Data Ingestion (Week 2) 🚧 In Progress (2.1 Complete)
 - [ ] Phase 3: Trip State Engine (Week 3-4)
 - [ ] Phase 4: Admin Configuration (Week 5)
 - [ ] Phase 5: Frontend UI (Week 6-7)
