@@ -264,10 +264,10 @@ Section 3: Movement History UI (Frontend)
 ## 🎯 Phase 4: Admin Configuration (Week 5)
 
 ### 4.1 Global Config UI
-**Status:** ⏳ Not Started  
+**Status:** ✅ COMPLETE  
 **Files:**
-- [ ] `gps-tracker/admin-portal/views/trip_config.html`
-- [ ] `gps-tracker/backend/app/routes_portal.py` (config endpoints)
+- [x] `gps-tracker/admin-portal/trip-config.html`
+- [x] `gps-tracker/backend/app/routes_portal.py` (config endpoints)
 
 **Configuration Parameters:**
 ```javascript
@@ -289,10 +289,10 @@ engine_smoothing_window: 3
 ```
 
 **Success Criteria:**
-- [ ] Admin can modify config without deploy
-- [ ] Config changes apply to new data processing
-- [ ] Per-tenant overrides work
-- [ ] Audit log for config changes
+- [x] Admin can modify config without deploy
+- [x] Config changes apply to new data processing
+- [x] Per-tenant overrides work
+- [x] Audit log for config changes (via logger.info)
 
 ---
 
@@ -515,16 +515,16 @@ PUT /api/portal/devices/{device_imei}/subscription
 ## 📊 Progress Tracking
 
 ### Overall Progress
-- **Total Tasks:** 3/150+ (2%)
-- **Current Phase:** Phase 2 (Data Ingestion) ✅ Complete (awaiting scheduler)
-- **Next Phase:** Phase 3 (Trip State Engine)
+- **Total Tasks:** 8/150+ (5.3%)
+- **Current Phase:** Phase 4.1 (Admin Configuration) ✅ Complete
+- **Next Phase:** Phase 5 (Frontend UI)
 
 ### Phase Status
 - [x] Phase 0: Planning ✅ Complete
 - [x] Phase 1: Foundation (Week 1) ✅ Complete
 - [x] Phase 2: Data Ingestion (Week 2) ✅ Complete (2.1 + 2.2)
-- [ ] Phase 3: Trip State Engine (Week 3-4)
-- [ ] Phase 4: Admin Configuration (Week 5)
+- [x] Phase 3: Trip State Engine (Week 3-4) ✅ Complete (3.1 + 3.2 + 3.3 + 3.4)
+- [~] Phase 4: Admin Configuration (Week 5) - Phase 4.1 Complete
 - [ ] Phase 5: Frontend UI (Week 6-7)
 - [ ] Phase 6: Backend API Endpoints (Week 8)
 - [ ] Phase 7: Integration & Testing (Week 9)

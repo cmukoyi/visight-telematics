@@ -3668,3 +3668,152 @@ def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
     del _portal_reset_pins[email]
     return {"detail": "Password reset successfully"}
 
+
+
+# ==============================================================================
+# TRIP ENGINE CONFIGURATION (Phase 4.1)
+# ==============================================================================
+
+class TripConfigResponse(BaseModel):
+    """Trip engine configuration response model."""
+    tenant_id: Optional[str]
+    
+    # Ingestion
+    batch_sweep_interval_minutes: int
+    tracklist_delay_minutes: int
+    coalesce_floor_minutes: int
+    
+    # Engine
+    engine_anchor_radius_m: int
+    engine_min_leg_distance_m: int
+    engine_move_confirm_m: int
+    engine_max_speed_kmh: int
+    engine_gap_timeout_min: int
+    engine_air_speed_kmh: int
+    engine_air_min_distance_km: int
+    engine_journey_break_dwell_min: int
+    engine_smoothing_window: int
+
+
+class TripConfigUpdate(BaseModel):
+    """Trip engine configuration update model."""
+    # Ingestion (optional fields for partial updates)
+    batch_sweep_interval_minutes: Optional[int] = None
+    tracklist_delay_minutes: Optional[int] = None
+    coalesce_floor_minutes: Optional[int] = None
+    
+    # Engine
+    engine_anchor_radius_m: Optional[int] = None
+    engine_min_leg_distance_m: Optional[int] = None
+    engine_move_confirm_m: Optional[int] = None
+    engine_max_speed_kmh: Optional[int] = None
+    engine_gap_timeout_min: Optional[int] = None
+    engine_air_speed_kmh: Optional[int] = None
+    engine_air_min_distance_km: Optional[int] = None
+    engine_journey_break_dwell_min: Optional[int] = None
+    engine_smoothing_window: Optional[int] = None
+
+
+@router.get("/trip-config", response_model=TripConfigResponse)
+def get_trip_config(
+    tenant_id: Optional[str] = Query(None, description="Tenant ID for override config (None = global)"),
+    db: Session = Depends(get_db),
+):
+    """
+    Get trip engine configuration (global or per-tenant).
+    
+    Returns the effective configuration for the given tenant, applying overrides
+    over global defaults.
+    """
+    from app.models import TripConfig
+    
+    # Get global config
+    global_config = db.query(TripConfig).filter(TripConfig.tenant_id == None).first()
+    
+    if not global_config:
+        raise HTTPException(status_code=404, detail="Global trip config not found")
+    
+    # If tenant_id provided, try to get tenant-specific overrides
+    if tenant_id:
+        tenant_config = db.query(TripConfig).filter(TripConfig.tenant_id == tenant_id).first()
+        if tenant_config:
+            # Return tenant config (which inherits from global if fields are NULL)
+            return TripConfigResponse(
+                tenant_id=tenant_id,
+                batch_sweep_interval_minutes=tenant_config.batch_sweep_interval_minutes or global_config.batch_sweep_interval_minutes,
+                tracklist_delay_minutes=tenant_config.tracklist_delay_minutes or global_config.tracklist_delay_minutes,
+                coalesce_floor_minutes=tenant_config.coalesce_floor_minutes or global_config.coalesce_floor_minutes,
+                engine_anchor_radius_m=tenant_config.engine_anchor_radius_m or global_config.engine_anchor_radius_m,
+                engine_min_leg_distance_m=tenant_config.engine_min_leg_distance_m or global_config.engine_min_leg_distance_m,
+                engine_move_confirm_m=tenant_config.engine_move_confirm_m or global_config.engine_move_confirm_m,
+                engine_max_speed_kmh=tenant_config.engine_max_speed_kmh or global_config.engine_max_speed_kmh,
+                engine_gap_timeout_min=tenant_config.engine_gap_timeout_min or global_config.engine_gap_timeout_min,
+                engine_air_speed_kmh=tenant_config.engine_air_speed_kmh or global_config.engine_air_speed_kmh,
+                engine_air_min_distance_km=tenant_config.engine_air_min_distance_km or global_config.engine_air_min_distance_km,
+                engine_journey_break_dwell_min=tenant_config.engine_journey_break_dwell_min or global_config.engine_journey_break_dwell_min,
+                engine_smoothing_window=tenant_config.engine_smoothing_window or global_config.engine_smoothing_window,
+            )
+    
+    # Return global config
+    return TripConfigResponse(
+        tenant_id=None,
+        batch_sweep_interval_minutes=global_config.batch_sweep_interval_minutes,
+        tracklist_delay_minutes=global_config.tracklist_delay_minutes,
+        coalesce_floor_minutes=global_config.coalesce_floor_minutes,
+        engine_anchor_radius_m=global_config.engine_anchor_radius_m,
+        engine_min_leg_distance_m=global_config.engine_min_leg_distance_m,
+        engine_move_confirm_m=global_config.engine_move_confirm_m,
+        engine_max_speed_kmh=global_config.engine_max_speed_kmh,
+        engine_gap_timeout_min=global_config.engine_gap_timeout_min,
+        engine_air_speed_kmh=global_config.engine_air_speed_kmh,
+        engine_air_min_distance_km=global_config.engine_air_min_distance_km,
+        engine_journey_break_dwell_min=global_config.engine_journey_break_dwell_min,
+        engine_smoothing_window=global_config.engine_smoothing_window,
+    )
+
+
+@router.put("/trip-config", response_model=TripConfigResponse)
+def update_trip_config(
+    data: TripConfigUpdate,
+    tenant_id: Optional[str] = Query(None, description="Tenant ID for override config (None = global)"),
+    db: Session = Depends(get_db),
+):
+    """
+    Update trip engine configuration (global or per-tenant).
+    
+    For global config (tenant_id=None), updates the base configuration.
+    For tenant config, creates or updates per-tenant overrides (only non-null fields).
+    """
+    from app.models import TripConfig
+    from sqlalchemy.dialects.postgresql import insert
+    
+    # Validate at least one field provided
+    if all(v is None for v in data.dict().values()):
+        raise HTTPException(status_code=400, detail="At least one configuration field must be provided")
+    
+    # Get or create config record
+    config = db.query(TripConfig).filter(TripConfig.tenant_id == tenant_id).first()
+    
+    if not config:
+        # Create new config record
+        config = TripConfig(tenant_id=tenant_id)
+        db.add(config)
+    
+    # Update only provided fields
+    update_data = data.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        if value is not None:
+            setattr(config, key, value)
+    
+    config.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(config)
+    
+    logger.info(
+        "Trip config updated: tenant_id=%s, fields=%s",
+        tenant_id or "global",
+        list(update_data.keys())
+    )
+    
+    # Return effective config
+    return get_trip_config(tenant_id=tenant_id, db=db)

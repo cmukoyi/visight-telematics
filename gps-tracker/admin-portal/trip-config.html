@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trip Engine Configuration | PinPlot Admin</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f7fa;
+            color: #2d3748;
+            line-height: 1.6;
+        }
+        
+        .header {
+            background: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 1rem 2rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1a202c;
+        }
+        
+        .header-subtitle {
+            font-size: 0.875rem;
+            color: #718096;
+            margin-top: 0.25rem;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+        
+        .config-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        
+        .tab {
+            padding: 0.75rem 1.5rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            color: #718096;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+        
+        .tab:hover {
+            color: #4a5568;
+        }
+        
+        .tab.active {
+            color: #3182ce;
+            border-bottom-color: #3182ce;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .card-header {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #1a202c;
+        }
+        
+        .card-description {
+            font-size: 0.875rem;
+            color: #718096;
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: #4a5568;
+        }
+        
+        .form-hint {
+            font-size: 0.75rem;
+            color: #a0aec0;
+            margin-top: 0.25rem;
+        }
+        
+        .form-input {
+            padding: 0.625rem;
+            border: 1px solid #cbd5e0;
+            border-radius: 6px;
+            font-size: 0.9375rem;
+            transition: border-color 0.2s;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #3182ce;
+            box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+        }
+        
+        .form-input:disabled {
+            background: #f7fafc;
+            color: #a0aec0;
+            cursor: not-allowed;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+        }
+        
+        .btn {
+            padding: 0.625rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: #3182ce;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #2c5282;
+        }
+        
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+        
+        .btn-secondary:hover {
+            background: #cbd5e0;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .alert {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1.5rem;
+            display: none;
+        }
+        
+        .alert.show {
+            display: block;
+        }
+        
+        .alert-success {
+            background: #c6f6d5;
+            color: #22543d;
+            border: 1px solid #9ae6b4;
+        }
+        
+        .alert-error {
+            background: #fed7d7;
+            color: #742a2a;
+            border: 1px solid #fc8181;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #718096;
+        }
+        
+        .spinner {
+            border: 3px solid #e2e8f0;
+            border-top-color: #3182ce;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.625rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 9999px;
+            margin-left: 0.5rem;
+        }
+        
+        .badge-global {
+            background: #bee3f8;
+            color: #2c5282;
+        }
+        
+        .badge-tenant {
+            background: #fed7e2;
+            color: #702459;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Trip Engine Configuration</h1>
+        <div class="header-subtitle">
+            Manage ingestion and trip state engine parameters without code deploys
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="alert alert-success" id="successAlert"></div>
+        <div class="alert alert-error" id="errorAlert"></div>
+        
+        <div class="config-tabs">
+            <button class="tab active" data-tab="global">
+                Global Configuration<span class="badge badge-global">DEFAULT</span>
+            </button>
+            <button class="tab" data-tab="tenant">
+                Tenant Overrides<span class="badge badge-tenant">PER-TENANT</span>
+            </button>
+        </div>
+        
+        <!-- Global Config Tab -->
+        <div class="tab-content active" id="global-tab">
+            <div class="card">
+                <div class="card-header">Ingestion Parameters</div>
+                <div class="card-description">
+                    Controls how often GPS positions are fetched from TrackSolid API
+                </div>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Batch Sweep Interval (minutes)</label>
+                        <input type="number" class="form-input" id="batch_sweep_interval_minutes" min="1" max="60">
+                        <div class="form-hint">How often to query all devices for latest position (default: 10)</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Track List Delay (minutes)</label>
+                        <input type="number" class="form-input" id="tracklist_delay_minutes" min="1" max="30">
+                        <div class="form-hint">Delay before pulling full track history (default: 5)</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Coalesce Floor (minutes)</label>
+                        <input type="number" class="form-input" id="coalesce_floor_minutes" min="30" max="480">
+                        <div class="form-hint">Minimum interval between track.list pulls per device (default: 120)</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">Engine Geometry Parameters</div>
+                <div class="card-description">
+                    Controls the state machine's spatial thresholds and movement detection
+                </div>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Anchor Radius (meters)</label>
+                        <input type="number" class="form-input" id="engine_anchor_radius_m" min="50" max="500">
+                        <div class="form-hint">R = "same place" threshold (default: 100m)</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Min Leg Distance (meters)</label>
+                        <input type="number" class="form-input" id="engine_min_leg_distance_m" min="100" max="1000">
+                        <div class="form-hint">Legs shorter than this are drift (default: 300m = 3×R)</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Move Confirmation (meters)</label>
+                        <input type="number" class="form-input" id="engine_move_confirm_m" min="50" max="500">
+                        <div class="form-hint">Must travel this far to emit a leg (default: 150m)</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">Engine Outlier & Timeout Parameters</div>
+                <div class="card-description">
+                    Speed gates and timeout thresholds for edge case handling
+                </div>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Max Speed (km/h)</label>
+                        <input type="number" class="form-input" id="engine_max_speed_kmh" min="100" max="300">
+                        <div class="form-hint">Ground outlier threshold (default: 200)</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Air Speed (km/h)</label>
+                        <input type="number" class="form-input" id="engine_air_speed_kmh" min="200" max="1000">
+                        <div class="form-hint">Flight detection threshold (default: 300)</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Air Min Distance (km)</label>
+                        <input type="number" class="form-input" id="engine_air_min_distance_km" min="50" max="500">
+                        <div class="form-hint">Minimum distance for air leg (default: 150)</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Gap Timeout (minutes)</label>
+                        <input type="number" class="form-input" id="engine_gap_timeout_min" min="10" max="120">
+                        <div class="form-hint">Force close leg after this gap (default: 30)</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Journey Break Dwell (minutes)</label>
+                        <input type="number" class="form-input" id="engine_journey_break_dwell_min" min="10" max="120">
+                        <div class="form-hint">Stationary >this splits journeys (default: 30)</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Smoothing Window</label>
+                        <input type="number" class="form-input" id="engine_smoothing_window" min="3" max="9" step="2">
+                        <div class="form-hint">Median filter window (must be odd, default: 3)</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="saveGlobalConfig()">Save Global Config</button>
+                <button class="btn btn-secondary" onclick="loadConfig(null)">Reset to Current</button>
+            </div>
+        </div>
+        
+        <!-- Tenant Override Tab -->
+        <div class="tab-content" id="tenant-tab">
+            <div class="card">
+                <div class="card-header">Per-Tenant Configuration</div>
+                <div class="card-description">
+                    Override specific parameters for individual tenants. Only set fields you want to override; others inherit from global config.
+                </div>
+                
+                <div class="form-group" style="max-width: 400px; margin-bottom: 1.5rem;">
+                    <label class="form-label">Tenant ID</label>
+                    <input type="text" class="form-input" id="tenant_id" placeholder="e.g., tenant-uuid-here">
+                    <div class="form-hint">Leave blank to edit global config</div>
+                </div>
+                
+                <button class="btn btn-secondary" onclick="loadTenantConfig()" style="margin-bottom: 1.5rem;">
+                    Load Tenant Config
+                </button>
+                
+                <div id="tenant-config-form" style="display: none;">
+                    <!-- Same form fields as global, but for tenant overrides -->
+                    <div class="card">
+                        <div class="card-header">Tenant Ingestion Overrides</div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label class="form-label">Coalesce Floor (minutes)</label>
+                                <input type="number" class="form-input" id="tenant_coalesce_floor_minutes" min="30" max="480">
+                                <div class="form-hint">Override per-tenant pull frequency</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="button-group">
+                        <button class="btn btn-primary" onclick="saveTenantConfig()">Save Tenant Overrides</button>
+                        <button class="btn btn-secondary" onclick="clearTenantForm()">Clear Form</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = '/api/portal';
+        
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+                
+                // Update tab active state
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Show corresponding content
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                document.getElementById(`${tabName}-tab`).classList.add('active');
+            });
+        });
+        
+        // Alert helpers
+        function showSuccess(message) {
+            const alert = document.getElementById('successAlert');
+            alert.textContent = message;
+            alert.classList.add('show');
+            setTimeout(() => alert.classList.remove('show'), 5000);
+        }
+        
+        function showError(message) {
+            const alert = document.getElementById('errorAlert');
+            alert.textContent = message;
+            alert.classList.add('show');
+            setTimeout(() => alert.classList.remove('show'), 5000);
+        }
+        
+        // Load configuration
+        async function loadConfig(tenantId = null) {
+            try {
+                const url = tenantId 
+                    ? `${API_BASE}/trip-config?tenant_id=${encodeURIComponent(tenantId)}`
+                    : `${API_BASE}/trip-config`;
+                
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Failed to load configuration');
+                
+                const config = await response.json();
+                
+                // Populate form fields
+                const prefix = tenantId ? 'tenant_' : '';
+                Object.keys(config).forEach(key => {
+                    if (key === 'tenant_id') return;
+                    const input = document.getElementById(prefix + key);
+                    if (input) input.value = config[key];
+                });
+                
+                return config;
+            } catch (error) {
+                showError(`Error loading config: ${error.message}`);
+                throw error;
+            }
+        }
+        
+        // Save global configuration
+        async function saveGlobalConfig() {
+            const data = {
+                batch_sweep_interval_minutes: parseInt(document.getElementById('batch_sweep_interval_minutes').value),
+                tracklist_delay_minutes: parseInt(document.getElementById('tracklist_delay_minutes').value),
+                coalesce_floor_minutes: parseInt(document.getElementById('coalesce_floor_minutes').value),
+                engine_anchor_radius_m: parseInt(document.getElementById('engine_anchor_radius_m').value),
+                engine_min_leg_distance_m: parseInt(document.getElementById('engine_min_leg_distance_m').value),
+                engine_move_confirm_m: parseInt(document.getElementById('engine_move_confirm_m').value),
+                engine_max_speed_kmh: parseInt(document.getElementById('engine_max_speed_kmh').value),
+                engine_gap_timeout_min: parseInt(document.getElementById('engine_gap_timeout_min').value),
+                engine_air_speed_kmh: parseInt(document.getElementById('engine_air_speed_kmh').value),
+                engine_air_min_distance_km: parseInt(document.getElementById('engine_air_min_distance_km').value),
+                engine_journey_break_dwell_min: parseInt(document.getElementById('engine_journey_break_dwell_min').value),
+                engine_smoothing_window: parseInt(document.getElementById('engine_smoothing_window').value),
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/trip-config`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (!response.ok) throw new Error('Failed to save configuration');
+                
+                showSuccess('Global configuration saved successfully!');
+                await loadConfig(); // Reload to show saved values
+            } catch (error) {
+                showError(`Error saving config: ${error.message}`);
+            }
+        }
+        
+        // Load tenant configuration
+        async function loadTenantConfig() {
+            const tenantId = document.getElementById('tenant_id').value.trim();
+            if (!tenantId) {
+                showError('Please enter a tenant ID');
+                return;
+            }
+            
+            try {
+                await loadConfig(tenantId);
+                document.getElementById('tenant-config-form').style.display = 'block';
+                showSuccess(`Loaded configuration for tenant: ${tenantId}`);
+            } catch (error) {
+                // Error already shown by loadConfig
+            }
+        }
+        
+        // Save tenant configuration
+        async function saveTenantConfig() {
+            const tenantId = document.getElementById('tenant_id').value.trim();
+            if (!tenantId) {
+                showError('Please enter a tenant ID');
+                return;
+            }
+            
+            // Only send non-empty fields for tenant overrides
+            const data = {};
+            const coalesce = document.getElementById('tenant_coalesce_floor_minutes').value;
+            if (coalesce) data.coalesce_floor_minutes = parseInt(coalesce);
+            
+            if (Object.keys(data).length === 0) {
+                showError('Please set at least one override value');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/trip-config?tenant_id=${encodeURIComponent(tenantId)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (!response.ok) throw new Error('Failed to save tenant configuration');
+                
+                showSuccess(`Tenant configuration saved for: ${tenantId}`);
+            } catch (error) {
+                showError(`Error saving tenant config: ${error.message}`);
+            }
+        }
+        
+        // Clear tenant form
+        function clearTenantForm() {
+            document.getElementById('tenant_id').value = '';
+            document.getElementById('tenant_coalesce_floor_minutes').value = '';
+            document.getElementById('tenant-config-form').style.display = 'none';
+        }
+        
+        // Load global config on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadConfig().catch(() => {
+                showError('Failed to load initial configuration. Please refresh the page.');
+            });
+        });
+    </script>
+</body>
+</html>
