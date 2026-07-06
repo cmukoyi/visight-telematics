@@ -6,7 +6,7 @@ version: '3.8'
 
 services:
   db:
-    image: postgis/postgis:15-alpine
+    image: postgis/postgis:15-3.3-alpine
     container_name: beacon_telematics_db_local
     environment:
       POSTGRES_USER: beacon_user
