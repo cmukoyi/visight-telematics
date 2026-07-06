@@ -288,6 +288,11 @@
                 <span class="nav-label">Movement History</span>
             </button>
 
+            <button class="nav-item" data-tab="history-advanced" onclick="switchTab('history-advanced')">
+                <span class="nav-icon"><i class="fa-solid fa-map-location-dot"></i></span>
+                <span class="nav-label">Movement History Advanced <span class="beta-badge">Beta</span></span>
+            </button>
+
             <button class="nav-item" data-tab="hive" onclick="switchTab('hive')">
                 <span class="nav-icon"><i class="fa-solid fa-shield-halved"></i></span>
                 <span class="nav-label">Hive Tracking</span>
@@ -3104,6 +3109,20 @@ input.hive-range::-moz-range-track {
                 </div>
             </div>
 
+            <!-- ══════════ MOVEMENT HISTORY ADVANCED TAB (Phase 5) ══════════ -->
+            <div id="tab-history-advanced" class="tab-content" style="flex-direction:column;gap:0;padding:0;overflow:hidden">
+                <div style="display:flex;flex-direction:column;height:100%;">
+                    <!-- Placeholder for Phase 5.2+ implementation -->
+                    <div style="padding:40px;text-align:center;">
+                        <i class="fa-solid fa-map-location-dot" style="font-size:48px;color:var(--primary);margin-bottom:16px;"></i>
+                        <h2>Movement History Advanced</h2>
+                        <p style="color:var(--text-2);margin-top:8px;">Trip engine with journey visualization</p>
+                        <span class="beta-badge" style="font-size:14px;margin-top:12px;display:inline-block;">Beta</span>
+                        <p style="margin-top:24px;color:var(--text-3);font-size:14px;">Phase 5.2+ UI coming soon...</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- ══════════ HIVE TRACKING TAB ══════════ -->
             <div id="tab-hive" class="tab-content" style="flex-direction:column;gap:0;padding:20px">
 
@@ -4672,7 +4691,7 @@ window.addEventListener('resize', function() {
 // ══════════════════════════════════════════
 // Tab switching
 // ══════════════════════════════════════════
-const TAB_TITLES = { livemap: 'Live Map', assets: 'Asset List', history: 'Movement History', 'asset-mgmt': 'Asset Management', locations: 'Geofences', users: 'User Accounts', building: 'Floor Plan Sketch', floorplan: 'Floor Plan', settings: 'Settings', qr: 'QR / NFC Tags', 'reports-subscriptions': 'Tag Subscriptions Report', 'reports-activity': 'Asset Activity Summary', 'reports-trips': 'Movement / Journey Log', 'reports-battery': 'Battery & Offline Report', 'reports-alerts': 'Alerts Inbox', 'reports-geofence': 'Geofence Events', hive: 'Hive Tracking' };
+const TAB_TITLES = { livemap: 'Live Map', assets: 'Asset List', history: 'Movement History', 'history-advanced': 'Movement History Advanced', 'asset-mgmt': 'Asset Management', locations: 'Geofences', users: 'User Accounts', building: 'Floor Plan Sketch', floorplan: 'Floor Plan', settings: 'Settings', qr: 'QR / NFC Tags', 'reports-subscriptions': 'Tag Subscriptions Report', 'reports-activity': 'Asset Activity Summary', 'reports-trips': 'Movement / Journey Log', 'reports-battery': 'Battery & Offline Report', 'reports-alerts': 'Alerts Inbox', 'reports-geofence': 'Geofence Events', hive: 'Hive Tracking' };
 let _mapInitialized = false;
 
 function switchTab(name) {
