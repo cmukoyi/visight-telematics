@@ -110,7 +110,7 @@ def _login_record_success(ip: str) -> None:
 # ---------------------------------------------------------------------------
 
 SECTION_FEATURES: dict = {
-    "tracking":   ["livemap", "floorplan", "assets", "history", "hive"],
+    "tracking":   ["livemap", "floorplan", "assets", "history", "history-advanced", "hive"],
     "management": ["asset-mgmt", "users", "qr", "building", "locations", "settings"],
     "reports":    [
         "reports-subscriptions", "reports-activity", "reports-trips",
