@@ -3129,6 +3129,7 @@ input.hive-range::-moz-range-track {
             .mha-ap-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
             .mha-ap-stat { background:var(--bg-3); border:1px solid var(--border); border-radius:8px; padding:7px 3px; text-align:center; cursor:pointer; transition:all .15s; }
             .mha-ap-stat:hover { border-color:var(--primary); }
+            .mha-ap-stat.act { background:color-mix(in srgb,var(--primary) 10%,transparent); border-color:var(--primary); }
             .mha-ap-stat .n { font-size:16px; font-weight:600; line-height:1.1; }
             .mha-ap-stat .l { font-size:9px; color:var(--text-3); text-transform:uppercase; letter-spacing:.03em; }
             .mha-ap-stat.act .n { color:var(--primary); }
@@ -3141,6 +3142,11 @@ input.hive-range::-moz-range-track {
             .mha-asset-row .info { flex:1; min-width:0; }
             .mha-asset-row .nm { font-size:13px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
             .mha-asset-row .im { font-size:10px; color:var(--text-3); }
+            .mha-asset-row .ts { font-size:10px; color:var(--text-3); margin-top:2px; }
+            .mha-asset-row .badge { display:inline-block; padding:2px 6px; border-radius:10px; font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:.03em; }
+            .mha-asset-row .badge.active { background:color-mix(in srgb,var(--primary) 20%,transparent); color:var(--primary); }
+            .mha-asset-row .badge.idle { background:rgba(245,158,11,.2); color:#f59e0b; }
+            .mha-asset-row .badge.offline { background:var(--bg-3); color:var(--text-3); }
             
             /* Map Panel (flex) */
             .mha-map-panel { flex:1; min-width:0; background:var(--bg-2); border:1px solid var(--border); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; }
@@ -3149,6 +3155,7 @@ input.hive-range::-moz-range-track {
             .mha-map-head .t i { color:var(--primary); font-size:16px; }
             .mha-map-head .meta { font-size:11px; color:var(--text-3); }
             .mha-map-container { position:relative; flex:1; min-height:460px; background:var(--bg-3); }
+            #mha-map { width:100%; height:100%; min-height:460px; }
             .mha-map-placeholder { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:var(--text-3); }
             .mha-map-placeholder i { font-size:64px; margin-bottom:16px; opacity:.3; }
             .mha-map-placeholder p { font-size:14px; }
@@ -3164,6 +3171,24 @@ input.hive-range::-moz-range-track {
             .mha-jp-placeholder { text-align:center; padding:40px 16px; color:var(--text-3); }
             .mha-jp-placeholder i { font-size:48px; margin-bottom:12px; opacity:.3; }
             .mha-jp-placeholder p { font-size:13px; }
+            
+            /* Journey Cards */
+            .mha-journey-card { background:var(--bg-3); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:10px; cursor:pointer; transition:all .15s; }
+            .mha-journey-card:hover { border-color:var(--primary); }
+            .mha-journey-card.selected { border-color:var(--primary); background:color-mix(in srgb,var(--primary) 8%,transparent); }
+            .mha-journey-hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+            .mha-journey-hd .date { font-size:13px; font-weight:600; }
+            .mha-journey-hd .dur { font-size:11px; color:var(--text-3); }
+            .mha-journey-stats { display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:11px; }
+            .mha-journey-stats .stat { display:flex; align-items:center; gap:5px; }
+            .mha-journey-stats .stat i { color:var(--text-3); font-size:12px; }
+            .mha-journey-stats .stat .v { font-weight:600; }
+            
+            /* Position Timeline */
+            .mha-position-item { padding:10px 0; border-bottom:1px solid var(--border); }
+            .mha-position-item:last-child { border-bottom:none; }
+            .mha-position-time { font-size:12px; font-weight:600; margin-bottom:4px; }
+            .mha-position-loc { font-size:11px; color:var(--text-3); font-family:monospace; }
             
             @media(max-width:1100px) {
                 .mha-assets-panel,
@@ -3182,26 +3207,26 @@ input.hive-range::-moz-range-track {
                         <div class="mha-ap-body">
                             <div class="mha-ap-search">
                                 <i class="fa-solid fa-search"></i>
-                                <input type="text" placeholder="Search assets...">
+                                <input type="text" id="mha-search-input" placeholder="Search assets..." oninput="mhaFilterAssets()">
                             </div>
                             
                             <div>
                                 <div class="mha-ap-label">Status</div>
                                 <div class="mha-ap-stats">
-                                    <div class="mha-ap-stat act">
-                                        <div class="n">0</div>
+                                    <div class="mha-ap-stat act" data-status="all" onclick="mhaFilterByStatus('all', this)">
+                                        <div class="n" id="mha-stat-active">0</div>
                                         <div class="l">Active</div>
                                     </div>
-                                    <div class="mha-ap-stat">
-                                        <div class="n">0</div>
+                                    <div class="mha-ap-stat" data-status="idle" onclick="mhaFilterByStatus('idle', this)">
+                                        <div class="n" id="mha-stat-idle">0</div>
                                         <div class="l">Idle</div>
                                     </div>
-                                    <div class="mha-ap-stat">
-                                        <div class="n">0</div>
+                                    <div class="mha-ap-stat" data-status="offline" onclick="mhaFilterByStatus('offline', this)">
+                                        <div class="n" id="mha-stat-offline">0</div>
                                         <div class="l">Offline</div>
                                     </div>
-                                    <div class="mha-ap-stat">
-                                        <div class="n">0</div>
+                                    <div class="mha-ap-stat" data-status="total" onclick="mhaFilterByStatus('total', this)">
+                                        <div class="n" id="mha-stat-total">0</div>
                                         <div class="l">Total</div>
                                     </div>
                                 </div>
@@ -3209,11 +3234,10 @@ input.hive-range::-moz-range-track {
                             
                             <div style="flex:1;display:flex;flex-direction:column;">
                                 <div class="mha-ap-label">Asset List</div>
-                                <div class="mha-ap-list">
+                                <div class="mha-ap-list" id="mha-asset-list">
                                     <div style="padding:40px 16px;text-align:center;color:var(--text-3);font-size:13px;">
-                                        <i class="fa-solid fa-tags" style="font-size:32px;opacity:.3;margin-bottom:12px;display:block;"></i>
-                                        No assets found<br>
-                                        <small style="font-size:11px;">Phase 5.3 implementation</small>
+                                        <i class="fa-solid fa-spinner fa-spin" style="font-size:24px;margin-bottom:12px;display:block;"></i>
+                                        Loading assets...
                                     </div>
                                 </div>
                             </div>
@@ -3227,32 +3251,35 @@ input.hive-range::-moz-range-track {
                                 <i class="fa-solid fa-map"></i>
                                 <span>Journey Map</span>
                             </div>
-                            <div class="meta">Select an asset to view journeys</div>
+                            <div class="meta" id="mha-map-meta">Select an asset to view journeys</div>
                         </div>
                         <div class="mha-map-container">
-                            <div class="mha-map-placeholder">
-                                <i class="fa-solid fa-map-location-dot"></i>
-                                <p>Journey visualization coming in Phase 5.4</p>
-                            </div>
+                            <div id="mha-map"></div>
                         </div>
                     </div>
                     
                     <!-- Journeys/Positions Panel (Phase 5.5) -->
                     <div class="mha-journeys-panel">
                         <div class="mha-jp-tabs">
-                            <div class="mha-jp-tab active" data-mha-tab="journeys">
+                            <div class="mha-jp-tab active" data-mha-tab="journeys" onclick="mhaSwitchTab('journeys')">
                                 <i class="fa-solid fa-route"></i>
                                 <span>Journeys</span>
                             </div>
-                            <div class="mha-jp-tab" data-mha-tab="positions">
+                            <div class="mha-jp-tab" data-mha-tab="positions" onclick="mhaSwitchTab('positions')">
                                 <i class="fa-solid fa-location-dot"></i>
                                 <span>Positions</span>
                             </div>
                         </div>
-                        <div class="mha-jp-body">
+                        <div class="mha-jp-body" id="mha-journeys-body">
                             <div class="mha-jp-placeholder">
                                 <i class="fa-solid fa-route"></i>
-                                <p>Journey cards will appear here<br><small style="font-size:11px;">Phase 5.5 implementation</small></p>
+                                <p>Select an asset to view journeys</p>
+                            </div>
+                        </div>
+                        <div class="mha-jp-body" id="mha-positions-body" style="display:none;">
+                            <div class="mha-jp-placeholder">
+                                <i class="fa-solid fa-location-dot"></i>
+                                <p>Select an asset to view positions</p>
                             </div>
                         </div>
                     </div>
@@ -4866,6 +4893,7 @@ function switchTab(name) {
     if (name === 'livemap')    _runTabTask(initLiveMap(), 'livemap');
     if (name === 'assets')     _runTabTask(initAssetList(), 'assets');
     if (name === 'history')    _runTabTask(initHistoryTab(), 'history');
+    if (name === 'history-advanced') _runTabTask(initHistoryAdvanced(), 'history-advanced');
     if (name === 'asset-mgmt') _runTabTask(initAssetMgmt(), 'asset-mgmt');
     if (name === 'locations')  _runTabTask(locationsLoad(), 'locations');
     if (name === 'floorplan')  _runTabTask(FP.onShow(), 'floorplan');
@@ -13099,5 +13127,481 @@ function qrOpenHelp() {
   }, 500);
 
   console.log('[Floor Plan] Floor Plan Sketch database integration loaded');
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MOVEMENT HISTORY ADVANCED (Phases 5.3, 5.4, 5.5)
+// ═══════════════════════════════════════════════════════════════════════════
+(function() {
+  let _mhaMap = null;
+  let _mhaMapReady = false;
+  let _mhaAssets = [];
+  let _mhaAllAssets = [];
+  let _mhaSelectedImei = null;
+  let _mhaActiveJourney = null;
+  let _mhaFilterStatus = 'all';
+  let _mhaSearchQuery = '';
+  let _mhaJourneyLayers = [];
+
+  // Initialize Movement History Advanced tab
+  window.initHistoryAdvanced = async function() {
+    console.log('[MHA] Initializing Movement History Advanced');
+    
+    // Initialize map (Phase 5.4)
+    if (!_mhaMapReady) {
+      _mhaMap = L.map('mha-map', {
+        zoomControl: true,
+        attributionControl: false,
+        zoomSnap: 0.25,
+        zoomDelta: 0.5,
+        wheelPxPerZoomLevel: 80
+      }).setView([51.5074, -0.1278], 12);
+      addPinplotBasemap(_mhaMap);
+      _mhaMapReady = true;
+    } else {
+      _mhaMap.invalidateSize();
+    }
+    
+    // Load assets (Phase 5.3)
+    await mhaLoadAssets();
+  };
+
+  // Phase 5.3: Load and render assets
+  async function mhaLoadAssets() {
+    try {
+      const res = await apiFetch('/api/portal/tags');
+      if (!res.ok) throw new Error('Failed to load assets');
+      
+      _mhaAllAssets = await res.json();
+      _mhaAssets = _mhaAllAssets;
+      
+      // Sort by last_seen (most recent first)
+      _mhaAssets.sort((a, b) => {
+        const aTime = a.last_seen ? new Date(a.last_seen).getTime() : 0;
+        const bTime = b.last_seen ? new Date(b.last_seen).getTime() : 0;
+        return bTime - aTime;
+      });
+      
+      mhaUpdateStats();
+      mhaRenderAssetList();
+    } catch (err) {
+      console.error('[MHA] Error loading assets:', err);
+      document.getElementById('mha-asset-list').innerHTML =
+        `<div style="padding:20px;text-align:center;color:var(--danger)">
+          <i class="fa-solid fa-triangle-exclamation"></i> ${esc(err.message)}
+        </div>`;
+    }
+  }
+
+  // Update stats chips
+  function mhaUpdateStats() {
+    const now = Date.now();
+    const day = 24 * 60 * 60 * 1000;
+    const week = 7 * day;
+    
+    let active = 0, idle = 0, offline = 0;
+    
+    _mhaAssets.forEach(asset => {
+      if (!asset.last_seen) {
+        offline++;
+        return;
+      }
+      const lastSeen = new Date(asset.last_seen).getTime();
+      const age = now - lastSeen;
+      
+      if (age < day) active++;
+      else if (age < week) idle++;
+      else offline++;
+    });
+    
+    document.getElementById('mha-stat-active').textContent = active;
+    document.getElementById('mha-stat-idle').textContent = idle;
+    document.getElementById('mha-stat-offline').textContent = offline;
+    document.getElementById('mha-stat-total').textContent = _mhaAssets.length;
+  }
+
+  // Render asset list
+  function mhaRenderAssetList() {
+    const list = document.getElementById('mha-asset-list');
+    
+    if (_mhaAssets.length === 0) {
+      list.innerHTML = `
+        <div style="padding:40px 16px;text-align:center;color:var(--text-3);font-size:13px;">
+          <i class="fa-solid fa-tags" style="font-size:32px;opacity:.3;margin-bottom:12px;display:block;"></i>
+          No assets found
+        </div>`;
+      return;
+    }
+    
+    list.innerHTML = _mhaAssets.map(asset => {
+      const status = mhaGetAssetStatus(asset);
+      const lastSeenText = mhaFormatLastSeen(asset.last_seen);
+      const name = esc(asset.description || asset.device_name || asset.imei);
+      const isActive = _mhaSelectedImei === asset.imei;
+      
+      return `
+        <div class="mha-asset-row ${isActive ? 'active' : ''}" onclick="mhaSelectAsset('${esc(asset.imei)}')">
+          <i class="fa-solid fa-location-dot pin"></i>
+          <div class="info">
+            <div class="nm">${name}</div>
+            <div class="im">${esc(asset.imei)}</div>
+            <div class="ts">${lastSeenText}</div>
+          </div>
+          <span class="badge ${status}">${status}</span>
+        </div>`;
+    }).join('');
+  }
+
+  // Get asset status
+  function mhaGetAssetStatus(asset) {
+    if (!asset.last_seen) return 'offline';
+    
+    const now = Date.now();
+    const lastSeen = new Date(asset.last_seen).getTime();
+    const age = now - lastSeen;
+    const day = 24 * 60 * 60 * 1000;
+    const week = 7 * day;
+    
+    if (age < day) return 'active';
+    if (age < week) return 'idle';
+    return 'offline';
+  }
+
+  // Format last seen time
+  function mhaFormatLastSeen(lastSeen) {
+    if (!lastSeen) return 'Never';
+    
+    const date = new Date(lastSeen);
+    const now = Date.now();
+    const diff = now - date.getTime();
+    
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+    
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+    
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  }
+
+  // Filter assets by status
+  window.mhaFilterByStatus = function(status, el) {
+    _mhaFilterStatus = status;
+    
+    // Update active stat chip
+    document.querySelectorAll('.mha-ap-stat').forEach(s => s.classList.remove('act'));
+    if (el) el.classList.add('act');
+    
+    mhaFilterAssets();
+  };
+
+  // Filter assets by search query
+  window.mhaFilterAssets = function() {
+    _mhaSearchQuery = document.getElementById('mha-search-input').value.toLowerCase();
+    
+    _mhaAssets = _mhaAllAssets.filter(asset => {
+      // Search filter
+      const searchMatch = !_mhaSearchQuery || 
+        (asset.description || '').toLowerCase().includes(_mhaSearchQuery) ||
+        (asset.device_name || '').toLowerCase().includes(_mhaSearchQuery) ||
+        asset.imei.toLowerCase().includes(_mhaSearchQuery);
+      
+      if (!searchMatch) return false;
+      
+      // Status filter
+      if (_mhaFilterStatus === 'all' || _mhaFilterStatus === 'total') return true;
+      
+      const status = mhaGetAssetStatus(asset);
+      return status === _mhaFilterStatus;
+    });
+    
+    mhaRenderAssetList();
+  };
+
+  // Phase 5.3: Select asset
+  window.mhaSelectAsset = async function(imei) {
+    _mhaSelectedImei = imei;
+    const asset = _mhaAllAssets.find(a => a.imei === imei);
+    if (!asset) return;
+    
+    // Update UI
+    mhaRenderAssetList();
+    document.getElementById('mha-map-meta').textContent = 
+      `${esc(asset.description || asset.device_name || imei)} - Loading journeys...`;
+    
+    // Phase 5.5: Load journeys
+    await mhaLoadJourneys(imei);
+    
+    // Phase 5.4: Center map on asset
+    if (asset.latitude && asset.longitude) {
+      _mhaMap.setView([parseFloat(asset.latitude), parseFloat(asset.longitude)], 14);
+    }
+  };
+
+  // Phase 5.5: Load journeys for selected asset
+  async function mhaLoadJourneys(imei) {
+    const journeysBody = document.getElementById('mha-journeys-body');
+    journeysBody.innerHTML = `
+      <div style="text-align:center;padding:40px 16px;color:var(--text-3);">
+        <i class="fa-solid fa-spinner fa-spin" style="font-size:32px;margin-bottom:12px;display:block;"></i>
+        Loading journeys...
+      </div>`;
+    
+    try {
+      // Default: last 7 days
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 7);
+      
+      const params = new URLSearchParams({
+        device_imei: imei,
+        start_date: startDate.toISOString().split('T')[0],
+        end_date: endDate.toISOString().split('T')[0],
+        page: 1,
+        page_size: 50
+      });
+      
+      const res = await apiFetch(`/api/portal/journeys?${params}`);
+      if (!res.ok) throw new Error('Failed to load journeys');
+      
+      const data = await res.json();
+      
+      if (data.journeys.length === 0) {
+        journeysBody.innerHTML = `
+          <div class="mha-jp-placeholder">
+            <i class="fa-solid fa-route"></i>
+            <p>No journeys found<br><small>Last 7 days</small></p>
+          </div>`;
+        document.getElementById('mha-map-meta').textContent = 'No journeys in the last 7 days';
+        return;
+      }
+      
+      mhaRenderJourneys(data.journeys);
+      document.getElementById('mha-map-meta').textContent = 
+        `${data.total} journey${data.total !== 1 ? 's' : ''} (last 7 days)`;
+    } catch (err) {
+      console.error('[MHA] Error loading journeys:', err);
+      journeysBody.innerHTML = `
+        <div style="text-align:center;padding:40px 16px;color:var(--danger);">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <p>${esc(err.message)}</p>
+        </div>`;
+    }
+  }
+
+  // Render journey cards
+  function mhaRenderJourneys(journeys) {
+    const journeysBody = document.getElementById('mha-journeys-body');
+    
+    journeysBody.innerHTML = journeys.map(journey => {
+      const startDate = new Date(journey.started_at);
+      const duration = mhaFormatDuration(journey.total_duration_seconds);
+      const distance = (journey.total_distance_m / 1000).toFixed(1);
+      const isSelected = _mhaActiveJourney === journey.id;
+      
+      return `
+        <div class="mha-journey-card ${isSelected ? 'selected' : ''}" onclick="mhaSelectJourney('${journey.id}')">
+          <div class="mha-journey-hd">
+            <div class="date">${startDate.toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+            <div class="dur">${duration}</div>
+          </div>
+          <div class="mha-journey-stats">
+            <div class="stat">
+              <i class="fa-solid fa-route"></i>
+              <span class="v">${distance} km</span>
+            </div>
+            <div class="stat">
+              <i class="fa-solid fa-circle-pause"></i>
+              <span class="v">${journey.stationary_count} stops</span>
+            </div>
+            <div class="stat">
+              <i class="fa-solid fa-forward"></i>
+              <span class="v">${journey.leg_count} legs</span>
+            </div>
+            ${journey.is_air_journey ? '<div class="stat"><i class="fa-solid fa-plane"></i><span class="v">Air</span></div>' : ''}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // Format duration
+  function mhaFormatDuration(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    if (minutes > 0) return `${minutes}m`;
+    return `${seconds}s`;
+  }
+
+  // Phase 5.4 & 5.5: Select and visualize journey
+  window.mhaSelectJourney = async function(journeyId) {
+    _mhaActiveJourney = journeyId;
+    
+    // Update UI - highlight selected card
+    document.querySelectorAll('.mha-journey-card').forEach(card => {
+      card.classList.toggle('selected', card.onclick.toString().includes(journeyId));
+    });
+    
+    // Clear existing journey layers
+    _mhaJourneyLayers.forEach(layer => _mhaMap.removeLayer(layer));
+    _mhaJourneyLayers = [];
+    
+    try {
+      // Fetch journey path (GeoJSON)
+      const res = await apiFetch(`/api/portal/journeys/${journeyId}/path`);
+      if (!res.ok) throw new Error('Failed to load journey path');
+      
+      const geojson = await res.json();
+      
+      // Render journey on map
+      const layer = L.geoJSON(geojson, {
+        style: function(feature) {
+          const colors = {
+            leg: '#3b82f6',           // Blue for legs
+            stationary: '#f59e0b',    // Amber for stationaries
+            start: '#22c55e',         // Green for start
+            end: '#ef4444'            // Red for end
+          };
+          return {
+            color: colors[feature.properties.type] || '#3b82f6',
+            weight: 3,
+            opacity: 0.8
+          };
+        },
+        pointToLayer: function(feature, latlng) {
+          const colors = {
+            start: '#22c55e',
+            end: '#ef4444',
+            stationary: '#f59e0b'
+          };
+          const color = colors[feature.properties.type] || '#3b82f6';
+          
+          return L.circleMarker(latlng, {
+            radius: 6,
+            fillColor: color,
+            color: '#fff',
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.8
+          });
+        },
+        onEachFeature: function(feature, layer) {
+          if (feature.properties) {
+            const props = feature.properties;
+            let popupContent = `<div style="font-size:12px;">`;
+            
+            if (props.type === 'leg') {
+              popupContent += `<b>Leg</b><br>Distance: ${(props.distance_m / 1000).toFixed(2)} km<br>Duration: ${mhaFormatDuration(props.duration_seconds)}`;
+            } else if (props.type === 'stationary') {
+              popupContent += `<b>Stop</b><br>Duration: ${mhaFormatDuration(props.duration_seconds)}`;
+            } else if (props.type === 'start') {
+              popupContent += `<b>Start</b><br>${new Date(props.time).toLocaleString()}`;
+            } else if (props.type === 'end') {
+              popupContent += `<b>End</b><br>${new Date(props.time).toLocaleString()}`;
+            }
+            
+            popupContent += `</div>`;
+            layer.bindPopup(popupContent);
+          }
+        }
+      }).addTo(_mhaMap);
+      
+      _mhaJourneyLayers.push(layer);
+      
+      // Fit map to journey bounds
+      const bounds = layer.getBounds();
+      if (bounds.isValid()) {
+        _mhaMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+      }
+      
+    } catch (err) {
+      console.error('[MHA] Error loading journey path:', err);
+    }
+  };
+
+  // Phase 5.5: Switch between Journeys and Positions tabs
+  window.mhaSwitchTab = function(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.mha-jp-tab').forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.mhaTab === tabName);
+    });
+    
+    // Show/hide panels
+    if (tabName === 'journeys') {
+      document.getElementById('mha-journeys-body').style.display = '';
+      document.getElementById('mha-positions-body').style.display = 'none';
+    } else {
+      document.getElementById('mha-journeys-body').style.display = 'none';
+      document.getElementById('mha-positions-body').style.display = '';
+      
+      // Load positions if not already loaded
+      if (_mhaSelectedImei) {
+        mhaLoadPositions(_mhaSelectedImei);
+      }
+    }
+  };
+
+  // Load raw positions for selected asset
+  async function mhaLoadPositions(imei) {
+    const positionsBody = document.getElementById('mha-positions-body');
+    positionsBody.innerHTML = `
+      <div style="text-align:center;padding:40px 16px;color:var(--text-3);">
+        <i class="fa-solid fa-spinner fa-spin" style="font-size:32px;margin-bottom:12px;display:block;"></i>
+        Loading positions...
+      </div>`;
+    
+    try {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 1); // Last 24 hours
+      
+      const params = new URLSearchParams({
+        device_imei: imei,
+        start_date: startDate.toISOString(),
+        end_date: endDate.toISOString(),
+        page: 1,
+        page_size: 100
+      });
+      
+      const res = await apiFetch(`/api/portal/positions?${params}`);
+      if (!res.ok) throw new Error('Failed to load positions');
+      
+      const data = await res.json();
+      
+      if (data.positions.length === 0) {
+        positionsBody.innerHTML = `
+          <div class="mha-jp-placeholder">
+            <i class="fa-solid fa-location-dot"></i>
+            <p>No positions found<br><small>Last 24 hours</small></p>
+          </div>`;
+        return;
+      }
+      
+      positionsBody.innerHTML = data.positions.map(pos => {
+        const time = new Date(pos.observed_at).toLocaleString([], { 
+          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+        });
+        return `
+          <div class="mha-position-item">
+            <div class="mha-position-time">${time}</div>
+            <div class="mha-position-loc">${pos.latitude.toFixed(6)}, ${pos.longitude.toFixed(6)}</div>
+          </div>`;
+      }).join('');
+      
+    } catch (err) {
+      console.error('[MHA] Error loading positions:', err);
+      positionsBody.innerHTML = `
+        <div style="text-align:center;padding:40px 16px;color:var(--danger);">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <p>${esc(err.message)}</p>
+        </div>`;
+    }
+  }
+
+  console.log('[MHA] Movement History Advanced module loaded');
 })();
 </script>
