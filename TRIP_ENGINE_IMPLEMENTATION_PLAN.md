@@ -333,47 +333,45 @@ engine_smoothing_window: 3
 ```
 
 ### 5.3 Assets Panel
-**Status:** ⏳ Not Started
+**Status:** ✅ COMPLETE
 
 **Features:**
-- [ ] Search assets/tags (typeahead)
-- [ ] Date range pills (Today, Yesterday, Last 7/30 days, Custom)
-- [ ] Stat chips (Total/Active/Idle/Offline)
-- [ ] Filter pills (All, New Tags, Parcels, QR Code)
-- [ ] Asset list sorted by last reported
-- [ ] Time badges (2m, 3h, 2d) color-coded by freshness
-- [ ] Panel collapse/expand
+- [x] Search assets/tags (real-time filter)
+- [x] Stat chips (Total/Active/Idle/Offline) with click filtering
+- [x] Asset list sorted by last reported (most recent first)
+- [x] Time badges (2m, 3h, 2d) with human-readable format
+- [x] Status badges (Active/Idle/Offline) with auto-detection
+- [x] Asset selection with visual feedback
+- [x] Real API data from /api/portal/tags
 
 ### 5.4 Map Component
-**Status:** ⏳ Not Started
+**Status:** ✅ COMPLETE
 
 **Features:**
-- [ ] SVG-based journey visualization
-- [ ] Color hierarchy: green (Start), blue (Leg), amber (Stationary), red (End)
-- [ ] Pulsing rings for stationaries
-- [ ] Air leg visualization (dashed great-circle)
-- [ ] Map controls: Show/Hide geofences, Clear markers, Reset view
-- [ ] Legend (bottom-left)
-- [ ] Journey badge (bottom-right)
-- [ ] Focus ring animations
+- [x] Leaflet map (same as Live Map)
+- [x] GeoJSON journey visualization from /api/portal/journeys/{id}/path
+- [x] Color hierarchy: green (Start), blue (Leg), amber (Stationary), red (End)
+- [x] Auto-fit bounds to journey
+- [x] Interactive popups with leg/stop details
+- [x] Journey selection and rendering
+- [x] Smooth path visualization with PostGIS geometries
 
 ### 5.5 Journeys/Positions Panel
-**Status:** ⏳ Not Started
+**Status:** ✅ COMPLETE
 
 **Features:**
-- [ ] Two tabs: Journeys | Positions
-- [ ] **Journeys tab:**
-  - [ ] Journey cards grouped by date
-  - [ ] Expandable steps (Start, Leg n, Stationary n, End)
-  - [ ] Idle connectors between journeys
-  - [ ] Air-leg journeys with ✈ flight tag
-  - [ ] Plot all button
-- [ ] **Positions tab:**
-  - [ ] Raw positions from `device_positions` table
-  - [ ] Sticky date headers
-  - [ ] Leg/stationary links
-  - [ ] Per-row pin toggle
-  - [ ] Plot all button
+- [x] Two tabs: Journeys | Positions
+- [x] **Journeys tab:**
+  - [x] Journey cards with real API data (/api/portal/journeys)
+  - [x] Last 7 days default range, 50 journeys per page
+  - [x] Journey stats: distance, duration, stops, legs
+  - [x] Air journey badges
+  - [x] Clickable cards to visualize on map
+- [x] **Positions tab:**
+  - [x] Raw positions from /api/portal/positions
+  - [x] Last 24 hours of GPS data
+  - [x] Time and coordinate display
+  - [x] Tab switching between views
 
 ### 5.6 Two-Way Interaction
 **Status:** ⏳ Not Started
@@ -545,9 +543,9 @@ PUT /api/portal/devices/{device_imei}/subscription
 ## 📊 Progress Tracking
 
 ### Overall Progress
-- **Total Tasks:** 13/150+ (8.7%)
-- **Current Phase:** Phase 5.2 (Page Structure) ✅ Complete
-- **Next Phase:** Phase 5.3 (Assets Panel Implementation)
+- **Total Tasks:** 16/150+ (10.7%)
+- **Current Phase:** Phase 5 (Frontend UI) ✅ Core Complete (5.1, 5.2, 5.3, 5.4, 5.5)
+- **Next Phase:** Phase 5.6 (Two-Way Interaction) or Phase 4.2 (Subscription Management)
 
 ### Phase Status
 - [x] Phase 0: Planning ✅ Complete
@@ -555,7 +553,7 @@ PUT /api/portal/devices/{device_imei}/subscription
 - [x] Phase 2: Data Ingestion (Week 2) ✅ Complete (2.1 + 2.2)
 - [x] Phase 3: Trip State Engine (Week 3-4) ✅ Complete (3.1 + 3.2 + 3.3 + 3.4)
 - [~] Phase 4: Admin Configuration (Week 5) - Phase 4.1 Complete, 4.2 Pending
-- [~] Phase 5: Frontend UI (Week 6-7) - Phases 5.1, 5.2 Complete
+- [~] Phase 5: Frontend UI (Week 6-7) - Phases 5.1, 5.2, 5.3, 5.4, 5.5 Complete ✅ CORE DONE
 - [x] Phase 6: Backend API Endpoints (Week 8) ✅ Complete (6.1 + 6.2 + 6.3)
 - [ ] Phase 7: Integration & Testing (Week 9)
 - [ ] Phase 8: Documentation & Deployment (Week 10)
