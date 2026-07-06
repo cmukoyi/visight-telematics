@@ -3172,6 +3172,29 @@ input.hive-range::-moz-range-track {
             .mha-jp-placeholder i { font-size:48px; margin-bottom:12px; opacity:.3; }
             .mha-jp-placeholder p { font-size:13px; }
             
+            /* Date & Filter Pills */
+            .mha-pills { display:flex; gap:6px; flex-wrap:wrap; }
+            .mha-pill { font-size:11px; padding:6px 11px; border-radius:16px; border:1px solid var(--border); background:var(--bg-3); color:var(--text-2); cursor:pointer; white-space:nowrap; transition:all .12s; }
+            .mha-pill:hover { border-color:var(--border-2); background:var(--bg-2); }
+            .mha-pill.on { background:color-mix(in srgb,var(--primary) 12%,transparent); color:var(--primary); border-color:var(--primary); }
+            .mha-pill i { font-size:12px; margin-right:3px; }
+            
+            /* Asset Row Time Badges (color-coded by freshness) */
+            .mha-asset-row .seen { font-size:10.5px; font-weight:600; font-variant-numeric:tabular-nums; line-height:1; border:1px solid currentColor; border-radius:5px; padding:2px 6px; }
+            .mha-asset-row .seen.fresh { color:#22c55e; } /* ≤15 min */
+            .mha-asset-row .seen.recent { color:var(--text-2); } /* ≤3 h */
+            .mha-asset-row .seen.old { color:var(--text-3); } /* older */
+            .mha-asset-row .seen.offline { color:#ef4444; } /* offline */
+            
+            /* Battery & Status Dots */
+            .mha-asset-row .mrow { display:flex; align-items:center; gap:7px; margin-top:3px; }
+            .mha-asset-row .batt { font-size:10px; color:var(--text-2); display:flex; align-items:center; gap:3px; }
+            .mha-asset-row .batt i { font-size:13px; }
+            .mha-asset-row .sdot { width:8px; height:8px; border-radius:50%; flex:none; }
+            .mha-asset-row .sdot.active { background:#22c55e; }
+            .mha-asset-row .sdot.idle { background:#f59e0b; }
+            .mha-asset-row .sdot.offline { background:#ef4444; }
+            
             /* Journey Cards */
             .mha-journey-card { background:var(--bg-3); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:10px; cursor:pointer; transition:all .15s; }
             .mha-journey-card:hover { border-color:var(--primary); }
@@ -3210,6 +3233,18 @@ input.hive-range::-moz-range-track {
                                 <input type="text" id="mha-search-input" placeholder="Search assets..." oninput="mhaFilterAssets()">
                             </div>
                             
+                            <!-- Date Range Pills -->
+                            <div>
+                                <div class="mha-ap-label">Date range</div>
+                                <div class="mha-pills">
+                                    <span class="mha-pill" data-range="today" onclick="mhaSetDateRange('today', this)">Today</span>
+                                    <span class="mha-pill on" data-range="yesterday" onclick="mhaSetDateRange('yesterday', this)">Yesterday</span>
+                                    <span class="mha-pill" data-range="7d" onclick="mhaSetDateRange('7d', this)">Last 7 days</span>
+                                    <span class="mha-pill" data-range="30d" onclick="mhaSetDateRange('30d', this)">Last 30 days</span>
+                                    <span class="mha-pill" data-range="custom" onclick="mhaSetDateRange('custom', this)" style="color:var(--text-3)"><i class="fa-solid fa-calendar"></i> Custom</span>
+                                </div>
+                            </div>
+                            
                             <div>
                                 <div class="mha-ap-label">Status</div>
                                 <div class="mha-ap-stats">
@@ -3232,8 +3267,21 @@ input.hive-range::-moz-range-track {
                                 </div>
                             </div>
                             
+                            <!-- Filter Pills -->
+                            <div>
+                                <div class="mha-pills">
+                                    <span class="mha-pill on" data-filter="all" onclick="mhaSetFilter('all', this)">All</span>
+                                    <span class="mha-pill" data-filter="newtags" onclick="mhaSetFilter('newtags', this)">New Tags</span>
+                                    <span class="mha-pill" data-filter="parcels" onclick="mhaSetFilter('parcels', this)">Parcels</span>
+                                    <span class="mha-pill" data-filter="qr" onclick="mhaSetFilter('qr', this)">QR Code</span>
+                                </div>
+                            </div>
+                            
                             <div style="flex:1;display:flex;flex-direction:column;">
-                                <div class="mha-ap-label">Asset List</div>
+                                <div class="mha-ap-label" style="display:flex;justify-content:space-between;align-items:center">
+                                    <span>Assets</span>
+                                    <span style="text-transform:none;letter-spacing:0;font-size:10px"><i class="fa-solid fa-arrow-down" style="font-size:10px;margin-right:2px"></i> last reported</span>
+                                </div>
                                 <div class="mha-ap-list" id="mha-asset-list">
                                     <div style="padding:40px 16px;text-align:center;color:var(--text-3);font-size:13px;">
                                         <i class="fa-solid fa-spinner fa-spin" style="font-size:24px;margin-bottom:12px;display:block;"></i>
@@ -13142,6 +13190,8 @@ function qrOpenHelp() {
   let _mhaFilterStatus = 'all';
   let _mhaSearchQuery = '';
   let _mhaJourneyLayers = [];
+  let _mhaDateRange = 'yesterday'; // today, yesterday, 7d, 30d, custom
+  let _mhaFilter = 'all'; // all, newtags, parcels, qr
 
   // Initialize Movement History Advanced tab
   window.initHistoryAdvanced = async function() {
@@ -13220,7 +13270,7 @@ function qrOpenHelp() {
     document.getElementById('mha-stat-total').textContent = _mhaAssets.length;
   }
 
-  // Render asset list
+  // Render asset list with color-coded time badges, battery, status dots
   function mhaRenderAssetList() {
     const list = document.getElementById('mha-asset-list');
     
@@ -13235,9 +13285,14 @@ function qrOpenHelp() {
     
     list.innerHTML = _mhaAssets.map(asset => {
       const status = mhaGetAssetStatus(asset);
-      const lastSeenText = mhaFormatLastSeen(asset.last_seen);
+      const {text: timeText, cssClass: timeClass} = mhaGetTimeBadge(asset.last_seen);
       const name = esc(asset.description || asset.device_name || asset.imei);
       const isActive = _mhaSelectedImei === asset.imei;
+      
+      // Battery (if available)
+      const battery = asset.battery_level || asset.battery;
+      const batteryHtml = battery ? 
+        `<span class="batt"><i class="fa-solid fa-battery-${battery > 75 ? 'full' : battery > 50 ? 'three-quarters' : battery > 25 ? 'half' : 'quarter'}"></i>${battery}%</span>` : '';
       
       return `
         <div class="mha-asset-row ${isActive ? 'active' : ''}" onclick="mhaSelectAsset('${esc(asset.imei)}')">
@@ -13245,9 +13300,14 @@ function qrOpenHelp() {
           <div class="info">
             <div class="nm">${name}</div>
             <div class="im">${esc(asset.imei)}</div>
-            <div class="ts">${lastSeenText}</div>
           </div>
-          <span class="badge ${status}">${status}</span>
+          <div class="meta">
+            <span class="seen ${timeClass}">${timeText}</span>
+            <span class="mrow">
+              ${batteryHtml}
+              <span class="sdot ${status}"></span>
+            </span>
+          </div>
         </div>`;
     }).join('');
   }
@@ -13267,7 +13327,32 @@ function qrOpenHelp() {
     return 'offline';
   }
 
-  // Format last seen time
+  // Get time badge with color coding (matching reference design)
+  function mhaGetTimeBadge(lastSeen) {
+    if (!lastSeen) return {text: 'offline', cssClass: 'offline'};
+    
+    const now = Date.now();
+    const diff = now - new Date(lastSeen).getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+    
+    // Fresh: ≤15 minutes (green)
+    if (minutes <= 15) return {text: `${minutes}m`, cssClass: 'fresh'};
+    
+    // Recent: ≤3 hours (muted)
+    if (hours <= 3) return {text: `${minutes}m`, cssClass: 'recent'};
+    
+    // Old: ≤24 hours (dim)
+    if (hours < 24) return {text: `${hours}h`, cssClass: 'old'};
+    
+    // Offline: >24 hours (red)
+    if (days < 7) return {text: `${days}d`, cssClass: 'offline'};
+    
+    return {text: 'offline', cssClass: 'offline'};
+  }
+  
+  // Format last seen time (legacy - kept for compatibility)
   function mhaFormatLastSeen(lastSeen) {
     if (!lastSeen) return 'Never';
     
@@ -13287,6 +13372,30 @@ function qrOpenHelp() {
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   }
 
+  // Date range filter
+  window.mhaSetDateRange = function(range, el) {
+    _mhaDateRange = range;
+    
+    // Update active pill
+    document.querySelectorAll('.mha-pill[data-range]').forEach(p => p.classList.remove('on'));
+    if (el) el.classList.add('on');
+    
+    // TODO: Apply date range filter when loading journeys
+    console.log(`[MHA] Date range set to: ${range}`);
+  };
+  
+  // Category filter (All, New Tags, Parcels, QR Code)
+  window.mhaSetFilter = function(filter, el) {
+    _mhaFilter = filter;
+    
+    // Update active pill
+    document.querySelectorAll('.mha-pill[data-filter]').forEach(p => p.classList.remove('on'));
+    if (el) el.classList.add('on');
+    
+    // TODO: Apply category filter to asset list
+    console.log(`[MHA] Filter set to: ${filter}`);
+  };
+  
   // Filter assets by status
   window.mhaFilterByStatus = function(status, el) {
     _mhaFilterStatus = status;
