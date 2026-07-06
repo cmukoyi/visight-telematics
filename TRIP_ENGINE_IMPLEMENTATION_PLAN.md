@@ -310,7 +310,18 @@ engine_smoothing_window: 3
 - [x] Placeholder tab content with icon and description
 
 ### 5.2 Page Structure
-**Status:** ⏳ Not Started  
+**Status:** ✅ COMPLETE  
+**Files:**
+- [x] `gps-tracker/customer-dashboard/public/index.html`
+
+**Implementation:**
+- [x] 3-panel flex layout: Assets (266px) | Map (flex) | Journeys (340px)
+- [x] Responsive design (stacks below 1100px)
+- [x] Scoped CSS styles for Movement History Advanced
+- [x] Assets Panel skeleton with search, stats, and list placeholder
+- [x] Map Panel with header and placeholder
+- [x] Journeys/Positions Panel with tab structure
+- [x] Dark/light theme support via CSS variables  
 **Files:**
 - [ ] `gps-tracker/customer-dashboard/public/movement-history-advanced.html`
 - [ ] `gps-tracker/customer-dashboard/public/css/movement-history-advanced.css`
@@ -534,9 +545,9 @@ PUT /api/portal/devices/{device_imei}/subscription
 ## 📊 Progress Tracking
 
 ### Overall Progress
-- **Total Tasks:** 11/150+ (7.3%)
-- **Current Phase:** Phase 6 (Backend APIs) ✅ Complete
-- **Next Phase:** Phase 5 (Frontend UI)
+- **Total Tasks:** 13/150+ (8.7%)
+- **Current Phase:** Phase 5.2 (Page Structure) ✅ Complete
+- **Next Phase:** Phase 5.3 (Assets Panel Implementation)
 
 ### Phase Status
 - [x] Phase 0: Planning ✅ Complete
@@ -544,7 +555,7 @@ PUT /api/portal/devices/{device_imei}/subscription
 - [x] Phase 2: Data Ingestion (Week 2) ✅ Complete (2.1 + 2.2)
 - [x] Phase 3: Trip State Engine (Week 3-4) ✅ Complete (3.1 + 3.2 + 3.3 + 3.4)
 - [~] Phase 4: Admin Configuration (Week 5) - Phase 4.1 Complete, 4.2 Pending
-- [ ] Phase 5: Frontend UI (Week 6-7)
+- [~] Phase 5: Frontend UI (Week 6-7) - Phases 5.1, 5.2 Complete
 - [x] Phase 6: Backend API Endpoints (Week 8) ✅ Complete (6.1 + 6.2 + 6.3)
 - [ ] Phase 7: Integration & Testing (Week 9)
 - [ ] Phase 8: Documentation & Deployment (Week 10)

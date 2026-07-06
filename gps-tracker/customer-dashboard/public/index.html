@@ -3110,15 +3110,151 @@ input.hive-range::-moz-range-track {
             </div>
 
             <!-- ══════════ MOVEMENT HISTORY ADVANCED TAB (Phase 5) ══════════ -->
+            <style>
+            /* ── Movement History Advanced scoped styles (Phase 5.2) ────────────────── */
+            #tab-history-advanced { padding:16px 20px !important; overflow-y:auto; }
+            .mha-main { display:flex; gap:14px; align-items:stretch; min-height:600px; }
+            @media(max-width:1100px) { .mha-main { flex-direction:column; } }
+            
+            /* Assets Panel (266px) */
+            .mha-assets-panel { width:266px; flex:none; background:var(--bg-2); border:1px solid var(--border); border-radius:12px; display:flex; flex-direction:column; overflow:hidden; }
+            .mha-ap-head { display:flex; align-items:center; gap:9px; padding:12px 14px; border-bottom:1px solid var(--border); font-weight:500; }
+            .mha-ap-head i { color:var(--primary); font-size:16px; }
+            .mha-ap-body { display:flex; flex-direction:column; gap:11px; padding:12px; flex:1; min-height:0; }
+            .mha-ap-search { position:relative; }
+            .mha-ap-search input { width:100%; padding:9px 12px 9px 34px; background:var(--bg-3); border:1px solid var(--border); border-radius:8px; color:var(--text-1); font-size:12px; outline:none; }
+            .mha-ap-search input:focus { border-color:var(--primary); }
+            .mha-ap-search i { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-3); font-size:14px; }
+            .mha-ap-label { font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); margin-bottom:5px; }
+            .mha-ap-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+            .mha-ap-stat { background:var(--bg-3); border:1px solid var(--border); border-radius:8px; padding:7px 3px; text-align:center; cursor:pointer; transition:all .15s; }
+            .mha-ap-stat:hover { border-color:var(--primary); }
+            .mha-ap-stat .n { font-size:16px; font-weight:600; line-height:1.1; }
+            .mha-ap-stat .l { font-size:9px; color:var(--text-3); text-transform:uppercase; letter-spacing:.03em; }
+            .mha-ap-stat.act .n { color:var(--primary); }
+            .mha-ap-list { flex:1; overflow-y:auto; margin:2px -12px -12px; border-top:1px solid var(--border); }
+            .mha-asset-row { display:flex; align-items:center; gap:10px; padding:9px 14px; cursor:pointer; border-left:2px solid transparent; border-bottom:1px solid var(--border); transition:all .12s; }
+            .mha-asset-row:hover { background:var(--bg-3); }
+            .mha-asset-row.active { background:color-mix(in srgb,var(--primary) 10%,transparent); border-left-color:var(--primary); }
+            .mha-asset-row .pin { color:var(--text-3); font-size:16px; }
+            .mha-asset-row.active .pin { color:var(--primary); }
+            .mha-asset-row .info { flex:1; min-width:0; }
+            .mha-asset-row .nm { font-size:13px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+            .mha-asset-row .im { font-size:10px; color:var(--text-3); }
+            
+            /* Map Panel (flex) */
+            .mha-map-panel { flex:1; min-width:0; background:var(--bg-2); border:1px solid var(--border); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; }
+            .mha-map-head { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--border); }
+            .mha-map-head .t { display:flex; align-items:center; gap:9px; font-weight:500; }
+            .mha-map-head .t i { color:var(--primary); font-size:16px; }
+            .mha-map-head .meta { font-size:11px; color:var(--text-3); }
+            .mha-map-container { position:relative; flex:1; min-height:460px; background:var(--bg-3); }
+            .mha-map-placeholder { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:var(--text-3); }
+            .mha-map-placeholder i { font-size:64px; margin-bottom:16px; opacity:.3; }
+            .mha-map-placeholder p { font-size:14px; }
+            
+            /* Journeys/Positions Panel (340px) */
+            .mha-journeys-panel { flex:none; width:340px; min-width:300px; background:var(--bg-2); border:1px solid var(--border); border-radius:12px; display:flex; flex-direction:column; overflow:hidden; }
+            .mha-jp-tabs { display:flex; border-bottom:1px solid var(--border); }
+            .mha-jp-tab { flex:1; text-align:center; padding:13px 0; font-size:13px; color:var(--text-2); cursor:pointer; border-bottom:2px solid transparent; display:flex; align-items:center; justify-content:center; gap:6px; transition:all .15s; }
+            .mha-jp-tab i { font-size:15px; }
+            .mha-jp-tab:hover { color:var(--text-1); background:var(--bg-3); }
+            .mha-jp-tab.active { color:var(--text-1); border-bottom-color:var(--primary); }
+            .mha-jp-body { overflow:auto; padding:12px; flex:1; }
+            .mha-jp-placeholder { text-align:center; padding:40px 16px; color:var(--text-3); }
+            .mha-jp-placeholder i { font-size:48px; margin-bottom:12px; opacity:.3; }
+            .mha-jp-placeholder p { font-size:13px; }
+            
+            @media(max-width:1100px) {
+                .mha-assets-panel,
+                .mha-journeys-panel { width:100%; min-width:0; }
+            }
+            </style>
+            
             <div id="tab-history-advanced" class="tab-content" style="flex-direction:column;gap:0;padding:0;overflow:hidden">
-                <div style="display:flex;flex-direction:column;height:100%;">
-                    <!-- Placeholder for Phase 5.2+ implementation -->
-                    <div style="padding:40px;text-align:center;">
-                        <i class="fa-solid fa-map-location-dot" style="font-size:48px;color:var(--primary);margin-bottom:16px;"></i>
-                        <h2>Movement History Advanced</h2>
-                        <p style="color:var(--text-2);margin-top:8px;">Trip engine with journey visualization</p>
-                        <span class="beta-badge" style="font-size:14px;margin-top:12px;display:inline-block;">Beta</span>
-                        <p style="margin-top:24px;color:var(--text-3);font-size:14px;">Phase 5.2+ UI coming soon...</p>
+                <div class="mha-main">
+                    <!-- Assets Panel (Phase 5.3) -->
+                    <div class="mha-assets-panel">
+                        <div class="mha-ap-head">
+                            <i class="fa-solid fa-tags"></i>
+                            <span>Assets</span>
+                        </div>
+                        <div class="mha-ap-body">
+                            <div class="mha-ap-search">
+                                <i class="fa-solid fa-search"></i>
+                                <input type="text" placeholder="Search assets...">
+                            </div>
+                            
+                            <div>
+                                <div class="mha-ap-label">Status</div>
+                                <div class="mha-ap-stats">
+                                    <div class="mha-ap-stat act">
+                                        <div class="n">0</div>
+                                        <div class="l">Active</div>
+                                    </div>
+                                    <div class="mha-ap-stat">
+                                        <div class="n">0</div>
+                                        <div class="l">Idle</div>
+                                    </div>
+                                    <div class="mha-ap-stat">
+                                        <div class="n">0</div>
+                                        <div class="l">Offline</div>
+                                    </div>
+                                    <div class="mha-ap-stat">
+                                        <div class="n">0</div>
+                                        <div class="l">Total</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div style="flex:1;display:flex;flex-direction:column;">
+                                <div class="mha-ap-label">Asset List</div>
+                                <div class="mha-ap-list">
+                                    <div style="padding:40px 16px;text-align:center;color:var(--text-3);font-size:13px;">
+                                        <i class="fa-solid fa-tags" style="font-size:32px;opacity:.3;margin-bottom:12px;display:block;"></i>
+                                        No assets found<br>
+                                        <small style="font-size:11px;">Phase 5.3 implementation</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Map Panel (Phase 5.4) -->
+                    <div class="mha-map-panel">
+                        <div class="mha-map-head">
+                            <div class="t">
+                                <i class="fa-solid fa-map"></i>
+                                <span>Journey Map</span>
+                            </div>
+                            <div class="meta">Select an asset to view journeys</div>
+                        </div>
+                        <div class="mha-map-container">
+                            <div class="mha-map-placeholder">
+                                <i class="fa-solid fa-map-location-dot"></i>
+                                <p>Journey visualization coming in Phase 5.4</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Journeys/Positions Panel (Phase 5.5) -->
+                    <div class="mha-journeys-panel">
+                        <div class="mha-jp-tabs">
+                            <div class="mha-jp-tab active" data-mha-tab="journeys">
+                                <i class="fa-solid fa-route"></i>
+                                <span>Journeys</span>
+                            </div>
+                            <div class="mha-jp-tab" data-mha-tab="positions">
+                                <i class="fa-solid fa-location-dot"></i>
+                                <span>Positions</span>
+                            </div>
+                        </div>
+                        <div class="mha-jp-body">
+                            <div class="mha-jp-placeholder">
+                                <i class="fa-solid fa-route"></i>
+                                <p>Journey cards will appear here<br><small style="font-size:11px;">Phase 5.5 implementation</small></p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
