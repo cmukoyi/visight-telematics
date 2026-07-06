@@ -3817,3 +3817,531 @@ def update_trip_config(
     
     # Return effective config
     return get_trip_config(tenant_id=tenant_id, db=db)
+
+
+# ==============================================================================
+# TRIP ENGINE API - JOURNEY ENDPOINTS (Phase 6.1)
+# ==============================================================================
+
+class JourneyResponse(BaseModel):
+    """Journey response model."""
+    id: str
+    device_imei: str
+    started_at: datetime
+    ended_at: datetime
+    leg_count: int
+    stationary_count: int
+    total_distance_m: float
+    total_duration_seconds: int
+    is_air_journey: bool
+    created_at: datetime
+
+
+class LegResponse(BaseModel):
+    """Leg response model."""
+    id: str
+    device_imei: str
+    journey_id: Optional[str]
+    started_at: datetime
+    ended_at: datetime
+    start_lat: Optional[float]
+    start_lng: Optional[float]
+    end_lat: Optional[float]
+    end_lng: Optional[float]
+    distance_m: float
+    duration_seconds: int
+    point_count: int
+    is_air_leg: bool
+    created_at: datetime
+
+
+class StationaryResponse(BaseModel):
+    """Stationary response model."""
+    id: str
+    device_imei: str
+    journey_id: Optional[str]
+    started_at: datetime
+    ended_at: datetime
+    anchor_lat: float
+    anchor_lng: float
+    point_count: int
+    duration_seconds: int
+    created_at: datetime
+
+
+class JourneyDetailResponse(BaseModel):
+    """Detailed journey with legs and stationaries."""
+    journey: JourneyResponse
+    legs: List[LegResponse]
+    stationaries: List[StationaryResponse]
+
+
+class JourneyListResponse(BaseModel):
+    """Paginated journey list."""
+    journeys: List[JourneyResponse]
+    total: int
+    page: int
+    page_size: int
+    has_more: bool
+
+
+@router.get("/journeys", response_model=JourneyListResponse)
+def list_journeys(
+    device_imei: str = Query(..., description="Device IMEI"),
+    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    page_size: int = Query(50, ge=1, le=500, description="Items per page"),
+    db: Session = Depends(get_db),
+):
+    """
+    List journeys for a device with optional date filtering.
+    
+    Returns paginated list of journeys ordered by started_at DESC.
+    """
+    from app.models import Journey
+    from sqlalchemy import and_
+    
+    # Build query
+    query = db.query(Journey).filter(Journey.device_imei == device_imei)
+    
+    # Date filtering
+    if start_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date).replace(hour=0, minute=0, second=0, microsecond=0)
+            query = query.filter(Journey.started_at >= start_dt)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid start_date format (use YYYY-MM-DD)")
+    
+    if end_date:
+        try:
+            end_dt = datetime.fromisoformat(end_date).replace(hour=23, minute=59, second=59, microsecond=999999)
+            query = query.filter(Journey.ended_at <= end_dt)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid end_date format (use YYYY-MM-DD)")
+    
+    # Count total
+    total = query.count()
+    
+    # Pagination
+    offset = (page - 1) * page_size
+    journeys = query.order_by(Journey.started_at.desc()).offset(offset).limit(page_size).all()
+    
+    # Convert to response models
+    journey_responses = [
+        JourneyResponse(
+            id=str(j.id),
+            device_imei=j.device_imei,
+            started_at=j.started_at,
+            ended_at=j.ended_at,
+            leg_count=j.leg_count,
+            stationary_count=j.stationary_count,
+            total_distance_m=j.total_distance_m,
+            total_duration_seconds=j.total_duration_seconds,
+            is_air_journey=j.is_air_journey,
+            created_at=j.created_at,
+        )
+        for j in journeys
+    ]
+    
+    return JourneyListResponse(
+        journeys=journey_responses,
+        total=total,
+        page=page,
+        page_size=page_size,
+        has_more=(offset + len(journeys)) < total,
+    )
+
+
+@router.get("/journeys/{journey_id}", response_model=JourneyDetailResponse)
+def get_journey(
+    journey_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Get a specific journey with all its legs and stationaries.
+    
+    Returns journey detail including ordered steps (legs + stationaries).
+    """
+    from app.models import Journey, Leg, Stationary
+    from uuid import UUID
+    
+    # Validate UUID
+    try:
+        journey_uuid = UUID(journey_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid journey_id format")
+    
+    # Get journey
+    journey = db.query(Journey).filter(Journey.id == journey_uuid).first()
+    if not journey:
+        raise HTTPException(status_code=404, detail="Journey not found")
+    
+    # Get legs
+    legs = db.query(Leg).filter(
+        Leg.journey_id == journey_uuid
+    ).order_by(Leg.started_at).all()
+    
+    # Get stationaries
+    stationaries = db.query(Stationary).filter(
+        Stationary.journey_id == journey_uuid
+    ).order_by(Stationary.started_at).all()
+    
+    # Convert to response models
+    journey_response = JourneyResponse(
+        id=str(journey.id),
+        device_imei=journey.device_imei,
+        started_at=journey.started_at,
+        ended_at=journey.ended_at,
+        leg_count=journey.leg_count,
+        stationary_count=journey.stationary_count,
+        total_distance_m=journey.total_distance_m,
+        total_duration_seconds=journey.total_duration_seconds,
+        is_air_journey=journey.is_air_journey,
+        created_at=journey.created_at,
+    )
+    
+    leg_responses = [
+        LegResponse(
+            id=str(leg.id),
+            device_imei=leg.device_imei,
+            journey_id=str(leg.journey_id) if leg.journey_id else None,
+            started_at=leg.started_at,
+            ended_at=leg.ended_at,
+            start_lat=leg.start_lat,
+            start_lng=leg.start_lng,
+            end_lat=leg.end_lat,
+            end_lng=leg.end_lng,
+            distance_m=leg.distance_m,
+            duration_seconds=leg.duration_seconds,
+            point_count=leg.point_count,
+            is_air_leg=leg.is_air_leg,
+            created_at=leg.created_at,
+        )
+        for leg in legs
+    ]
+    
+    stationary_responses = [
+        StationaryResponse(
+            id=str(st.id),
+            device_imei=st.device_imei,
+            journey_id=str(st.journey_id) if st.journey_id else None,
+            started_at=st.started_at,
+            ended_at=st.ended_at,
+            anchor_lat=st.anchor_lat,
+            anchor_lng=st.anchor_lng,
+            point_count=st.point_count,
+            duration_seconds=st.duration_seconds,
+            created_at=st.created_at,
+        )
+        for st in stationaries
+    ]
+    
+    return JourneyDetailResponse(
+        journey=journey_response,
+        legs=leg_responses,
+        stationaries=stationary_responses,
+    )
+
+
+@router.get("/journeys/{journey_id}/path")
+def get_journey_path(
+    journey_id: str,
+    simplified: bool = Query(False, description="Use simplified path (for zoomed-out maps)"),
+    db: Session = Depends(get_db),
+):
+    """
+    Get journey path as GeoJSON for map visualization.
+    
+    Returns GeoJSON FeatureCollection with legs as LineStrings and stationaries as Points.
+    Uses PostGIS geometry columns for optimal performance.
+    """
+    from app.models import Journey, Leg, Stationary
+    from uuid import UUID
+    from sqlalchemy import text
+    
+    # Validate UUID
+    try:
+        journey_uuid = UUID(journey_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid journey_id format")
+    
+    # Verify journey exists
+    journey = db.query(Journey).filter(Journey.id == journey_uuid).first()
+    if not journey:
+        raise HTTPException(status_code=404, detail="Journey not found")
+    
+    # Get leg paths (PostGIS geometry → GeoJSON)
+    path_column = "path_simplified" if simplified else "path"
+    leg_query = text(f"""
+        SELECT 
+            id,
+            started_at,
+            ended_at,
+            distance_m,
+            duration_seconds,
+            is_air_leg,
+            ST_AsGeoJSON({path_column})::json as geometry
+        FROM legs
+        WHERE journey_id = :journey_id
+        ORDER BY started_at
+    """)
+    
+    leg_results = db.execute(leg_query, {"journey_id": str(journey_uuid)}).fetchall()
+    
+    # Get stationary centroids (PostGIS geometry → GeoJSON)
+    stationary_query = text("""
+        SELECT 
+            id,
+            started_at,
+            ended_at,
+            duration_seconds,
+            anchor_lat,
+            anchor_lng,
+            ST_AsGeoJSON(centroid)::json as geometry
+        FROM stationaries
+        WHERE journey_id = :journey_id
+        ORDER BY started_at
+    """)
+    
+    stationary_results = db.execute(stationary_query, {"journey_id": str(journey_uuid)}).fetchall()
+    
+    # Build GeoJSON FeatureCollection
+    features = []
+    
+    # Add legs as LineString features
+    for leg in leg_results:
+        features.append({
+            "type": "Feature",
+            "geometry": leg.geometry if leg.geometry else {
+                "type": "LineString",
+                "coordinates": []
+            },
+            "properties": {
+                "id": str(leg.id),
+                "type": "leg",
+                "started_at": leg.started_at.isoformat(),
+                "ended_at": leg.ended_at.isoformat(),
+                "distance_m": float(leg.distance_m),
+                "duration_seconds": leg.duration_seconds,
+                "is_air_leg": leg.is_air_leg,
+            }
+        })
+    
+    # Add stationaries as Point features
+    for st in stationary_results:
+        # Use PostGIS centroid if available, else fallback to anchor lat/lng
+        geometry = st.geometry if st.geometry else {
+            "type": "Point",
+            "coordinates": [st.anchor_lng, st.anchor_lat]
+        }
+        features.append({
+            "type": "Feature",
+            "geometry": geometry,
+            "properties": {
+                "id": str(st.id),
+                "type": "stationary",
+                "started_at": st.started_at.isoformat(),
+                "ended_at": st.ended_at.isoformat(),
+                "duration_seconds": st.duration_seconds,
+            }
+        })
+    
+    return {
+        "type": "FeatureCollection",
+        "features": features,
+        "metadata": {
+            "journey_id": str(journey_id),
+            "device_imei": journey.device_imei,
+            "simplified": simplified,
+            "feature_count": len(features),
+        }
+    }
+
+
+# ==============================================================================
+# TRIP ENGINE API - POSITION ENDPOINTS (Phase 6.2)
+# ==============================================================================
+
+class PositionResponse(BaseModel):
+    """Position response model."""
+    id: int
+    device_imei: str
+    observed_at: datetime
+    latitude: float
+    longitude: float
+    speed_kmh: Optional[float]
+    heading: Optional[float]
+    ignition: Optional[bool]
+    source: str
+    created_at: datetime
+
+
+class PositionListResponse(BaseModel):
+    """Paginated position list."""
+    positions: List[PositionResponse]
+    total: int
+    page: int
+    page_size: int
+    has_more: bool
+
+
+@router.get("/positions", response_model=PositionListResponse)
+def list_positions(
+    device_imei: str = Query(..., description="Device IMEI"),
+    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    page_size: int = Query(200, ge=1, le=1000, description="Items per page"),
+    db: Session = Depends(get_db),
+):
+    """
+    List raw GPS positions for a device with optional date filtering.
+    
+    Returns paginated list of positions ordered by observed_at DESC.
+    Used for timeline view and raw data inspection.
+    """
+    from app.models import DevicePosition
+    
+    # Build query
+    query = db.query(DevicePosition).filter(DevicePosition.device_imei == device_imei)
+    
+    # Date filtering
+    if start_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date).replace(hour=0, minute=0, second=0, microsecond=0)
+            query = query.filter(DevicePosition.observed_at >= start_dt)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid start_date format (use YYYY-MM-DD)")
+    
+    if end_date:
+        try:
+            end_dt = datetime.fromisoformat(end_date).replace(hour=23, minute=59, second=59, microsecond=999999)
+            query = query.filter(DevicePosition.observed_at <= end_dt)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid end_date format (use YYYY-MM-DD)")
+    
+    # Count total
+    total = query.count()
+    
+    # Pagination
+    offset = (page - 1) * page_size
+    positions = query.order_by(DevicePosition.observed_at.desc()).offset(offset).limit(page_size).all()
+    
+    # Convert to response models
+    position_responses = [
+        PositionResponse(
+            id=p.id,
+            device_imei=p.device_imei,
+            observed_at=p.observed_at,
+            latitude=p.latitude,
+            longitude=p.longitude,
+            speed_kmh=p.speed_kmh,
+            heading=p.heading,
+            ignition=p.ignition,
+            source=p.source,
+            created_at=p.created_at,
+        )
+        for p in positions
+    ]
+    
+    return PositionListResponse(
+        positions=position_responses,
+        total=total,
+        page=page,
+        page_size=page_size,
+        has_more=(offset + len(positions)) < total,
+    )
+
+
+# ==============================================================================
+# TRIP ENGINE API - DEVICE ENDPOINTS (Phase 6.3)
+# ==============================================================================
+
+class DeviceSubscriptionResponse(BaseModel):
+    """Device trip subscription response."""
+    device_imei: str
+    trip_subscribed: bool
+    updated_at: Optional[datetime]
+
+
+class DeviceSubscriptionUpdate(BaseModel):
+    """Device trip subscription update."""
+    trip_subscribed: bool
+
+
+@router.get("/devices/{device_imei}/subscription", response_model=DeviceSubscriptionResponse)
+def get_device_subscription(
+    device_imei: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Get trip subscription status for a device.
+    
+    Returns whether the device is enrolled in trip processing.
+    """
+    from app.models import DeviceState
+    
+    state = db.query(DeviceState).filter(DeviceState.device_imei == device_imei).first()
+    
+    if not state:
+        # Return default: not subscribed
+        return DeviceSubscriptionResponse(
+            device_imei=device_imei,
+            trip_subscribed=False,
+            updated_at=None,
+        )
+    
+    return DeviceSubscriptionResponse(
+        device_imei=device_imei,
+        trip_subscribed=state.trip_subscribed,
+        updated_at=state.updated_at,
+    )
+
+
+@router.put("/devices/{device_imei}/subscription", response_model=DeviceSubscriptionResponse)
+def update_device_subscription(
+    device_imei: str,
+    data: DeviceSubscriptionUpdate,
+    db: Session = Depends(get_db),
+):
+    """
+    Update trip subscription status for a device.
+    
+    Enables or disables trip processing for this device. When enabled:
+    - Device included in batch sweep (Tier 1)
+    - Selective track.list pulls triggered (Tier 2)
+    - Positions flow through trip engine
+    """
+    from app.models import DeviceState
+    
+    # Get or create device state
+    state = db.query(DeviceState).filter(DeviceState.device_imei == device_imei).first()
+    
+    if not state:
+        # Create new device state
+        state = DeviceState(
+            device_imei=device_imei,
+            trip_subscribed=data.trip_subscribed,
+            updated_at=datetime.utcnow(),
+        )
+        db.add(state)
+    else:
+        # Update existing state
+        state.trip_subscribed = data.trip_subscribed
+        state.updated_at = datetime.utcnow()
+    
+    db.commit()
+    db.refresh(state)
+    
+    logger.info(
+        "Device subscription updated: imei=%s, trip_subscribed=%s",
+        device_imei,
+        data.trip_subscribed
+    )
+    
+    return DeviceSubscriptionResponse(
+        device_imei=device_imei,
+        trip_subscribed=state.trip_subscribed,
+        updated_at=state.updated_at,
+    )

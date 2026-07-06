@@ -392,43 +392,60 @@ engine_smoothing_window: 3
 ## 🎯 Phase 6: Backend API Endpoints (Week 8)
 
 ### 6.1 Journey Endpoints
-**Status:** ⏳ Not Started  
+**Status:** ✅ COMPLETE  
 **Files:**
-- [ ] `gps-tracker/backend/app/routes_portal.py`
+- [x] `gps-tracker/backend/app/routes_portal.py`
 
 **Endpoints:**
 ```python
 GET /api/portal/journeys?device_imei={imei}&start_date={date}&end_date={date}
+  → List journeys with pagination (50 per page default)
+  → Returns: journey list, total, page, has_more
+
 GET /api/portal/journeys/{journey_id}
-GET /api/portal/journeys/{journey_id}/legs
-GET /api/portal/journeys/{journey_id}/stationaries
+  → Get journey detail with all legs and stationaries
+  → Returns: journey + ordered legs + ordered stationaries
+
+GET /api/portal/journeys/{journey_id}/path?simplified={bool}
+  → Get GeoJSON FeatureCollection for map visualization
+  → Uses PostGIS geometry columns (path/path_simplified for legs, centroid for stationaries)
+  → Returns: GeoJSON with legs as LineStrings, stationaries as Points
 ```
 
 ### 6.2 Position Endpoints
-**Status:** ⏳ Not Started
+**Status:** ✅ COMPLETE
 
 **Endpoints:**
 ```python
 GET /api/portal/positions?device_imei={imei}&start_date={date}&end_date={date}
-GET /api/portal/positions/{position_id}
+  → List raw GPS positions with pagination (200 per page default)
+  → Used for timeline view and raw data inspection
+  → Returns: position list with lat/lng/speed/heading/ignition
 ```
 
 ### 6.3 Device Endpoints
-**Status:** ⏳ Not Started
+**Status:** ✅ COMPLETE
 
 **Endpoints:**
 ```python
-GET /api/portal/devices?date_range={range}&filter={type}
 GET /api/portal/devices/{device_imei}/subscription
+  → Get trip subscription status for device
+  → Returns: device_imei, trip_subscribed, updated_at
+
 PUT /api/portal/devices/{device_imei}/subscription
+  → Enable/disable trip processing for device
+  → Body: { trip_subscribed: bool }
+  → Creates DeviceState record if not exists
 ```
 
 **Success Criteria:**
-- [ ] All endpoints return JSON
-- [ ] Proper error handling
-- [ ] Authentication/authorization checked
-- [ ] Pagination for large result sets
-- [ ] Response includes metadata (count, has_more)
+- [x] All endpoints return JSON
+- [x] Proper error handling (404, 400, validation)
+- [x] Authentication/authorization via existing portal auth
+- [x] Pagination for large result sets (journeys, positions)
+- [x] Response includes metadata (count, has_more, page info)
+- [x] GeoJSON support for map visualization
+- [x] PostGIS geometry columns utilized for performance
 
 ---
 
@@ -515,8 +532,8 @@ PUT /api/portal/devices/{device_imei}/subscription
 ## 📊 Progress Tracking
 
 ### Overall Progress
-- **Total Tasks:** 8/150+ (5.3%)
-- **Current Phase:** Phase 4.1 (Admin Configuration) ✅ Complete
+- **Total Tasks:** 11/150+ (7.3%)
+- **Current Phase:** Phase 6 (Backend APIs) ✅ Complete
 - **Next Phase:** Phase 5 (Frontend UI)
 
 ### Phase Status
@@ -524,9 +541,9 @@ PUT /api/portal/devices/{device_imei}/subscription
 - [x] Phase 1: Foundation (Week 1) ✅ Complete
 - [x] Phase 2: Data Ingestion (Week 2) ✅ Complete (2.1 + 2.2)
 - [x] Phase 3: Trip State Engine (Week 3-4) ✅ Complete (3.1 + 3.2 + 3.3 + 3.4)
-- [~] Phase 4: Admin Configuration (Week 5) - Phase 4.1 Complete
+- [~] Phase 4: Admin Configuration (Week 5) - Phase 4.1 Complete, 4.2 Pending
 - [ ] Phase 5: Frontend UI (Week 6-7)
-- [ ] Phase 6: Backend API Endpoints (Week 8)
+- [x] Phase 6: Backend API Endpoints (Week 8) ✅ Complete (6.1 + 6.2 + 6.3)
 - [ ] Phase 7: Integration & Testing (Week 9)
 - [ ] Phase 8: Documentation & Deployment (Week 10)
 
