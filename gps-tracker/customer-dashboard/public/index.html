@@ -4719,9 +4719,13 @@ function _ppMaptilerKey() {
 const _ppMapTilerLayers = []; // { map, layer } registry so we can swap on theme change
 // User preference: when true, always use the light basemap regardless of the
 // page theme. Stored in localStorage so it persists across reloads. Toggled
-// from the avatar-dropdown "Light maps" checkbox. Defaults to false.
+// from the avatar-dropdown "Light maps" checkbox. Defaults to TRUE.
 function _ppLightMapsAlways() {
-    try { return localStorage.getItem('pp-light-maps') === '1'; } catch (_) { return false; }
+    try { 
+        const pref = localStorage.getItem('pp-light-maps');
+        // Default to '1' (always light) if not explicitly set
+        return pref === null ? true : pref === '1';
+    } catch (_) { return true; }
 }
 function _ppToggleLightMaps(on) {
     try { localStorage.setItem('pp-light-maps', on ? '1' : '0'); } catch (_) {}
