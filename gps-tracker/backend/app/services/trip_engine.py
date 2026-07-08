@@ -236,10 +236,10 @@ class EngineContext:
     # STATIONARY state
     anchor_lat: Optional[float] = None
     anchor_lng: Optional[float] = None
-    anchor_points: List[Tuple[float, float, datetime]] = None  # (lat, lng, observed_at)
+    anchor_points: List[Tuple[float, float, datetime, Optional[int]]] = None  # (lat, lng, observed_at, position_id)
     
     # MOVE state
-    leg_buffer: List[Tuple[float, float, datetime, int]] = None  # (lat, lng, observed_at, position_id)
+    leg_buffer: List[Tuple[float, float, datetime, Optional[int]]] = None  # (lat, lng, observed_at, position_id)
     
     # Last processed
     last_processed_at: Optional[datetime] = None
@@ -803,7 +803,7 @@ class TripEngine:
         if self.context.last_position_time is None:
             self.context.anchor_lat = lat
             self.context.anchor_lng = lng
-            self.context.anchor_points = [(lat, lng, observed_at)]
+            self.context.anchor_points = [(lat, lng, observed_at, position_id)]
             self.context.last_position_lat = lat
             self.context.last_position_lng = lng
             self.context.last_position_time = observed_at
@@ -853,7 +853,7 @@ class TripEngine:
                 self.context.current_state = "STATIONARY"
                 self.context.anchor_lat = lat
                 self.context.anchor_lng = lng
-                self.context.anchor_points = [(lat, lng, observed_at)]
+                self.context.anchor_points = [(lat, lng, observed_at, position_id)]
             else:
                 # Glitch: Discard point
                 logger.warning(
@@ -888,7 +888,7 @@ class TripEngine:
             self.context.current_state = "STATIONARY"
             self.context.anchor_lat = lat
             self.context.anchor_lng = lng
-            self.context.anchor_points = [(lat, lng, observed_at)]
+            self.context.anchor_points = [(lat, lng, observed_at, position_id)]
             self.context.leg_buffer = []
         
         # Step 3: State-specific logic
@@ -901,7 +901,7 @@ class TripEngine:
             
             if anchor_dist <= self.config.anchor_radius_m:
                 # Still stationary: roll anchor
-                self.context.anchor_points.append((lat, lng, observed_at))
+                self.context.anchor_points.append((lat, lng, observed_at, position_id))
                 self.context.anchor_lat, self.context.anchor_lng = calculate_centroid(
                     [(p[0], p[1]) for p in self.context.anchor_points]
                 )
