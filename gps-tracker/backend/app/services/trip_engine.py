@@ -518,8 +518,8 @@ class TripEngine:
         # Create record
         stationary = Stationary(
             device_imei=self.device_imei,
-            centroid_lat=centroid_lat,
-            centroid_lng=centroid_lng,
+            anchor_lat=centroid_lat,
+            anchor_lng=centroid_lng,
             started_at=started_at,
             ended_at=ended_at,
             duration_seconds=int(duration_seconds),
