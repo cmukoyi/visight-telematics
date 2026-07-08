@@ -96,7 +96,7 @@ app.get('/', (req, res) => {
       `<meta property="og:description" content="${brandTagline}">`
     )
     .replace(
-      /<meta property="og:url" content="https:\/\/beacontelematics\.co\.uk\/customer">/,
+      /<meta property="og:url" content="__OG_URL__">/,
       `<meta property="og:url" content="https://${brandDomain}/customer">`
     )
     .replace(
@@ -104,7 +104,7 @@ app.get('/', (req, res) => {
       `<meta property="og:site_name" content="${brandName}">`
     )
     .replace(
-      /<meta property="og:image" content="https:\/\/beacontelematics\.co\.uk\/customer\/assets\/logo\.png">/,
+      /<meta property="og:image" content="__OG_IMAGE__">/,
       `<meta property="og:image" content="https://${brandDomain}/customer/assets/logo.png">`
     )
     .replace(
