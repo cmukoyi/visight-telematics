@@ -4345,3 +4345,48 @@ def update_device_subscription(
         trip_subscribed=state.trip_subscribed,
         updated_at=state.updated_at,
     )
+
+
+@router.post("/admin/trip-engine/trigger")
+async def trigger_trip_engine_manual(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Manual trigger for trip engine (admin/testing only).
+    
+    Forces immediate processing of all subscribed devices.
+    Bypasses the 15-minute interval timer.
+    """
+    from app.services.trip_engine import process_all_subscribed_devices
+    
+    logger.info("🔧 Manual trip engine trigger requested")
+    
+    try:
+        result = await process_all_subscribed_devices(db)
+        
+        if result['success']:
+            return {
+                "success": True,
+                "message": f"Trip engine completed: {result['devices_processed']} devices processed",
+                "statistics": {
+                    "devices_processed": result['devices_processed'],
+                    "total_positions": result['total_positions'],
+                    "total_stationaries": result['total_stationaries'],
+                    "total_legs": result['total_legs'],
+                    "total_journeys": result['total_journeys'],
+                },
+                "device_results": result['device_results']
+            }
+        else:
+            return {
+                "success": False,
+                "error": result.get('error', 'Unknown error')
+            }
+    
+    except Exception as exc:
+        logger.error("❌ Manual trip engine trigger failed: %s", exc, exc_info=True)
+        return {
+            "success": False,
+            "error": str(exc)
+        }
