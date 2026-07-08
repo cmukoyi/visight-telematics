@@ -246,6 +246,7 @@ class EngineContext:
     last_position_lat: Optional[float] = None
     last_position_lng: Optional[float] = None
     last_position_time: Optional[datetime] = None
+    last_position_id: Optional[int] = None  # Track position_id for air leg starts
     
     # Current journey context
     current_journey_id: Optional[str] = None
@@ -807,6 +808,7 @@ class TripEngine:
             self.context.last_position_lat = lat
             self.context.last_position_lng = lng
             self.context.last_position_time = observed_at
+            self.context.last_position_id = position_id
             self.context.current_state = "STATIONARY"
             logger.debug("📍 IMEI %s: First position at (%f, %f)", self.device_imei, lat, lng)
             return result
@@ -841,7 +843,7 @@ class TripEngine:
                 # Create air leg
                 air_leg_buffer = [
                     (self.context.last_position_lat, self.context.last_position_lng, 
-                     self.context.last_position_time, None),
+                     self.context.last_position_time, self.context.last_position_id),
                     (lat, lng, observed_at, position_id)
                 ]
                 air_leg = self._create_leg(air_leg_buffer, is_air_leg=True)
@@ -926,7 +928,7 @@ class TripEngine:
                 self.context.current_state = "MOVE"
                 self.context.leg_buffer = [
                     (self.context.anchor_lat, self.context.anchor_lng, 
-                     self.context.anchor_points[-1][2], None),  # Start from anchor
+                     self.context.anchor_points[-1][2], self.context.anchor_points[-1][3]),  # Start from anchor with position_id
                     (lat, lng, observed_at, position_id)  # Current point
                 ]
         
@@ -976,6 +978,7 @@ class TripEngine:
         self.context.last_position_lat = lat
         self.context.last_position_lng = lng
         self.context.last_position_time = observed_at
+        self.context.last_position_id = position_id
         
         return result
 
