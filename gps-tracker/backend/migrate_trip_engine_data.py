@@ -52,7 +52,7 @@ def migrate_positions(db, imei: Optional[str] = None, limit: Optional[int] = Non
     else:
         print(f"🎯 Target: ALL devices")
     
-    query = query.order_by(TrackSolidLocation.imei, TrackSolidLocation.timestamp)
+    query = query.order_by(TrackSolidLocation.imei, TrackSolidLocation.gps_time)
     
     if limit:
         # Note: This limits total, not per-device
@@ -69,7 +69,7 @@ def migrate_positions(db, imei: Optional[str] = None, limit: Optional[int] = Non
         if locations:
             print(f"\nSample positions:")
             for loc in locations[:5]:
-                print(f"  IMEI {loc.imei}: {loc.timestamp} @ ({loc.latitude}, {loc.longitude})")
+                print(f"  IMEI {loc.imei}: {loc.gps_time} @ ({loc.lat}, {loc.lng})")
         return 0
     
     # Migrate positions
@@ -77,20 +77,25 @@ def migrate_positions(db, imei: Optional[str] = None, limit: Optional[int] = Non
     skipped_count = 0
     
     for loc in locations:
+        # Skip if no GPS time or coordinates
+        if not loc.gps_time or not loc.lat or not loc.lng:
+            skipped_count += 1
+            continue
+            
         # Prepare position data
         position_data = {
             'device_imei': loc.imei,
-            'lat': loc.latitude,
-            'lng': loc.longitude,
-            'observed_at': loc.timestamp,  # Already UTC
-            'direction': loc.direction,
-            'gps_speed': loc.speed,
-            'pos_type': None,  # Not in tracksolid_locations
-            'satellite': None,
-            'ignition': None,
-            'acc_status': None,
-            'gps_mode': None,
-            'confidence': None,
+            'lat': loc.lat,
+            'lng': loc.lng,
+            'observed_at': loc.gps_time,  # Already UTC
+            'direction': None,  # Not in tracksolid_locations
+            'gps_speed': float(loc.speed) if loc.speed and loc.speed != '' else None,
+            'pos_type': int(loc.pos_type) if loc.pos_type and loc.pos_type.isdigit() else None,
+            'satellite': None,  # Not in tracksolid_locations (gps_signal is not satellite count)
+            'ignition': None,  # Not in tracksolid_locations
+            'acc_status': loc.acc_status,
+            'gps_mode': None,  # Not in tracksolid_locations
+            'confidence': None,  # Not in tracksolid_locations
             'source': 'migration',
             'created_at': datetime.now(timezone.utc),
         }
