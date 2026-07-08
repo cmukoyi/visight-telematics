@@ -1009,12 +1009,21 @@ async def process_all_subscribed_devices(db: Session) -> Dict:
     """
     from app.models import DeviceState
     
+    # Ensure we see committed data from other transactions
+    db.commit()
+    
     # Get all subscribed devices
+    logger.info("🔍 Querying device_state for trip_subscribed=true...")
     subscribed = db.execute(
         select(DeviceState).where(DeviceState.trip_subscribed == True)
     ).scalars().all()
     
     logger.info("🔄 Processing trips for %d subscribed devices", len(subscribed))
+    
+    if len(subscribed) == 0:
+        logger.warning("⚠️  No subscribed devices found! Check device_state table.")
+    else:
+        logger.info("📱 Found devices: %s", [d.device_imei for d in subscribed])
     
     total_stats = {
         'devices_processed': 0,
