@@ -3,14 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PinPlot HPS — Customer Portal</title>
+    <title>Customer Portal — Asset Tracking</title>
     <!-- Favicon: served by the outer nginx via `location = /favicon.ico` which
          proxies to the flutter-web container's /fav.ico (tenant-branded). -->
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
     <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
-    <meta name="description" content="PinPlot Customer Portal — live asset tracking, geofencing, and reporting for your fleet of GPS and BLE-tagged assets.">
+    <meta name="description" content="Customer Portal — Live asset tracking, geofencing, and reporting for your fleet of GPS and BLE-tagged assets.">
     <meta name="theme-color" content="#0F1117">
     <meta name="robots" content="noindex, nofollow">
+    
+    <!-- Open Graph meta tags for social media sharing (WhatsApp, Facebook, Slack, etc.)
+         These are read by social media scrapers which don't execute JavaScript, so they
+         must be present in the static HTML. The _ppApplyBrand script below updates them
+         dynamically based on the /api/branding response for tenant-specific branding. -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Customer Portal — Asset Tracking">
+    <meta property="og:description" content="Live asset tracking, geofencing, and reporting for your fleet of GPS and BLE-tagged assets.">
+    <meta property="og:url" content="https://beacontelematics.co.uk/customer">
+    <meta property="og:site_name" content="Customer Portal">
+    <meta property="og:image" content="https://beacontelematics.co.uk/customer/assets/logo.png">
+    <meta property="og:image:alt" content="Customer Portal Logo">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Customer Portal — Asset Tracking">
+    <meta name="twitter:description" content="Live asset tracking, geofencing, and reporting for your fleet of GPS and BLE-tagged assets.">
 
     <!-- Tenant branding bootstrap — fetches /api/branding and applies title,
          theme-color, --brand-primary CSS variable, and any element marked
@@ -22,11 +37,33 @@
         function _ppApplyBrand(b){
           if (!b) return;
           window.APP_BRANDING = b;
+          // Update <title>
           if (b.product) document.title = b.product;
+          // Update theme-color meta tag
           const tc = document.querySelector('meta[name="theme-color"]');
           if (tc && b.themeColor) tc.setAttribute('content', b.themeColor);
+          // Update description meta tag
           const md = document.querySelector('meta[name="description"]');
           if (md && b.product && b.tagline) md.setAttribute('content', b.product + ' — ' + b.tagline);
+          // Update Open Graph meta tags for social media sharing
+          const ogTitle = document.querySelector('meta[property="og:title"]');
+          if (ogTitle && b.product) ogTitle.setAttribute('content', b.product);
+          const ogDesc = document.querySelector('meta[property="og:description"]');
+          if (ogDesc && b.tagline) ogDesc.setAttribute('content', b.tagline);
+          const ogSiteName = document.querySelector('meta[property="og:site_name"]');
+          if (ogSiteName && b.name) ogSiteName.setAttribute('content', b.name);
+          const ogUrl = document.querySelector('meta[property="og:url"]');
+          if (ogUrl && b.domain) ogUrl.setAttribute('content', 'https://' + b.domain + '/customer');
+          const ogImage = document.querySelector('meta[property="og:image"]');
+          if (ogImage && b.domain) ogImage.setAttribute('content', 'https://' + b.domain + '/customer/assets/logo.png');
+          const ogImageAlt = document.querySelector('meta[property="og:image:alt"]');
+          if (ogImageAlt && b.name) ogImageAlt.setAttribute('content', b.name + ' Logo');
+          // Update Twitter Card meta tags
+          const twitterTitle = document.querySelector('meta[name="twitter:title"]');
+          if (twitterTitle && b.product) twitterTitle.setAttribute('content', b.product);
+          const twitterDesc = document.querySelector('meta[name="twitter:description"]');
+          if (twitterDesc && b.tagline) twitterDesc.setAttribute('content', b.tagline);
+          // Update CSS custom property
           if (b.primaryColor) document.documentElement.style.setProperty('--brand-primary', b.primaryColor);
           // Replace any element marked with data-brand="<key>" with the
           // corresponding branding value. Uses textContent to avoid HTML
