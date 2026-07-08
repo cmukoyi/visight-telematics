@@ -400,6 +400,18 @@ async def startup_event():
     asyncio.create_task(critical_service_alerts.start())
     print("🚨 Critical service alert monitor started (60-second cycle)")
 
+    # Start Trip Engine background tasks
+    from app.services import tracksolid_batch_service, tracksolid_track_service, trip_engine
+    
+    tracksolid_batch_service.start_batch_sweep()
+    print("🚗 Trip Engine: Batch sweep started (10-minute interval)")
+    
+    tracksolid_track_service.start_selective_sweep()
+    print("📍 Trip Engine: Selective sweep started (12-minute interval)")
+    
+    trip_engine.start_trip_engine()
+    print("🛣️  Trip Engine: Journey processor started (15-minute interval)")
+
 @app.on_event("shutdown")
 async def shutdown_event():
     location_poller.stop()

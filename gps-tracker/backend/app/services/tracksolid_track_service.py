@@ -562,6 +562,52 @@ async def run_selective_sweep(db: Session) -> Dict:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# BACKGROUND TASK
+# ═══════════════════════════════════════════════════════════════════════════
+
+SELECTIVE_SWEEP_INTERVAL_MINUTES = 12  # Run after batch sweep (10min + 2min buffer)
+_selective_sweep_task = None
+
+
+async def _selective_sweep_loop():
+    """Background task that runs selective sweep every 12 minutes."""
+    from app.database import SessionLocal
+    
+    logger.info("🚀 Selective sweep loop started (interval: %d minutes)", SELECTIVE_SWEEP_INTERVAL_MINUTES)
+    
+    # Wait 2 minutes for first batch sweep to complete
+    await asyncio.sleep(120)
+    
+    while True:
+        try:
+            db = SessionLocal()
+            try:
+                result = await run_selective_sweep(db)
+                if result['success']:
+                    logger.info("✅ Selective sweep: %d qualified, %d processed, %d positions inserted",
+                               result['devices_qualified'], result['devices_processed'], result['total_positions_inserted'])
+                else:
+                    logger.error("❌ Selective sweep failed: %s", result['error'])
+            finally:
+                db.close()
+        except Exception as exc:
+            logger.error("❌ Selective sweep loop error: %s", exc, exc_info=True)
+        
+        # Wait for next cycle
+        await asyncio.sleep(SELECTIVE_SWEEP_INTERVAL_MINUTES * 60)
+
+
+def start_selective_sweep():
+    """Start the selective sweep background task."""
+    global _selective_sweep_task
+    if _selective_sweep_task is None:
+        _selective_sweep_task = asyncio.create_task(_selective_sweep_loop())
+        logger.info("✅ Selective sweep task scheduled")
+    else:
+        logger.warning("⚠️  Selective sweep task already running")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # TESTING / MANUAL TRIGGER
 # ═══════════════════════════════════════════════════════════════════════════
 

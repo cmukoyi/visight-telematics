@@ -488,6 +488,49 @@ async def run_batch_sweep(db: Session) -> dict:
 # TESTING / MANUAL TRIGGER
 # ═══════════════════════════════════════════════════════════════════════════
 
+# ═══════════════════════════════════════════════════════════════════════════
+# BACKGROUND TASK
+# ═══════════════════════════════════════════════════════════════════════════
+
+BATCH_SWEEP_INTERVAL_MINUTES = 10
+_batch_sweep_task = None
+
+
+async def _batch_sweep_loop():
+    """Background task that runs batch sweep every 10 minutes."""
+    from app.database import SessionLocal
+    
+    logger.info("🚀 Batch sweep loop started (interval: %d minutes)", BATCH_SWEEP_INTERVAL_MINUTES)
+    
+    while True:
+        try:
+            db = SessionLocal()
+            try:
+                result = await run_batch_sweep(db)
+                if result['success']:
+                    logger.info("✅ Batch sweep: %d devices, %d new positions, %d API calls today",
+                               result['devices_received'], result['positions_inserted'], result['api_calls_today'])
+                else:
+                    logger.error("❌ Batch sweep failed: %s", result['error'])
+            finally:
+                db.close()
+        except Exception as exc:
+            logger.error("❌ Batch sweep loop error: %s", exc, exc_info=True)
+        
+        # Wait for next cycle
+        await asyncio.sleep(BATCH_SWEEP_INTERVAL_MINUTES * 60)
+
+
+def start_batch_sweep():
+    """Start the batch sweep background task."""
+    global _batch_sweep_task
+    if _batch_sweep_task is None:
+        _batch_sweep_task = asyncio.create_task(_batch_sweep_loop())
+        logger.info("✅ Batch sweep task scheduled")
+    else:
+        logger.warning("⚠️  Batch sweep task already running")
+
+
 async def main():
     """Test batch sweep service (manual trigger)."""
     from app.database import SessionLocal

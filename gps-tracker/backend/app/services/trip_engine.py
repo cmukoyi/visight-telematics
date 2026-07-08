@@ -1048,6 +1048,54 @@ async def process_all_subscribed_devices(db: Session) -> Dict:
 # ═══════════════════════════════════════════════════════════════════════════
 # TESTING / MANUAL TRIGGER
 # ═══════════════════════════════════════════════════════════════════════════
+# BACKGROUND TASK
+# ═══════════════════════════════════════════════════════════════════════════
+
+TRIP_ENGINE_INTERVAL_MINUTES = 15  # Run every 15 minutes
+_trip_engine_task = None
+
+
+async def _trip_engine_loop():
+    """Background task that processes trips for all subscribed devices."""
+    from app.database import SessionLocal
+    
+    logger.info("🚀 Trip engine loop started (interval: %d minutes)", TRIP_ENGINE_INTERVAL_MINUTES)
+    
+    # Wait 5 minutes for first sweeps to complete
+    await asyncio.sleep(300)
+    
+    while True:
+        try:
+            db = SessionLocal()
+            try:
+                result = await process_all_subscribed_devices(db)
+                if result['success']:
+                    logger.info("✅ Trip engine: %d devices processed, %d new journeys created",
+                               result['devices_processed'], result['total_journeys_created'])
+                else:
+                    logger.error("❌ Trip engine failed: %s", result['error'])
+            finally:
+                db.close()
+        except Exception as exc:
+            logger.error("❌ Trip engine loop error: %s", exc, exc_info=True)
+        
+        # Wait for next cycle
+        await asyncio.sleep(TRIP_ENGINE_INTERVAL_MINUTES * 60)
+
+
+def start_trip_engine():
+    """Start the trip engine background task."""
+    global _trip_engine_task
+    if _trip_engine_task is None:
+        _trip_engine_task = asyncio.create_task(_trip_engine_loop())
+        logger.info("✅ Trip engine task scheduled")
+    else:
+        logger.warning("⚠️  Trip engine task already running")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TESTING / MANUAL TRIGGER
+# ═══════════════════════════════════════════════════════════════════════════
 
 async def main():
     """Test trip engine (manual trigger)."""
