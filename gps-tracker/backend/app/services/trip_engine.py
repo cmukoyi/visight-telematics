@@ -1043,6 +1043,10 @@ async def process_all_subscribed_devices(db: Session) -> Dict:
         total_stats['total_stationaries'], total_stats['total_legs'], total_stats['total_journeys']
     )
     
+    # Add success flag for caller
+    total_stats['success'] = True
+    total_stats['error'] = None
+    
     return total_stats
 
 
@@ -1072,7 +1076,7 @@ async def _trip_engine_loop():
                 result = await process_all_subscribed_devices(db)
                 if result['success']:
                     logger.info("✅ Trip engine: %d devices processed, %d new journeys created",
-                               result['devices_processed'], result['total_journeys_created'])
+                               result['devices_processed'], result['total_journeys'])
                 else:
                     logger.error("❌ Trip engine failed: %s", result['error'])
             finally:
