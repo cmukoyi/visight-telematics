@@ -926,9 +926,16 @@ class TripEngine:
                 
                 # Enter MOVE state
                 self.context.current_state = "MOVE"
+                
+                # Use anchor position or current position for leg start
+                if len(self.context.anchor_points) > 0:
+                    start_lat, start_lng, start_time, start_pos_id = self.context.anchor_points[-1]
+                else:
+                    # Fallback: use current position as both start and continuation
+                    start_lat, start_lng, start_time, start_pos_id = lat, lng, observed_at, position_id
+                
                 self.context.leg_buffer = [
-                    (self.context.anchor_lat, self.context.anchor_lng, 
-                     self.context.anchor_points[-1][2], self.context.anchor_points[-1][3]),  # Start from anchor with position_id
+                    (start_lat, start_lng, start_time, start_pos_id),  # Start from anchor
                     (lat, lng, observed_at, position_id)  # Current point
                 ]
         
