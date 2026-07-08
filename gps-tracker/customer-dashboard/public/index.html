@@ -3281,10 +3281,15 @@ input.hive-range::-moz-range-track {
                                 <div class="mha-ap-label">Date range</div>
                                 <div class="mha-pills">
                                     <span class="mha-pill" data-range="today" onclick="mhaSetDateRange('today', this)">Today</span>
-                                    <span class="mha-pill on" data-range="yesterday" onclick="mhaSetDateRange('yesterday', this)">Yesterday</span>
-                                    <span class="mha-pill" data-range="7d" onclick="mhaSetDateRange('7d', this)">Last 7 days</span>
+                                    <span class="mha-pill" data-range="yesterday" onclick="mhaSetDateRange('yesterday', this)">Yesterday</span>
+                                    <span class="mha-pill on" data-range="7d" onclick="mhaSetDateRange('7d', this)">Last 7 days</span>
                                     <span class="mha-pill" data-range="30d" onclick="mhaSetDateRange('30d', this)">Last 30 days</span>
                                     <span class="mha-pill" data-range="custom" onclick="mhaSetDateRange('custom', this)" style="color:var(--text-3)"><i class="fa-solid fa-calendar"></i> Custom</span>
+                                </div>
+                                <!-- Custom date inputs (hidden by default) -->
+                                <div id="mha-custom-dates" style="display:none;margin-top:8px;">
+                                    <input type="date" id="mha-start-date" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-3);color:var(--text-1);font-size:11px;margin-bottom:6px;" onchange="mhaApplyCustomDates()">
+                                    <input type="date" id="mha-end-date" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-3);color:var(--text-1);font-size:11px;" onchange="mhaApplyCustomDates()">
                                 </div>
                             </div>
                             
@@ -13237,7 +13242,7 @@ function qrOpenHelp() {
   let _mhaFilterStatus = 'all';
   let _mhaSearchQuery = '';
   let _mhaJourneyLayers = [];
-  let _mhaDateRange = 'yesterday'; // today, yesterday, 7d, 30d, custom
+  let _mhaDateRange = '7d'; // today, yesterday, 7d, 30d, custom
   let _mhaFilter = 'all'; // all, newtags, parcels, qr
 
   // Initialize Movement History Advanced tab
@@ -13419,6 +13424,51 @@ function qrOpenHelp() {
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   }
 
+  // Get date range based on selected option
+  function mhaGetDateRange() {
+    const endDate = new Date();
+    endDate.setHours(23, 59, 59, 999); // End of today
+    const startDate = new Date();
+    
+    switch (_mhaDateRange) {
+      case 'today':
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case 'yesterday':
+        startDate.setDate(startDate.getDate() - 1);
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setDate(endDate.getDate() - 1);
+        endDate.setHours(23, 59, 59, 999);
+        break;
+      case '7d':
+        startDate.setDate(startDate.getDate() - 7);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case '30d':
+        startDate.setDate(startDate.getDate() - 30);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case 'custom':
+        const startInput = document.getElementById('mha-start-date').value;
+        const endInput = document.getElementById('mha-end-date').value;
+        if (startInput && endInput) {
+          return {
+            startDate: new Date(startInput + 'T00:00:00'),
+            endDate: new Date(endInput + 'T23:59:59')
+          };
+        }
+        // Default to last 7 days if custom not set
+        startDate.setDate(startDate.getDate() - 7);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      default:
+        startDate.setDate(startDate.getDate() - 7);
+        startDate.setHours(0, 0, 0, 0);
+    }
+    
+    return { startDate, endDate };
+  }
+
   // Date range filter
   window.mhaSetDateRange = function(range, el) {
     _mhaDateRange = range;
@@ -13427,8 +13477,35 @@ function qrOpenHelp() {
     document.querySelectorAll('.mha-pill[data-range]').forEach(p => p.classList.remove('on'));
     if (el) el.classList.add('on');
     
-    // TODO: Apply date range filter when loading journeys
-    console.log(`[MHA] Date range set to: ${range}`);
+    // Show/hide custom date inputs
+    const customDiv = document.getElementById('mha-custom-dates');
+    if (range === 'custom') {
+      customDiv.style.display = 'block';
+      // Set default dates if empty
+      const startInput = document.getElementById('mha-start-date');
+      const endInput = document.getElementById('mha-end-date');
+      if (!startInput.value) {
+        const start = new Date();
+        start.setDate(start.getDate() - 7);
+        startInput.value = start.toISOString().split('T')[0];
+      }
+      if (!endInput.value) {
+        endInput.value = new Date().toISOString().split('T')[0];
+      }
+    } else {
+      customDiv.style.display = 'none';
+      // Reload journeys for non-custom ranges
+      if (_mhaSelectedImei) {
+        mhaLoadJourneys(_mhaSelectedImei);
+      }
+    }
+  };
+  
+  // Apply custom date range
+  window.mhaApplyCustomDates = function() {
+    if (_mhaSelectedImei && _mhaDateRange === 'custom') {
+      mhaLoadJourneys(_mhaSelectedImei);
+    }
   };
   
   // Category filter (All, New Tags, Parcels, QR Code)
@@ -13507,10 +13584,8 @@ function qrOpenHelp() {
       </div>`;
     
     try {
-      // Default: last 7 days
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - 7);
+      // Get date range based on selected filter
+      const { startDate, endDate } = mhaGetDateRange();
       
       const params = new URLSearchParams({
         device_imei: imei,
@@ -13525,19 +13600,30 @@ function qrOpenHelp() {
       
       const data = await res.json();
       
+      // Get range label for display
+      let rangeLabel = 'last 7 days';
+      if (_mhaDateRange === 'today') rangeLabel = 'today';
+      else if (_mhaDateRange === 'yesterday') rangeLabel = 'yesterday';
+      else if (_mhaDateRange === '30d') rangeLabel = 'last 30 days';
+      else if (_mhaDateRange === 'custom') {
+        const start = startDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        const end = endDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        rangeLabel = `${start} - ${end}`;
+      }
+      
       if (data.journeys.length === 0) {
         journeysBody.innerHTML = `
           <div class="mha-jp-placeholder">
             <i class="fa-solid fa-route"></i>
-            <p>No journeys found<br><small>Last 7 days</small></p>
+            <p>No journeys found<br><small>${rangeLabel}</small></p>
           </div>`;
-        document.getElementById('mha-map-meta').textContent = 'No journeys in the last 7 days';
+        document.getElementById('mha-map-meta').textContent = `No journeys (${rangeLabel})`;
         return;
       }
       
       mhaRenderJourneys(data.journeys);
       document.getElementById('mha-map-meta').textContent = 
-        `${data.total} journey${data.total !== 1 ? 's' : ''} (last 7 days)`;
+        `${data.total} journey${data.total !== 1 ? 's' : ''} (${rangeLabel})`;
     } catch (err) {
       console.error('[MHA] Error loading journeys:', err);
       journeysBody.innerHTML = `
