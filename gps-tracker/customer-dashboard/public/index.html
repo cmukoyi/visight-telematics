@@ -3149,8 +3149,8 @@ input.hive-range::-moz-range-track {
             <!-- ══════════ MOVEMENT HISTORY ADVANCED TAB (Phase 5) ══════════ -->
             <style>
             /* ── Movement History Advanced scoped styles (Phase 5.2) ────────────────── */
-            #tab-history-advanced { padding:16px 20px !important; overflow-y:auto; }
-            .mha-main { display:flex; gap:14px; align-items:stretch; min-height:600px; }
+            #tab-history-advanced { padding:0 !important; overflow:hidden; display:flex; flex-direction:column; }
+            .mha-main { display:flex; gap:14px; align-items:stretch; height:100%; padding:16px 20px; }
             @media(max-width:1100px) { .mha-main { flex-direction:column; } }
             
             /* Assets Panel (266px) */
@@ -3236,6 +3236,7 @@ input.hive-range::-moz-range-track {
             .mha-journey-card { background:var(--bg-3); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:10px; cursor:pointer; transition:all .15s; }
             .mha-journey-card:hover { border-color:var(--primary); }
             .mha-journey-card.selected { border-color:var(--primary); background:color-mix(in srgb,var(--primary) 8%,transparent); }
+            .mha-journey-card.open { border-color:var(--primary); }
             .mha-journey-hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
             .mha-journey-hd .date { font-size:13px; font-weight:600; }
             .mha-journey-hd .dur { font-size:11px; color:var(--text-3); }
@@ -3243,6 +3244,11 @@ input.hive-range::-moz-range-track {
             .mha-journey-stats .stat { display:flex; align-items:center; gap:5px; }
             .mha-journey-stats .stat i { color:var(--text-3); font-size:12px; }
             .mha-journey-stats .stat .v { font-weight:600; }
+            
+            /* Journey Steps */
+            .mha-step { display:flex; gap:9px; font-size:12px; padding:6px 0; align-items:flex-start; }
+            .mha-step i { margin-top:4px; flex:none; }
+            .airtag { font-size:9px; font-weight:600; color:var(--primary); border:1px solid var(--primary); border-radius:4px; padding:1px 5px; margin-left:4px; vertical-align:1px; }
             
             /* Position Timeline */
             .mha-position-item { padding:10px 0; border-bottom:1px solid var(--border); }
@@ -13542,26 +13548,27 @@ function qrOpenHelp() {
     }
   }
 
-  // Render journey cards
+  // Render journey cards with expansion support
   function mhaRenderJourneys(journeys) {
     const journeysBody = document.getElementById('mha-journeys-body');
     
-    journeysBody.innerHTML = journeys.map(journey => {
+    journeysBody.innerHTML = journeys.map((journey, idx) => {
       const startDate = new Date(journey.started_at);
       const duration = mhaFormatDuration(journey.total_duration_seconds);
       const distance = (journey.total_distance_m / 1000).toFixed(1);
       const isSelected = _mhaActiveJourney === journey.id;
+      const airTag = journey.is_air_journey ? ' <span class="airtag">✈ flight</span>' : '';
       
       return `
-        <div class="mha-journey-card ${isSelected ? 'selected' : ''}" onclick="mhaSelectJourney('${journey.id}')">
-          <div class="mha-journey-hd">
+        <div class="mha-journey-card ${isSelected ? 'selected open' : ''}" data-journey-id="${journey.id}">
+          <div class="mha-journey-hd" onclick="mhaToggleJourney('${journey.id}', event)">
             <div class="date">${startDate.toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
             <div class="dur">${duration}</div>
           </div>
-          <div class="mha-journey-stats">
+          <div class="mha-journey-stats" onclick="mhaToggleJourney('${journey.id}', event)">
             <div class="stat">
               <i class="fa-solid fa-route"></i>
-              <span class="v">${distance} km</span>
+              <span class="v">${distance} km${airTag}</span>
             </div>
             <div class="stat">
               <i class="fa-solid fa-circle-pause"></i>
@@ -13571,10 +13578,142 @@ function qrOpenHelp() {
               <i class="fa-solid fa-forward"></i>
               <span class="v">${journey.leg_count} legs</span>
             </div>
-            ${journey.is_air_journey ? '<div class="stat"><i class="fa-solid fa-plane"></i><span class="v">Air</span></div>' : ''}
+          </div>
+          <div class="mha-journey-steps" id="mha-steps-${journey.id}" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:9px;">
+            <div style="text-align:center;padding:10px;color:var(--text-3);"><i class="fa-solid fa-spinner fa-spin"></i> Loading details...</div>
           </div>
         </div>`;
     }).join('');
+  }
+
+  // Toggle journey card expansion
+  window.mhaToggleJourney = async function(journeyId, event) {
+    event.stopPropagation();
+    const card = document.querySelector(`[data-journey-id="${journeyId}"]`);
+    const stepsDiv = document.getElementById(`mha-steps-${journeyId}`);
+    
+    // Toggle expansion
+    const isOpen = card.classList.contains('open');
+    
+    // Close all other cards
+    document.querySelectorAll('.mha-journey-card').forEach(c => {
+      c.classList.remove('open');
+      const steps = c.querySelector('.mha-journey-steps');
+      if (steps) steps.style.display = 'none';
+    });
+    
+    if (isOpen) {
+      // Was open, now closing
+      card.classList.remove('open');
+      stepsDiv.style.display = 'none';
+    } else {
+      // Opening
+      card.classList.add('open');
+      stepsDiv.style.display = 'block';
+      
+      // Load details if not already loaded
+      if (stepsDiv.dataset.loaded !== 'true') {
+        await mhaLoadJourneyDetails(journeyId);
+      }
+      
+      // Also select on map
+      mhaSelectJourney(journeyId);
+    }
+  };
+
+  // Load journey details (legs and stationaries)
+  async function mhaLoadJourneyDetails(journeyId) {
+    const stepsDiv = document.getElementById(`mha-steps-${journeyId}`);
+    
+    try {
+      const res = await apiFetch(`/api/portal/journeys/${journeyId}`);
+      if (!res.ok) throw new Error('Failed to load journey details');
+      
+      const data = await res.json();
+      
+      // Build steps HTML (start → legs/stationaries → end)
+      let stepsHtml = '';
+      
+      // Start marker
+      if (data.legs && data.legs.length > 0) {
+        const firstLeg = data.legs[0];
+        stepsHtml += `
+          <div class="mha-step">
+            <i class="fa-solid fa-circle" style="color:#22c55e;font-size:10px;"></i>
+            <div>
+              <span style="font-weight:500;">Start</span>
+              <span style="color:var(--text-2);margin-left:8px;">${new Date(firstLeg.started_at).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</span>
+            </div>
+          </div>`;
+      }
+      
+      // Interleave legs and stationaries by timestamp
+      const items = [];
+      
+      (data.legs || []).forEach(leg => {
+        items.push({type: 'leg', data: leg, time: new Date(leg.started_at).getTime()});
+      });
+      
+      (data.stationaries || []).forEach(stat => {
+        items.push({type: 'stationary', data: stat, time: new Date(stat.started_at).getTime()});
+      });
+      
+      items.sort((a, b) => a.time - b.time);
+      
+      // Render items
+      items.forEach((item, idx) => {
+        if (item.type === 'leg') {
+          const leg = item.data;
+          const distKm = (leg.distance_m / 1000).toFixed(1);
+          const dur = mhaFormatDuration(leg.duration_seconds);
+          const airBadge = leg.mode === 'air' ? ' <span class="airtag">✈</span>' : '';
+          
+          stepsHtml += `
+            <div class="mha-step">
+              <i class="fa-solid fa-circle" style="color:#3b82f6;font-size:10px;"></i>
+              <div>
+                <span style="font-weight:500;">Leg ${idx + 1}${airBadge}</span>
+                <span style="color:var(--text-2);margin-left:8px;">${distKm} km · ${dur}</span>
+              </div>
+            </div>`;
+        } else {
+          const stat = item.data;
+          const dur = mhaFormatDuration(stat.duration_seconds);
+          
+          stepsHtml += `
+            <div class="mha-step">
+              <i class="fa-solid fa-circle" style="color:#f59e0b;font-size:10px;"></i>
+              <div>
+                <span style="font-weight:500;">Stop</span>
+                <span style="color:var(--text-2);margin-left:8px;">${dur}</span>
+              </div>
+            </div>`;
+        }
+      });
+      
+      // End marker
+      if (data.legs && data.legs.length > 0) {
+        const lastLeg = data.legs[data.legs.length - 1];
+        stepsHtml += `
+          <div class="mha-step">
+            <i class="fa-solid fa-circle" style="color:#ef4444;font-size:10px;"></i>
+            <div>
+              <span style="font-weight:500;">End</span>
+              <span style="color:var(--text-2);margin-left:8px;">${new Date(lastLeg.ended_at).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</span>
+            </div>
+          </div>`;
+      }
+      
+      stepsDiv.innerHTML = stepsHtml;
+      stepsDiv.dataset.loaded = 'true';
+      
+    } catch (err) {
+      console.error('[MHA] Error loading journey details:', err);
+      stepsDiv.innerHTML = `
+        <div style="text-align:center;padding:10px;color:var(--danger);">
+          <i class="fa-solid fa-triangle-exclamation"></i> Failed to load details
+        </div>`;
+    }
   }
 
   // Format duration
