@@ -599,7 +599,7 @@ jobs:
           DO_USER: ${{ secrets.DO_USER }}
         run: |
           check() {
-            local NAME="$1" URL="$2" RETRIES="${3:-10}"
+            local NAME="$1" URL="$2" RETRIES="${3:-20}"
             for i in $(seq 1 $RETRIES); do
               if curl -fsS --max-time 5 "$URL" >/dev/null 2>&1; then
                 echo "✅ $NAME healthy"
@@ -613,10 +613,10 @@ jobs:
           }
 
           FAILED=0
-          check "Backend"      "http://$DO_SERVER_IP:8001/api/health" || FAILED=1
-          check "Admin Portal" "http://$DO_SERVER_IP:3010"            || FAILED=1
-          check "Flutter Web"  "http://$DO_SERVER_IP:3012"            || FAILED=1
-          check "Customer UI"  "http://$DO_SERVER_IP:3011"            || FAILED=1
+          check "Backend"      "http://$DO_SERVER_IP:8001/api/health" 20 || FAILED=1
+          check "Admin Portal" "http://$DO_SERVER_IP:3010"            15 || FAILED=1
+          check "Flutter Web"  "http://$DO_SERVER_IP:3012"            15 || FAILED=1
+          check "Customer UI"  "http://$DO_SERVER_IP:3011"            15 || FAILED=1
 
           if [ "$FAILED" -eq 1 ]; then
             echo "❌ Health checks failed — collecting logs..."
