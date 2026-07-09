@@ -172,8 +172,8 @@ def main():
     # Get database session
     db = next(get_db())
     
-    # Initialize geocoding service
-    geocode_service = GeocodeService(db=db)
+    # Initialize geocoding service (doesn't need db parameter)
+    geocode_service = GeocodeService()
     
     try:
         print("")
