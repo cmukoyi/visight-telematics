@@ -300,8 +300,10 @@ class TripEngine:
             
             # Reconstruct anchor_points from anchor (single point for now)
             if state_row.anchor_lat and state_row.anchor_lng:
+                # Must be 4-tuple: (lat, lng, timestamp, position_id)
+                # position_id is None for reconstructed state (we don't persist it)
                 context.anchor_points = [
-                    (state_row.anchor_lat, state_row.anchor_lng, state_row.last_processed_at)
+                    (state_row.anchor_lat, state_row.anchor_lng, state_row.last_processed_at, None)
                 ] * state_row.anchor_count
             
             logger.info(

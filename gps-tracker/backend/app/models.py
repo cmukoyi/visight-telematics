@@ -966,9 +966,9 @@ class Stationary(Base):
     device_imei = Column(String(20), nullable=False, index=True)
     journey_id = get_uuid_nullable()  # NULL if ungrouped
     
-    # Position references
-    start_position_id = Column(Integer, nullable=False)
-    end_position_id = Column(Integer, nullable=False)
+    # Position references (nullable for reconstructed state)
+    start_position_id = Column(Integer, nullable=True)
+    end_position_id = Column(Integer, nullable=True)
     
     # Time window
     started_at = Column(DateTime(timezone=True), nullable=False, index=True)
