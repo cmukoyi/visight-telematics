@@ -3166,10 +3166,12 @@ input.hive-range::-moz-range-track {
             .mha-ap-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
             .mha-ap-stat { background:var(--bg-3); border:1px solid var(--border); border-radius:8px; padding:7px 3px; text-align:center; cursor:pointer; transition:all .15s; }
             .mha-ap-stat:hover { border-color:var(--primary); }
-            .mha-ap-stat.act { background:color-mix(in srgb,var(--primary) 10%,transparent); border-color:var(--primary); }
+            .mha-ap-stat.selected { background:color-mix(in srgb,var(--primary) 10%,transparent); border-color:var(--primary); }
             .mha-ap-stat .n { font-size:16px; font-weight:600; line-height:1.1; }
             .mha-ap-stat .l { font-size:9px; color:var(--text-3); text-transform:uppercase; letter-spacing:.03em; }
-            .mha-ap-stat.act .n { color:var(--primary); }
+            .mha-ap-stat.act .n { color:#22c55e; }
+            .mha-ap-stat.idl .n { color:#f59e0b; }
+            .mha-ap-stat.off .n { color:#ef4444; }
             .mha-ap-list { flex:1; overflow-y:auto; margin:2px -12px -12px; border-top:1px solid var(--border); }
             .mha-asset-row { display:flex; align-items:center; gap:10px; padding:9px 14px; cursor:pointer; border-left:2px solid transparent; border-bottom:1px solid var(--border); transition:all .12s; }
             .mha-asset-row:hover { background:var(--bg-3); }
@@ -3348,21 +3350,21 @@ input.hive-range::-moz-range-track {
                             <div>
                                 <div class="mha-ap-label">Status</div>
                                 <div class="mha-ap-stats">
-                                    <div class="mha-ap-stat act" data-status="all" onclick="mhaFilterByStatus('all', this)">
-                                        <div class="n" id="mha-stat-active">0</div>
-                                        <div class="l">Active</div>
-                                    </div>
-                                    <div class="mha-ap-stat" data-status="idle" onclick="mhaFilterByStatus('idle', this)">
-                                        <div class="n" id="mha-stat-idle">0</div>
-                                        <div class="l">Idle</div>
-                                    </div>
-                                    <div class="mha-ap-stat" data-status="offline" onclick="mhaFilterByStatus('offline', this)">
-                                        <div class="n" id="mha-stat-offline">0</div>
-                                        <div class="l">Offline</div>
-                                    </div>
                                     <div class="mha-ap-stat" data-status="total" onclick="mhaFilterByStatus('total', this)">
                                         <div class="n" id="mha-stat-total">0</div>
                                         <div class="l">Total</div>
+                                    </div>
+                                    <div class="mha-ap-stat act selected" data-status="all" onclick="mhaFilterByStatus('all', this)">
+                                        <div class="n" id="mha-stat-active">0</div>
+                                        <div class="l">Active</div>
+                                    </div>
+                                    <div class="mha-ap-stat idl" data-status="idle" onclick="mhaFilterByStatus('idle', this)">
+                                        <div class="n" id="mha-stat-idle">0</div>
+                                        <div class="l">Idle</div>
+                                    </div>
+                                    <div class="mha-ap-stat off" data-status="offline" onclick="mhaFilterByStatus('offline', this)">
+                                        <div class="n" id="mha-stat-offline">0</div>
+                                        <div class="l">Offline</div>
                                     </div>
                                 </div>
                             </div>
@@ -13427,7 +13429,7 @@ function qrOpenHelp() {
       
       return `
         <div class="mha-asset-row ${isActive ? 'active' : ''}" onclick="mhaSelectAsset('${esc(asset.imei)}')">
-          <i class="fa-solid fa-location-dot pin"></i>
+          <i class="fa-solid fa-map-pin pin"></i>
           <div class="info">
             <div class="nm">${name}</div>
             <div class="im">${esc(asset.imei)}</div>
@@ -13603,9 +13605,9 @@ function qrOpenHelp() {
   window.mhaFilterByStatus = function(status, el) {
     _mhaFilterStatus = status;
     
-    // Update active stat chip
-    document.querySelectorAll('.mha-ap-stat').forEach(s => s.classList.remove('act'));
-    if (el) el.classList.add('act');
+    // Update selected stat chip (not .act/.idl/.off - those are permanent color classes)
+    document.querySelectorAll('.mha-ap-stat').forEach(s => s.classList.remove('selected'));
+    if (el) el.classList.add('selected');
     
     mhaFilterAssets();
   };
