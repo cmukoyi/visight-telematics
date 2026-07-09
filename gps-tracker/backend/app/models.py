@@ -1,6 +1,7 @@
 from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, Float, Text, Enum, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from geoalchemy2 import Geometry
 import uuid
 from app.database import Base
 import os
@@ -984,7 +985,7 @@ class Stationary(Base):
     # Geometry
     anchor_lat = Column(Float, nullable=False)
     anchor_lng = Column(Float, nullable=False)
-    # centroid = Column(Geometry('Point', srid=4326), nullable=True)  # PostGIS Point geometry (added in migration 056)
+    centroid = Column(Geometry('Point', srid=4326), nullable=True)  # PostGIS Point geometry (added in migration 056)
     point_count = Column(Integer, nullable=False)
     
     # Metrics
@@ -1021,8 +1022,8 @@ class Leg(Base):
     end_lng = Column(Float, nullable=True)
     
     # Geometry (PostGIS) - Added in migration 056
-    # path = Column(Geometry('LineString', srid=4326), nullable=True)  # Full resolution path
-    # path_simplified = Column(Geometry('LineString', srid=4326), nullable=True)  # Simplified for rendering
+    path = Column(Geometry('LineString', srid=4326), nullable=True)  # Full resolution path
+    path_simplified = Column(Geometry('LineString', srid=4326), nullable=True)  # Simplified for rendering
     
     # Metrics
     distance_m = Column(Float, nullable=False)
