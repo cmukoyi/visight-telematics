@@ -3264,8 +3264,11 @@ input.hive-range::-moz-range-track {
             .mha-position-item:last-child { border-bottom:none; }
             .mha-position-time { font-weight:500; min-width:50px; }
             .mha-position-addr { flex:1; color:var(--text-2); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-            .mha-position-link { color:var(--primary); font-size:11px; padding:2px 6px; border-radius:4px; border:1px solid var(--primary); cursor:pointer; flex:none; }
-            .mha-position-link:hover { background:var(--accent-bg); }
+            .mha-position-link { font-size:11px; padding:3px 8px; border-radius:4px; border:1px solid; cursor:pointer; flex:none; font-weight:500; transition:all .12s; }
+            .mha-position-link.leg { color:#3b82f6; border-color:#3b82f6; background:color-mix(in srgb, #3b82f6 8%, transparent); }
+            .mha-position-link.leg:hover { background:color-mix(in srgb, #3b82f6 15%, transparent); }
+            .mha-position-link.stat { color:#f59e0b; border-color:#f59e0b; background:color-mix(in srgb, #f59e0b 8%, transparent); }
+            .mha-position-link.stat:hover { background:color-mix(in srgb, #f59e0b 15%, transparent); }
             .mha-plot-btn { width:28px; height:28px; border:1px solid var(--border); border-radius:6px; background:var(--bg-3); color:var(--text-2); cursor:pointer; display:flex; align-items:center; justify-content:center; flex:none; }
             .mha-plot-btn:hover { border-color:var(--primary); color:var(--primary); background:var(--accent-bg); }
             .mha-plot-all { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg-3); color:var(--text); font-size:12px; cursor:pointer; }
@@ -14167,15 +14170,44 @@ function qrOpenHelp() {
           </button>
         </div>`;
       
+      // Build leg/stationary lookup map from journey data
+      const legMap = {};
+      const statMap = {};
+      
+      if (window._mhaJourneyData && _mhaActiveJourney) {
+        const journey = window._mhaJourneyData[_mhaActiveJourney];
+        if (journey) {
+          // Create ordered mapping of leg IDs to display numbers
+          (journey.legs || []).forEach((leg, idx) => {
+            legMap[leg.id] = idx + 1; // Leg 1, Leg 2, etc.
+          });
+          
+          // Create ordered mapping of stationary IDs to display numbers
+          (journey.stationaries || []).forEach((stat, idx) => {
+            statMap[stat.id] = idx + 1; // Stationary 1, Stationary 2, etc.
+          });
+        }
+      }
+      
       Object.keys(grouped).forEach(dateKey => {
         html += `<div class="mha-date-header">${dateKey}</div>`;
         grouped[dateKey].forEach(pos => {
           const time = new Date(pos.observed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           const addr = pos.address || `${pos.latitude.toFixed(4)}, ${pos.longitude.toFixed(4)}`;
+          
+          // Determine if position belongs to a leg or stationary
+          let linkHtml = '';
+          if (pos.leg_id && legMap[pos.leg_id]) {
+            linkHtml = `<span class="mha-position-link leg">Leg ${legMap[pos.leg_id]}</span>`;
+          } else if (pos.stationary_id && statMap[pos.stationary_id]) {
+            linkHtml = `<span class="mha-position-link stat">Stationary ${statMap[pos.stationary_id]}</span>`;
+          }
+          
           html += `
             <div class="mha-position-item">
               <span class="mha-position-time">${time}</span>
               <span class="mha-position-addr">${esc(addr)}</span>
+              ${linkHtml}
               <button class="mha-plot-btn" onclick="mhaPlotPosition(${pos.latitude}, ${pos.longitude})" title="Show on map">
                 <i class="fa-solid fa-location-dot"></i>
               </button>
