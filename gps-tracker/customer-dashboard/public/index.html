@@ -13872,13 +13872,15 @@ function qrOpenHelp() {
       // Journeys in this date group
       group.journeys.forEach((journey, idx) => {
         // Add idle connector before this journey (check across ALL journeys, not just within date group)
+        // NOTE: previousJourney is NEWER (just processed), journey is OLDER (processing now)
+        // So we calculate: previousJourney.start - journey.end (chronological idle time)
         if (previousJourney) {
-          const idleDuration = mhaCalculateIdleDuration(previousJourney.ended_at, journey.started_at);
+          const idleDuration = mhaCalculateIdleDuration(journey.ended_at, previousJourney.started_at);
           console.log('[MHA] Idle check:', {
-            from: previousJourney.id,
-            to: journey.id,
-            prevEnd: previousJourney.ended_at,
-            currStart: journey.started_at,
+            from: journey.id,
+            to: previousJourney.id,
+            olderEnd: journey.ended_at,
+            newerStart: previousJourney.started_at,
             idleDuration: idleDuration,
             willShow: idleDuration && idleDuration > 60
           });
