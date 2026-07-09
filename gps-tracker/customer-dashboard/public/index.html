@@ -478,6 +478,18 @@
                         <i class="fa-solid fa-eraser"></i>
                         <span>Clear Markers</span>
                     </button>
+                    <!-- Map Style Switcher for Live Map -->
+                    <div class="map-style-switcher" id="live-style-switcher">
+                        <button class="map-style-btn active" data-style="streets" onclick="liveSwitchMapStyle('streets')">
+                            <i class="fa-solid fa-map"></i> Streets
+                        </button>
+                        <button class="map-style-btn" data-style="satellite" onclick="liveSwitchMapStyle('satellite')">
+                            <i class="fa-solid fa-satellite"></i> Satellite
+                        </button>
+                        <button class="map-style-btn" data-style="hybrid" onclick="liveSwitchMapStyle('hybrid')">
+                            <i class="fa-solid fa-layer-group"></i> Hybrid
+                        </button>
+                    </div>
                     <div id="liveMap"></div>
                 </div>
             </div>
@@ -3206,6 +3218,14 @@ input.hive-range::-moz-range-track {
             .mha-map-btn.on { background:color-mix(in srgb,var(--primary) 12%,transparent); color:var(--primary); border-color:var(--primary); }
             .mha-map-btn i { font-size:14px; }
             
+            /* Map Style Switcher */
+            .map-style-switcher { position:absolute; top:12px; left:12px; z-index:1000; background:var(--bg-2); border:1px solid var(--border); border-radius:8px; overflow:hidden; display:flex; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
+            .map-style-btn { padding:6px 10px; font-size:11px; color:var(--text-2); cursor:pointer; border:none; background:transparent; font-family:inherit; transition:all .15s; display:flex; align-items:center; gap:5px; border-right:1px solid var(--border); }
+            .map-style-btn:last-child { border-right:none; }
+            .map-style-btn:hover { color:var(--text-1); background:var(--bg-3); }
+            .map-style-btn.active { color:var(--primary); background:color-mix(in srgb,var(--primary) 10%,transparent); font-weight:600; }
+            .map-style-btn i { font-size:13px; }
+            
             /* Legend */
             .mha-legend { position:absolute; left:12px; bottom:12px; display:flex; gap:12px; flex-wrap:wrap; background:var(--bg-2); border:1px solid var(--border); border-radius:9px; padding:8px 12px; font-size:11px; color:var(--text-2); z-index:1000; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
             .mha-legend span { display:flex; align-items:center; gap:6px; white-space:nowrap; }
@@ -3405,6 +3425,19 @@ input.hive-range::-moz-range-track {
                         </div>
                         <div class="mha-map-container">
                             <div id="mha-map"></div>
+                            
+                            <!-- Map Style Switcher -->
+                            <div class="map-style-switcher" id="mha-style-switcher">
+                                <button class="map-style-btn active" data-style="streets" onclick="mhaSwitchMapStyle('streets')">
+                                    <i class="fa-solid fa-map"></i> Streets
+                                </button>
+                                <button class="map-style-btn" data-style="satellite" onclick="mhaSwitchMapStyle('satellite')">
+                                    <i class="fa-solid fa-satellite"></i> Satellite
+                                </button>
+                                <button class="map-style-btn" data-style="hybrid" onclick="mhaSwitchMapStyle('hybrid')">
+                                    <i class="fa-solid fa-layer-group"></i> Hybrid
+                                </button>
+                            </div>
                             
                             <!-- Map Controls -->
                             <div class="mha-map-controls">
@@ -10196,6 +10229,7 @@ async function initLiveMap() {
             doubleClickZoom: true
         }).setView([51.5074, -0.1278], 12);
         addPinplotBasemap(_liveMap);
+        _liveMap._ppCurrentStyle = 'streets';
         // Keep the currently-selected tag/POI centered when using +/- zoom buttons
         // (scroll-wheel already zooms toward cursor; this fixes button-zoom UX).
         _liveMap.on('zoomstart', () => {
@@ -10218,6 +10252,47 @@ async function initLiveMap() {
     }
     await _lmLoadTags();
     _lmConnectAssetSSE();
+}
+
+// Map style switcher for Live Map
+window.liveSwitchMapStyle = function(style) {
+    if (!_liveMap) return;
+    
+    // Update button states
+    document.querySelectorAll('#live-style-switcher .map-style-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.style === style);
+    });
+    
+    // Get MapTiler style name
+    let tileStyle;
+    switch(style) {
+        case 'satellite':
+            tileStyle = 'satellite-v2';
+            break;
+        case 'hybrid':
+            tileStyle = 'hybrid-v2';
+            break;
+        default:
+            tileStyle = _ppMapTilerStyle(); // streets (theme-aware)
+    }
+    
+    // Replace tile layer
+    _ppMapTilerLayers.forEach(entry => {
+        if (entry.map === _liveMap) {
+            _liveMap.removeLayer(entry.layer);
+            const newLayer = L.tileLayer(_ppMapTilerUrl(tileStyle), {
+                maxZoom: 20,
+                tileSize: 512,
+                zoomOffset: -1,
+                crossOrigin: true,
+                attribution: '&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors'
+            }).addTo(_liveMap);
+            entry.layer = newLayer;
+            _liveMap.invalidateSize({ animate: false });
+        }
+    });
+    
+    _liveMap._ppCurrentStyle = style;
     // Legacy QR/NFC asset endpoint (/api/assets) was removed; series_3 assets
     // are now included in /api/portal/tags and rendered with regular markers.
 }
@@ -13340,6 +13415,7 @@ function qrOpenHelp() {
         wheelPxPerZoomLevel: 80
       }).setView([51.5074, -0.1278], 12);
       addPinplotBasemap(_mhaMap);
+      _mhaMap._ppCurrentStyle = 'streets';
       _mhaMapReady = true;
     } else {
       _mhaMap.invalidateSize();
@@ -13347,6 +13423,47 @@ function qrOpenHelp() {
     
     // Load assets (Phase 5.3)
     await mhaLoadAssets();
+  };
+  
+  // Map style switcher for MHA Journey Map
+  window.mhaSwitchMapStyle = function(style) {
+    if (!_mhaMap) return;
+    
+    // Update button states
+    document.querySelectorAll('#mha-style-switcher .map-style-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.style === style);
+    });
+    
+    // Get MapTiler style name
+    let tileStyle;
+    switch(style) {
+      case 'satellite':
+        tileStyle = 'satellite-v2';
+        break;
+      case 'hybrid':
+        tileStyle = 'hybrid-v2';
+        break;
+      default:
+        tileStyle = _ppMapTilerStyle(); // streets (theme-aware)
+    }
+    
+    // Replace tile layer
+    _ppMapTilerLayers.forEach(entry => {
+      if (entry.map === _mhaMap) {
+        _mhaMap.removeLayer(entry.layer);
+        const newLayer = L.tileLayer(_ppMapTilerUrl(tileStyle), {
+          maxZoom: 20,
+          tileSize: 512,
+          zoomOffset: -1,
+          crossOrigin: true,
+          attribution: '&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors'
+        }).addTo(_mhaMap);
+        entry.layer = newLayer;
+        _mhaMap.invalidateSize({ animate: false });
+      }
+    });
+    
+    _mhaMap._ppCurrentStyle = style;
   };
 
   // Phase 5.3: Load and render assets
