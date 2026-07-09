@@ -559,6 +559,30 @@ class TripEngine:
             )
             # Don't fail the stationary creation if geometry fails
         
+        # Write stationary_id back to device_positions (Section 3.6)
+        try:
+            position_ids = [p[3] for p in points if p[3] is not None]
+            if position_ids:
+                placeholders = ", ".join([f":id{i}" for i in range(len(position_ids))])
+                params = {f"id{i}": pid for i, pid in enumerate(position_ids)}
+                params["stationary_id"] = str(stationary.id)
+                
+                self.db.execute(text(f"""
+                    UPDATE device_positions 
+                    SET stationary_id = :stationary_id
+                    WHERE id IN ({placeholders})
+                """), params)
+                
+                logger.debug(
+                    "✍️  IMEI %s: Linked %d positions to stationary %s",
+                    self.device_imei, len(position_ids), stationary.id
+                )
+        except Exception as exc:
+            logger.warning(
+                "⚠️  IMEI %s: Failed to link positions to stationary %s: %s",
+                self.device_imei, stationary.id, exc
+            )
+        
         logger.info(
             "🟠 IMEI %s: Stationary created at (%.4f, %.4f) for %.0f min (%d points)%s",
             self.device_imei, centroid_lat, centroid_lng,
@@ -691,6 +715,30 @@ class TripEngine:
                 self.device_imei, leg.id, exc
             )
             # Don't fail the leg creation if geometry fails
+        
+        # Write leg_id back to device_positions (Section 3.6)
+        try:
+            position_ids = [p[3] for p in leg_buffer if p[3] is not None]
+            if position_ids:
+                placeholders = ", ".join([f":id{i}" for i in range(len(position_ids))])
+                params = {f"id{i}": pid for i, pid in enumerate(position_ids)}
+                params["leg_id"] = str(leg.id)
+                
+                self.db.execute(text(f"""
+                    UPDATE device_positions 
+                    SET leg_id = :leg_id
+                    WHERE id IN ({placeholders})
+                """), params)
+                
+                logger.debug(
+                    "✍️  IMEI %s: Linked %d positions to leg %s",
+                    self.device_imei, len(position_ids), leg.id
+                )
+        except Exception as exc:
+            logger.warning(
+                "⚠️  IMEI %s: Failed to link positions to leg %s: %s",
+                self.device_imei, leg.id, exc
+            )
         
         emoji = "✈️ " if is_air_leg else "🔵"
         logger.info(
