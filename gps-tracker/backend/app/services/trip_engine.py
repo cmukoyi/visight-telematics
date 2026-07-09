@@ -1008,8 +1008,8 @@ class TripEngine:
                         self.device_imei, self.config.anchor_radius_m
                     )
                     
-                    # Close the leg (excluding the last 3 points which form the new stationary)
-                    leg_points = self.context.leg_buffer[:-2]  # Keep all but last 2 (last point is current)
+                    # Close the leg BEFORE the cluster (excluding all 3 clustered points per spec Section 2.3)
+                    leg_points = self.context.leg_buffer[:-3]  # Exclude all 3 clustered points (spec: "before the cluster")
                     if len(leg_points) >= 2:
                         leg = self._create_leg(leg_points, is_air_leg=False)
                         if leg:
