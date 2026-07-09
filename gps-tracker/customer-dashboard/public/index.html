@@ -13957,6 +13957,11 @@ function qrOpenHelp() {
   }
 
   // Phase 5.4 & 5.5: Select and visualize journey
+  // Global variables for zoom/focus functionality
+  let _mhaInitialBounds = null;
+  let _mhaFocusRing = null;
+  let _mhaGeofencesVisible = false;
+  
   window.mhaSelectJourney = async function(journeyId) {
     _mhaActiveJourney = journeyId;
     
@@ -13974,10 +13979,20 @@ function qrOpenHelp() {
     _mhaJourneyLayers.forEach(layer => _mhaMap.removeLayer(layer));
     _mhaJourneyLayers = [];
     
+    // Remove focus ring if exists
+    if (_mhaFocusRing) {
+      _mhaMap.removeLayer(_mhaFocusRing);
+      _mhaFocusRing = null;
+    }
+    
+    // Hide reset view button
+    document.getElementById('mha-reset-view').style.display = 'none';
+    
     // Get stored journey data
     const journeyData = window._mhaJourneyData && window._mhaJourneyData[journeyId];
     if (!journeyData || !journeyData.legs || journeyData.legs.length === 0) {
       console.warn('[MHA] No journey data available for plotting');
+      document.getElementById('mha-journey-badge').style.display = 'none';
       return;
     }
     
@@ -13986,6 +14001,8 @@ function qrOpenHelp() {
       const bounds = [];
       let legCounter = 0;
       let statCounter = 0;
+      let totalDistance = 0;
+      let positionCount = 0;
       
       // Start marker (green)
       const firstLeg = journeyData.legs[0];
@@ -13996,9 +14013,11 @@ function qrOpenHelp() {
         const startMarker = L.marker([startLat, startLng], {
           icon: L.divIcon({
             className: 'mha-marker-start',
-            html: '<div style="background:#22c55e;width:24px;height:24px;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-weight:600;font-size:11px;">S</div>',
-            iconSize: [24, 24]
-          })
+            html: '<div style="background:#22c55e;width:26px;height:26px;border-radius:50%;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:#04140a;font-weight:700;font-size:12px;">S</div>',
+            iconSize: [26, 26],
+            iconAnchor: [13, 13]
+          }),
+          zIndexOffset: 1000
         }).addTo(_mhaMap);
         
         startMarker.bindPopup(`<b>Start</b><br>${new Date(firstLeg.started_at).toLocaleString()}`);
@@ -14017,10 +14036,12 @@ function qrOpenHelp() {
       items.sort((a, b) => a.time - b.time);
       
       // Plot each item
-      items.forEach(item => {
+      items.forEach((item, idx) => {
         if (item.type === 'leg') {
           legCounter++;
           const leg = item.data;
+          totalDistance += leg.distance_m || 0;
+          positionCount += leg.point_count || 0;
           
           // Draw leg as polyline (blue)
           const startLat = leg.start_lat || leg.latitude;
@@ -14034,8 +14055,10 @@ function qrOpenHelp() {
               {
                 color: leg.mode === 'air' ? '#3b82f6' : '#3b82f6',
                 weight: 3,
-                opacity: 0.7,
-                dashArray: leg.mode === 'air' ? '10, 10' : null
+                opacity: 0.8,
+                dashArray: leg.mode === 'air' ? '10, 10' : null,
+                lineCap: 'round',
+                lineJoin: 'round'
               }
             ).addTo(_mhaMap);
             
@@ -14048,31 +14071,41 @@ function qrOpenHelp() {
         } else {
           statCounter++;
           const stat = item.data;
-          const lat = stat.centroid_lat || stat.latitude;
-          const lng = stat.centroid_lng || stat.longitude;
+          const lat = stat.anchor_lat || stat.centroid_lat || stat.latitude;
+          const lng = stat.anchor_lng || stat.centroid_lng || stat.longitude;
+          positionCount += stat.point_count || 0;
           
           if (lat && lng) {
-            // Stationary marker with pulsing ring (amber)
+            // Calculate staggered animation delay based on index
+            const animDelay = (statCounter * 0.4);
+            
+            // Stationary marker with staggered pulsing ring (amber)
             const statMarker = L.marker([lat, lng], {
               icon: L.divIcon({
                 className: 'mha-marker-stationary',
                 html: `
-                  <div style="position:relative;width:30px;height:30px;">
-                    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;background:#f59e0b;opacity:0.3;animation:pulse 2s ease-out infinite;"></div>
-                    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#f59e0b;width:18px;height:18px;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-weight:600;font-size:9px;">${statCounter}</div>
+                  <div style="position:relative;width:36px;height:36px;">
+                    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:36px;height:36px;border-radius:50%;background:#f59e0b;animation:mha-pulse 1.9s ease-out infinite;animation-delay:${animDelay}s;"></div>
+                    <div class="mha-stat-inner" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#f59e0b;width:20px;height:20px;border-radius:50%;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:#3a2402;font-weight:700;font-size:10px;transition:all .15s;">${statCounter}</div>
                   </div>
-                  <style>
-                  @keyframes pulse {
-                    0% { transform:translate(-50%,-50%) scale(1); opacity:0.5; }
-                    100% { transform:translate(-50%,-50%) scale(2); opacity:0; }
-                  }
-                  </style>
                 `,
-                iconSize: [30, 30]
-              })
+                iconSize: [36, 36],
+                iconAnchor: [18, 18]
+              }),
+              zIndexOffset: 900 + statCounter,
+              lat: lat,
+              lng: lng,
+              statCounter: statCounter
             }).addTo(_mhaMap);
             
-            statMarker.bindPopup(`<b>Stop ${statCounter}</b><br>Duration: ${mhaFormatDuration(stat.duration_seconds)}`);
+            statMarker.bindPopup(`<b>Stationary ${statCounter}</b><br>Duration: ${mhaFormatDuration(stat.duration_seconds)}`);
+            
+            // Make stationary clickable to zoom
+            statMarker.on('click', function(e) {
+              L.DomEvent.stopPropagation(e);
+              mhaFocusPointZoom(lat, lng, statCounter);
+            });
+            
             _mhaJourneyLayers.push(statMarker);
             bounds.push([lat, lng]);
           }
@@ -14088,9 +14121,11 @@ function qrOpenHelp() {
         const endMarker = L.marker([endLat, endLng], {
           icon: L.divIcon({
             className: 'mha-marker-end',
-            html: '<div style="background:#ef4444;width:24px;height:24px;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-weight:600;font-size:11px;">E</div>',
-            iconSize: [24, 24]
-          })
+            html: '<div style="background:#ef4444;width:26px;height:26px;border-radius:50%;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:12px;">E</div>',
+            iconSize: [26, 26],
+            iconAnchor: [13, 13]
+          }),
+          zIndexOffset: 1000
         }).addTo(_mhaMap);
         
         endMarker.bindPopup(`<b>End</b><br>${new Date(lastLeg.ended_at).toLocaleString()}`);
@@ -14098,14 +14133,121 @@ function qrOpenHelp() {
         bounds.push([endLat, endLng]);
       }
       
-      // Fit map to journey bounds
+      // Fit map to journey bounds and save initial view
       if (bounds.length > 0) {
         _mhaMap.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
+        _mhaInitialBounds = bounds;
       }
+      
+      // Update journey badge
+      const distKm = (totalDistance / 1000).toFixed(1);
+      document.getElementById('mha-badge-distance').textContent = distKm + ' km';
+      document.getElementById('mha-badge-legs').textContent = `${legCounter} leg${legCounter !== 1 ? 's' : ''}`;
+      document.getElementById('mha-badge-stats').textContent = `${statCounter} ${statCounter !== 1 ? 'stationaries' : 'stationary'}`;
+      document.getElementById('mha-badge-positions').textContent = `${positionCount} position${positionCount !== 1 ? 's' : ''}`;
+      document.getElementById('mha-journey-badge').style.display = 'block';
       
     } catch (err) {
       console.error('[MHA] Error plotting journey:', err);
+      document.getElementById('mha-journey-badge').style.display = 'none';
     }
+  };
+
+  // Focus map on a specific point (stationary) with zoom and focus ring
+  window.mhaFocusPointZoom = function(lat, lng, label) {
+    console.log('[MHA] Focusing on point:', lat, lng, label);
+    
+    // Zoom to point
+    _mhaMap.setView([lat, lng], 16, {
+      animate: true,
+      duration: 0.5
+    });
+    
+    // Remove existing focus ring
+    if (_mhaFocusRing) {
+      _mhaMap.removeLayer(_mhaFocusRing);
+    }
+    
+    // Add focus ring with pulsing animation
+    _mhaFocusRing = L.circle([lat, lng], {
+      radius: 50,
+      color: '#22c55e',
+      weight: 3,
+      opacity: 1,
+      fillOpacity: 0,
+      className: 'mha-focus-ring-circle'
+    }).addTo(_mhaMap);
+    
+    // Show reset view button
+    document.getElementById('mha-reset-view').style.display = 'flex';
+  };
+
+  // Reset view to show full journey
+  window.mhaResetView = function() {
+    console.log('[MHA] Resetting view');
+    
+    // Remove focus ring
+    if (_mhaFocusRing) {
+      _mhaMap.removeLayer(_mhaFocusRing);
+      _mhaFocusRing = null;
+    }
+    
+    // Fit to initial bounds
+    if (_mhaInitialBounds && _mhaInitialBounds.length > 0) {
+      _mhaMap.fitBounds(_mhaInitialBounds, { 
+        padding: [50, 50], 
+        maxZoom: 14,
+        animate: true,
+        duration: 0.5
+      });
+    }
+    
+    // Hide reset view button
+    document.getElementById('mha-reset-view').style.display = 'none';
+  };
+
+  // Toggle geofences visibility
+  window.mhaToggleGeofences = function() {
+    _mhaGeofencesVisible = !_mhaGeofencesVisible;
+    const btn = document.getElementById('mha-show-geofences');
+    
+    if (_mhaGeofencesVisible) {
+      btn.classList.add('on');
+      btn.innerHTML = '<i class="fa-solid fa-draw-polygon"></i> Hide geofences';
+      // TODO: Add geofences layer when available
+    } else {
+      btn.classList.remove('on');
+      btn.innerHTML = '<i class="fa-solid fa-draw-polygon"></i> Show geofences';
+      // TODO: Remove geofences layer
+    }
+  };
+
+  // Clear all markers from map
+  window.mhaClearMarkers = function() {
+    console.log('[MHA] Clearing all markers');
+    
+    // Remove all journey layers
+    _mhaJourneyLayers.forEach(layer => _mhaMap.removeLayer(layer));
+    _mhaJourneyLayers = [];
+    
+    // Remove focus ring
+    if (_mhaFocusRing) {
+      _mhaMap.removeLayer(_mhaFocusRing);
+      _mhaFocusRing = null;
+    }
+    
+    // Hide journey badge and reset view button
+    document.getElementById('mha-journey-badge').style.display = 'none';
+    document.getElementById('mha-reset-view').style.display = 'none';
+    
+    // Reset initial bounds
+    _mhaInitialBounds = null;
+    _mhaActiveJourney = null;
+    
+    // Deselect all journey cards
+    document.querySelectorAll('.mha-journey-card').forEach(card => {
+      card.classList.remove('selected');
+    });
   };
 
   // Two-way interaction: Focus map on a specific point (stationary/start/end)
