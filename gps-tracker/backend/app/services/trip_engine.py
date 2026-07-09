@@ -251,6 +251,7 @@ class EngineContext:
     # Current journey context
     current_journey_id: Optional[str] = None
     last_stationary_ended_at: Optional[datetime] = None
+    journey_just_created: bool = False  # Flag for tracking new journey creation
     
     def __post_init__(self):
         if self.anchor_points is None:
@@ -363,6 +364,8 @@ class TripEngine:
         """
         Ensure a journey is open. Creates one if needed.
         
+        Sets context.journey_just_created = True when creating a new journey.
+        
         Args:
             timestamp: Current timestamp (for journey start)
         
@@ -370,6 +373,7 @@ class TripEngine:
             Journey ID (UUID as string)
         """
         if self.context.current_journey_id:
+            self.context.journey_just_created = False
             return self.context.current_journey_id
         
         # Create new journey
@@ -388,6 +392,7 @@ class TripEngine:
         self.db.flush()  # Get ID
         
         self.context.current_journey_id = str(journey.id)
+        self.context.journey_just_created = True  # Flag for stats tracking
         
         logger.info(
             "🆕 IMEI %s: Journey %s started at %s",
@@ -891,6 +896,8 @@ class TripEngine:
                     leg = self._create_leg(self.context.leg_buffer, is_air_leg=False)
                     if leg:
                         result['leg_created'] = True
+                        if self.context.journey_just_created:
+                            result['journey_created'] = True
                     self.context.leg_buffer = []
                 
                 # Create air leg
@@ -903,6 +910,8 @@ class TripEngine:
                 if air_leg:
                     result['leg_created'] = True
                     result['air_leg_detected'] = True
+                    if self.context.journey_just_created:
+                        result['journey_created'] = True
                 
                 # Start new stationary at destination
                 self.context.current_state = "STATIONARY"
@@ -928,6 +937,8 @@ class TripEngine:
                 leg = self._create_leg(self.context.leg_buffer, is_air_leg=False)
                 if leg:
                     result['leg_created'] = True
+                    if self.context.journey_just_created:
+                        result['journey_created'] = True
             
             # Create stationary from last position until now
             gap_stationary_points = [
@@ -938,6 +949,8 @@ class TripEngine:
             stationary = self._create_stationary(gap_stationary_points, reason="gap_timeout")
             if stationary:
                 result['stationary_created'] = True
+                if self.context.journey_just_created:
+                    result['journey_created'] = True
             
             # Return to STATIONARY state
             self.context.current_state = "STATIONARY"
@@ -976,6 +989,8 @@ class TripEngine:
                     stationary = self._create_stationary(self.context.anchor_points, reason="leaving_anchor")
                     if stationary:
                         result['stationary_created'] = True
+                        if self.context.journey_just_created:
+                            result['journey_created'] = True
                 
                 # Enter MOVE state
                 self.context.current_state = "MOVE"
@@ -1017,6 +1032,8 @@ class TripEngine:
                         leg = self._create_leg(leg_points, is_air_leg=False)
                         if leg:
                             result['leg_created'] = True
+                            if self.context.journey_just_created:
+                                result['journey_created'] = True
                     
                     # Create new stationary from last 3 points
                     new_anchor_points = [
@@ -1027,6 +1044,8 @@ class TripEngine:
                     stationary = self._create_stationary(new_anchor_points, reason="anchor_formed")
                     if stationary:
                         result['stationary_created'] = True
+                        if self.context.journey_just_created:
+                            result['journey_created'] = True
                     
                     # Return to STATIONARY
                     self.context.current_state = "STATIONARY"
