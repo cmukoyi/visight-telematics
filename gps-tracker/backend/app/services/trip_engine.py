@@ -977,7 +977,7 @@ class TripEngine:
                     
                     # Return to STATIONARY
                     self.context.current_state = "STATIONARY"
-                    self.context.anchor_points = [last_3[-1][:3]]  # Start new anchor from last point
+                    self.context.anchor_points = [last_3[-1]]  # Start new anchor from last point (keep all 4 elements including position_id)
                     self.context.anchor_lat, self.context.anchor_lng = last_3[-1][0], last_3[-1][1]
                     self.context.leg_buffer = []
         
