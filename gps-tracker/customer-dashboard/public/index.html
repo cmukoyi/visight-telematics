@@ -13863,17 +13863,17 @@ function qrOpenHelp() {
     
     let html = '';
     let journeyNumber = journeys.length; // Count down from total (newest = highest number)
+    let previousJourney = null; // Track previous journey across date boundaries
     
-    dateGroups.forEach(group => {
+    dateGroups.forEach((group, groupIdx) => {
       // Date header
       html += `<div class="mha-date-hd">${group.date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })}</div>`;
       
       // Journeys in this date group
       group.journeys.forEach((journey, idx) => {
-        // Add idle connector before this journey (except first in group)
-        if (idx > 0) {
-          const prevJourney = group.journeys[idx - 1];
-          const idleDuration = mhaCalculateIdleDuration(prevJourney.ended_at, journey.started_at);
+        // Add idle connector before this journey (check across ALL journeys, not just within date group)
+        if (previousJourney) {
+          const idleDuration = mhaCalculateIdleDuration(previousJourney.ended_at, journey.started_at);
           if (idleDuration && idleDuration > 60) { // Show if idle > 1 minute
             html += `
               <div class="mha-idle">
@@ -13911,6 +13911,7 @@ function qrOpenHelp() {
             </div>
           </div>`;
         
+        previousJourney = journey; // Update for next iteration
         journeyNumber--; // Decrement for next journey (older journeys get lower numbers)
       });
     });
