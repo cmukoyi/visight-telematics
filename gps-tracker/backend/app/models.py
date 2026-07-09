@@ -868,6 +868,13 @@ class DevicePosition(Base):
     gps_mode = Column(Integer, nullable=True)
     confidence = Column(Integer, nullable=True)          # 1-3 (NEVER use for classification per spec)
     
+    # Trip engine linkage (Section 3.4 - journey/leg/stationary linking)
+    leg_id = get_uuid_nullable()                         # Which leg this position belongs to
+    stationary_id = get_uuid_nullable()                  # Which stationary this position belongs to
+    
+    # Reverse geocoding (Section 3.6 - cached at ingest)
+    address = Column(Text, nullable=True)                # Human-readable location
+    
     # Metadata
     source = Column(String(20), nullable=False, default="batch")  # 'batch' or 'tracklist'
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)

@@ -4175,6 +4175,11 @@ class PositionResponse(BaseModel):
     ignition: Optional[bool]
     source: str
     created_at: datetime
+    # Trip engine linkage (Section 3.4)
+    leg_id: Optional[str] = None
+    stationary_id: Optional[str] = None
+    # Reverse geocoding (Section 3.6)
+    address: Optional[str] = None
 
 
 class PositionListResponse(BaseModel):
@@ -4241,6 +4246,9 @@ def list_positions(
             ignition=(p.ignition == "ON") if p.ignition else None,
             source=p.source,
             created_at=p.created_at,
+            leg_id=str(p.leg_id) if p.leg_id else None,
+            stationary_id=str(p.stationary_id) if p.stationary_id else None,
+            address=p.address,
         )
         for p in positions
     ]
