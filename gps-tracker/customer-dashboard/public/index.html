@@ -13872,6 +13872,29 @@ function qrOpenHelp() {
     return `${seconds}s`;
   }
 
+  // Shorten address to most relevant place name
+  function mhaShortAddress(fullAddress) {
+    if (!fullAddress) return '';
+    
+    // Split by comma
+    const parts = fullAddress.split(',').map(p => p.trim());
+    
+    // Remove postcodes (UK: SW1A 1AA, US: 12345, etc.)
+    const cleaned = parts.filter(part => {
+      // Skip if looks like postcode
+      if (/^[A-Z]{1,2}\d{1,2}[A-Z]?\s?\d[A-Z]{2}$/i.test(part)) return false; // UK postcode
+      if (/^\d{5}(-\d{4})?$/.test(part)) return false; // US ZIP
+      // Skip country names
+      if (['United Kingdom', 'UK', 'United States', 'USA', 'England', 'Scotland', 'Wales'].includes(part)) return false;
+      // Skip generic regions
+      if (part.includes('Greater London') || part.includes('County')) return false;
+      return true;
+    });
+    
+    // Return first meaningful part (neighborhood or town)
+    return cleaned[0] || parts[0] || fullAddress;
+  }
+
   // Phase 5.4 & 5.5: Select and visualize journey
   window.mhaSelectJourney = async function(journeyId) {
     _mhaActiveJourney = journeyId;
@@ -14193,7 +14216,8 @@ function qrOpenHelp() {
         html += `<div class="mha-date-header">${dateKey}</div>`;
         grouped[dateKey].forEach(pos => {
           const time = new Date(pos.observed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          const addr = pos.address || `${pos.latitude.toFixed(4)}, ${pos.longitude.toFixed(4)}`;
+          const fullAddr = pos.address || `${pos.latitude.toFixed(4)}, ${pos.longitude.toFixed(4)}`;
+          const addr = pos.address ? mhaShortAddress(pos.address) : fullAddr;
           
           // Determine if position belongs to a leg or stationary
           let linkHtml = '';
