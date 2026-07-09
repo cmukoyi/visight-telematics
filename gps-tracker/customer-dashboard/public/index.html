@@ -13874,6 +13874,14 @@ function qrOpenHelp() {
         // Add idle connector before this journey (check across ALL journeys, not just within date group)
         if (previousJourney) {
           const idleDuration = mhaCalculateIdleDuration(previousJourney.ended_at, journey.started_at);
+          console.log('[MHA] Idle check:', {
+            from: previousJourney.id,
+            to: journey.id,
+            prevEnd: previousJourney.ended_at,
+            currStart: journey.started_at,
+            idleDuration: idleDuration,
+            willShow: idleDuration && idleDuration > 60
+          });
           if (idleDuration && idleDuration > 60) { // Show if idle > 1 minute
             html += `
               <div class="mha-idle">
