@@ -1054,7 +1054,7 @@ async def process_all_subscribed_devices(db: Session) -> Dict:
             total_stats['total_journeys'] += stats['journeys_created']
             total_stats['device_results'].append(stats)
         except Exception as exc:
-            logger.error("❌ IMEI %s: Processing failed: %s", device_state.device_imei, exc)
+            logger.error("❌ IMEI %s: Processing failed: %s", device_state.device_imei, exc, exc_info=True)
     
     logger.info(
         "✅ Processed %d devices: %d positions → %d stationaries, %d legs, %d journeys",
