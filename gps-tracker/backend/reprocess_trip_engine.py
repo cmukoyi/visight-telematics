@@ -21,9 +21,9 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.database import get_db
-from app.models import DevicePosition, Journey, Leg, Stationary
-from app.services.trip_engine import TripEngine, TripEngineConfig
-from sqlalchemy import select, delete, update
+from app.models import DevicePosition, Journey, Leg, Stationary, EngineState
+from app.services.trip_engine import TripEngine, EngineConfig
+from sqlalchemy import select, delete, update, func
 from sqlalchemy.orm import Session
 
 
@@ -33,16 +33,16 @@ def clear_trip_data(db: Session, imei: str, dry_run: bool = False):
     print(f"🧹 Clearing trip data for IMEI {imei}...")
     
     # Count records before deletion
-    journey_count = db.scalar(select(Journey).where(Journey.device_imei == imei).count())
-    leg_count = db.scalar(select(Leg).where(Leg.device_imei == imei).count())
-    stat_count = db.scalar(select(Stationary).where(Stationary.device_imei == imei).count())
+    journey_count = db.scalar(select(func.count()).select_from(Journey).where(Journey.device_imei == imei))
+    leg_count = db.scalar(select(func.count()).select_from(Leg).where(Leg.device_imei == imei))
+    stat_count = db.scalar(select(func.count()).select_from(Stationary).where(Stationary.device_imei == imei))
     pos_with_assoc = db.scalar(
-        select(DevicePosition)
+        select(func.count())
+        .select_from(DevicePosition)
         .where(
             DevicePosition.device_imei == imei,
             (DevicePosition.leg_id.isnot(None) | DevicePosition.stationary_id.isnot(None))
         )
-        .count()
     )
     
     print(f"   📊 Found:")
@@ -61,7 +61,7 @@ def clear_trip_data(db: Session, imei: str, dry_run: bool = False):
     db.execute(delete(Journey).where(Journey.device_imei == imei))
     
     # Clear engine state
-    db.execute(delete(db.query("engine_state").filter_by(device_imei=imei)))
+    db.execute(delete(EngineState).where(EngineState.device_imei == imei))
     
     # Clear associations from positions
     db.execute(
@@ -82,9 +82,9 @@ def reprocess_trip_engine(db: Session, imei: str, dry_run: bool = False):
     
     # Count positions to process
     pos_count = db.scalar(
-        select(DevicePosition)
+        select(func.count())
+        .select_from(DevicePosition)
         .where(DevicePosition.device_imei == imei)
-        .count()
     )
     
     print(f"   📊 Found {pos_count} positions to process")
@@ -93,15 +93,9 @@ def reprocess_trip_engine(db: Session, imei: str, dry_run: bool = False):
         print("   🔍 DRY RUN: Would process these positions")
         return {}
     
-    # Initialize trip engine
-    config = TripEngineConfig(
-        anchor_radius_m=100,
-        min_leg_distance_m=300,
-        journey_break_dwell_min=30,
-        air_leg_speed_threshold_kmh=150
-    )
-    
-    engine = TripEngine(db=db, device_imei=imei, config=config)
+    # Initialize trip engine with default config
+    # Note: TripEngine loads config from database via _load_config()
+    engine = TripEngine(db=db, device_imei=imei)
     
     print(f"   ⚙️  Starting trip engine...")
     print("")
@@ -161,20 +155,20 @@ def main():
         
         # Verify associations were written
         pos_with_leg = db.scalar(
-            select(DevicePosition)
+            select(func.count())
+            .select_from(DevicePosition)
             .where(
                 DevicePosition.device_imei == args.imei,
                 DevicePosition.leg_id.isnot(None)
             )
-            .count()
         )
         pos_with_stat = db.scalar(
-            select(DevicePosition)
+            select(func.count())
+            .select_from(DevicePosition)
             .where(
                 DevicePosition.device_imei == args.imei,
                 DevicePosition.stationary_id.isnot(None)
             )
-            .count()
         )
         
         print("")
