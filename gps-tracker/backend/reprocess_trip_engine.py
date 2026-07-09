@@ -148,10 +148,10 @@ def main():
         print("")
         print(f"📊 Results:")
         print(f"   - Positions processed: {result.get('positions_processed', 0)}")
-        print(f"   - Journeys created: {result.get('total_journeys', 0)}")
-        print(f"   - Legs created: {result.get('total_legs', 0)}")
-        print(f"   - Stationaries created: {result.get('total_stationaries', 0)}")
-        print(f"   - Final state: {result.get('final_state', 'UNKNOWN')}")
+        print(f"   - Journeys created: {result.get('journeys_created', 0)}")
+        print(f"   - Legs created: {result.get('legs_created', 0)}")
+        print(f"   - Stationaries created: {result.get('stationaries_created', 0)}")
+        print(f"   - Final state: {result.get('current_state', 'UNKNOWN')}")
         
         # Verify associations were written
         pos_with_leg = db.scalar(

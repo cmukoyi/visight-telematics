@@ -830,6 +830,9 @@ class TripEngine:
             stats['stationaries_created'], stats['legs_created'], stats['journeys_created']
         )
         
+        # Add final state to stats
+        stats['current_state'] = self.context.current_state
+        
         return stats
     
     def _process_single_position(
