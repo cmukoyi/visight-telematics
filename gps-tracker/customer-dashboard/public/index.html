@@ -14725,39 +14725,72 @@ function qrOpenHelp() {
   // Plot all journeys on map
   window.mhaPlotAllJourneys = async function() {
     const journeyCards = document.querySelectorAll('.mha-journey-card');
+    const btn = document.getElementById('mha-plot-all-journeys-btn');
     
     if (journeyCards.length === 0) {
       console.warn('[MHA] No journey cards found to plot');
       return;
     }
     
-    console.log(`[MHA] Plotting ${journeyCards.length} journeys`);
+    // Prevent re-clicking while loading
+    if (btn && btn.disabled) {
+      console.log('[MHA] Plot all already in progress, ignoring click');
+      return;
+    }
     
-    // Plot each journey in additive mode
-    for (const card of journeyCards) {
-      const journeyId = card.dataset.journeyId;
-      if (journeyId) {
-        console.log(`[MHA] Loading journey ${journeyId} details...`);
-        
-        // Load journey details first if not already loaded
+    // Disable button and show loading state
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Loading...';
+    }
+    
+    console.log(`[MHA] Plotting ${journeyCards.length} journeys in parallel`);
+    
+    try {
+      // Collect all journey IDs
+      const journeyIds = Array.from(journeyCards)
+        .map(card => card.dataset.journeyId)
+        .filter(id => id);
+      
+      // Load all journey details in parallel
+      const loadPromises = journeyIds.map(journeyId => {
         if (!window._mhaJourneyData || !window._mhaJourneyData[journeyId]) {
-          await mhaLoadJourneyDetails(journeyId);
+          return mhaLoadJourneyDetails(journeyId);
         }
-        
-        // Now plot the journey
-        await mhaSelectJourney(journeyId, true); // true = additive mode
-        card.classList.add('plotted');
+        return Promise.resolve();
+      });
+      
+      await Promise.all(loadPromises);
+      console.log('[MHA] All journey details loaded');
+      
+      // Plot all journeys in parallel (additive mode)
+      const plotPromises = journeyIds.map((journeyId, idx) => {
+        const card = journeyCards[idx];
+        return mhaSelectJourney(journeyId, true).then(() => {
+          if (card) card.classList.add('plotted');
+        });
+      });
+      
+      await Promise.all(plotPromises);
+      
+      // Update button
+      if (btn) {
+        btn.innerHTML = '<i class="fa-solid fa-eraser"></i> Clear all';
+        btn.onclick = mhaClearAllJourneys;
+        btn.disabled = false;
+      }
+      
+      console.log('[MHA] All journeys plotted successfully');
+    } catch (error) {
+      console.error('[MHA] Error plotting journeys:', error);
+      
+      // Reset button on error
+      if (btn) {
+        btn.innerHTML = '<i class="fa-solid fa-route"></i> Plot all';
+        btn.onclick = mhaPlotAllJourneys;
+        btn.disabled = false;
       }
     }
-    
-    // Update button
-    const btn = document.getElementById('mha-plot-all-journeys-btn');
-    if (btn) {
-      btn.innerHTML = '<i class="fa-solid fa-eraser"></i> Clear all';
-      btn.onclick = mhaClearAllJourneys;
-    }
-    
-    console.log('[MHA] All journeys plotted successfully');
   };
 
   // Clear all journeys from map
@@ -14901,7 +14934,7 @@ function qrOpenHelp() {
       
       // Find the leg's LineString feature
       const legFeature = geojson.features.find(f => 
-        f.properties && f.properties.leg_id === leg.id
+        f.properties && f.properties.type === 'leg' && f.properties.id === legId
       );
       
       if (legFeature && legFeature.geometry && legFeature.geometry.coordinates) {
