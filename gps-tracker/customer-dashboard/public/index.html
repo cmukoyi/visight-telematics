@@ -14737,6 +14737,14 @@ function qrOpenHelp() {
     for (const card of journeyCards) {
       const journeyId = card.dataset.journeyId;
       if (journeyId) {
+        console.log(`[MHA] Loading journey ${journeyId} details...`);
+        
+        // Load journey details first if not already loaded
+        if (!window._mhaJourneyData || !window._mhaJourneyData[journeyId]) {
+          await mhaLoadJourneyDetails(journeyId);
+        }
+        
+        // Now plot the journey
         await mhaSelectJourney(journeyId, true); // true = additive mode
         card.classList.add('plotted');
       }
@@ -14748,6 +14756,8 @@ function qrOpenHelp() {
       btn.innerHTML = '<i class="fa-solid fa-eraser"></i> Clear all';
       btn.onclick = mhaClearAllJourneys;
     }
+    
+    console.log('[MHA] All journeys plotted successfully');
   };
 
   // Clear all journeys from map
