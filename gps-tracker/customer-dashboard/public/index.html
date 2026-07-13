@@ -10295,7 +10295,7 @@ window.liveSwitchMapStyle = function(style) {
     let tileStyle;
     switch(style) {
         case 'satellite':
-            tileStyle = 'satellite-v2';
+            tileStyle = 'satellite'; // legacy style (v2 not available on all plans)
             break;
         case 'hybrid':
             tileStyle = 'hybrid-v2';
@@ -13466,7 +13466,7 @@ function qrOpenHelp() {
     let tileStyle;
     switch(style) {
       case 'satellite':
-        tileStyle = 'satellite-v2';
+        tileStyle = 'satellite'; // legacy style (v2 not available on all plans)
         break;
       case 'hybrid':
         tileStyle = 'hybrid-v2';
