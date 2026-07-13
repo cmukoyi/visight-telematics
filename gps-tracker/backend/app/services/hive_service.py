@@ -717,17 +717,53 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
                 
                 fresh_evidence_guard = live.persistence_has_new_evidence
                 
-                # Confirm if both conditions satisfied
-                if duration_met and fresh_evidence_guard:
+                # Fix A (v1.3): Confirmation requires persistence PLUS a real, coherent breach
+                # in the FIRING evaluation. Persistence may accumulate across stale/incoherent
+                # evaluations, but the transition to BREACHING may only fire when the current
+                # evaluation demonstrates:
+                #   1. Coherent evidence (not stale snapshot, not incoherent-only)
+                #   2. At least one breaching pair exists
+                #   3. A valid outlier is selectable
+                has_breaching_pairs = any(count > 0 for count in breaching_pair_counts.values())
+                has_valid_outlier = outlier_id is not None
+                is_coherent_breach = (
+                    not stale_snapshot and 
+                    coherent_pair_count > 0 and 
+                    coherent_diameter_m is not None and 
+                    coherent_diameter_m > threshold
+                )
+                
+                # Confirm if persistence is satisfied AND current evaluation is coherent breach
+                if duration_met and fresh_evidence_guard and is_coherent_breach and has_breaching_pairs and has_valid_outlier:
                     new_state = "BREACHING"
                     log.info(
-                        f"HIVE {hive_id}: BREACH_PENDING → BREACHING (duration-based persistence)",
+                        f"HIVE {hive_id}: BREACH_PENDING → BREACHING (coherent breach confirmed)",
                         extra={
                             "hive_id": hive_id,
                             "elapsed_minutes": round(elapsed_minutes, 2),
                             "eval_count": live.persistence_eval_count,
                             "has_new_evidence": live.persistence_has_new_evidence,
-                            "persistence_rule": "v1.2_duration_based"
+                            "coherent_diameter_m": round(coherent_diameter_m, 1) if coherent_diameter_m else None,
+                            "has_breaching_pairs": has_breaching_pairs,
+                            "has_valid_outlier": has_valid_outlier,
+                            "outlier_tag_id": str(outlier_id) if outlier_id else None,
+                            "persistence_rule": "v1.3_coherent_confirm_only"
+                        }
+                    )
+                elif duration_met and fresh_evidence_guard:
+                    # Persistence satisfied but current evaluation lacks coherent breach evidence
+                    # HOLD in BREACH_PENDING until next coherent evaluation
+                    log.info(
+                        f"HIVE {hive_id}: Persistence satisfied but firing evaluation not coherent - HOLD in BREACH_PENDING",
+                        extra={
+                            "hive_id": hive_id,
+                            "elapsed_minutes": round(elapsed_minutes, 2),
+                            "eval_count": live.persistence_eval_count,
+                            "stale_snapshot": stale_snapshot,
+                            "coherent_pair_count": coherent_pair_count,
+                            "has_breaching_pairs": has_breaching_pairs,
+                            "has_valid_outlier": has_valid_outlier,
+                            "fix": "v1.3_coherent_confirm_only"
                         }
                     )
                 
