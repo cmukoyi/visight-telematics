@@ -14762,14 +14762,17 @@ function qrOpenHelp() {
 
   // Clear all journeys from map
   window.mhaClearAllJourneys = function() {
+    console.log('[MHA] Clearing all journeys from map');
+    
     // Clear map layers
-    if (window._mhaJourneyLayers) {
-      window._mhaJourneyLayers.forEach(layer => {
+    if (_mhaJourneyLayers && _mhaJourneyLayers.length > 0) {
+      console.log(`[MHA] Removing ${_mhaJourneyLayers.length} layers`);
+      _mhaJourneyLayers.forEach(layer => {
         if (_mhaMap && _mhaMap.hasLayer(layer)) {
           _mhaMap.removeLayer(layer);
         }
       });
-      window._mhaJourneyLayers = [];
+      _mhaJourneyLayers = [];
     }
     
     // Reset journey cards
