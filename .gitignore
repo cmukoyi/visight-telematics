@@ -88,3 +88,15 @@ TRIP_ENGINE_*.md
 TROUBLESHOOT_*.md
 scripts/*_DEPLOYMENT.md
 scripts/*_CANARY.md
+
+# Test and debug shell scripts — keep local only
+test_*.sh
+debug_*.sh
+diagnose_*.sh
+**/test_*.sh
+**/debug_*.sh
+**/diagnose_*.sh
+check_*.sh
+**/check_*.sh
+scripts/monitor-*.sh
+scripts/validate-*.sh
