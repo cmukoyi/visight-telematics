@@ -3167,10 +3167,11 @@ input.hive-range::-moz-range-track {
             .mha-assets-panel.collapsed { width:40px; min-width:40px; }
             .mha-assets-panel.collapsed .mha-ap-body { display:none; }
             .mha-ap-head { display:flex; align-items:center; gap:9px; padding:12px 14px; border-bottom:1px solid var(--border); font-weight:500; position:relative; }
-            .mha-ap-head i { color:var(--primary); font-size:16px; }
+            .mha-ap-head i.fa-tags { color:var(--primary); font-size:16px; }
             .mha-ap-head span { flex:1; }
+            .mha-assets-panel.collapsed .mha-ap-head i.fa-tags { display:none; }
             .mha-assets-panel.collapsed .mha-ap-head span { display:none; }
-            .mha-ap-collapse { width:28px; height:28px; border-radius:6px; border:1px solid var(--border); background:var(--bg-3); color:var(--text-2); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:12px; transition:all .15s; }
+            .mha-ap-collapse { width:28px; height:28px; border-radius:6px; border:1px solid var(--border); background:var(--bg-3); color:var(--text-2); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:12px; transition:all .15s; flex-shrink:0; }
             .mha-ap-collapse:hover { background:var(--primary); color:white; border-color:var(--primary); }
             .mha-ap-body { display:flex; flex-direction:column; gap:11px; padding:12px; flex:1; min-height:0; }
             .mha-ap-search { position:relative; }
@@ -3368,7 +3369,7 @@ input.hive-range::-moz-range-track {
                             <i class="fa-solid fa-tags"></i>
                             <span>Assets</span>
                             <button class="mha-ap-collapse" onclick="mhaToggleAssetsPanel()" title="Collapse panel">
-                                <i class="fa-solid fa-chevron-right"></i>
+                                <i class="fa-solid fa-chevron-left"></i>
                             </button>
                         </div>
                         <div class="mha-ap-body">
@@ -14712,7 +14713,8 @@ function qrOpenHelp() {
     const panel = document.querySelector('.mha-assets-panel');
     const btn = document.querySelector('.mha-ap-collapse i');
     panel.classList.toggle('collapsed');
-    btn.className = panel.classList.contains('collapsed') ? 'fa-solid fa-chevron-left' : 'fa-solid fa-chevron-right';
+    // Chevron-left when expanded (collapse TO left), chevron-right when collapsed (expand FROM right)
+    btn.className = panel.classList.contains('collapsed') ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-left';
     
     // Invalidate map size after transition
     setTimeout(() => {
@@ -14721,15 +14723,24 @@ function qrOpenHelp() {
   };
 
   // Plot all journeys on map
-  window.mhaPlotAllJourneys = function() {
+  window.mhaPlotAllJourneys = async function() {
     const journeyCards = document.querySelectorAll('.mha-journey-card');
-    journeyCards.forEach(card => {
+    
+    if (journeyCards.length === 0) {
+      console.warn('[MHA] No journey cards found to plot');
+      return;
+    }
+    
+    console.log(`[MHA] Plotting ${journeyCards.length} journeys`);
+    
+    // Plot each journey in additive mode
+    for (const card of journeyCards) {
       const journeyId = card.dataset.journeyId;
-      if (journeyId && !card.classList.contains('plotted')) {
-        mhaSelectJourney(journeyId, true); // true = additive mode
+      if (journeyId) {
+        await mhaSelectJourney(journeyId, true); // true = additive mode
         card.classList.add('plotted');
       }
-    });
+    }
     
     // Update button
     const btn = document.getElementById('mha-plot-all-journeys-btn');
