@@ -274,20 +274,30 @@ async def _upsert_track_positions(db: Session, imei: str, track_points: List[dic
         if lat == 0 and lng == 0:
             continue
         
+        # Defensive type conversion for integer fields
+        def safe_int(value):
+            """Convert to int or None. TrackSolid sometimes returns strings."""
+            if value is None:
+                return None
+            try:
+                return int(value)
+            except (ValueError, TypeError):
+                return None
+        
         # Prepare position data
         position_data = {
             'device_imei': imei,
             'lat': lat,
             'lng': lng,
             'observed_at': observed_at,
-            'direction': point.get('direction'),
+            'direction': safe_int(point.get('direction')),
             'gps_speed': point.get('gpsSpeed'),
-            'pos_type': point.get('posType'),
-            'satellite': point.get('satellite'),
+            'pos_type': safe_int(point.get('posType')),
+            'satellite': safe_int(point.get('satellite')),
             'ignition': point.get('ignition'),
             'acc_status': point.get('accStatus'),
-            'gps_mode': point.get('gpsMode'),
-            'confidence': point.get('confidence'),
+            'gps_mode': safe_int(point.get('gpsMode')),
+            'confidence': safe_int(point.get('confidence')),
             'source': 'tracklist',  # Tag as from selective pull
             'created_at': created_at,
         }

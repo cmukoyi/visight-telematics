@@ -300,20 +300,30 @@ async def _upsert_positions(db: Session, locations: list[dict]) -> int:
         if lat == 0 and lng == 0:
             continue
         
+        # Defensive type conversion for integer fields
+        def safe_int(value):
+            """Convert to int or None. TrackSolid sometimes returns strings like 'BEACON'."""
+            if value is None:
+                return None
+            try:
+                return int(value)
+            except (ValueError, TypeError):
+                return None
+        
         # Prepare position data
         position_data = {
             'device_imei': imei,
             'lat': lat,
             'lng': lng,
             'observed_at': observed_at,
-            'direction': loc.get('direction'),
+            'direction': safe_int(loc.get('direction')),
             'gps_speed': loc.get('speed'),
-            'pos_type': loc.get('posType'),
-            'satellite': loc.get('satellite'),
+            'pos_type': safe_int(loc.get('posType')),  # Convert 'BEACON' → None
+            'satellite': safe_int(loc.get('satellite')),
             'ignition': loc.get('ignition'),
             'acc_status': loc.get('accStatus'),
-            'gps_mode': loc.get('gpsMode'),
-            'confidence': loc.get('confidence'),
+            'gps_mode': safe_int(loc.get('gpsMode')),
+            'confidence': safe_int(loc.get('confidence')),
             'source': 'batch',
             'created_at': batch_ts,
         }
