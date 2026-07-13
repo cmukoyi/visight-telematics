@@ -3219,7 +3219,7 @@ input.hive-range::-moz-range-track {
             .mha-map-btn i { font-size:14px; }
             
             /* Map Style Switcher */
-            .map-style-switcher { position:absolute; top:12px; left:12px; z-index:1000; background:var(--bg-2); border:1px solid var(--border); border-radius:8px; overflow:hidden; display:flex; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
+            .map-style-switcher { position:absolute; bottom:12px; left:12px; z-index:1000; background:var(--bg-2); border:1px solid var(--border); border-radius:8px; overflow:hidden; display:flex; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
             .map-style-btn { padding:6px 10px; font-size:11px; color:var(--text-2); cursor:pointer; border:none; background:transparent; font-family:inherit; transition:all .15s; display:flex; align-items:center; gap:5px; border-right:1px solid var(--border); }
             .map-style-btn:last-child { border-right:none; }
             .map-style-btn:hover { color:var(--text-1); background:var(--bg-3); }
@@ -3253,13 +3253,18 @@ input.hive-range::-moz-range-track {
                 50% { opacity:0.35; transform:scale(1.5); }
             }
             
-            /* Journeys/Positions Panel (340px) */
-            .mha-journeys-panel { flex:none; width:340px; min-width:300px; background:var(--bg-2); border:1px solid var(--border); border-radius:12px; display:flex; flex-direction:column; overflow:hidden; }
-            .mha-jp-tabs { display:flex; border-bottom:1px solid var(--border); }
+            /* Journeys/Positions Panel (340px) - Collapsible */
+            .mha-journeys-panel { flex:none; width:340px; min-width:300px; background:var(--bg-2); border:1px solid var(--border); border-radius:12px; display:flex; flex-direction:column; overflow:hidden; transition:width .3s, min-width .3s; }
+            .mha-journeys-panel.collapsed { width:40px; min-width:40px; }
+            .mha-jp-tabs { display:flex; border-bottom:1px solid var(--border); position:relative; }
             .mha-jp-tab { flex:1; text-align:center; padding:13px 0; font-size:13px; color:var(--text-2); cursor:pointer; border-bottom:2px solid transparent; display:flex; align-items:center; justify-content:center; gap:6px; transition:all .15s; }
             .mha-jp-tab i { font-size:15px; }
             .mha-jp-tab:hover { color:var(--text-1); background:var(--bg-3); }
             .mha-jp-tab.active { color:var(--text-1); border-bottom-color:var(--primary); }
+            .mha-jp-collapse { position:absolute; right:4px; top:50%; transform:translateY(-50%); width:28px; height:28px; border-radius:6px; border:1px solid var(--border); background:var(--bg-3); color:var(--text-2); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:12px; transition:all .15s; }
+            .mha-jp-collapse:hover { background:var(--primary); color:white; border-color:var(--primary); }
+            .mha-journeys-panel.collapsed .mha-jp-tab span { display:none; }
+            .mha-journeys-panel.collapsed .mha-jp-body { display:none; }
             .mha-jp-body { overflow:auto; padding:12px; flex:1; }
             .mha-jp-placeholder { text-align:center; padding:40px 16px; color:var(--text-3); }
             .mha-jp-placeholder i { font-size:48px; margin-bottom:12px; opacity:.3; }
@@ -3273,7 +3278,7 @@ input.hive-range::-moz-range-track {
             .mha-pill i { font-size:12px; margin-right:3px; }
             
             /* Asset Row Time Badges (color-coded by freshness) */
-            .mha-asset-row .seen { font-size:10.5px; font-weight:600; font-variant-numeric:tabular-nums; line-height:1; border:1px solid currentColor; border-radius:5px; padding:2px 6px; }
+            .mha-asset-row .seen { font-size:10.5px; font-weight:600; font-variant-numeric:tabular-nums; line-height:1; border:1px solid currentColor; border-radius:5px; padding:2px 6px; text-align:center; min-width:65px; }
             .mha-asset-row .seen.fresh { color:#22c55e; } /* ≤15 min */
             .mha-asset-row .seen.recent { color:var(--text-2); } /* ≤3 h */
             .mha-asset-row .seen.old { color:var(--text-3); } /* older */
@@ -3281,8 +3286,10 @@ input.hive-range::-moz-range-track {
             
             /* Battery & Status Dots */
             .mha-asset-row .mrow { display:flex; align-items:center; gap:7px; margin-top:3px; }
-            .mha-asset-row .batt { font-size:10px; color:var(--text-2); display:flex; align-items:center; gap:3px; }
+            .mha-asset-row .batt { font-size:10px; display:flex; align-items:center; gap:3px; }
             .mha-asset-row .batt i { font-size:13px; }
+            .mha-asset-row .batt.low { color:#ef4444; }
+            .mha-asset-row .batt.good { color:#22c55e; }
             .mha-asset-row .sdot { width:8px; height:8px; border-radius:50%; flex:none; }
             .mha-asset-row .sdot.active { background:#22c55e; }
             .mha-asset-row .sdot.idle { background:#f59e0b; }
@@ -3336,10 +3343,12 @@ input.hive-range::-moz-range-track {
             .mha-position-link.leg:hover { background:color-mix(in srgb, #3b82f6 15%, transparent); }
             .mha-position-link.stat { color:#f59e0b; border-color:#f59e0b; background:color-mix(in srgb, #f59e0b 8%, transparent); }
             .mha-position-link.stat:hover { background:color-mix(in srgb, #f59e0b 15%, transparent); }
-            .mha-plot-btn { width:28px; height:28px; border:1px solid var(--border); border-radius:6px; background:var(--bg-3); color:var(--text-2); cursor:pointer; display:flex; align-items:center; justify-content:center; flex:none; }
+            .mha-plot-btn { width:28px; height:28px; border:1px solid var(--border); border-radius:6px; background:var(--bg-3); color:var(--text-2); cursor:pointer; display:flex; align-items:center; justify-content:center; flex:none; transition:all .15s; }
             .mha-plot-btn:hover { border-color:var(--primary); color:var(--primary); background:var(--accent-bg); }
-            .mha-plot-all { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg-3); color:var(--text); font-size:12px; cursor:pointer; }
+            .mha-plot-btn.plotted { background:var(--primary); color:white; border-color:var(--primary); }
+            .mha-plot-all { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg-3); color:var(--text); font-size:12px; cursor:pointer; transition:all .15s; }
             .mha-plot-all:hover { border-color:var(--primary); background:var(--accent-bg); color:var(--primary); }
+            .mha-plot-all.active { background:var(--primary); color:white; border-color:var(--primary); }
             
             @media(max-width:1100px) {
                 .mha-assets-panel,
@@ -3490,6 +3499,9 @@ input.hive-range::-moz-range-track {
                                 <i class="fa-solid fa-location-dot"></i>
                                 <span>Positions</span>
                             </div>
+                            <button class="mha-jp-collapse" onclick="mhaTogglePanel()" title="Collapse panel">
+                                <i class="fa-solid fa-chevron-right"></i>
+                            </button>
                         </div>
                         <div class="mha-jp-body" id="mha-journeys-body">
                             <div class="mha-jp-placeholder">
@@ -13552,8 +13564,9 @@ function qrOpenHelp() {
       
       // Battery (if available)
       const battery = asset.battery_level || asset.battery;
+      const batteryClass = battery ? (battery > 20 ? 'good' : 'low') : '';
       const batteryHtml = battery ? 
-        `<span class="batt"><i class="fa-solid fa-battery-${battery > 75 ? 'full' : battery > 50 ? 'three-quarters' : battery > 25 ? 'half' : 'quarter'}"></i>${battery}%</span>` : '';
+        `<span class="batt ${batteryClass}"><i class="fa-solid fa-battery-${battery > 75 ? 'full' : battery > 50 ? 'three-quarters' : battery > 25 ? 'half' : 'quarter'}"></i>${battery}%</span>` : '';
       
       return `
         <div class="mha-asset-row ${isActive ? 'active' : ''}" onclick="mhaSelectAsset('${esc(asset.imei)}')">
@@ -13861,7 +13874,16 @@ function qrOpenHelp() {
     // Sort date groups (newest first)
     const dateGroups = Object.values(journeysByDate).sort((a, b) => b.date - a.date);
     
-    let html = '';
+    let html = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <span style="font-size:12px;color:var(--text-2);">
+          ${journeys.length} journey${journeys.length !== 1 ? 's' : ''}
+        </span>
+        <button class="mha-plot-all" id="mha-plot-all-journeys-btn" onclick="mhaPlotAllJourneys()">
+          <i class="fa-solid fa-route"></i> Plot all
+        </button>
+      </div>`;
+    
     let journeyNumber = journeys.length; // Count down from total (newest = highest number)
     let previousJourney = null; // Track previous journey across date boundaries
     
@@ -14644,7 +14666,7 @@ function qrOpenHelp() {
               <span class="mha-position-time">${time}</span>
               <span class="mha-position-addr">${esc(addr)}</span>
               ${linkHtml}
-              <button class="mha-plot-btn" onclick="mhaPlotPosition(${pos.latitude}, ${pos.longitude})" title="Show on map">
+              <button class="mha-plot-btn" onclick="mhaPlotPosition(${pos.latitude}, ${pos.longitude}, event)" title="Toggle on map">
                 <i class="fa-solid fa-location-dot"></i>
               </button>
             </div>`;
@@ -14665,6 +14687,210 @@ function qrOpenHelp() {
         </div>`;
     }
   }
+
+  // Toggle panel collapse
+  window.mhaTogglePanel = function() {
+    const panel = document.querySelector('.mha-journeys-panel');
+    const btn = document.querySelector('.mha-jp-collapse i');
+    panel.classList.toggle('collapsed');
+    btn.className = panel.classList.contains('collapsed') ? 'fa-solid fa-chevron-left' : 'fa-solid fa-chevron-right';
+    
+    // Invalidate map size after transition
+    setTimeout(() => {
+      if (_mhaMap) _mhaMap.invalidateSize();
+    }, 300);
+  };
+
+  // Plot all journeys on map
+  window.mhaPlotAllJourneys = function() {
+    const journeyCards = document.querySelectorAll('.mha-journey-card');
+    journeyCards.forEach(card => {
+      const journeyId = card.dataset.journeyId;
+      if (journeyId && !card.classList.contains('plotted')) {
+        mhaSelectJourney(journeyId, true); // true = additive mode
+        card.classList.add('plotted');
+      }
+    });
+    
+    // Update button
+    const btn = document.getElementById('mha-plot-all-journeys-btn');
+    if (btn) {
+      btn.innerHTML = '<i class="fa-solid fa-eraser"></i> Clear all';
+      btn.onclick = mhaClearAllJourneys;
+    }
+  };
+
+  // Clear all journeys from map
+  window.mhaClearAllJourneys = function() {
+    // Clear map layers
+    if (window._mhaJourneyLayers) {
+      window._mhaJourneyLayers.forEach(layer => {
+        if (_mhaMap && _mhaMap.hasLayer(layer)) {
+          _mhaMap.removeLayer(layer);
+        }
+      });
+      window._mhaJourneyLayers = [];
+    }
+    
+    // Reset journey cards
+    document.querySelectorAll('.mha-journey-card').forEach(card => {
+      card.classList.remove('plotted', 'selected');
+    });
+    
+    // Update button
+    const btn = document.getElementById('mha-plot-all-journeys-btn');
+    if (btn) {
+      btn.innerHTML = '<i class="fa-solid fa-route"></i> Plot all';
+      btn.onclick = mhaPlotAllJourneys;
+    }
+    
+    _mhaActiveJourney = null;
+  };
+
+  // Toggle position plot (click to plot, click again to unplot)
+  let _mhaPlottedPositions = new Map(); // Map<button, marker>
+  
+  window.mhaPlotPosition = function(lat, lng, event) {
+    const btn = event ? event.currentTarget : null;
+    
+    // Check if this position is already plotted
+    if (btn && _mhaPlottedPositions.has(btn)) {
+      // Unplot
+      const marker = _mhaPlottedPositions.get(btn);
+      if (_mhaMap && marker) {
+        _mhaMap.removeLayer(marker);
+      }
+      _mhaPlottedPositions.delete(btn);
+      btn.classList.remove('plotted');
+    } else {
+      // Plot new marker
+      const marker = L.circleMarker([lat, lng], {
+        radius: 6,
+        fillColor: '#3b82f6',
+        color: '#fff',
+        weight: 2,
+        fillOpacity: 0.8
+      }).addTo(_mhaMap);
+      
+      marker.bindPopup(`
+        <div style="font-size:12px;">
+          <strong>Position</strong><br>
+          ${lat.toFixed(6)}, ${lng.toFixed(6)}
+        </div>
+      `);
+      
+      if (btn) {
+        _mhaPlottedPositions.set(btn, marker);
+        btn.classList.add('plotted');
+      }
+      
+      _mhaMap.setView([lat, lng], 15);
+    }
+  };
+
+  // Toggle plot all positions
+  let _mhaAllPositionsPlotted = false;
+  
+  window.mhaPlotAllPositions = function() {
+    const btn = event ? event.currentTarget : document.querySelector('.mha-plot-all');
+    
+    if (_mhaAllPositionsPlotted) {
+      // Remove all
+      _mhaPlottedPositions.forEach((marker, button) => {
+        if (_mhaMap && marker) {
+          _mhaMap.removeLayer(marker);
+        }
+        button.classList.remove('plotted');
+      });
+      _mhaPlottedPositions.clear();
+      _mhaAllPositionsPlotted = false;
+      
+      btn.innerHTML = '<i class="fa-solid fa-map-pin"></i> Plot all';
+      btn.classList.remove('active');
+    } else {
+      // Plot all
+      if (!window._mhaCurrentPositions || _mhaCurrentPositions.length === 0) return;
+      
+      const buttons = document.querySelectorAll('.mha-plot-btn');
+      _mhaCurrentPositions.forEach((pos, idx) => {
+        const marker = L.circleMarker([pos.latitude, pos.longitude], {
+          radius: 6,
+          fillColor: '#3b82f6',
+          color: '#fff',
+          weight: 2,
+          fillOpacity: 0.8
+        }).addTo(_mhaMap);
+        
+        if (buttons[idx]) {
+          _mhaPlottedPositions.set(buttons[idx], marker);
+          buttons[idx].classList.add('plotted');
+        }
+      });
+      
+      _mhaAllPositionsPlotted = true;
+      btn.innerHTML = '<i class="fa-solid fa-eraser"></i> Remove all';
+      btn.classList.add('active');
+      
+      // Fit bounds to all positions
+      const bounds = L.latLngBounds(_mhaCurrentPositions.map(p => [p.latitude, p.longitude]));
+      _mhaMap.fitBounds(bounds, { padding: [50, 50] });
+    }
+  };
+
+  // Focus on leg (zoom to leg path)
+  window.mhaFocusLeg = async function(event, legIndex) {
+    event.stopPropagation();
+    
+    if (!_mhaActiveJourney || !window._mhaJourneyData) return;
+    
+    const journey = window._mhaJourneyData[_mhaActiveJourney];
+    if (!journey || !journey.legs || !journey.legs[legIndex]) return;
+    
+    const leg = journey.legs[legIndex];
+    
+    // Fetch leg path if not already loaded
+    try {
+      const res = await apiFetch(`/api/portal/journeys/${_mhaActiveJourney}/path`);
+      if (!res.ok) throw new Error('Failed to load path');
+      
+      const geojson = await res.json();
+      
+      // Find the leg's LineString feature
+      const legFeature = geojson.features.find(f => 
+        f.properties && f.properties.leg_id === leg.id
+      );
+      
+      if (legFeature && legFeature.geometry && legFeature.geometry.coordinates) {
+        // Convert coordinates and fit bounds
+        const coords = legFeature.geometry.coordinates.map(c => [c[1], c[0]]);
+        const bounds = L.latLngBounds(coords);
+        _mhaMap.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+        
+        // Add temporary highlight
+        const highlight = L.polyline(coords, {
+          color: '#3b82f6',
+          weight: 6,
+          opacity: 0.7
+        }).addTo(_mhaMap);
+        
+        setTimeout(() => {
+          if (_mhaMap && _mhaMap.hasLayer(highlight)) {
+            _mhaMap.removeLayer(highlight);
+          }
+        }, 2000);
+      }
+    } catch (err) {
+      console.error('[MHA] Error focusing leg:', err);
+      // Fallback: zoom to start/end points
+      if (leg.start_lat && leg.start_lng && leg.end_lat && leg.end_lng) {
+        const bounds = L.latLngBounds([
+          [leg.start_lat, leg.start_lng],
+          [leg.end_lat, leg.end_lng]
+        ]);
+        _mhaMap.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+      }
+    }
+  };
 
   console.log('[MHA] Movement History Advanced module loaded');
 })();
