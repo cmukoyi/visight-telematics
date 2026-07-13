@@ -227,9 +227,13 @@ async def _fetch_batch_locations(access_token: str, app_key: str, app_secret: st
     params = {
         'access_token': access_token,
         'app_key': app_key,
-        'user_id': account,
+        'format': 'json',
+        'map_type': 'GOOGLE',
+        'method': 'jimi.user.device.location.list',
+        'sign_method': 'md5',
+        'target': account,
         'timestamp': timestamp,
-        'format': 'json',  # Required by TrackSolid API
+        'v': '0.9',
     }
     
     # Generate signature
@@ -241,10 +245,7 @@ async def _fetch_batch_locations(access_token: str, app_key: str, app_secret: st
         logger.info("📡 TrackSolid: Fetching batch locations...")
         response = await client.post(
             f"{OPEN_API_BASE_URL}",
-            params={
-                'method': 'jimi.user.device.location.list',
-                **params
-            }
+            data=params  # Use data, not params - matches working implementation
         )
         response.raise_for_status()
         data = response.json()
