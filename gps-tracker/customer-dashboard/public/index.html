@@ -13996,7 +13996,7 @@ function qrOpenHelp() {
   };
 
   // Load journey details (legs and stationaries)
-  async function mhaLoadJourneyDetails(journeyId) {
+  window.mhaLoadJourneyDetails = async function(journeyId) {
     const stepsDiv = document.getElementById(`mha-steps-${journeyId}`);
     
     try {
