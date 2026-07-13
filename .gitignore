@@ -68,3 +68,23 @@ MULTI_TENANT_MIGRATION.md
 HIVE_Architecture_Specification.md
 DEPLOY_RUNBOOK.md
 gps-tracker/.tenant
+
+# Strategic documentation — keep local only (public repo)
+ADD_GITHUB_SECRETS.md
+API_DOCUMENTATION.md
+ASSET_TRACKING_IMPLEMENTATION.md
+BUTTONS_*.md
+DOCKER_HUB_AUTH_SETUP.md
+FLOOR_PLAN_*.md
+I18N_*.md
+IMEI_MAC_QR_UPDATES.md
+JOURNEY_PATH_TEST_PLAN.md
+MHA_*.md
+PHASE_*.md
+PROMOTION_TRACKER.md
+QR_NFC_COLOR_THEMING_FIX.md
+TRACKSOLID_*.md
+TRIP_ENGINE_*.md
+TROUBLESHOOT_*.md
+scripts/*_DEPLOYMENT.md
+scripts/*_CANARY.md
