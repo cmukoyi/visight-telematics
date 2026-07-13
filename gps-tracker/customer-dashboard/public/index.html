@@ -481,13 +481,10 @@
                     <!-- Map Style Switcher for Live Map -->
                     <div class="map-style-switcher" id="live-style-switcher">
                         <button class="map-style-btn active" data-style="streets" onclick="liveSwitchMapStyle('streets')">
-                            <i class="fa-solid fa-map"></i> Streets
+                            Streets
                         </button>
                         <button class="map-style-btn" data-style="satellite" onclick="liveSwitchMapStyle('satellite')">
-                            <i class="fa-solid fa-satellite"></i> Satellite
-                        </button>
-                        <button class="map-style-btn" data-style="hybrid" onclick="liveSwitchMapStyle('hybrid')">
-                            <i class="fa-solid fa-layer-group"></i> Hybrid
+                            Satellite
                         </button>
                     </div>
                     <div id="liveMap"></div>
@@ -3165,10 +3162,16 @@ input.hive-range::-moz-range-track {
             .mha-main { display:flex; gap:14px; align-items:stretch; height:100%; padding:16px 20px; }
             @media(max-width:1100px) { .mha-main { flex-direction:column; } }
             
-            /* Assets Panel (266px) */
-            .mha-assets-panel { width:266px; flex:none; background:var(--bg-2); border:1px solid var(--border); border-radius:12px; display:flex; flex-direction:column; overflow:hidden; }
-            .mha-ap-head { display:flex; align-items:center; gap:9px; padding:12px 14px; border-bottom:1px solid var(--border); font-weight:500; }
+            /* Assets Panel (266px) - Collapsible */
+            .mha-assets-panel { width:266px; flex:none; background:var(--bg-2); border:1px solid var(--border); border-radius:12px; display:flex; flex-direction:column; overflow:hidden; transition:width .3s, min-width .3s; }
+            .mha-assets-panel.collapsed { width:40px; min-width:40px; }
+            .mha-assets-panel.collapsed .mha-ap-body { display:none; }
+            .mha-ap-head { display:flex; align-items:center; gap:9px; padding:12px 14px; border-bottom:1px solid var(--border); font-weight:500; position:relative; }
             .mha-ap-head i { color:var(--primary); font-size:16px; }
+            .mha-ap-head span { flex:1; }
+            .mha-assets-panel.collapsed .mha-ap-head span { display:none; }
+            .mha-ap-collapse { width:28px; height:28px; border-radius:6px; border:1px solid var(--border); background:var(--bg-3); color:var(--text-2); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:12px; transition:all .15s; }
+            .mha-ap-collapse:hover { background:var(--primary); color:white; border-color:var(--primary); }
             .mha-ap-body { display:flex; flex-direction:column; gap:11px; padding:12px; flex:1; min-height:0; }
             .mha-ap-search { position:relative; }
             .mha-ap-search input { width:100%; padding:9px 12px 9px 34px; background:var(--bg-3); border:1px solid var(--border); border-radius:8px; color:var(--text-1); font-size:12px; outline:none; }
@@ -3194,6 +3197,7 @@ input.hive-range::-moz-range-track {
             .mha-asset-row .nm { font-size:13px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
             .mha-asset-row .im { font-size:10px; color:var(--text-3); }
             .mha-asset-row .ts { font-size:10px; color:var(--text-3); margin-top:2px; }
+            .mha-asset-row .meta { display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex:none; }
             .mha-asset-row .badge { display:inline-block; padding:2px 6px; border-radius:10px; font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:.03em; }
             .mha-asset-row .badge.active { background:color-mix(in srgb,var(--primary) 20%,transparent); color:var(--primary); }
             .mha-asset-row .badge.idle { background:rgba(245,158,11,.2); color:#f59e0b; }
@@ -3219,7 +3223,7 @@ input.hive-range::-moz-range-track {
             .mha-map-btn i { font-size:14px; }
             
             /* Map Style Switcher */
-            .map-style-switcher { position:absolute; bottom:12px; left:12px; z-index:1000; background:var(--bg-2); border:1px solid var(--border); border-radius:8px; overflow:hidden; display:flex; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
+            .map-style-switcher { position:absolute; top:12px; left:50%; transform:translateX(-50%); z-index:1000; background:var(--bg-2); border:1px solid var(--border); border-radius:8px; overflow:hidden; display:flex; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
             .map-style-btn { padding:6px 10px; font-size:11px; color:var(--text-2); cursor:pointer; border:none; background:transparent; font-family:inherit; transition:all .15s; display:flex; align-items:center; gap:5px; border-right:1px solid var(--border); }
             .map-style-btn:last-child { border-right:none; }
             .map-style-btn:hover { color:var(--text-1); background:var(--bg-3); }
@@ -3363,6 +3367,9 @@ input.hive-range::-moz-range-track {
                         <div class="mha-ap-head">
                             <i class="fa-solid fa-tags"></i>
                             <span>Assets</span>
+                            <button class="mha-ap-collapse" onclick="mhaToggleAssetsPanel()" title="Collapse panel">
+                                <i class="fa-solid fa-chevron-right"></i>
+                            </button>
                         </div>
                         <div class="mha-ap-body">
                             <div class="mha-ap-search">
@@ -3449,13 +3456,10 @@ input.hive-range::-moz-range-track {
                             <!-- Map Style Switcher -->
                             <div class="map-style-switcher" id="mha-style-switcher">
                                 <button class="map-style-btn active" data-style="streets" onclick="mhaSwitchMapStyle('streets')">
-                                    <i class="fa-solid fa-map"></i> Streets
+                                    Streets
                                 </button>
                                 <button class="map-style-btn" data-style="satellite" onclick="mhaSwitchMapStyle('satellite')">
-                                    <i class="fa-solid fa-satellite"></i> Satellite
-                                </button>
-                                <button class="map-style-btn" data-style="hybrid" onclick="mhaSwitchMapStyle('hybrid')">
-                                    <i class="fa-solid fa-layer-group"></i> Hybrid
+                                    Satellite
                                 </button>
                             </div>
                             
@@ -14051,7 +14055,7 @@ function qrOpenHelp() {
           const partialWarn = (posCount > 0 && posCount < 5) ? ' <span class="warn">· partial path</span>' : '';
           
           stepsHtml += `
-            <div class="mha-step" data-leg-id="${leg.id}" onclick="mhaFocusLeg(event, ${legCounter - 1})">
+            <div class="mha-step" data-leg-id="${leg.id}" onclick="mhaFocusLegById(event, '${leg.id}')">
               <i class="dot sd" style="background:#3b82f6;"></i>
               <div>
                 <span class="val">Leg ${legCounter}</span>
@@ -14146,7 +14150,7 @@ function qrOpenHelp() {
   let _mhaFocusRing = null;
   let _mhaGeofencesVisible = false;
   
-  window.mhaSelectJourney = async function(journeyId) {
+  window.mhaSelectJourney = async function(journeyId, additive = false) {
     _mhaActiveJourney = journeyId;
     
     // Update UI - highlight selected card
@@ -14154,14 +14158,16 @@ function qrOpenHelp() {
       const isSelected = card.getAttribute('data-journey-id') === journeyId;
       if (isSelected) {
         card.classList.add('selected');
-      } else {
+      } else if (!additive) {
         card.classList.remove('selected');
       }
     });
     
-    // Clear existing journey layers
-    _mhaJourneyLayers.forEach(layer => _mhaMap.removeLayer(layer));
-    _mhaJourneyLayers = [];
+    // Clear existing journey layers unless in additive mode
+    if (!additive) {
+      _mhaJourneyLayers.forEach(layer => _mhaMap.removeLayer(layer));
+      _mhaJourneyLayers = [];
+    }
     
     // Remove focus ring if exists
     if (_mhaFocusRing) {
@@ -14701,6 +14707,19 @@ function qrOpenHelp() {
     }, 300);
   };
 
+  // Toggle assets panel collapse
+  window.mhaToggleAssetsPanel = function() {
+    const panel = document.querySelector('.mha-assets-panel');
+    const btn = document.querySelector('.mha-ap-collapse i');
+    panel.classList.toggle('collapsed');
+    btn.className = panel.classList.contains('collapsed') ? 'fa-solid fa-chevron-left' : 'fa-solid fa-chevron-right';
+    
+    // Invalidate map size after transition
+    setTimeout(() => {
+      if (_mhaMap) _mhaMap.invalidateSize();
+    }, 300);
+  };
+
   // Plot all journeys on map
   window.mhaPlotAllJourneys = function() {
     const journeyCards = document.querySelectorAll('.mha-journey-card');
@@ -14837,16 +14856,17 @@ function qrOpenHelp() {
     }
   };
 
-  // Focus on leg (zoom to leg path)
-  window.mhaFocusLeg = async function(event, legIndex) {
+  // Focus on leg (zoom to leg path) by ID
+  window.mhaFocusLegById = async function(event, legId) {
     event.stopPropagation();
     
     if (!_mhaActiveJourney || !window._mhaJourneyData) return;
     
     const journey = window._mhaJourneyData[_mhaActiveJourney];
-    if (!journey || !journey.legs || !journey.legs[legIndex]) return;
+    if (!journey || !journey.legs) return;
     
-    const leg = journey.legs[legIndex];
+    const leg = journey.legs.find(l => l.id === legId);
+    if (!leg) return;
     
     // Fetch leg path if not already loaded
     try {
