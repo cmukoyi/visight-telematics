@@ -229,6 +229,7 @@ async def _fetch_batch_locations(access_token: str, app_key: str, app_secret: st
         'app_key': app_key,
         'user_id': account,
         'timestamp': timestamp,
+        'format': 'json',  # Required by TrackSolid API
     }
     
     # Generate signature
