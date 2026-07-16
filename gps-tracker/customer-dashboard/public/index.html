@@ -14080,7 +14080,14 @@ function qrOpenHelp() {
         } else {
           statCounter++;
           const stat = item.data;
-          const durationMin = Math.floor(stat.duration_seconds / 60);
+          // Format duration properly - show seconds if < 1 minute
+          let durationText;
+          if (stat.duration_seconds < 60) {
+            durationText = `${stat.duration_seconds}s`;
+          } else {
+            const minutes = Math.floor(stat.duration_seconds / 60);
+            durationText = `${minutes} min`;
+          }
           const lat = stat.centroid_lat || stat.latitude;
           const lng = stat.centroid_lng || stat.longitude;
           const addr = stat.address ? mhaShortAddress(stat.address) : '';
@@ -14090,7 +14097,7 @@ function qrOpenHelp() {
               <i class="dot sd" style="background:#f59e0b;"></i>
               <div>
                 <span class="val">Stationary ${statCounter}</span>
-                <span class="lbl"> · ${durationMin}m${addr ? ' · ' + esc(addr) : ''}</span>
+                <span class="lbl"> · ${durationText}${addr ? ' · ' + esc(addr) : ''}</span>
               </div>
             </div>`;
         }
