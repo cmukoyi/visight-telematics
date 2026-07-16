@@ -174,8 +174,8 @@ class APIToken(Base):
     
     id = Column(Integer, primary_key=True)
     provider = Column(String(50), nullable=False, unique=True)  # e.g. 'tracksolid_open_api'
-    access_token = Column(String(200), nullable=True)
-    refresh_token = Column(String(200), nullable=True)
+    access_token = Column(String(500), nullable=True)  # Increased for JWT tokens (~240 chars)
+    refresh_token = Column(String(500), nullable=True)
     expires_at = Column(DateTime(timezone=True), nullable=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
