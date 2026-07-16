@@ -411,6 +411,33 @@ class TripEngine:
         if not self.context.current_journey_id:
             return None
         
+        # Flush any pending leg data before aggregating
+        # CRITICAL: If we're in MOVE state with unflushed leg_buffer, create the leg now
+        # Otherwise it won't be included in the journey metrics
+        if self.context.current_state == "MOVE" and len(self.context.leg_buffer) >= 2:
+            logger.debug(
+                "🔄 IMEI %s: Flushing leg_buffer (%d points) before closing journey",
+                self.device_imei, len(self.context.leg_buffer)
+            )
+            leg = self._create_leg(self.context.leg_buffer, is_air_leg=False)
+            if leg:
+                logger.debug("✅ IMEI %s: Flushed leg %s before journey close", self.device_imei, leg.id)
+            self.context.leg_buffer = []
+        
+        # Flush any pending stationary data (anchor_points)
+        # If we're in STATIONARY state with accumulated anchor points, create stationary now
+        if self.context.current_state == "STATIONARY" and len(self.context.anchor_points) >= 1:
+            # Don't create journey-breaking stationary here (would recursively close journey)
+            # Just flush to a normal stationary
+            logger.debug(
+                "🔄 IMEI %s: Flushing anchor_points (%d points) before closing journey",
+                self.device_imei, len(self.context.anchor_points)
+            )
+            stat = self._create_stationary(self.context.anchor_points, reason="journey_close")
+            if stat:
+                logger.debug("✅ IMEI %s: Flushed stationary %s before journey close", self.device_imei, stat.id)
+            self.context.anchor_points = []
+        
         # Get journey from DB
         journey = self.db.execute(
             select(Journey).where(Journey.id == self.context.current_journey_id)
@@ -509,7 +536,11 @@ class TripEngine:
         end_position_id = points[-1][3] if len(points) > 0 and points[-1][3] else None
         
         # Journey grouping: Check if this stationary breaks the journey (dwell > 30 min)
-        breaks_journey = duration_seconds > (self.config.journey_break_dwell_min * 60)
+        # Skip journey-breaking logic if called from journey_close (prevents recursive close)
+        breaks_journey = (
+            duration_seconds > (self.config.journey_break_dwell_min * 60) 
+            and reason != "journey_close"
+        )
         
         if breaks_journey and self.context.current_journey_id:
             # Close current journey before creating the stationary
