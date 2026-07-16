@@ -871,6 +871,22 @@ class TripEngine:
             logger.debug("📍 IMEI %s: First position at (%f, %f)", self.device_imei, lat, lng)
             return result
         
+        # Day boundary check: Close journey at midnight (prevents multi-day open journeys)
+        # Per spec Section 2.4: time is used for journey grouping. A day boundary represents
+        # a "significant" period that should end a journey, even if device stayed within R.
+        if self.context.current_journey_id:
+            journey = self.db.execute(
+                select(Journey).where(Journey.id == self.context.current_journey_id)
+            ).scalar_one_or_none()
+            
+            if journey and journey.started_at.date() != observed_at.date():
+                logger.info(
+                    "📅 IMEI %s: Day boundary crossed (%s → %s) → closing journey %s",
+                    self.device_imei, journey.started_at.date(), observed_at.date(),
+                    str(journey.id)[:8]
+                )
+                self._close_journey()
+        
         # Calculate implied speed (for outlier/air gate)
         time_diff_seconds = (observed_at - self.context.last_position_time).total_seconds()
         distance_m = haversine_distance(
