@@ -1008,6 +1008,7 @@
                             <button class="tab"         id="logsrc-nginx-access" onclick="switchLogSource('nginx-access')">🌐 Nginx Access</button>
                             <button class="tab"         id="logsrc-nginx-error"  onclick="switchLogSource('nginx-error')">🚨 Nginx Error</button>
                             <button class="tab"         id="logsrc-hive"  onclick="switchLogSource('hive')">🛡️ Hive Logs</button>
+                            <button class="tab"         id="logsrc-trip"  onclick="switchLogSource('trip')">🚗 Trip Engine Logs</button>
                         </div>
 
                         <!-- APP LOGS (table view) -->
@@ -1134,6 +1135,47 @@
                                     <li><strong>hive-evaluations.txt</strong> — Recent evaluation results</li>
                                     <li><strong>hive-events.txt</strong> — State change events and triggers</li>
                                     <li><strong>hive-tag-membership.txt</strong> — Tag to HIVE associations</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- TRIP ENGINE LOGS EXPORT -->
+                        <div id="logview-trip" style="display:none;" class="card">
+                            <div style="margin-bottom:20px;padding:20px;background:var(--surface);border-radius:8px;border-left:4px solid var(--primary);">
+                                <h3 style="margin:0 0 12px 0;font-size:16px;">📦 Export Trip Engine Logs & Data</h3>
+                                <p style="margin:0 0 16px 0;color:var(--gray);font-size:14px;">
+                                    Download a complete bundle of Trip Engine logs and database data including journeys, legs, stationaries, and device states.
+                                </p>
+                                <div class="filters" style="margin-bottom:16px;">
+                                    <div class="filter-group">
+                                        <label>Time Range</label>
+                                        <select id="tripDaysFilter">
+                                            <option value="1">Last 24 hours</option>
+                                            <option value="3">Last 3 days</option>
+                                            <option value="7" selected>Last 7 days</option>
+                                            <option value="14">Last 14 days</option>
+                                            <option value="30">Last 30 days</option>
+                                            <option value="90">Last 90 days</option>
+                                        </select>
+                                    </div>
+                                    <div class="filter-group">
+                                        <button class="btn btn-primary" onclick="exportTripLogs()" id="tripExportBtn">
+                                            <i class="fa-solid fa-download"></i> Export Logs
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="tripExportStatus" style="display:none;padding:12px;background:var(--background);border-radius:4px;font-size:13px;"></div>
+                            </div>
+
+                            <div style="padding:20px;background:var(--surface);border-radius:8px;">
+                                <h4 style="margin:0 0 12px 0;font-size:14px;color:var(--gray);">📋 Export Contents</h4>
+                                <ul style="margin:0;padding-left:20px;color:var(--gray);font-size:13px;line-height:1.8;">
+                                    <li><strong>backend-trip-logs.log</strong> — Backend logs with Trip Engine processing details</li>
+                                    <li><strong>journeys.txt</strong> — All journeys with distance, duration, and leg counts</li>
+                                    <li><strong>legs.txt</strong> — Movement legs with paths and distances</li>
+                                    <li><strong>stationaries.txt</strong> — Stops and dwells with durations</li>
+                                    <li><strong>device-states.txt</strong> — Device subscription and position tracking status</li>
+                                    <li><strong>engine-states.txt</strong> — Trip engine processing state per device</li>
                                 </ul>
                             </div>
                         </div>
@@ -3326,15 +3368,16 @@ dashboard.welcome,Bienvenue</pre>
 
         function switchLogSource(src) {
             currentLogSource = src;
-            ['app','backend','nginx-access','nginx-error','hive'].forEach(function(k) {
+            ['app','backend','nginx-access','nginx-error','hive','trip'].forEach(function(k) {
                 var el = document.getElementById('logsrc-' + k);
                 if (el) el.classList.toggle('active', k === src);
             });
             document.getElementById('logview-app').style.display = src === 'app' ? '' : 'none';
-            document.getElementById('logview-container').style.display = (src !== 'app' && src !== 'hive') ? '' : 'none';
+            document.getElementById('logview-container').style.display = (src !== 'app' && src !== 'hive' && src !== 'trip') ? '' : 'none';
             document.getElementById('logview-hive').style.display = src === 'hive' ? '' : 'none';
+            document.getElementById('logview-trip').style.display = src === 'trip' ? '' : 'none';
             if (src === 'app') { loadLogs(); } 
-            else if (src === 'hive') { /* Export on demand, nothing to auto-load */ }
+            else if (src === 'hive' || src === 'trip') { /* Export on demand, nothing to auto-load */ }
             else { loadContainerLogs(); }
         }
 
@@ -3499,6 +3542,69 @@ dashboard.welcome,Bienvenue</pre>
                 const blob = await response.blob();
                 const contentDisposition = response.headers.get('Content-Disposition');
                 let filename = 'hive-logs.tar.gz';
+                if (contentDisposition) {
+                    const matches = /filename="([^"]+)"/.exec(contentDisposition);
+                    if (matches && matches[1]) filename = matches[1];
+                }
+
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(downloadUrl);
+
+                if (statusEl) {
+                    statusEl.style.color = '#86efac';
+                    statusEl.innerHTML = '<i class="fa-solid fa-check-circle"></i> Export completed! Check your downloads folder for <strong>' + filename + '</strong>';
+                }
+            } catch (error) {
+                if (statusEl) {
+                    statusEl.style.color = '#f87171';
+                    statusEl.innerHTML = '<i class="fa-solid fa-exclamation-circle"></i> Export failed: ' + error.message;
+                }
+            } finally {
+                if (btnEl) btnEl.disabled = false;
+            }
+        }
+
+        // TRIP ENGINE LOGS EXPORT
+        async function exportTripLogs() {
+            const authToken = localStorage.getItem('adminToken');
+            if (!authToken) {
+                alert('Please log in first');
+                return;
+            }
+            
+            const daysEl = document.getElementById('tripDaysFilter');
+            const days = daysEl ? daysEl.value : '7';
+            const statusEl = document.getElementById('tripExportStatus');
+            const btnEl = document.getElementById('tripExportBtn');
+            
+            if (btnEl) btnEl.disabled = true;
+            if (statusEl) {
+                statusEl.style.display = 'block';
+                statusEl.style.color = 'var(--gray)';
+                statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Extracting Trip Engine logs and database data...';
+            }
+
+            try {
+                const url = API_URL + '/api/admin/trip-logs/export?days=' + days;
+                const response = await fetch(url, { 
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.detail || response.statusText);
+                }
+
+                // Download the file
+                const blob = await response.blob();
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = 'trip-logs.tar.gz';
                 if (contentDisposition) {
                     const matches = /filename="([^"]+)"/.exec(contentDisposition);
                     if (matches && matches[1]) filename = matches[1];

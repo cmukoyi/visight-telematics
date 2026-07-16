@@ -1091,6 +1091,181 @@ async def export_hive_logs(
 
 
 # ---------------------------------------------------------------------------
+# Trip Engine Logs Export
+# ---------------------------------------------------------------------------
+
+@router.get("/trip-logs/export")
+async def export_trip_logs(
+    request: Request,
+    db: Session = Depends(get_db),
+    days: int = Query(7, ge=1, le=90, description="Number of days of logs to export"),
+):
+    """
+    Export Trip Engine logs and database data as a downloadable tar.gz bundle.
+    Includes backend logs, journeys, legs, stationaries, and device states.
+    """
+    from fastapi.responses import StreamingResponse
+    import subprocess
+    import tempfile
+    import os
+    import tarfile
+    from io import BytesIO
+    
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires manager role")
+    
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    
+    # Create in-memory tar.gz
+    buffer = BytesIO()
+    
+    with tarfile.open(fileobj=buffer, mode='w:gz') as tar:
+        # 1. Backend Trip Engine logs (from docker logs)
+        try:
+            result = subprocess.run(
+                ['docker', 'logs', '--since', f'{days}d', 'pinplot_backend'],
+                capture_output=True, text=True, timeout=30
+            )
+            logs = result.stdout + result.stderr
+            # Filter for Trip Engine-related lines
+            trip_lines = [line for line in logs.split('\n') if any(x in line for x in [
+                'TripEngine', 'trip_engine', 'Journey', 'Leg', 'Stationary',
+                '🆕', '✅', '🔵', '🟠', '✈️', '🔚', '📅', 'IMEI'
+            ])]
+            trip_log_content = '\n'.join(trip_lines).encode('utf-8')
+            
+            info = tarfile.TarInfo(name='backend-trip-logs.log')
+            info.size = len(trip_log_content)
+            info.mtime = datetime.utcnow().timestamp()
+            tar.addfile(info, BytesIO(trip_log_content))
+        except Exception as e:
+            logger.error(f"Failed to extract backend trip logs: {e}")
+        
+        # 2. Journeys table
+        from app.models import Journey
+        journeys = db.query(Journey).filter(
+            Journey.started_at >= cutoff
+        ).order_by(Journey.started_at.desc()).limit(1000).all()
+        
+        journeys_data = f"Journeys (last {days} days): {len(journeys)}\n\n"
+        for j in journeys:
+            duration_min = j.total_duration_seconds / 60 if j.total_duration_seconds else 0
+            journeys_data += f"ID: {j.id}\n"
+            journeys_data += f"Device: {j.device_imei}\n"
+            journeys_data += f"Started: {j.started_at}\n"
+            journeys_data += f"Ended: {j.ended_at}\n"
+            journeys_data += f"Duration: {duration_min:.1f} min\n"
+            journeys_data += f"Distance: {j.total_distance_m/1000:.2f} km\n"
+            journeys_data += f"Legs: {j.leg_count}\n"
+            journeys_data += f"Stationaries: {j.stationary_count}\n"
+            journeys_data += f"Air Journey: {j.is_air_journey}\n"
+            journeys_data += f"Created: {j.created_at}\n\n"
+        
+        info = tarfile.TarInfo(name='journeys.txt')
+        info.size = len(journeys_data.encode('utf-8'))
+        info.mtime = datetime.utcnow().timestamp()
+        tar.addfile(info, BytesIO(journeys_data.encode('utf-8')))
+        
+        # 3. Legs table (sample from recent journeys)
+        from app.models import Leg
+        legs = db.query(Leg).filter(
+            Leg.started_at >= cutoff
+        ).order_by(Leg.started_at.desc()).limit(500).all()
+        
+        legs_data = f"Legs (last {days} days): {len(legs)}\n\n"
+        for leg in legs:
+            duration_min = leg.duration_seconds / 60 if leg.duration_seconds else 0
+            legs_data += f"ID: {leg.id}\n"
+            legs_data += f"Journey: {leg.journey_id}\n"
+            legs_data += f"Device: {leg.device_imei}\n"
+            legs_data += f"Started: {leg.started_at}\n"
+            legs_data += f"Ended: {leg.ended_at}\n"
+            legs_data += f"Duration: {duration_min:.1f} min\n"
+            legs_data += f"Distance: {leg.distance_m/1000:.3f} km\n"
+            legs_data += f"Points: {leg.point_count}\n"
+            legs_data += f"Air Leg: {leg.is_air_leg}\n"
+            legs_data += f"Start: ({leg.start_lat:.6f}, {leg.start_lng:.6f})\n"
+            legs_data += f"End: ({leg.end_lat:.6f}, {leg.end_lng:.6f})\n\n"
+        
+        info = tarfile.TarInfo(name='legs.txt')
+        info.size = len(legs_data.encode('utf-8'))
+        info.mtime = datetime.utcnow().timestamp()
+        tar.addfile(info, BytesIO(legs_data.encode('utf-8')))
+        
+        # 4. Stationaries table
+        from app.models import Stationary
+        stationaries = db.query(Stationary).filter(
+            Stationary.started_at >= cutoff
+        ).order_by(Stationary.started_at.desc()).limit(500).all()
+        
+        stats_data = f"Stationaries (last {days} days): {len(stationaries)}\n\n"
+        for stat in stationaries:
+            duration_min = stat.duration_seconds / 60 if stat.duration_seconds else 0
+            stats_data += f"ID: {stat.id}\n"
+            stats_data += f"Journey: {stat.journey_id or 'NULL (journey-breaking)'}\n"
+            stats_data += f"Device: {stat.device_imei}\n"
+            stats_data += f"Started: {stat.started_at}\n"
+            stats_data += f"Ended: {stat.ended_at}\n"
+            stats_data += f"Duration: {duration_min:.1f} min\n"
+            stats_data += f"Points: {stat.point_count}\n"
+            stats_data += f"Anchor: ({stat.anchor_lat:.6f}, {stat.anchor_lng:.6f})\n\n"
+        
+        info = tarfile.TarInfo(name='stationaries.txt')
+        info.size = len(stats_data.encode('utf-8'))
+        info.mtime = datetime.utcnow().timestamp()
+        tar.addfile(info, BytesIO(stats_data.encode('utf-8')))
+        
+        # 5. Device states (trip subscriptions)
+        from app.models import DeviceState
+        device_states = db.query(DeviceState).all()
+        
+        states_data = f"Device States (total): {len(device_states)}\n\n"
+        for ds in device_states:
+            states_data += f"Device: {ds.device_imei}\n"
+            states_data += f"Trip Subscribed: {ds.trip_subscribed}\n"
+            states_data += f"Last Batch: {ds.last_batch_ts}\n"
+            states_data += f"Last Position: {ds.last_position_ts}\n"
+            states_data += f"Last Tracklist Pull: {ds.last_tracklist_pull_at}\n"
+            states_data += f"Updated: {ds.updated_at}\n\n"
+        
+        info = tarfile.TarInfo(name='device-states.txt')
+        info.size = len(states_data.encode('utf-8'))
+        info.mtime = datetime.utcnow().timestamp()
+        tar.addfile(info, BytesIO(states_data.encode('utf-8')))
+        
+        # 6. Engine states (trip processing state)
+        from app.models import EngineState
+        engine_states = db.query(EngineState).all()
+        
+        engine_data = f"Engine States (total): {len(engine_states)}\n\n"
+        for es in engine_states:
+            engine_data += f"Device: {es.device_imei}\n"
+            engine_data += f"Current State: {es.current_state}\n"
+            engine_data += f"Current Journey: {es.current_journey_id or 'None'}\n"
+            engine_data += f"Last Processed: {es.last_processed_at}\n"
+            engine_data += f"Anchor: ({es.anchor_lat:.6f if es.anchor_lat else 'N/A'}, {es.anchor_lng:.6f if es.anchor_lng else 'N/A'})\n"
+            engine_data += f"Last Position: ({es.last_position_lat:.6f if es.last_position_lat else 'N/A'}, {es.last_position_lng:.6f if es.last_position_lng else 'N/A'})\n"
+            engine_data += f"Updated: {es.updated_at}\n\n"
+        
+        info = tarfile.TarInfo(name='engine-states.txt')
+        info.size = len(engine_data.encode('utf-8'))
+        info.mtime = datetime.utcnow().timestamp()
+        tar.addfile(info, BytesIO(engine_data.encode('utf-8')))
+    
+    buffer.seek(0)
+    
+    return StreamingResponse(
+        buffer,
+        media_type='application/gzip',
+        headers={
+            'Content-Disposition': f'attachment; filename="trip-logs-{timestamp}.tar.gz"'
+        }
+    )
+
+
+# ---------------------------------------------------------------------------
 # App Feature Flags
 # ---------------------------------------------------------------------------
 
