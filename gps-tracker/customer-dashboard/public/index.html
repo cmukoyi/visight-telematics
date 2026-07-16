@@ -3188,7 +3188,7 @@ input.hive-range::-moz-range-track {
             .mha-ap-stat.act .n { color:#22c55e; }
             .mha-ap-stat.idl .n { color:#f59e0b; }
             .mha-ap-stat.off .n { color:#ef4444; }
-            .mha-ap-list { flex:1; overflow-y:auto; margin:2px -12px -12px; border-top:1px solid var(--border); }
+            .mha-ap-list { flex:1; min-height:0; overflow-y:auto; margin:2px -12px -12px; border-top:1px solid var(--border); }
             .mha-asset-row { display:flex; align-items:center; gap:10px; padding:9px 14px; cursor:pointer; border-left:2px solid transparent; border-bottom:1px solid var(--border); transition:all .12s; }
             .mha-asset-row:hover { background:var(--bg-3); }
             .mha-asset-row.active { background:color-mix(in srgb,var(--primary) 10%,transparent); border-left-color:var(--primary); }
@@ -3219,7 +3219,7 @@ input.hive-range::-moz-range-track {
             /* Map Controls */
             .mha-map-controls { position:absolute; top:12px; right:12px; display:flex; gap:8px; z-index:1000; }
             .mha-map-btn { display:flex; align-items:center; gap:6px; font-size:12px; padding:8px 12px; border-radius:8px; border:1px solid var(--border-2); background:var(--bg-2); color:var(--text-1); cursor:pointer; font-family:inherit; transition:all .15s; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
-            .mha-map-btn:hover { border-color:var(--primary); background:var(--bg-1); }
+            .mha-map-btn:hover { border-color:var(--primary); background:var(--bg-2); }
             .mha-map-btn.on { background:color-mix(in srgb,var(--primary) 12%,transparent); color:var(--primary); border-color:var(--primary); }
             .mha-map-btn i { font-size:14px; }
             
@@ -3402,7 +3402,7 @@ input.hive-range::-moz-range-track {
                                         <div class="n" id="mha-stat-total">0</div>
                                         <div class="l">Total</div>
                                     </div>
-                                    <div class="mha-ap-stat act selected" data-status="all" onclick="mhaFilterByStatus('all', this)">
+                                    <div class="mha-ap-stat act selected" data-status="active" onclick="mhaFilterByStatus('active', this)">
                                         <div class="n" id="mha-stat-active">0</div>
                                         <div class="l">Active</div>
                                     </div>
@@ -13743,7 +13743,8 @@ function qrOpenHelp() {
     document.querySelectorAll('.mha-pill[data-filter]').forEach(p => p.classList.remove('on'));
     if (el) el.classList.add('on');
     
-    // TODO: Apply category filter to asset list
+    // Apply category filter
+    mhaFilterAssets();
     console.log(`[MHA] Filter set to: ${filter}`);
   };
   
@@ -13771,8 +13772,21 @@ function qrOpenHelp() {
       
       if (!searchMatch) return false;
       
+      // Category filter
+      if (_mhaFilter !== 'all') {
+        const assetType = (asset.asset_type || '').toLowerCase();
+        if (_mhaFilter === 'newtags' && assetType !== 'newtag') return false;
+        if (_mhaFilter === 'parcels' && assetType !== 'parcel') return false;
+        if (_mhaFilter === 'qr' && assetType !== 'qr') return false;
+      }
+      
       // Status filter
-      if (_mhaFilterStatus === 'all' || _mhaFilterStatus === 'total') return true;
+      if (_mhaFilterStatus === 'total') return true;
+      if (_mhaFilterStatus === 'all') {
+        // 'all' was renamed to 'active' but keep backward compatibility
+        const status = mhaGetAssetStatus(asset);
+        return status === 'active';
+      }
       
       const status = mhaGetAssetStatus(asset);
       return status === _mhaFilterStatus;
@@ -14150,6 +14164,8 @@ function qrOpenHelp() {
   let _mhaInitialBounds = null;
   let _mhaFocusRing = null;
   let _mhaGeofencesVisible = false;
+  let _mhaGeofenceData = null;
+  let _mhaGeofenceLayers = [];
   
   window.mhaSelectJourney = async function(journeyId, additive = false) {
     _mhaActiveJourney = journeyId;
@@ -14442,20 +14458,113 @@ function qrOpenHelp() {
   };
 
   // Toggle geofences visibility
-  window.mhaToggleGeofences = function() {
+  window.mhaToggleGeofences = async function() {
     _mhaGeofencesVisible = !_mhaGeofencesVisible;
     const btn = document.getElementById('mha-show-geofences');
     
     if (_mhaGeofencesVisible) {
       btn.classList.add('on');
       btn.innerHTML = '<i class="fa-solid fa-draw-polygon"></i> Hide geofences';
-      // TODO: Add geofences layer when available
+      
+      // Load geofences if not already loaded
+      if (!_mhaGeofenceData) {
+        try {
+          const res = await apiFetch('/api/portal/locations');
+          if (!res.ok) throw new Error('Failed to load geofences');
+          _mhaGeofenceData = await res.json();
+        } catch (err) {
+          _mhaGeofencesVisible = false;
+          btn.classList.remove('on');
+          btn.innerHTML = '<i class="fa-solid fa-draw-polygon"></i> Show geofences';
+          alert('Could not load geofences: ' + err.message);
+          return;
+        }
+      }
+      
+      // Render geofences on map
+      mhaRenderGeofences();
     } else {
       btn.classList.remove('on');
       btn.innerHTML = '<i class="fa-solid fa-draw-polygon"></i> Show geofences';
-      // TODO: Remove geofences layer
+      mhaClearGeofences();
     }
   };
+  
+  // Clear geofences from map
+  function mhaClearGeofences() {
+    _mhaGeofenceLayers.forEach(layer => {
+      try { _mhaMap.removeLayer(layer); } catch (e) {}
+    });
+    _mhaGeofenceLayers = [];
+  }
+  
+  // Render geofences on map
+  function mhaRenderGeofences() {
+    if (!_mhaMap || !_mhaGeofenceData) return;
+    mhaClearGeofences();
+    
+    _mhaGeofenceData.forEach(gf => {
+      const armed = (gf.armed_count || 0) > 0;
+      const color = armed ? '#10B981' : '#6B7280';
+      const opts = { color, weight: 2, fillColor: color, fillOpacity: 0.12, interactive: true };
+      let layer = null;
+      const type = (gf.shape_type || gf.type || '').toLowerCase();
+      
+      // Parse coordinates if stored as JSON string
+      let verts = gf.coordinates || gf.polygon_points;
+      if (typeof verts === 'string') {
+        try { verts = JSON.parse(verts); } catch (_) { verts = null; }
+      }
+      
+      try {
+        if (type === 'polygon' && Array.isArray(verts) && verts.length >= 3) {
+          layer = L.polygon(verts, opts);
+        } else if (type === 'rectangle' && Array.isArray(verts) && verts.length >= 2) {
+          layer = L.rectangle(verts, opts);
+        } else if (gf.latitude != null && gf.longitude != null) {
+          layer = L.circle([gf.latitude, gf.longitude], { ...opts, radius: gf.radius || 150 });
+        }
+      } catch (e) {
+        console.warn('[MHA geofence] failed to build layer for', gf?.name, e);
+        return;
+      }
+      
+      if (!layer) {
+        console.warn('[MHA geofence] no renderable shape for', gf?.name, gf);
+        return;
+      }
+      
+      // Add to map
+      try {
+        layer.addTo(_mhaMap);
+        _mhaGeofenceLayers.push(layer);
+        
+        // Add popup
+        const armedTxt = armed 
+          ? `<br><span style="color:#10B981;font-weight:600">Armed: ${gf.armed_count} tag${gf.armed_count>1?'s':''}</span>` 
+          : '<br><span style="color:var(--text-3)">Not armed</span>';
+        layer.bindPopup(`<strong>${esc(gf.name||'Geofence')}</strong>${gf.address?'<br><small>'+esc(gf.address)+'</small>':''}${armedTxt}`);
+        
+        // Add permanent label
+        const labelLatLng = (typeof layer.getBounds === 'function')
+          ? layer.getBounds().getCenter()
+          : (gf.latitude != null && gf.longitude != null ? L.latLng(gf.latitude, gf.longitude) : null);
+        
+        if (labelLatLng) {
+          try {
+            layer.bindTooltip(esc(gf.name || 'Geofence'), {
+              permanent: true,
+              direction: 'center',
+              className: 'geofence-label',
+              opacity: 0.8
+            });
+          } catch (e) { /* non-fatal */ }
+        }
+      } catch (e) {
+        console.warn('[MHA geofence] addTo failed for', gf?.name, e);
+      }
+    });
+  }
 
   // Clear all markers from map
   window.mhaClearMarkers = function() {
