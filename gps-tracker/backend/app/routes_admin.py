@@ -1244,14 +1244,13 @@ async def export_trip_logs(
             engine_data += f"Device: {es.device_imei}\n"
             engine_data += f"Current State: {es.current_state}\n"
             engine_data += f"Current Journey: {es.current_journey_id or 'None'}\n"
+            engine_data += f"Current Leg: {es.current_leg_id or 'None'}\n"
             engine_data += f"Last Processed: {es.last_processed_at}\n"
             
-            # Format coordinates safely
+            # Format anchor coordinates safely
             anchor_str = f"({es.anchor_lat:.6f}, {es.anchor_lng:.6f})" if es.anchor_lat is not None and es.anchor_lng is not None else "N/A"
-            last_pos_str = f"({es.last_position_lat:.6f}, {es.last_position_lng:.6f})" if es.last_position_lat is not None and es.last_position_lng is not None else "N/A"
-            
             engine_data += f"Anchor: {anchor_str}\n"
-            engine_data += f"Last Position: {last_pos_str}\n"
+            engine_data += f"Anchor Count: {es.anchor_count}\n"
             engine_data += f"Updated: {es.updated_at}\n\n"
         
         info = tarfile.TarInfo(name='engine-states.txt')
