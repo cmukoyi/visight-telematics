@@ -38,6 +38,7 @@ from app.models import (
     TrackSolidSyncState,
     TripConfig,
 )
+from app.services.geocode_service import GeocodeService
 from app.services.tracksolid_batch_service import (
     _get_credentials,
     _generate_signature,
@@ -284,6 +285,22 @@ async def _upsert_track_positions(db: Session, imei: str, track_points: List[dic
             except (ValueError, TypeError):
                 return None
         
+        # Reverse geocode position (with smart caching)
+        address = None
+        try:
+            # Import here to avoid circular dependency
+            from app.services.tracksolid_batch_service import get_geocode_service
+            geocode_service = get_geocode_service()
+            result = geocode_service.reverse_geocode(
+                device_imei=imei,
+                lat=lat,
+                lng=lng
+            )
+            address = result.get("address")
+        except Exception as e:
+            # Don't fail position insert if geocoding fails
+            logger.warning("⚠️  Geocoding failed for IMEI %s: %s", imei, str(e))
+        
         # Prepare position data
         position_data = {
             'device_imei': imei,
@@ -298,6 +315,7 @@ async def _upsert_track_positions(db: Session, imei: str, track_points: List[dic
             'acc_status': point.get('accStatus'),
             'gps_mode': safe_int(point.get('gpsMode')),
             'confidence': safe_int(point.get('confidence')),
+            'address': address,  # Add reverse geocoded address
             'source': 'tracklist',  # Tag as from selective pull
             'created_at': created_at,
         }

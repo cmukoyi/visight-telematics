@@ -37,8 +37,24 @@ from app.models import (
     TrackSolidSyncState,
     APIToken,
 )
+from app.services.geocode_service import GeocodeService
 
 logger = logging.getLogger(__name__)
+
+# ── Geocoding Service (automatic reverse geocoding) ────────────────────────
+_geocode_service = None
+
+def get_geocode_service() -> GeocodeService:
+    """Lazy-load geocoding service singleton."""
+    global _geocode_service
+    if _geocode_service is None:
+        _geocode_service = GeocodeService(
+            provider="maptiler",
+            threshold_metres=500,  # Only re-geocode if moved >500m
+            cache_file="/tmp/pinplot_geocode_cache.json"
+        )
+        logger.info("🌍 Initialized GeocodeService (provider=maptiler, threshold=500m)")
+    return _geocode_service
 
 # ── API Constants ──────────────────────────────────────────────────────────
 OPEN_API_BASE_URL = "https://eu-open.tracksolidpro.com/route/rest"
@@ -310,6 +326,23 @@ async def _upsert_positions(db: Session, locations: list[dict]) -> int:
             except (ValueError, TypeError):
                 return None
         
+        # Reverse geocode position (with smart caching)
+        address = None
+        try:
+            geocode_service = get_geocode_service()
+            result = geocode_service.reverse_geocode(
+                device_imei=imei,
+                lat=lat,
+                lng=lng
+            )
+            address = result.get("address")
+            # Log only new geocodes (not cache hits)
+            if not result.get("cached"):
+                logger.debug("🌍 Geocoded IMEI %s: %s", imei, address[:50] if address else "Unknown")
+        except Exception as e:
+            # Don't fail position insert if geocoding fails
+            logger.warning("⚠️  Geocoding failed for IMEI %s: %s", imei, str(e))
+        
         # Prepare position data
         position_data = {
             'device_imei': imei,
@@ -324,6 +357,7 @@ async def _upsert_positions(db: Session, locations: list[dict]) -> int:
             'acc_status': loc.get('accStatus'),
             'gps_mode': safe_int(loc.get('gpsMode')),
             'confidence': safe_int(loc.get('confidence')),
+            'address': address,  # Add reverse geocoded address
             'source': 'batch',
             'created_at': batch_ts,
         }
