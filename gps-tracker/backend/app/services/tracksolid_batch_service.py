@@ -158,28 +158,33 @@ async def _fetch_oauth_token(account: str, password: str, app_key: str, app_secr
     Raises:
         Exception if API call fails
     """
+    # TrackSolid requires MD5 hash of password
+    password_md5 = hashlib.md5(password.encode()).hexdigest().lower()
     timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
     
     params = {
-        'user_id': account,
-        'user_pwd': password,
         'app_key': app_key,
+        'expires_in': str(OPEN_API_TOKEN_TTL_SECONDS),
+        'format': 'json',  # REQUIRED by TrackSolid API
+        'method': 'jimi.oauth.token.get',
+        'sign_method': 'md5',
         'timestamp': timestamp,
+        'user_id': account,
+        'user_pwd_md5': password_md5,
+        'v': '0.9',
     }
     
-    # Generate signature
+    # Generate signature (excludes 'sign' itself)
     params['sign'] = _generate_signature(params, app_secret)
     
     timeout = httpx.Timeout(READ_TIMEOUT_SECONDS, connect=CONNECT_TIMEOUT_SECONDS)
     
     async with httpx.AsyncClient(timeout=timeout) as client:
         logger.info("🔑 TrackSolid: Fetching OAuth token...")
+        # Use POST with data (not params in URL)
         response = await client.post(
             f"{OPEN_API_BASE_URL}",
-            params={
-                'method': 'jimi.oauth.token.get',
-                **params
-            }
+            data=params  # Changed from params= to data=
         )
         response.raise_for_status()
         data = response.json()
