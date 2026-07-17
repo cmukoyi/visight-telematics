@@ -216,7 +216,7 @@ def _load_config(db: Session, tenant_id: Optional[str] = None) -> EngineConfig:
             air_speed_kmh=global_config.engine_air_speed_kmh,
             air_min_distance_km=global_config.engine_air_min_distance_km,
             journey_break_dwell_min=global_config.engine_journey_break_dwell_min,
-            settle_min_dwell_min=getattr(global_config, 'engine_settle_min_dwell_min', DEFAULT_SETTLE_MIN_DWELL_MIN),
+            settle_min_dwell_min=global_config.engine_settle_min_dwell_min,
             smoothing_window=global_config.engine_smoothing_window,
         )
     else:

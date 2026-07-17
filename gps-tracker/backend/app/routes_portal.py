@@ -1766,6 +1766,8 @@ class PortalTagOut(BaseModel):
     # Category (from attributes.category.value)
     category_id: Optional[str] = None
     category_name: Optional[str] = None
+    # Trip engine subscription
+    trip_subscribed: bool = False
     # Activity status derived from last_seen (real GPS-fix age):
     #   active  : reported within last 24 h
     #   idle    : reported within last 7 days but not within 24 h
@@ -1858,6 +1860,14 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
         .all()
     )
 
+    # Build DeviceState lookup for trip_subscribed field
+    device_state_map = {}
+    imeis = [tag.imei for tag in tags]
+    if imeis:
+        states = db.query(DeviceState).filter(DeviceState.device_imei.in_(imeis)).all()
+        for state in states:
+            device_state_map[state.device_imei] = state.trip_subscribed
+
     # Some group-scoped tags are included via attributes._created_usergroup_id
     # and may belong to users outside the current domain filter. Resolve those
     # owner emails as well so response model validation never sees None.
@@ -1933,6 +1943,7 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
             activation_date=tag.activation_date,
             category_id=cat_id,
             category_name=cat_name,
+            trip_subscribed=device_state_map.get(tag.imei, False),
             activity_status=_compute_activity_status(tag.last_seen),
         ))
 

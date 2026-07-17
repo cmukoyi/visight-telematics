@@ -13764,6 +13764,10 @@ function qrOpenHelp() {
     _mhaSearchQuery = document.getElementById('mha-search-input').value.toLowerCase();
     
     _mhaAssets = _mhaAllAssets.filter(asset => {
+      // v2.1: Only show trip-subscribed assets (spec Section 3.2)
+      // Unsubscribed assets produce no trip data, listing them would be a dead end
+      if (!asset.trip_subscribed) return false;
+      
       // Search filter
       const searchMatch = !_mhaSearchQuery || 
         (asset.description || '').toLowerCase().includes(_mhaSearchQuery) ||

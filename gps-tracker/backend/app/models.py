@@ -1102,6 +1102,9 @@ class TripConfig(Base):
     # Journey grouping
     engine_journey_break_dwell_min = Column(Integer, nullable=False, default=30)
     
+    # v2.1: Settle-dwell confirmation
+    engine_settle_min_dwell_min = Column(Integer, nullable=False, default=3)
+    
     # Metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
