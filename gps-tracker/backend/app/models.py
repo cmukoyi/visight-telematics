@@ -361,6 +361,11 @@ class UserGroup(Base):
     # Tag type restrictions: list of allowed tag types ['series1', 'series2', 'series3']
     # NULL means all types allowed (default — backward-compatible).
     allowed_tag_types = Column(JSON, nullable=True)
+    
+    # v2.2 A1: Per-tenant trip engine config
+    # Coalesce floor: min interval between track.list pulls per device
+    # NULL = use global default (120 min)
+    coalesce_floor_minutes = Column(Integer, nullable=True)
 
     portal_users = relationship("PortalUser", back_populates="usergroup",
                                 cascade="all, delete-orphan")
@@ -1064,6 +1069,10 @@ class Journey(Base):
     
     # Classification
     is_air_journey = Column(Boolean, nullable=False, default=False, index=True)
+    
+    # v2.2 A4: Engine versioning - track which engine version/params created this journey
+    engine_version = Column(String(20), nullable=True)  # e.g. 'v2.1', 'v2.2'
+    engine_params = Column(JSON, nullable=True)  # Snapshot of config at creation time
     
     # Metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now())

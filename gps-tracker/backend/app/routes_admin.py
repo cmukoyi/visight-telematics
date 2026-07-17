@@ -1270,6 +1270,108 @@ async def export_trip_logs(
 
 
 # ---------------------------------------------------------------------------
+# Trip Engine Reprocess (v2.2 A4)
+# ---------------------------------------------------------------------------
+
+class TripReprocessRequest(BaseModel):
+    """Request to reprocess trip data for a device."""
+    device_imei: str
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+
+class TripReprocessResponse(BaseModel):
+    """Result of trip reprocess operation."""
+    device_imei: str
+    positions_processed: int
+    journeys_created: int
+    legs_created: int
+    stationaries_created: int
+    engine_version: str
+
+@router.post("/trips/reprocess", response_model=TripReprocessResponse)
+async def reprocess_device_trips(
+    data: TripReprocessRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Reprocess trip segmentation for a device from stored positions (A4).
+    
+    Deletes all derived trip data (journeys/legs/stationaries) and replays
+    positions through the current engine with current parameters. Use this
+    after engine updates to adopt new logic (e.g. v2.1 settle-dwell/merge/air-leg).
+    
+    **WARNING**: This is a DESTRUCTIVE operation. All existing trip data for
+    this device will be deleted and regenerated.
+    
+    Args:
+        data: Device IMEI and optional date window
+    
+    Returns:
+        Statistics about positions processed and trips created
+    
+    Note:
+        - Positions table is never modified (source of truth)
+        - Requires manager role
+        - Runs in a transaction (atomic)
+    """
+    from app.services.trip_reprocess_service import replay_device_trips, ENGINE_VERSION
+    
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires manager role")
+    
+    logger.info(
+        "🔄 Admin %s triggered reprocess for device %s (window: %s to %s)",
+        admin.email,
+        data.device_imei,
+        data.start_date,
+        data.end_date
+    )
+    
+    try:
+        # Run replay in a transaction
+        result = replay_device_trips(
+            db=db,
+            device_imei=data.device_imei,
+            start_date=data.start_date,
+            end_date=data.end_date,
+            tenant_id=None  # TODO: resolve from device's usergroup when available
+        )
+        
+        db.commit()
+        
+        logger.info(
+            "✅ Reprocess complete for %s: %d positions → %d journeys, %d legs, %d stationaries",
+            data.device_imei,
+            result["positions_processed"],
+            result["journeys_created"],
+            result["legs_created"],
+            result["stationaries_created"]
+        )
+        
+        return TripReprocessResponse(
+            device_imei=data.device_imei,
+            positions_processed=result["positions_processed"],
+            journeys_created=result["journeys_created"],
+            legs_created=result["legs_created"],
+            stationaries_created=result["stationaries_created"],
+            engine_version=ENGINE_VERSION
+        )
+        
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        db.rollback()
+        logger.error("❌ Reprocess failed for %s: %s", data.device_imei, e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Reprocess failed: {str(e)}"
+        )
+
+
+# ---------------------------------------------------------------------------
 # App Feature Flags
 # ---------------------------------------------------------------------------
 
