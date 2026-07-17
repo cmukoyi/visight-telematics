@@ -1,7 +1,7 @@
 """add settle_min_dwell config
 
-Revision ID: 057
-Revises: 056
+Revision ID: 057_add_settle_min_dwell_config
+Revises: 056_add_postgis_geometry
 Create Date: 2026-07-18 01:00:00.000000
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '057'
-down_revision = '056'
+revision = '057_add_settle_min_dwell_config'
+down_revision = '056_add_postgis_geometry'
 branch_labels = None
 depends_on = None
 
