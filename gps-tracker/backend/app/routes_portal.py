@@ -265,10 +265,7 @@ def _decode_portal_token(token: str) -> Optional[dict]:
 
 
 def get_portal_user_from_request(request: Request, db: Session) -> PortalUser:
-    """Dependency: extract and validate portal JWT, return PortalUser.
-    
-    Allows inactive users (admin impersonation tokens may target inactive accounts).
-    """
+    """Dependency: extract and validate portal JWT, return PortalUser."""
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
@@ -279,11 +276,12 @@ def get_portal_user_from_request(request: Request, db: Session) -> PortalUser:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail="Invalid or expired token")
     user = db.query(PortalUser).filter(
-        PortalUser.id == payload["portal_user_id"]
+        PortalUser.id == payload["portal_user_id"],
+        PortalUser.is_active == True,
     ).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                            detail="Portal user not found")
+                            detail="Portal user not found or inactive")
     return user
 
 
