@@ -1917,9 +1917,9 @@ def impersonate_user(
         raise HTTPException(status_code=400, detail="Cannot impersonate inactive user")
 
     # Portal dashboard uses PortalUser identities (scoped by usergroup), not mobile-user JWTs.
-    # Allow impersonating inactive portal users (admins often need to debug inactive accounts)
     portal_user = db.query(PortalUser).filter(
-        PortalUser.email == user.email
+        PortalUser.email == user.email,
+        PortalUser.is_active == True
     ).first()
     if portal_user:
         portal_secret = os.environ.get("PORTAL_SECRET_KEY") or os.environ["ADMIN_SECRET_KEY"]
