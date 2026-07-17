@@ -38,8 +38,10 @@ Filters:
 
 v2.1 Changes:
     - Settle-dwell confirmation: stops must hold ≥3 min before confirming
+    - Stationary merge: new stops within R of journey's last stop are merged (one place = one record)
     - Leg arrival fix: leg end_point set to stop candidate anchor (line reaches stop)
     - Prevents false stops from brief slowdowns (traffic lights, roundabouts)
+    - Prevents duplicate stop records from scattered position reports
 """
 
 import asyncio
@@ -574,7 +576,125 @@ class TripEngine:
         if not breaks_journey:
             self._ensure_journey_open(started_at)
         
-        # Create record
+        # v2.1: Stationary merge logic
+        # Before creating a new stationary, check if we should merge with the journey's last stationary
+        # Spec: "when persisting a confirmed Stationary, if the journey's most recent Stationary anchor 
+        # is within R, merge into it rather than inserting a new record"
+        last_stationary = None
+        if self.context.current_journey_id and not breaks_journey:
+            # Get the most recent stationary for this journey
+            last_stationary_result = self.db.execute(
+                select(Stationary)
+                .where(and_(
+                    Stationary.journey_id == self.context.current_journey_id,
+                    Stationary.device_imei == self.device_imei
+                ))
+                .order_by(Stationary.ended_at.desc())
+                .limit(1)
+            ).first()
+            
+            if last_stationary_result:
+                last_stationary = last_stationary_result[0]
+                
+                # Calculate distance between new centroid and last stationary centroid
+                merge_distance = haversine_distance(
+                    last_stationary.anchor_lat, last_stationary.anchor_lng,
+                    centroid_lat, centroid_lng
+                )
+                
+                if merge_distance <= self.config.anchor_radius_m:
+                    # MERGE: Extend existing stationary instead of creating new
+                    logger.info(
+                        "🔄 IMEI %s: Merging into existing stationary %s (%.0f m away)",
+                        self.device_imei, last_stationary.id, merge_distance
+                    )
+                    
+                    # Get all existing points from the stationary (via device_positions)
+                    existing_positions = self.db.execute(text("""
+                        SELECT lat, lng, observed_at, id
+                        FROM device_positions
+                        WHERE stationary_id = :stationary_id
+                        ORDER BY observed_at
+                    """), {"stationary_id": str(last_stationary.id)}).fetchall()
+                    
+                    # Combine with new points
+                    all_points = [(row[0], row[1], row[2], row[3]) for row in existing_positions]
+                    all_points.extend(points)
+                    
+                    # Recalculate metrics
+                    new_centroid_lat, new_centroid_lng = calculate_centroid([(p[0], p[1]) for p in all_points])
+                    new_ended_at = points[-1][2]  # Latest point from new batch
+                    new_duration_seconds = (new_ended_at - last_stationary.started_at).total_seconds()
+                    new_point_count = len(all_points)
+                    new_end_position_id = points[-1][3] if points[-1][3] else last_stationary.end_position_id
+                    
+                    # Update existing stationary
+                    last_stationary.anchor_lat = new_centroid_lat
+                    last_stationary.anchor_lng = new_centroid_lng
+                    last_stationary.ended_at = new_ended_at
+                    last_stationary.duration_seconds = int(new_duration_seconds)
+                    last_stationary.point_count = new_point_count
+                    last_stationary.end_position_id = new_end_position_id
+                    
+                    # Update geometry
+                    try:
+                        self.db.execute(text("""
+                            UPDATE stationaries 
+                            SET centroid = ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)
+                            WHERE id = :stationary_id
+                        """), {
+                            "lng": new_centroid_lng,
+                            "lat": new_centroid_lat,
+                            "stationary_id": str(last_stationary.id)
+                        })
+                    except Exception as exc:
+                        logger.warning(
+                            "⚠️  IMEI %s: Failed to update geometry for merged stationary %s: %s",
+                            self.device_imei, last_stationary.id, exc
+                        )
+                    
+                    # Link new positions to this stationary
+                    try:
+                        position_ids = [p[3] for p in points if p[3] is not None]
+                        if position_ids:
+                            placeholders = ", ".join([f":id{i}" for i in range(len(position_ids))])
+                            params = {f"id{i}": pid for i, pid in enumerate(position_ids)}
+                            params["stationary_id"] = str(last_stationary.id)
+                            
+                            self.db.execute(text(f"""
+                                UPDATE device_positions 
+                                SET stationary_id = :stationary_id
+                                WHERE id IN ({placeholders})
+                            """), params)
+                            
+                            logger.debug(
+                                "✍️  IMEI %s: Linked %d new positions to merged stationary %s",
+                                self.device_imei, len(position_ids), last_stationary.id
+                            )
+                    except Exception as exc:
+                        logger.warning(
+                            "⚠️  IMEI %s: Failed to link positions to merged stationary %s: %s",
+                            self.device_imei, last_stationary.id, exc
+                        )
+                    
+                    logger.info(
+                        "✅ IMEI %s: Merged stationary now %.0f min, %d total points",
+                        self.device_imei, new_duration_seconds / 60, new_point_count
+                    )
+                    
+                    # Update journey context
+                    self.context.last_stationary_ended_at = new_ended_at
+                    
+                    # Return the merged stationary
+                    return last_stationary
+                else:
+                    # Too far away - will create new stationary below
+                    logger.debug(
+                        "📍 IMEI %s: Last stationary %.0f m away (> R=%.0f m), creating new",
+                        self.device_imei, merge_distance, self.config.anchor_radius_m
+                    )
+        
+        # Create new stationary record (no merge)
         stationary = Stationary(
             device_imei=self.device_imei,
             anchor_lat=centroid_lat,
