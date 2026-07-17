@@ -295,7 +295,7 @@ class TrackSolidTagProvider(DeviceTagProvider):
             logger.error("TrackSolid token fetch failed: %s", exc)
             return TagValidationResult(
                 is_valid=False,
-                message="Could not connect to TrackSolid. Please try again later.",
+                message="Error. Please contact support.",
             )
 
         _, _, user_id, org_id = _creds()
@@ -329,13 +329,13 @@ class TrackSolidTagProvider(DeviceTagProvider):
             logger.error("TrackSolid equipment list HTTP error: %s", exc)
             return TagValidationResult(
                 is_valid=False,
-                message="TrackSolid API error. Please try again later.",
+                message="Error. Please contact support.",
             )
         except Exception as exc:
             logger.error("TrackSolid equipment list error: %s", exc)
             return TagValidationResult(
                 is_valid=False,
-                message="Could not reach TrackSolid. Check your connection.",
+                message="Error. Please contact support.",
             )
 
         # Parse the device list — handle both wrapped and flat response shapes
@@ -376,7 +376,7 @@ class TrackSolidTagProvider(DeviceTagProvider):
             )
         return TagValidationResult(
             is_valid=False,
-            message="Tag not supported — IMEI not found on TrackSolid account.",
+            message="Tag not supported — IMEI not found.",
         )
 
 
