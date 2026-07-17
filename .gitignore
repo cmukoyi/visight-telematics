@@ -98,5 +98,42 @@ diagnose_*.sh
 **/diagnose_*.sh
 check_*.sh
 **/check_*.sh
+compare_*.sh
+**/compare_*.sh
+
+# Test/debug Python scripts with hardcoded credentials — NEVER commit
+list_tracksolid_*.py
+test_tracksolid_*.py
+check_*.py
+test_*.py
+**/test_*.py
+**/check_*.py
+
+# Test/debug HTML/JS files — keep local only
+test_*.html
+debug_*.html
+button_test.html
+location-manager.html
+**/test_*.html
+**/debug_*.html
+diagnose_*.js
+diagnostic_*.js
+debug_*.js
+check_*.js
+fix_*.js
+quick_fix.js
+ultimate_*.js
+test_*.js
+extract_*.py
+
+# API response dumps — may contain real customer data
+*_response.json
+*_response.txt
+tracksolid_*.json
+tracksolid_*.txt
+
+# Deployment/operations docs with potential secrets
+GEOCODING_DEPLOYMENT.md
+*_DEPLOYMENT.md
 scripts/monitor-*.sh
 scripts/validate-*.sh
