@@ -1,7 +1,7 @@
 """
 Trip State Engine (Trip Engine - Section 2)
 
-Implements STATIONARY ↔ MOVE state machine from PinPlot_Trip_Engine_Spec_v2.md.
+Implements STATIONARY ↔ MOVE state machine from PinPlot_Trip_Engine_Spec_v2.1.md.
 
 Architecture:
     - Per-device displacement state machine
@@ -15,7 +15,9 @@ State Machine:
                  Beyond R → enter MOVE (leg opens)
     
     MOVE:        Accumulate points in leg buffer
-                 Last 3 points within R of each other → close leg, STATIONARY
+                 Last 3 points within R → open stop candidate (v2.1)
+                 Candidate holds ≥ settle_min_dwell_min → confirm stop, STATIONARY (v2.1)
+                 Candidate leaves R before settling → discard, continue leg (v2.1)
                  Gap timeout → force close leg, STATIONARY
 
 Rules:
@@ -23,6 +25,7 @@ Rules:
     - R = 100m (anchor radius)
     - Min leg distance = 300m (3 × R)
     - Move confirm = 150m (before emitting leg)
+    - Settle dwell = 3 min (v2.1: minimum time to confirm stop)
     - MAX_KMH = 200 (outlier gate)
     - GAP_TIMEOUT = 30 min (force close)
     - Journey grouping: 30 min dwell threshold
@@ -32,6 +35,11 @@ Filters:
     - Air legs: ≥ 300 km/h, ≥ 150 km, multi-hour gap
     - Median smoothing: window 3 on lat/lng
     - Gap policy: spatial jump = unknown-path leg, temporal gap = long stationary
+
+v2.1 Changes:
+    - Settle-dwell confirmation: stops must hold ≥3 min before confirming
+    - Leg arrival fix: leg end_point set to stop candidate anchor (line reaches stop)
+    - Prevents false stops from brief slowdowns (traffic lights, roundabouts)
 """
 
 import asyncio
@@ -66,6 +74,7 @@ DEFAULT_GAP_TIMEOUT_MIN = 30
 DEFAULT_AIR_SPEED_KMH = 300
 DEFAULT_AIR_MIN_DISTANCE_KM = 150
 DEFAULT_JOURNEY_BREAK_DWELL_MIN = 30
+DEFAULT_SETTLE_MIN_DWELL_MIN = 3  # v2.1: settle-dwell confirmation (prevent false stops)
 DEFAULT_SMOOTHING_WINDOW = 3
 
 
@@ -172,6 +181,7 @@ class EngineConfig:
     air_speed_kmh: int
     air_min_distance_km: int
     journey_break_dwell_min: int
+    settle_min_dwell_min: int  # v2.1: minimum dwell time to confirm a stop
     smoothing_window: int
 
 
@@ -201,6 +211,7 @@ def _load_config(db: Session, tenant_id: Optional[str] = None) -> EngineConfig:
             air_speed_kmh=global_config.engine_air_speed_kmh,
             air_min_distance_km=global_config.engine_air_min_distance_km,
             journey_break_dwell_min=global_config.engine_journey_break_dwell_min,
+            settle_min_dwell_min=getattr(global_config, 'engine_settle_min_dwell_min', DEFAULT_SETTLE_MIN_DWELL_MIN),
             smoothing_window=global_config.engine_smoothing_window,
         )
     else:
@@ -214,6 +225,7 @@ def _load_config(db: Session, tenant_id: Optional[str] = None) -> EngineConfig:
             air_speed_kmh=DEFAULT_AIR_SPEED_KMH,
             air_min_distance_km=DEFAULT_AIR_MIN_DISTANCE_KM,
             journey_break_dwell_min=DEFAULT_JOURNEY_BREAK_DWELL_MIN,
+            settle_min_dwell_min=DEFAULT_SETTLE_MIN_DWELL_MIN,
             smoothing_window=DEFAULT_SMOOTHING_WINDOW,
         )
     
@@ -241,6 +253,12 @@ class EngineContext:
     # MOVE state
     leg_buffer: List[Tuple[float, float, datetime, Optional[int]]] = None  # (lat, lng, observed_at, position_id)
     
+    # v2.1: Stop candidate tracking (settle-dwell confirmation)
+    stop_candidate_since: Optional[datetime] = None  # When the candidate was first detected
+    stop_candidate_lat: Optional[float] = None  # Candidate centroid
+    stop_candidate_lng: Optional[float] = None
+    stop_candidate_points: List[Tuple[float, float, datetime, Optional[int]]] = None  # Points in the candidate cluster
+    
     # Last processed
     last_processed_at: Optional[datetime] = None
     last_position_lat: Optional[float] = None
@@ -258,6 +276,8 @@ class EngineContext:
             self.anchor_points = []
         if self.leg_buffer is None:
             self.leg_buffer = []
+        if self.stop_candidate_points is None:
+            self.stop_candidate_points = []
 
 
 class TripEngine:
@@ -634,7 +654,8 @@ class TripEngine:
     def _create_leg(
         self,
         leg_buffer: List[Tuple[float, float, datetime, Optional[int]]],
-        is_air_leg: bool = False
+        is_air_leg: bool = False,
+        end_override: Optional[Tuple[float, float]] = None  # v2.1: override end point (lat, lng) for stop arrival
     ) -> Optional[Leg]:
         """
         Create a Leg record from movement buffer with filtering.
@@ -647,6 +668,8 @@ class TripEngine:
         Args:
             leg_buffer: List of (lat, lng, observed_at, position_id) tuples
             is_air_leg: Whether this is an air leg (teleport)
+            end_override: Optional (lat, lng) to use as leg end point instead of last buffer point
+                         (v2.1: for arrival at stop candidate anchor)
         
         Returns:
             Created Leg object or None if filtered out
@@ -688,6 +711,12 @@ class TripEngine:
         start_position_id = leg_buffer[0][3] if leg_buffer[0][3] else None
         end_position_id = leg_buffer[-1][3] if leg_buffer[-1][3] else None
         
+        # v2.1: Use end_override if provided (for arrival at stop candidate)
+        if end_override:
+            end_lat, end_lng = end_override
+        else:
+            end_lat, end_lng = leg_buffer[-1][0], leg_buffer[-1][1]
+        
         # Ensure journey is open
         self._ensure_journey_open(started_at)
         
@@ -701,8 +730,8 @@ class TripEngine:
             ended_at=ended_at,
             start_lat=leg_buffer[0][0],
             start_lng=leg_buffer[0][1],
-            end_lat=leg_buffer[-1][0],
-            end_lng=leg_buffer[-1][1],
+            end_lat=end_lat,
+            end_lng=end_lng,
             start_position_id=start_position_id,
             end_position_id=end_position_id,
             is_air_leg=is_air_leg,
@@ -1058,8 +1087,90 @@ class TripEngine:
             # Append to leg buffer
             self.context.leg_buffer.append((lat, lng, observed_at, position_id))
             
-            # Check if last 3 points form a new stationary (within R of each other)
-            if len(self.context.leg_buffer) >= 3:
+            # v2.1: Settle-dwell confirmation logic
+            # Check if we have an active stop candidate
+            if self.context.stop_candidate_since is not None:
+                # We have a candidate - check if current point stays within R
+                candidate_dist = haversine_distance(
+                    self.context.stop_candidate_lat, self.context.stop_candidate_lng,
+                    lat, lng
+                )
+                
+                if candidate_dist <= self.config.anchor_radius_m:
+                    # Point stays within R - fold it into the candidate
+                    self.context.stop_candidate_points.append((lat, lng, observed_at, position_id))
+                    # Recalculate candidate centroid
+                    self.context.stop_candidate_lat, self.context.stop_candidate_lng = calculate_centroid(
+                        [(p[0], p[1]) for p in self.context.stop_candidate_points]
+                    )
+                    
+                    # Check if dwell time threshold reached
+                    dwell_elapsed = (observed_at - self.context.stop_candidate_since).total_seconds() / 60.0  # minutes
+                    
+                    if dwell_elapsed >= self.config.settle_min_dwell_min:
+                        # CONFIRMED STOP: Close leg and transition to STATIONARY
+                        logger.info(
+                            "✅ IMEI %s: Stop confirmed after %.1f min dwell → close leg",
+                            self.device_imei, dwell_elapsed
+                        )
+                        
+                        # Close the leg BEFORE the candidate cluster (exclude all candidate points from leg)
+                        # Find where candidate starts in leg_buffer
+                        candidate_start_idx = len(self.context.leg_buffer) - len(self.context.stop_candidate_points)
+                        leg_points = self.context.leg_buffer[:candidate_start_idx]
+                        
+                        if len(leg_points) >= 2:
+                            # v2.1: Set leg end_point to the stop candidate anchor (so line reaches the stop)
+                            leg = self._create_leg(leg_points, is_air_leg=False, 
+                                                   end_override=(self.context.stop_candidate_lat, 
+                                                                self.context.stop_candidate_lng))
+                            if leg:
+                                result['leg_created'] = True
+                                if self.context.journey_just_created:
+                                    result['journey_created'] = True
+                        
+                        # Create stationary from candidate points
+                        stationary = self._create_stationary(self.context.stop_candidate_points, reason="settle_dwell_confirmed")
+                        if stationary:
+                            result['stationary_created'] = True
+                            if self.context.journey_just_created:
+                                result['journey_created'] = True
+                        
+                        # Transition to STATIONARY
+                        self.context.current_state = "STATIONARY"
+                        self.context.anchor_points = [self.context.stop_candidate_points[-1]]
+                        self.context.anchor_lat = self.context.stop_candidate_lat
+                        self.context.anchor_lng = self.context.stop_candidate_lng
+                        self.context.leg_buffer = []
+                        
+                        # Clear candidate
+                        self.context.stop_candidate_since = None
+                        self.context.stop_candidate_lat = None
+                        self.context.stop_candidate_lng = None
+                        self.context.stop_candidate_points = []
+                    else:
+                        # Not enough dwell yet - keep accumulating
+                        logger.debug(
+                            "⏳ IMEI %s: Stop candidate holding (%.1f/%.0f min)",
+                            self.device_imei, dwell_elapsed, self.config.settle_min_dwell_min
+                        )
+                else:
+                    # Point left R before settling - DISCARD candidate (was pass-through)
+                    logger.info(
+                        "❌ IMEI %s: Stop candidate discarded (point left R after %.1f m, needed %.0f m dwell)",
+                        self.device_imei, 
+                        (observed_at - self.context.stop_candidate_since).total_seconds() / 60.0,
+                        self.config.settle_min_dwell_min
+                    )
+                    # Keep all points in leg (candidate was just pass-through)
+                    # Clear candidate state
+                    self.context.stop_candidate_since = None
+                    self.context.stop_candidate_lat = None
+                    self.context.stop_candidate_lng = None
+                    self.context.stop_candidate_points = []
+            
+            # No active candidate - check if last 3 points form a new candidate
+            elif len(self.context.leg_buffer) >= 3:
                 last_3 = self.context.leg_buffer[-3:]
                 # Calculate pairwise distances
                 d12 = haversine_distance(last_3[0][0], last_3[0][1], last_3[1][0], last_3[1][1])
@@ -1067,38 +1178,20 @@ class TripEngine:
                 d13 = haversine_distance(last_3[0][0], last_3[0][1], last_3[2][0], last_3[2][1])
                 
                 if d12 <= self.config.anchor_radius_m and d23 <= self.config.anchor_radius_m and d13 <= self.config.anchor_radius_m:
-                    # New stationary formed: close leg
-                    logger.info(
-                        "🛑 IMEI %s: New stationary detected (last 3 points within %.0f m) → close leg",
-                        self.device_imei, self.config.anchor_radius_m
-                    )
-                    
-                    # Close the leg BEFORE the cluster (excluding all 3 clustered points per spec Section 2.3)
-                    leg_points = self.context.leg_buffer[:-3]  # Exclude all 3 clustered points (spec: "before the cluster")
-                    if len(leg_points) >= 2:
-                        leg = self._create_leg(leg_points, is_air_leg=False)
-                        if leg:
-                            result['leg_created'] = True
-                            if self.context.journey_just_created:
-                                result['journey_created'] = True
-                    
-                    # Create new stationary from last 3 points
-                    new_anchor_points = [
+                    # New stop CANDIDATE detected - open it but stay in MOVE
+                    candidate_centroid = calculate_centroid([(p[0], p[1]) for p in last_3])
+                    self.context.stop_candidate_since = observed_at
+                    self.context.stop_candidate_lat = candidate_centroid[0]
+                    self.context.stop_candidate_lng = candidate_centroid[1]
+                    self.context.stop_candidate_points = [
                         (last_3[0][0], last_3[0][1], last_3[0][2], last_3[0][3]),
                         (last_3[1][0], last_3[1][1], last_3[1][2], last_3[1][3]),
                         (last_3[2][0], last_3[2][1], last_3[2][2], last_3[2][3]),
                     ]
-                    stationary = self._create_stationary(new_anchor_points, reason="anchor_formed")
-                    if stationary:
-                        result['stationary_created'] = True
-                        if self.context.journey_just_created:
-                            result['journey_created'] = True
-                    
-                    # Return to STATIONARY
-                    self.context.current_state = "STATIONARY"
-                    self.context.anchor_points = [last_3[-1]]  # Start new anchor from last point (keep all 4 elements including position_id)
-                    self.context.anchor_lat, self.context.anchor_lng = last_3[-1][0], last_3[-1][1]
-                    self.context.leg_buffer = []
+                    logger.info(
+                        "🔵 IMEI %s: Stop candidate opened (last 3 points within %.0f m) - awaiting %.0f min settle",
+                        self.device_imei, self.config.anchor_radius_m, self.config.settle_min_dwell_min
+                    )
         
         # Update last position
         self.context.last_position_lat = lat
