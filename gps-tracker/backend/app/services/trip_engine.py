@@ -31,8 +31,9 @@ Rules:
     - Journey grouping: 30 min dwell threshold
 
 Filters:
-    - Outlier gate: > 200 km/h → air leg or discard
-    - Air legs: ≥ 300 km/h, ≥ 150 km, multi-hour gap
+    - Outlier gate: > 200 km/h → classify by 3-part AND
+    - Air legs: ≥ 300 km/h AND ≥ 150 km AND multi-hour gap (validated on real flights)
+    - GPS glitches: > 200 km/h but < 150 km → discard
     - Median smoothing: window 3 on lat/lng
     - Gap policy: spatial jump = unknown-path leg, temporal gap = long stationary
 
@@ -40,6 +41,8 @@ v2.1 Changes:
     - Settle-dwell confirmation: stops must hold ≥3 min before confirming
     - Stationary merge: new stops within R of journey's last stop are merged (one place = one record)
     - Leg arrival fix: leg end_point set to stop candidate anchor (line reaches stop)
+    - Air leg detection: 3-part AND validation (speed, distance, gap) prevents discarding real flights
+    - Great-circle geometry for air legs (straight line, path unknown)
     - Prevents false stops from brief slowdowns (traffic lights, roundabouts)
     - Prevents duplicate stop records from scattered position reports
 """
@@ -798,15 +801,25 @@ class TripEngine:
             logger.debug("⏭️  IMEI %s: Leg has <2 points, skipping", self.device_imei)
             return None
         
-        # Calculate total distance
-        total_distance_m = 0.0
-        for i in range(len(leg_buffer) - 1):
-            p1 = leg_buffer[i]
-            p2 = leg_buffer[i + 1]
-            total_distance_m += haversine_distance(p1[0], p1[1], p2[0], p2[1])
+        # Calculate distance
+        # v2.1: Air legs use great-circle distance (direct path), ground legs use cumulative
+        if is_air_leg:
+            # Great-circle distance between endpoints (spec 2.4a)
+            total_distance_m = haversine_distance(
+                leg_buffer[0][0], leg_buffer[0][1],
+                leg_buffer[-1][0], leg_buffer[-1][1]
+            )
+        else:
+            # Cumulative distance through all points (ground travel)
+            total_distance_m = 0.0
+            for i in range(len(leg_buffer) - 1):
+                p1 = leg_buffer[i]
+                p2 = leg_buffer[i + 1]
+                total_distance_m += haversine_distance(p1[0], p1[1], p2[0], p2[1])
         
         # Filter: Move confirmation (must travel at least move_confirm_m)
-        if total_distance_m < self.config.move_confirm_m:
+        # Skip for air legs (they're already validated by 150km threshold)
+        if not is_air_leg and total_distance_m < self.config.move_confirm_m:
             logger.debug(
                 "⏭️  IMEI %s: Leg %.0f m < move_confirm %.0f m, discarding",
                 self.device_imei, total_distance_m, self.config.move_confirm_m
@@ -863,37 +876,56 @@ class TripEngine:
         self.db.flush()  # Get ID without committing
         
         # Build PostGIS geometry for the leg path
-        # Create LineString from all points in leg_buffer using ST_MakeLine
+        # v2.1: Air legs use great-circle (straight line), ground legs use all points
         try:
-            # Build array of points for ST_MakeLine: ARRAY[ST_MakePoint(lng, lat), ...]
-            # Note: PostGIS uses (lng, lat) order, not (lat, lng)
-            points_array = ", ".join([
-                f"ST_MakePoint({p[1]}, {p[0]})"  # lng, lat
-                for p in leg_buffer
-            ])
-            
-            # Create full-resolution path
-            self.db.execute(text(f"""
-                UPDATE legs 
-                SET path = ST_SetSRID(ST_MakeLine(ARRAY[{points_array}]), 4326)
-                WHERE id = :leg_id
-            """), {"leg_id": str(leg.id)})
-            
-            # Create simplified path using Douglas-Peucker algorithm
-            # Tolerance of 0.0001 degrees ≈ 11m at equator (good for zoom level 12-15)
-            self.db.execute(text(f"""
-                UPDATE legs 
-                SET path_simplified = ST_Simplify(
-                    ST_SetSRID(ST_MakeLine(ARRAY[{points_array}]), 4326),
-                    0.0001
+            if is_air_leg:
+                # Air leg: Straight line between endpoints (great-circle, path unknown per spec 2.4a)
+                # Only use start and end points, ignore any intermediate points
+                start_point = f"ST_MakePoint({leg_buffer[0][1]}, {leg_buffer[0][0]})"  # lng, lat
+                end_point = f"ST_MakePoint({leg_buffer[-1][1]}, {leg_buffer[-1][0]})"  # lng, lat
+                
+                self.db.execute(text(f"""
+                    UPDATE legs 
+                    SET path = ST_SetSRID(ST_MakeLine({start_point}, {end_point}), 4326),
+                        path_simplified = ST_SetSRID(ST_MakeLine({start_point}, {end_point}), 4326)
+                    WHERE id = :leg_id
+                """), {"leg_id": str(leg.id)})
+                
+                logger.debug(
+                    "✈️  IMEI %s: Air leg %s geometry created (great-circle)",
+                    self.device_imei, leg.id
                 )
-                WHERE id = :leg_id
-            """), {"leg_id": str(leg.id)})
-            
-            logger.debug(
-                "📐 IMEI %s: Leg %s geometry created (%d points → simplified)",
-                self.device_imei, leg.id, point_count
-            )
+            else:
+                # Ground leg: Full path through all points
+                # Build array of points for ST_MakeLine: ARRAY[ST_MakePoint(lng, lat), ...]
+                # Note: PostGIS uses (lng, lat) order, not (lat, lng)
+                points_array = ", ".join([
+                    f"ST_MakePoint({p[1]}, {p[0]})"  # lng, lat
+                    for p in leg_buffer
+                ])
+                
+                # Create full-resolution path
+                self.db.execute(text(f"""
+                    UPDATE legs 
+                    SET path = ST_SetSRID(ST_MakeLine(ARRAY[{points_array}]), 4326)
+                    WHERE id = :leg_id
+                """), {"leg_id": str(leg.id)})
+                
+                # Create simplified path using Douglas-Peucker algorithm
+                # Tolerance of 0.0001 degrees ≈ 11m at equator (good for zoom level 12-15)
+                self.db.execute(text(f"""
+                    UPDATE legs 
+                    SET path_simplified = ST_Simplify(
+                        ST_SetSRID(ST_MakeLine(ARRAY[{points_array}]), 4326),
+                        0.0001
+                    )
+                    WHERE id = :leg_id
+                """), {"leg_id": str(leg.id)})
+                
+                logger.debug(
+                    "📐 IMEI %s: Leg %s geometry created (%d points → simplified)",
+                    self.device_imei, leg.id, point_count
+                )
         except Exception as exc:
             logger.warning(
                 "⚠️  IMEI %s: Failed to create geometry for leg %s: %s",
@@ -1078,13 +1110,22 @@ class TripEngine:
         if time_diff_seconds > 0:
             implied_speed_kmh = (distance_m / time_diff_seconds) * 3.6
         
-        # Step 1: Outlier/air gate
+        # Step 1: Outlier/air gate (spec Section 2.3, 2.4a)
         if implied_speed_kmh > self.config.max_speed_kmh:
-            if distance_m >= self.config.air_min_distance_km * 1000:
-                # Air leg: Create leg from last to current with is_air_leg=True
+            # v2.1: 3-part AND for air leg classification (prevents discarding real flights)
+            # Spec 2.4a: "glitches are fast but short (sub-100 km, sub-minute)"
+            distance_km = distance_m / 1000
+            time_diff_hours = time_diff_seconds / 3600
+            
+            is_air_speed = implied_speed_kmh >= self.config.air_speed_kmh  # ≥300 km/h
+            is_air_distance = distance_km >= self.config.air_min_distance_km  # ≥150 km
+            is_multi_hour_gap = time_diff_hours >= 1.0  # Multi-hour reporting gap
+            
+            if is_air_speed and is_air_distance and is_multi_hour_gap:
+                # AIR LEG: All 3 conditions met (validated on Dublin⇄Split flights)
                 logger.info(
-                    "✈️  IMEI %s: Air leg detected: %.0f km @ %.0f km/h",
-                    self.device_imei, distance_m / 1000, implied_speed_kmh
+                    "✈️  IMEI %s: Air leg detected: %.0f km @ %.0f km/h over %.1f hr gap",
+                    self.device_imei, distance_km, implied_speed_kmh, time_diff_hours
                 )
                 
                 # If in MOVE state, close current leg first
@@ -1096,7 +1137,7 @@ class TripEngine:
                             result['journey_created'] = True
                     self.context.leg_buffer = []
                 
-                # Create air leg
+                # Create air leg (endpoints = last pre-silence & first post-silence)
                 air_leg_buffer = [
                     (self.context.last_position_lat, self.context.last_position_lng, 
                      self.context.last_position_time, self.context.last_position_id),
@@ -1109,18 +1150,27 @@ class TripEngine:
                     if self.context.journey_just_created:
                         result['journey_created'] = True
                 
-                # Start new stationary at destination
+                # Start new stationary at destination (arrival airport)
                 self.context.current_state = "STATIONARY"
                 self.context.anchor_lat = lat
                 self.context.anchor_lng = lng
                 self.context.anchor_points = [(lat, lng, observed_at, position_id)]
-            else:
-                # Glitch: Discard point
+            elif distance_km < self.config.air_min_distance_km:
+                # GLITCH: Fast but short (< 150 km) → discard point
                 logger.warning(
-                    "⚠️  IMEI %s: Outlier discarded: %.0f m @ %.0f km/h (glitch)",
+                    "⚠️  IMEI %s: GPS glitch discarded: %.0f m @ %.0f km/h (fast but short)",
                     self.device_imei, distance_m, implied_speed_kmh
                 )
                 return result
+            else:
+                # OUTLIER: Fast and far but missing other air leg criteria
+                # Could be data error, treat as unknown-path leg
+                logger.warning(
+                    "⚠️  IMEI %s: High-speed outlier: %.0f km @ %.0f km/h over %.1f hr (not air leg)",
+                    self.device_imei, distance_km, implied_speed_kmh, time_diff_hours
+                )
+                # Let it fall through to be processed as spatial gap
+
         
         # Step 2: Gap timeout check
         if self.context.current_state == "MOVE" and time_diff_seconds > self.config.gap_timeout_min * 60:
