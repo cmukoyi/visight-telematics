@@ -167,8 +167,9 @@ def replay_device_trips(
     # Step 4: Replay positions through trip engine
     logger.info("⚙️  REPROCESS: Replaying positions through engine v%s", ENGINE_VERSION)
     
-    # Create engine instance with current config (resolved per tenant via A1)
-    engine = TripEngine(db=db, device_imei=device_imei, tenant_id=tenant_id)
+    # Create engine instance with current config
+    # TODO: Pass tenant_id when TripEngine supports per-tenant config (A1)
+    engine = TripEngine(db=db, device_imei=device_imei)
     
     # Process each position
     for i, pos in enumerate(positions):
