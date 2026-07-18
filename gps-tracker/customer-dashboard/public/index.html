@@ -14107,13 +14107,27 @@ function qrOpenHelp() {
         }
       });
       
-      // End marker
+      // End marker - use last stationary's end time if journey ends with a stop, otherwise last leg
       if (data.legs && data.legs.length > 0) {
         const lastLeg = data.legs[data.legs.length - 1];
-        const endLat = lastLeg.end_lat || lastLeg.latitude;
-        const endLng = lastLeg.end_lng || lastLeg.longitude;
-        const endTime = new Date(lastLeg.ended_at).toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit', hour12: false});
-        const endAddr = lastLeg.end_address ? mhaShortAddress(lastLeg.end_address) : '';
+        const lastStat = data.stationaries && data.stationaries.length > 0 ? data.stationaries[data.stationaries.length - 1] : null;
+        
+        // Determine actual end time and location
+        let endTime, endLat, endLng, endAddr;
+        
+        if (lastStat && new Date(lastStat.ended_at) > new Date(lastLeg.ended_at)) {
+          // Journey ends with a stationary (most recent event)
+          endTime = new Date(lastStat.ended_at).toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit', hour12: false});
+          endLat = lastStat.anchor_lat || lastStat.centroid_lat || lastStat.latitude;
+          endLng = lastStat.anchor_lng || lastStat.centroid_lng || lastStat.longitude;
+          endAddr = lastStat.address ? mhaShortAddress(lastStat.address) : '';
+        } else {
+          // Journey ends with a leg (movement)
+          endTime = new Date(lastLeg.ended_at).toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit', hour12: false});
+          endLat = lastLeg.end_lat || lastLeg.latitude;
+          endLng = lastLeg.end_lng || lastLeg.longitude;
+          endAddr = lastLeg.end_address ? mhaShortAddress(lastLeg.end_address) : '';
+        }
         
         stepsHtml += `
           <div class="mha-step" onclick="mhaFocusPoint(event, ${endLat}, ${endLng}, 15)">
@@ -14400,10 +14414,25 @@ function qrOpenHelp() {
         }
       });
       
-      // End marker (red)
+      // End marker (red) - place at last stationary if journey ends with a stop, otherwise last leg
       const lastLeg = journeyData.legs[journeyData.legs.length - 1];
-      const endLat = lastLeg.end_lat || lastLeg.latitude;
-      const endLng = lastLeg.end_lng || lastLeg.longitude;
+      const lastStat = journeyData.stationaries && journeyData.stationaries.length > 0 
+        ? journeyData.stationaries[journeyData.stationaries.length - 1] 
+        : null;
+      
+      let endLat, endLng, endTime;
+      
+      if (lastStat && new Date(lastStat.ended_at) > new Date(lastLeg.ended_at)) {
+        // Journey ends with a stationary
+        endLat = lastStat.anchor_lat || lastStat.centroid_lat || lastStat.latitude;
+        endLng = lastStat.anchor_lng || lastStat.centroid_lng || lastStat.longitude;
+        endTime = new Date(lastStat.ended_at).toLocaleString();
+      } else {
+        // Journey ends with a leg
+        endLat = lastLeg.end_lat || lastLeg.latitude;
+        endLng = lastLeg.end_lng || lastLeg.longitude;
+        endTime = new Date(lastLeg.ended_at).toLocaleString();
+      }
       
       if (endLat && endLng) {
         const endMarker = L.marker([endLat, endLng], {
@@ -14416,7 +14445,7 @@ function qrOpenHelp() {
           zIndexOffset: 1000
         }).addTo(_mhaMap);
         
-        endMarker.bindPopup(`<b>End</b><br>${new Date(lastLeg.ended_at).toLocaleString()}`);
+        endMarker.bindPopup(`<b>End</b><br>${endTime}`);
         _mhaJourneyLayers.push(endMarker);
         bounds.push([endLat, endLng]);
       }
