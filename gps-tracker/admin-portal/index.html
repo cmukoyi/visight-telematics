@@ -925,6 +925,18 @@
                             <span>Languages</span>
                         </button>
                     </li>
+                    <li class="sidebar-item">
+                        <button class="sidebar-link" onclick="switchTab('device-management')">
+                            <span>🔧</span>
+                            <span>Device Management</span>
+                        </button>
+                    </li>
+                    <li class="sidebar-item">
+                        <button class="sidebar-link" onclick="switchTab('jobs')">
+                            <span>⚙️</span>
+                            <span>Background Jobs</span>
+                        </button>
+                    </li>
                 </ul>
 
                 <div style="position: absolute; bottom: 24px; left: 24px; right: 24px;">
@@ -1407,6 +1419,12 @@
                                         <select id="cgLanguage" class="form-input">
                                             <option value="en">Loading...</option>
                                         </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Trip Data Refresh Rate (minutes) <span style="font-weight:normal;color:var(--text-secondary)">(optional)</span></label>
+                                        <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 10px">Min interval between TrackSolid pulls per device. Lower = fresher data but more API calls. Leave empty for global default (120 min).</p>
+                                        <input type="number" id="cgCoalesceFloor" class="form-input" placeholder="120" min="5" max="1440">
+                                        <p style="font-size:12px;color:var(--text-secondary);margin:6px 0 0">Recommended: 60-240 minutes. Applies to all subscribed devices in this group.</p>
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">Allowed Tag Types <span style="font-weight:normal;color:var(--text-secondary)">(optional)</span></label>
@@ -2640,6 +2658,227 @@
                     </div>
                     <!-- END LANGUAGES TAB -->
 
+                    <!-- DEVICE MANAGEMENT TAB -->
+                    <div id="device-management" class="tab-content">
+                        <div class="page-header">
+                            <h2 class="page-title">🔧 Device Management</h2>
+                            <p class="page-subtitle">Backfill historical data and reprocess trips for subscribed devices</p>
+                        </div>
+
+                        <!-- Tenant Selector -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Select Tenant</h3>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">User Group (Tenant)</label>
+                                <select id="dmTenantSelect" class="form-input" onchange="loadDevicesForTenant()">
+                                    <option value="">— Select a tenant —</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Device List -->
+                        <div id="dmDeviceSection" style="display:none">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Subscribed Devices</h3>
+                                    <div style="display:flex;gap:8px">
+                                        <button class="btn btn-secondary btn-small" onclick="openBatchBackfillModal()">⬇️ Batch Backfill</button>
+                                        <button class="btn btn-secondary btn-small" onclick="openBatchReprocessModal()">🔄 Batch Reprocess</button>
+                                    </div>
+                                </div>
+                                <div id="dmAlert" class="alert" style="display:none"><span id="dmAlertText"></span></div>
+                                <div class="table-wrapper">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>IMEI</th>
+                                                <th>Name</th>
+                                                <th>Last Position</th>
+                                                <th>Last Pull</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="dmDevicesTableBody">
+                                            <tr><td colspan="5" style="text-align:center;color:var(--gray);padding:2rem">Select a tenant to view devices</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Single Device Backfill Modal -->
+                        <div id="deviceBackfillModal" class="modal">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h3 class="modal-title">Backfill Device</h3>
+                                    <button class="modal-close" onclick="closeModal('deviceBackfillModal')">×</button>
+                                </div>
+                                <div id="dbAlert" class="alert" style="display:none"><span id="dbAlertText"></span></div>
+                                <form id="deviceBackfillForm" onsubmit="submitDeviceBackfill(event)">
+                                    <div class="form-group">
+                                        <label class="form-label">Device IMEI</label>
+                                        <input type="text" id="dbImei" class="form-input" readonly>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Time Window</label>
+                                        <select id="dbPreset" class="form-input" required>
+                                            <option value="today">Today</option>
+                                            <option value="yesterday">Yesterday</option>
+                                            <option value="last_7_days" selected>Last 7 Days</option>
+                                            <option value="last_30_days">Last 30 Days</option>
+                                        </select>
+                                        <p style="font-size:12px;color:var(--gray);margin-top:6px">Fetches historical positions from TrackSolid and reprocesses trips.</p>
+                                    </div>
+                                    <div style="display:flex;gap:12px;justify-content:flex-end">
+                                        <button type="button" class="btn btn-secondary" onclick="closeModal('deviceBackfillModal')">Cancel</button>
+                                        <button type="submit" class="btn btn-primary" id="dbSubmitBtn">⬇️ Start Backfill</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- Single Device Reprocess Modal -->
+                        <div id="deviceReprocessModal" class="modal">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h3 class="modal-title">Reprocess Device</h3>
+                                    <button class="modal-close" onclick="closeModal('deviceReprocessModal')">×</button>
+                                </div>
+                                <div id="drAlert" class="alert" style="display:none"><span id="drAlertText"></span></div>
+                                <form id="deviceReprocessForm" onsubmit="submitDeviceReprocess(event)">
+                                    <div class="form-group">
+                                        <label class="form-label">Device IMEI</label>
+                                        <input type="text" id="drImei" class="form-input" readonly>
+                                    </div>
+                                    <p style="font-size:13px;color:var(--gray);margin-bottom:16px">Rebuilds trip segmentation from stored positions using the current engine version and parameters.</p>
+                                    <div style="display:flex;gap:12px;justify-content:flex-end">
+                                        <button type="button" class="btn btn-secondary" onclick="closeModal('deviceReprocessModal')">Cancel</button>
+                                        <button type="submit" class="btn btn-primary" id="drSubmitBtn">🔄 Start Reprocess</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- Batch Backfill Modal -->
+                        <div id="batchBackfillModal" class="modal">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h3 class="modal-title">Batch Backfill</h3>
+                                    <button class="modal-close" onclick="closeModal('batchBackfillModal')">×</button>
+                                </div>
+                                <div id="bbAlert" class="alert" style="display:none"><span id="bbAlertText"></span></div>
+                                <form id="batchBackfillForm" onsubmit="submitBatchBackfill(event)">
+                                    <div class="form-group">
+                                        <label class="form-label">Tenant</label>
+                                        <input type="text" id="bbTenantName" class="form-input" readonly>
+                                        <input type="hidden" id="bbTenantId">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Time Window</label>
+                                        <select id="bbPreset" class="form-input" required>
+                                            <option value="today">Today</option>
+                                            <option value="yesterday">Yesterday</option>
+                                            <option value="last_7_days" selected>Last 7 Days</option>
+                                            <option value="last_30_days">Last 30 Days</option>
+                                        </select>
+                                        <p style="font-size:12px;color:var(--gray);margin-top:6px">Backfills all subscribed devices in this tenant. Runs as background job.</p>
+                                    </div>
+                                    <div style="display:flex;gap:12px;justify-content:flex-end">
+                                        <button type="button" class="btn btn-secondary" onclick="closeModal('batchBackfillModal')">Cancel</button>
+                                        <button type="submit" class="btn btn-primary" id="bbSubmitBtn">⬇️ Queue Batch Job</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- Batch Reprocess Modal -->
+                        <div id="batchReprocessModal" class="modal">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h3 class="modal-title">Batch Reprocess</h3>
+                                    <button class="modal-close" onclick="closeModal('batchReprocessModal')">×</button>
+                                </div>
+                                <div id="brAlert" class="alert" style="display:none"><span id="brAlertText"></span></div>
+                                <form id="batchReprocessForm" onsubmit="submitBatchReprocess(event)">
+                                    <div class="form-group">
+                                        <label class="form-label">Tenant</label>
+                                        <input type="text" id="brTenantName" class="form-input" readonly>
+                                        <input type="hidden" id="brTenantId">
+                                    </div>
+                                    <p style="font-size:13px;color:var(--gray);margin-bottom:16px">Reprocesses all subscribed devices in this tenant. Runs as background job.</p>
+                                    <div style="display:flex;gap:12px;justify-content:flex-end">
+                                        <button type="button" class="btn btn-secondary" onclick="closeModal('batchReprocessModal')">Cancel</button>
+                                        <button type="submit" class="btn btn-primary" id="brSubmitBtn">🔄 Queue Batch Job</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END DEVICE MANAGEMENT TAB -->
+
+                    <!-- JOBS TAB -->
+                    <div id="jobs" class="tab-content">
+                        <div class="page-header">
+                            <h2 class="page-title">⚙️ Background Jobs</h2>
+                            <p class="page-subtitle">Monitor async backfill and reprocess operations</p>
+                            <button class="btn btn-secondary" onclick="loadJobs()">↻ Refresh</button>
+                        </div>
+
+                        <!-- Status Filter -->
+                        <div class="card">
+                            <div style="display:flex;gap:12px;align-items:center">
+                                <label class="form-label" style="margin:0">Filter by Status:</label>
+                                <select id="jobStatusFilter" class="form-input" style="width:auto" onchange="loadJobs()">
+                                    <option value="">All Statuses</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="running" selected>Running</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="failed">Failed</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Jobs List -->
+                        <div class="card">
+                            <div id="jobsAlert" class="alert" style="display:none"><span id="jobsAlertText"></span></div>
+                            <div class="table-wrapper">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Job ID</th>
+                                            <th>Type</th>
+                                            <th>Status</th>
+                                            <th>Progress</th>
+                                            <th>Created By</th>
+                                            <th>Started</th>
+                                            <th>Completed</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="jobsTableBody">
+                                        <tr><td colspan="8" style="text-align:center;color:var(--gray);padding:2rem">Click ↻ Refresh to load jobs</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Job Details Modal -->
+                        <div id="jobDetailsModal" class="modal">
+                            <div class="modal-content" style="max-width:800px">
+                                <div class="modal-header">
+                                    <h3 class="modal-title">Job Details</h3>
+                                    <button class="modal-close" onclick="closeModal('jobDetailsModal')">×</button>
+                                </div>
+                                <div id="jobDetailsContent" style="max-height:70vh;overflow-y:auto">
+                                    <p style="text-align:center;color:var(--gray);padding:2rem">Loading...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END JOBS TAB -->
+
                 </div>
             </div>
         </div>
@@ -3003,7 +3242,9 @@ dashboard.welcome,Bienvenue</pre>
                 'flutter-users': 'Manage Flutter Users',
                 'imei': 'IMEI / Tags',
                 'translations': 'Translation Manager',
-                'languages': 'Language Manager'
+                'languages': 'Language Manager',
+                'device-management': 'Device Management',
+                'jobs': 'Background Jobs'
             };
             document.getElementById('pageTitle').textContent = titles[tabName];
 
@@ -3025,6 +3266,8 @@ dashboard.welcome,Bienvenue</pre>
             if (tabName === 'imei') { loadIMEI(); }
             if (tabName === 'translations') { loadTranslations(); }
             if (tabName === 'languages') { loadLanguages(); }
+            if (tabName === 'device-management') { loadTenantOptions(); }
+            if (tabName === 'jobs') { loadJobs(); }
         }
 
         // ── BLE TAGS ─────────────────────────────────────────────────────────
@@ -3981,6 +4224,10 @@ dashboard.welcome,Bienvenue</pre>
             if (document.getElementById('cgTypeSeries2').checked) allowedTypes.push('series2');
             if (document.getElementById('cgTypeSeries3').checked) allowedTypes.push('series3');
             
+            // Parse coalesce_floor_minutes (optional Trip Engine config v2.2)
+            const coalesceFloorRaw = document.getElementById('cgCoalesceFloor').value.trim();
+            const coalesceFloor = coalesceFloorRaw ? parseInt(coalesceFloorRaw, 10) : null;
+            
             const payload = {
                 name: document.getElementById('cgName').value.trim(),
                 admin_email: document.getElementById('cgEmail').value.trim(),
@@ -3990,6 +4237,7 @@ dashboard.welcome,Bienvenue</pre>
                 package_id: document.getElementById('cgPackage').value || null,
                 allowed_tag_types: allowedTypes.length > 0 ? allowedTypes : null,
                 default_language: document.getElementById('cgLanguage').value || 'en',
+                coalesce_floor_minutes: coalesceFloor
             };
             try {
                 const res = await fetch(`${API_URL}/api/admin/usergroups`, {
@@ -4977,6 +5225,384 @@ dashboard.welcome,Bienvenue</pre>
                 _editorMap.fitBounds(bounds, { padding: [20,20] });
             };
             reader.readAsDataURL(file);
+        }
+
+        // ====================================================================
+        // DEVICE MANAGEMENT (v2.2 A6)
+        // ====================================================================
+
+        let currentTenantId = null;
+        let currentTenantName = null;
+
+        async function loadTenantOptions() {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/usergroups`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const tenants = await response.json();
+                
+                const select = document.getElementById('dmTenantSelect');
+                select.innerHTML = '<option value="">— Select a tenant —</option>' + 
+                    tenants.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+            } catch (error) {
+                console.error('Failed to load tenants:', error);
+            }
+        }
+
+        async function loadDevicesForTenant() {
+            const tenantId = document.getElementById('dmTenantSelect').value;
+            if (!tenantId) {
+                document.getElementById('dmDeviceSection').style.display = 'none';
+                return;
+            }
+
+            currentTenantId = tenantId;
+            currentTenantName = document.getElementById('dmTenantSelect').selectedOptions[0].text;
+
+            try {
+                // Get all tags for this tenant
+                const tagsResponse = await fetch(`${API_URL}/api/admin/ble-tags?limit=1000`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const allTags = await tagsResponse.json();
+                
+                // Filter by tenant and subscribed status
+                const devices = allTags.filter(tag => 
+                    tag.user_group_id === tenantId && tag.device_state?.trip_subscribed
+                );
+
+                const tbody = document.getElementById('dmDevicesTableBody');
+                if (devices.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--gray);padding:2rem">No subscribed devices found</td></tr>';
+                } else {
+                    tbody.innerHTML = devices.map(device => `
+                        <tr>
+                            <td><code>${device.imei}</code></td>
+                            <td>${device.name || '—'}</td>
+                            <td>${device.device_state?.last_position_ts ? new Date(device.device_state.last_position_ts).toLocaleString() : '—'}</td>
+                            <td>${device.device_state?.last_tracklist_pull_at ? new Date(device.device_state.last_tracklist_pull_at).toLocaleString() : '—'}</td>
+                            <td>
+                                <button class="btn btn-secondary btn-small" onclick="openDeviceBackfillModal('${device.imei}')">⬇️ Backfill</button>
+                                <button class="btn btn-secondary btn-small" onclick="openDeviceReprocessModal('${device.imei}')">🔄 Reprocess</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+
+                document.getElementById('dmDeviceSection').style.display = 'block';
+            } catch (error) {
+                console.error('Failed to load devices:', error);
+                showAlert('dmAlert', 'error', 'Failed to load devices: ' + error.message);
+            }
+        }
+
+        function openDeviceBackfillModal(imei) {
+            document.getElementById('dbImei').value = imei;
+            openModal('deviceBackfillModal');
+        }
+
+        async function submitDeviceBackfill(event) {
+            event.preventDefault();
+            const btn = document.getElementById('dbSubmitBtn');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+
+            try {
+                const response = await fetch(`${API_URL}/api/admin/trips/backfill`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        device_imei: document.getElementById('dbImei').value,
+                        preset: document.getElementById('dbPreset').value
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.detail || 'Backfill failed');
+                }
+
+                showAlert('dbAlert', 'success', `Backfill complete: ${result.positions_fetched} fetched, ${result.positions_inserted} inserted, ${result.journeys_created} journeys created`);
+                
+                setTimeout(() => {
+                    closeModal('deviceBackfillModal');
+                    loadDevicesForTenant();
+                }, 2000);
+            } catch (error) {
+                showAlert('dbAlert', 'error', error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
+        function openDeviceReprocessModal(imei) {
+            document.getElementById('drImei').value = imei;
+            openModal('deviceReprocessModal');
+        }
+
+        async function submitDeviceReprocess(event) {
+            event.preventDefault();
+            const btn = document.getElementById('drSubmitBtn');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+
+            try {
+                const response = await fetch(`${API_URL}/api/admin/trips/reprocess`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        device_imei: document.getElementById('drImei').value
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.detail || 'Reprocess failed');
+                }
+
+                showAlert('drAlert', 'success', `Reprocess complete: ${result.positions_processed} positions → ${result.journeys_created} journeys`);
+                
+                setTimeout(() => {
+                    closeModal('deviceReprocessModal');
+                    loadDevicesForTenant();
+                }, 2000);
+            } catch (error) {
+                showAlert('drAlert', 'error', error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
+        function openBatchBackfillModal() {
+            document.getElementById('bbTenantId').value = currentTenantId;
+            document.getElementById('bbTenantName').value = currentTenantName;
+            openModal('batchBackfillModal');
+        }
+
+        async function submitBatchBackfill(event) {
+            event.preventDefault();
+            const btn = document.getElementById('bbSubmitBtn');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Queueing...';
+
+            try {
+                const response = await fetch(`${API_URL}/api/admin/jobs/batch-backfill`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        tenant_id: document.getElementById('bbTenantId').value,
+                        preset: document.getElementById('bbPreset').value
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.detail || 'Failed to queue job');
+                }
+
+                showAlert('bbAlert', 'success', `Job queued successfully! ID: ${result.id}. Switch to Jobs tab to monitor progress.`);
+                
+                setTimeout(() => {
+                    closeModal('batchBackfillModal');
+                }, 2000);
+            } catch (error) {
+                showAlert('bbAlert', 'error', error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
+        function openBatchReprocessModal() {
+            document.getElementById('brTenantId').value = currentTenantId;
+            document.getElementById('brTenantName').value = currentTenantName;
+            openModal('batchReprocessModal');
+        }
+
+        async function submitBatchReprocess(event) {
+            event.preventDefault();
+            const btn = document.getElementById('brSubmitBtn');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Queueing...';
+
+            try {
+                const response = await fetch(`${API_URL}/api/admin/jobs/batch-reprocess`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        tenant_id: document.getElementById('brTenantId').value
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.detail || 'Failed to queue job');
+                }
+
+                showAlert('brAlert', 'success', `Job queued successfully! ID: ${result.id}. Switch to Jobs tab to monitor progress.`);
+                
+                setTimeout(() => {
+                    closeModal('batchReprocessModal');
+                }, 2000);
+            } catch (error) {
+                showAlert('brAlert', 'error', error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
+        // ====================================================================
+        // BACKGROUND JOBS (v2.2 A6)
+        // ====================================================================
+
+        async function loadJobs() {
+            const statusFilter = document.getElementById('jobStatusFilter').value;
+            const url = statusFilter 
+                ? `${API_URL}/api/admin/jobs?status=${statusFilter}&limit=100`
+                : `${API_URL}/api/admin/jobs?limit=100`;
+
+            try {
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const jobs = await response.json();
+
+                const tbody = document.getElementById('jobsTableBody');
+                if (jobs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--gray);padding:2rem">No jobs found</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = jobs.map(job => {
+                    const statusBadge = getJobStatusBadge(job.status);
+                    const progress = job.total_devices 
+                        ? `${job.completed_devices}/${job.total_devices} (${Math.round(job.completed_devices/job.total_devices*100)}%)`
+                        : '—';
+                    
+                    return `
+                        <tr>
+                            <td><code style="font-size:11px">${job.id.substring(0,8)}...</code></td>
+                            <td>${job.job_type.replace('batch_', '').replace('_', ' ')}</td>
+                            <td>${statusBadge}</td>
+                            <td>${progress}</td>
+                            <td>${job.created_by}</td>
+                            <td>${job.started_at ? new Date(job.started_at).toLocaleString() : '—'}</td>
+                            <td>${job.completed_at ? new Date(job.completed_at).toLocaleString() : '—'}</td>
+                            <td><button class="btn btn-secondary btn-small" onclick="viewJobDetails('${job.id}')">View</button></td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Failed to load jobs:', error);
+                showAlert('jobsAlert', 'error', 'Failed to load jobs: ' + error.message);
+            }
+        }
+
+        function getJobStatusBadge(status) {
+            const colors = {
+                pending: '#ffa500',
+                running: '#3182ce',
+                completed: '#48bb78',
+                failed: '#f44336',
+                cancelled: '#718096'
+            };
+            return `<span style="display:inline-block;padding:4px 8px;border-radius:4px;background:${colors[status] || '#ccc'};color:white;font-size:12px;font-weight:600">${status}</span>`;
+        }
+
+        async function viewJobDetails(jobId) {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/jobs/${jobId}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const job = await response.json();
+
+                const html = `
+                    <div style="padding:1rem">
+                        <h4 style="margin:0 0 16px">Job ${job.id.substring(0,8)}...</h4>
+                        
+                        <div style="display:grid;grid-template-columns:150px 1fr;gap:12px;font-size:14px">
+                            <strong>Type:</strong><span>${job.job_type}</span>
+                            <strong>Status:</strong><span>${getJobStatusBadge(job.status)}</span>
+                            <strong>Created By:</strong><span>${job.created_by}</span>
+                            <strong>Created At:</strong><span>${new Date(job.created_at).toLocaleString()}</span>
+                            <strong>Started At:</strong><span>${job.started_at ? new Date(job.started_at).toLocaleString() : '—'}</span>
+                            <strong>Completed At:</strong><span>${job.completed_at ? new Date(job.completed_at).toLocaleString() : '—'}</span>
+                            <strong>Total Devices:</strong><span>${job.total_devices || '—'}</span>
+                            <strong>Completed:</strong><span style="color:#48bb78;font-weight:600">${job.completed_devices}</span>
+                            <strong>Failed:</strong><span style="color:#f44336;font-weight:600">${job.failed_devices}</span>
+                            <strong>Last Processed:</strong><span>${job.last_processed_imei || '—'}</span>
+                        </div>
+
+                        ${job.error_message ? `
+                            <div style="margin-top:16px;padding:12px;background:#fee;border-left:4px solid #f44336;border-radius:4px">
+                                <strong style="color:#c53030">Error:</strong><br>
+                                <code style="font-size:12px">${job.error_message}</code>
+                            </div>
+                        ` : ''}
+
+                        ${job.results ? `
+                            <div style="margin-top:16px">
+                                <h5 style="margin:0 0 8px">Results:</h5>
+                                <pre style="background:#f7fafc;padding:12px;border-radius:4px;font-size:12px;overflow-x:auto">${JSON.stringify(job.results, null, 2)}</pre>
+                            </div>
+                        ` : ''}
+
+                        <div style="margin-top:16px">
+                            <h5 style="margin:0 0 8px">Parameters:</h5>
+                            <pre style="background:#f7fafc;padding:12px;border-radius:4px;font-size:12px;overflow-x:auto">${JSON.stringify(job.params, null, 2)}</pre>
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('jobDetailsContent').innerHTML = html;
+                openModal('jobDetailsModal');
+            } catch (error) {
+                console.error('Failed to load job details:', error);
+                alert('Failed to load job details: ' + error.message);
+            }
+        }
+
+        // Helper function to show alerts
+        function showAlert(elementId, type, message) {
+            const alert = document.getElementById(elementId);
+            const textEl = document.getElementById(elementId + 'Text') || alert.querySelector('span');
+            
+            alert.className = 'alert';
+            if (type === 'error') alert.classList.add('alert-error');
+            else if (type === 'success') alert.classList.add('alert-success');
+            
+            if (textEl) textEl.textContent = message;
+            else alert.textContent = message;
+            
+            alert.style.display = 'block';
+            
+            // Auto-hide success messages
+            if (type === 'success') {
+                setTimeout(() => { alert.style.display = 'none'; }, 5000);
+            }
         }
 
     </script>
