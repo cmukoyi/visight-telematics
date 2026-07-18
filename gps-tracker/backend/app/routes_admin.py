@@ -3653,14 +3653,15 @@ def list_tags_with_subscriptions(
     including their trip subscription status from device_state.
     
     Returns tags that:
-    - Belong to users in the specified user group
+    - Belong to users in the specified user group (via domain OR portal_users)
     - Have an IMEI (GPS trackers, not BLE-only tags)
     - Include trip_subscribed status from DeviceState table
     """
     get_admin_from_request(request, db)
     
-    from app.models import PortalUser, User, DeviceState
+    from app.models import PortalUser, User, DeviceState, UserGroup
     from uuid import UUID
+    from sqlalchemy import or_
     
     # Validate UUID
     try:
@@ -3668,14 +3669,35 @@ def list_tags_with_subscriptions(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid usergroup_id format")
     
-    # Get all users in this group via PortalUser table
+    # Get the user group to check for email_domain
+    group = db.query(UserGroup).filter(UserGroup.id == usergroup_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="User group not found")
+    
+    # Build list of domains for this group
+    domains = []
+    if group.email_domain:
+        domains = [d.strip().lower() for d in group.email_domain.split(',') if d.strip()]
+    
+    user_ids = []
+    
+    # Source 1: Domain-matched users (auto-assigned via email domain)
+    if domains:
+        domain_filters = [User.email.ilike(f"%@{domain}") for domain in domains]
+        domain_users = db.query(User.id).filter(or_(*domain_filters)).all()
+        user_ids.extend([str(uid[0]) for uid in domain_users])
+    
+    # Source 2: Manually assigned users (via PortalUser table)
     portal_users = (
         db.query(User.id)
         .join(PortalUser, User.email == PortalUser.email)
         .filter(PortalUser.usergroup_id == usergroup_id)
         .all()
     )
-    user_ids = [str(uid[0]) for uid in portal_users]
+    user_ids.extend([str(uid[0]) for uid in portal_users])
+    
+    # Remove duplicates
+    user_ids = list(set(user_ids))
     
     if not user_ids:
         return []
