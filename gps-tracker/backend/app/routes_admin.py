@@ -1372,6 +1372,132 @@ async def reprocess_device_trips(
 
 
 # ---------------------------------------------------------------------------
+# Trip Backfill (v2.2 A3)
+# ---------------------------------------------------------------------------
+
+class TripBackfillRequest(BaseModel):
+    """Request to backfill historical positions for a device."""
+    device_imei: str
+    preset: str  # today | yesterday | last_7_days | last_30_days
+
+class TripBackfillResponse(BaseModel):
+    """Result of trip backfill operation."""
+    device_imei: str
+    preset: str
+    window_start: datetime
+    window_end: datetime
+    clamped: bool
+    positions_fetched: int
+    positions_inserted: int
+    positions_processed: int
+    journeys_created: int
+    legs_created: int
+    stationaries_created: int
+    engine_version: str
+
+@router.post("/trips/backfill", response_model=TripBackfillResponse)
+async def backfill_device_trips(
+    data: TripBackfillRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Backfill historical positions from TrackSolid and reprocess trips (A3).
+    
+    Fetches historical GPS positions for a device using TrackSolid track.list API,
+    then reprocesses trips. The backfill window is clamped to the forward pipeline
+    high-water mark (last_position_ts) to prevent overlap with automated pulls.
+    
+    **Use cases:**
+    - Device wasn't subscribed when it moved (missing history)
+    - Gap in position data needs to be filled
+    - One-off historical analysis
+    
+    **Safe guarantees:**
+    - Never crosses forward pipeline boundary (last_position_ts)
+    - Idempotent position storage (duplicates ignored)
+    - Does NOT modify forward pipeline state
+    - Works for subscribed AND unsubscribed devices
+    
+    Args:
+        data: Device IMEI and time window preset
+    
+    Returns:
+        Statistics about positions fetched, inserted, and trips created
+    
+    Note:
+        - Requires manager role
+        - Runs async (may take several seconds for large windows)
+        - Positions are upserted (idempotent on device_imei, observed_at)
+    """
+    from app.services.trip_backfill_service import backfill_device_positions, BackfillPreset
+    
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires manager role")
+    
+    # Validate preset
+    try:
+        preset_enum = BackfillPreset(data.preset)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid preset: {data.preset}. Must be one of: today, yesterday, last_7_days, last_30_days"
+        )
+    
+    logger.info(
+        "📥 Admin %s triggered backfill for device %s (preset: %s)",
+        admin.email,
+        data.device_imei,
+        data.preset
+    )
+    
+    try:
+        # Run backfill (fetches + upserts + reprocesses)
+        result = await backfill_device_positions(
+            db=db,
+            device_imei=data.device_imei,
+            preset=preset_enum
+        )
+        
+        db.commit()
+        
+        logger.info(
+            "✅ Backfill complete for %s: %d fetched, %d inserted, %d journeys",
+            data.device_imei,
+            result["positions_fetched"],
+            result["positions_inserted"],
+            result["journeys_created"]
+        )
+        
+        return TripBackfillResponse(
+            device_imei=result["device_imei"],
+            preset=result["preset"],
+            window_start=result["window_start"],
+            window_end=result["window_end"],
+            clamped=result["clamped"],
+            positions_fetched=result["positions_fetched"],
+            positions_inserted=result["positions_inserted"],
+            positions_processed=result["positions_processed"],
+            journeys_created=result["journeys_created"],
+            legs_created=result["legs_created"],
+            stationaries_created=result["stationaries_created"],
+            engine_version=result["engine_version"]
+        )
+        
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        db.rollback()
+        logger.error("❌ Backfill failed for %s: %s", data.device_imei, e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Backfill failed: {str(e)}"
+        )
+
+
+# ---------------------------------------------------------------------------
 # App Feature Flags
 # ---------------------------------------------------------------------------
 
