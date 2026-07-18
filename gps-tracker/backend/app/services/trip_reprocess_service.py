@@ -65,6 +65,12 @@ def replay_device_trips(
         device_imei, start_date, end_date, tenant_id
     )
     
+    # v1: Full history only (windowed reprocess deferred per spec)
+    if start_date or end_date:
+        logger.warning(
+            "⚠️  REPROCESS: start_date/end_date parameters ignored in v1 (full history only)"
+        )
+    
     # Verify device exists
     tag = db.execute(
         select(BLETag).where(BLETag.imei == device_imei)
@@ -76,38 +82,19 @@ def replay_device_trips(
     # Step 1: Delete existing derived data (transactional)
     logger.info("🗑️  REPROCESS: Deleting existing derived data for %s", device_imei)
     
-    # Build delete filters
-    delete_filters = [Leg.device_imei == device_imei]
-    if start_date:
-        delete_filters.append(Leg.started_at >= start_date)
-    if end_date:
-        delete_filters.append(Leg.ended_at <= end_date)
-    
-    # Delete legs (cascade will handle associated data)
+    # Delete all legs for this device
     legs_deleted = db.execute(
-        delete(Leg).where(*delete_filters)
+        delete(Leg).where(Leg.device_imei == device_imei)
     ).rowcount
     
-    # Delete stationaries
-    stat_filters = [Stationary.device_imei == device_imei]
-    if start_date:
-        stat_filters.append(Stationary.started_at >= start_date)
-    if end_date:
-        stat_filters.append(Stationary.ended_at <= end_date)
-    
+    # Delete all stationaries
     stationaries_deleted = db.execute(
-        delete(Stationary).where(*stat_filters)
+        delete(Stationary).where(Stationary.device_imei == device_imei)
     ).rowcount
     
-    # Delete journeys
-    journey_filters = [Journey.device_imei == device_imei]
-    if start_date:
-        journey_filters.append(Journey.started_at >= start_date)
-    if end_date:
-        journey_filters.append(Journey.ended_at <= end_date)
-    
+    # Delete all journeys
     journeys_deleted = db.execute(
-        delete(Journey).where(*journey_filters)
+        delete(Journey).where(Journey.device_imei == device_imei)
     ).rowcount
     
     logger.info(
@@ -138,85 +125,28 @@ def replay_device_trips(
     
     logger.info("✅ REPROCESS: Engine state reset complete")
     
-    # Step 3: Fetch positions from DB
-    logger.info("📥 REPROCESS: Fetching positions for replay")
-    
-    position_filters = [DevicePosition.device_imei == device_imei]
-    if start_date:
-        position_filters.append(DevicePosition.observed_at >= start_date)
-    if end_date:
-        position_filters.append(DevicePosition.observed_at <= end_date)
-    
-    positions = db.execute(
-        select(DevicePosition)
-        .where(*position_filters)
-        .order_by(DevicePosition.observed_at.asc())
-    ).scalars().all()
-    
-    if not positions:
-        logger.warning("⚠️  REPROCESS: No positions found for %s in window", device_imei)
-        return {
-            "positions_processed": 0,
-            "journeys_created": 0,
-            "legs_created": 0,
-            "stationaries_created": 0
-        }
-    
-    logger.info("📥 REPROCESS: Found %d positions to replay", len(positions))
-    
-    # Step 4: Replay positions through trip engine
+    # Step 3: Replay positions through trip engine
     logger.info("⚙️  REPROCESS: Replaying positions through engine v%s", ENGINE_VERSION)
     
-    # Create engine instance with current config
-    # TODO: Pass tenant_id when TripEngine supports per-tenant config (A1)
+    # Create engine instance
     engine = TripEngine(db=db, device_imei=device_imei)
     
-    # Process each position
-    for i, pos in enumerate(positions):
-        if i % 100 == 0:
-            logger.info("⚙️  REPROCESS: Processing position %d/%d", i + 1, len(positions))
-        
-        engine.process_position(
-            lat=float(pos.latitude),
-            lng=float(pos.longitude),
-            observed_at=pos.observed_at,
-            position_id=str(pos.id)
-        )
-    
-    # Flush any remaining engine state
-    engine.flush()
-    db.flush()
-    
-    # Step 5: Count what was created
-    journeys_created = db.execute(
-        select(Journey)
-        .where(Journey.device_imei == device_imei)
-    ).scalars().all()
-    
-    legs_created = db.execute(
-        select(Leg)
-        .where(Leg.device_imei == device_imei)
-    ).scalars().all()
-    
-    stationaries_created = db.execute(
-        select(Stationary)
-        .where(Stationary.device_imei == device_imei)
-    ).scalars().all()
-    
-    result = {
-        "positions_processed": len(positions),
-        "journeys_created": len(journeys_created),
-        "legs_created": len(legs_created),
-        "stationaries_created": len(stationaries_created)
-    }
+    # Process all positions (engine_state was reset, so last_processed_at is None)
+    # This will process ALL positions for this device through the current engine
+    stats = engine.process_positions()
     
     logger.info(
         "✅ REPROCESS COMPLETE: device_imei=%s positions=%d journeys=%d legs=%d stationaries=%d",
         device_imei,
-        result["positions_processed"],
-        result["journeys_created"],
-        result["legs_created"],
-        result["stationaries_created"]
+        stats['positions_processed'],
+        stats.get('journeys_created', 0),
+        stats.get('legs_created', 0),
+        stats.get('stationaries_created', 0)
     )
     
-    return result
+    return {
+        "positions_processed": stats['positions_processed'],
+        "journeys_created": stats.get('journeys_created', 0),
+        "legs_created": stats.get('legs_created', 0),
+        "stationaries_created": stats.get('stationaries_created', 0)
+    }
