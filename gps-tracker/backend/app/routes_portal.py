@@ -18,7 +18,7 @@ import secrets
 import logging
 
 from app.database import get_db
-from app.models import UserGroup, UserGroupPackage, PortalUser, Building, Floor, IndoorGateway, Room, BLETag, User, TagCategory, GeofenceAlert, POI, POITrackerLink, GeofenceState, PortalAlert, TagIndoorPosition
+from app.models import UserGroup, UserGroupPackage, PortalUser, Building, Floor, IndoorGateway, Room, BLETag, User, TagCategory, GeofenceAlert, POI, POITrackerLink, GeofenceState, PortalAlert, TagIndoorPosition, DeviceState
 from app.models_admin import TagPackage
 from app.admin_auth import hash_password, verify_password
 from app.services.device_providers.provider_factory import DeviceProviderFactory
