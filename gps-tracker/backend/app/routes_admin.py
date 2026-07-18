@@ -18,6 +18,7 @@ from app.models_admin import (
     BillingTransaction,
     CriticalServiceAlertSubscription,
     CriticalServiceCategory,
+    AsyncJob,
 )
 from app.models import (
     AppFeatures,
@@ -1495,6 +1496,243 @@ async def backfill_device_trips(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Backfill failed: {str(e)}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Async Jobs - Batch Operations (v2.2 A5)
+# ---------------------------------------------------------------------------
+
+class BatchBackfillRequest(BaseModel):
+    """Request to backfill all subscribed devices in a tenant."""
+    tenant_id: UUID
+    preset: str  # today | yesterday | last_7_days | last_30_days
+
+class BatchReprocessRequest(BaseModel):
+    """Request to reprocess all subscribed devices in a tenant."""
+    tenant_id: UUID
+
+class AsyncJobResponse(BaseModel):
+    """Response for async job operations."""
+    id: UUID
+    job_type: str
+    status: str
+    created_by: str
+    created_at: datetime
+    started_at: Optional[datetime]
+    completed_at: Optional[datetime]
+    total_devices: Optional[int]
+    completed_devices: int
+    failed_devices: int
+    results: Optional[Dict]
+    error_message: Optional[str]
+    last_processed_imei: Optional[str]
+    
+    class Config:
+        from_attributes = True
+
+
+@router.post("/jobs/batch-backfill", response_model=AsyncJobResponse)
+async def create_batch_backfill_job(
+    data: BatchBackfillRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Create a batch backfill job for all subscribed devices in a tenant (A5).
+    
+    Queues an async background job to backfill historical positions from
+    TrackSolid for all subscribed devices in the specified tenant.
+    
+    The job runs asynchronously and can be monitored via GET /jobs/{job_id}.
+    
+    Args:
+        data: Tenant ID and time window preset
+    
+    Returns:
+        Created job with status "pending"
+    
+    Note:
+        - Requires manager role
+        - Job runs in background (non-blocking)
+        - Use GET /jobs/{job_id} to monitor progress
+        - Background worker processes jobs sequentially
+    """
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires manager role")
+    
+    # Validate tenant exists
+    tenant = db.query(UserGroup).filter(UserGroup.id == data.tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+    
+    # Validate preset
+    valid_presets = ["today", "yesterday", "last_7_days", "last_30_days"]
+    if data.preset not in valid_presets:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid preset. Must be one of: {', '.join(valid_presets)}"
+        )
+    
+    logger.info(
+        "📥 Admin %s creating batch backfill job: tenant=%s (%s), preset=%s",
+        admin.email,
+        tenant.name,
+        data.tenant_id,
+        data.preset
+    )
+    
+    # Create job
+    job = AsyncJob(
+        job_type="batch_backfill",
+        status="pending",
+        created_by=admin.email,
+        params={
+            "tenant_id": str(data.tenant_id),
+            "preset": data.preset
+        },
+        completed_devices=0,
+        failed_devices=0
+    )
+    
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    
+    logger.info("✅ Created batch backfill job %s", job.id)
+    
+    return job
+
+
+@router.post("/jobs/batch-reprocess", response_model=AsyncJobResponse)
+async def create_batch_reprocess_job(
+    data: BatchReprocessRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Create a batch reprocess job for all subscribed devices in a tenant (A5).
+    
+    Queues an async background job to reprocess trip segmentation for all
+    subscribed devices in the specified tenant.
+    
+    Use this after engine updates to adopt new logic across all tenant devices.
+    
+    Args:
+        data: Tenant ID
+    
+    Returns:
+        Created job with status "pending"
+    
+    Note:
+        - Requires manager role
+        - Job runs in background (non-blocking)
+        - Use GET /jobs/{job_id} to monitor progress
+        - Background worker processes jobs sequentially
+    """
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires manager role")
+    
+    # Validate tenant exists
+    tenant = db.query(UserGroup).filter(UserGroup.id == data.tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+    
+    logger.info(
+        "🔄 Admin %s creating batch reprocess job: tenant=%s (%s)",
+        admin.email,
+        tenant.name,
+        data.tenant_id
+    )
+    
+    # Create job
+    job = AsyncJob(
+        job_type="batch_reprocess",
+        status="pending",
+        created_by=admin.email,
+        params={
+            "tenant_id": str(data.tenant_id)
+        },
+        completed_devices=0,
+        failed_devices=0
+    )
+    
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    
+    logger.info("✅ Created batch reprocess job %s", job.id)
+    
+    return job
+
+
+@router.get("/jobs/{job_id}", response_model=AsyncJobResponse)
+async def get_job_status(
+    job_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Get status and progress of an async job.
+    
+    Args:
+        job_id: Job UUID
+    
+    Returns:
+        Job details including status, progress, and results
+    
+    Note:
+        - Requires viewer role
+        - Poll this endpoint to monitor job progress
+        - Check status field: pending | running | completed | failed | cancelled
+    """
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "viewer"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires viewer role")
+    
+    job = db.query(AsyncJob).filter(AsyncJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    
+    return job
+
+
+@router.get("/jobs", response_model=List[AsyncJobResponse])
+async def list_jobs(
+    request: Request,
+    status: Optional[str] = Query(None, description="Filter by status: pending|running|completed|failed"),
+    limit: int = Query(50, le=200, description="Max results to return"),
+    db: Session = Depends(get_db),
+):
+    """
+    List async jobs with optional filtering.
+    
+    Args:
+        status: Optional status filter
+        limit: Max results (default 50, max 200)
+    
+    Returns:
+        List of jobs ordered by created_at desc
+    
+    Note:
+        - Requires viewer role
+        - Returns most recent jobs first
+    """
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "viewer"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires viewer role")
+    
+    query = db.query(AsyncJob)
+    
+    if status:
+        if status not in ["pending", "running", "completed", "failed", "cancelled"]:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status")
+        query = query.filter(AsyncJob.status == status)
+    
+    jobs = query.order_by(AsyncJob.created_at.desc()).limit(limit).all()
+    
+    return jobs
 
 
 # ---------------------------------------------------------------------------
