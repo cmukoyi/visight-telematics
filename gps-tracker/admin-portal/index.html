@@ -5260,27 +5260,32 @@ dashboard.welcome,Bienvenue</pre>
             currentTenantName = document.getElementById('dmTenantSelect').selectedOptions[0].text;
 
             try {
-                // Get all tags for this tenant
-                const tagsResponse = await fetch(`${API_URL}/api/admin/ble-tags?limit=1000`, {
+                // Get GPS tracker tags for this tenant with trip subscription status
+                const response = await fetch(`${API_URL}/api/admin/tags-with-subscriptions?usergroup_id=${tenantId}`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
-                const allTags = await tagsResponse.json();
                 
-                // Filter by tenant and subscribed status
-                const devices = allTags.filter(tag => 
-                    tag.user_group_id === tenantId && tag.device_state?.trip_subscribed
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.statusText}`);
+                }
+                
+                const allDevices = await response.json();
+                
+                // Filter for only subscribed devices
+                const devices = allDevices.filter(device => 
+                    device.device_state && device.device_state.trip_subscribed
                 );
 
                 const tbody = document.getElementById('dmDevicesTableBody');
                 if (devices.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--gray);padding:2rem">No subscribed devices found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--gray);padding:2rem">No subscribed devices found for this tenant</td></tr>';
                 } else {
                     tbody.innerHTML = devices.map(device => `
                         <tr>
                             <td><code>${device.imei}</code></td>
-                            <td>${device.name || '—'}</td>
-                            <td>${device.device_state?.last_position_ts ? new Date(device.device_state.last_position_ts).toLocaleString() : '—'}</td>
-                            <td>${device.device_state?.last_tracklist_pull_at ? new Date(device.device_state.last_tracklist_pull_at).toLocaleString() : '—'}</td>
+                            <td>${device.device_name || device.description || '—'}</td>
+                            <td>${device.device_state?.last_position_ts || '—'}</td>
+                            <td>${device.device_state?.last_tracklist_pull_at || '—'}</td>
                             <td>
                                 <button class="btn btn-secondary btn-small" onclick="openDeviceBackfillModal('${device.imei}')">⬇️ Backfill</button>
                                 <button class="btn btn-secondary btn-small" onclick="openDeviceReprocessModal('${device.imei}')">🔄 Reprocess</button>

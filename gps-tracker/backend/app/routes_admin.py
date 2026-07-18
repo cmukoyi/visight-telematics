@@ -3641,3 +3641,87 @@ def discovered_ble_tags(
         if pos.tag_id not in registered_macs
     ]
     return discovered
+
+
+@router.get("/tags-with-subscriptions")
+def list_tags_with_subscriptions(
+    usergroup_id: str = Query(..., description="User group ID to filter tags"),
+    request: Request = None,
+    db: Session = Depends(get_db),
+):
+    """Return GPS tracker tags (with IMEIs) for a specific tenant/user group,
+    including their trip subscription status from device_state.
+    
+    Returns tags that:
+    - Belong to users in the specified user group
+    - Have an IMEI (GPS trackers, not BLE-only tags)
+    - Include trip_subscribed status from DeviceState table
+    """
+    get_admin_from_request(request, db)
+    
+    from app.models import PortalUser, User, DeviceState
+    from uuid import UUID
+    
+    # Validate UUID
+    try:
+        group_uuid = UUID(usergroup_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid usergroup_id format")
+    
+    # Get all users in this group via PortalUser table
+    portal_users = (
+        db.query(User.id)
+        .join(PortalUser, User.email == PortalUser.email)
+        .filter(PortalUser.usergroup_id == usergroup_id)
+        .all()
+    )
+    user_ids = [str(uid[0]) for uid in portal_users]
+    
+    if not user_ids:
+        return []
+    
+    # Get all tags owned by these users that have IMEIs (GPS trackers)
+    tags = (
+        db.query(BLETag)
+        .filter(
+            BLETag.user_id.in_(user_ids),
+            BLETag.imei.isnot(None),
+            BLETag.is_active == True
+        )
+        .order_by(BLETag.added_at.desc())
+        .all()
+    )
+    
+    # Build DeviceState lookup for trip_subscribed status
+    device_state_map = {}
+    imeis = [tag.imei for tag in tags if tag.imei]
+    if imeis:
+        states = db.query(DeviceState).filter(DeviceState.device_imei.in_(imeis)).all()
+        for state in states:
+            device_state_map[state.device_imei] = {
+                'trip_subscribed': state.trip_subscribed,
+                'last_position_ts': state.last_position_ts,
+                'last_tracklist_pull_at': state.last_tracklist_pull_at
+            }
+    
+    # Build response
+    result = []
+    for tag in tags:
+        device_state = device_state_map.get(tag.imei, {})
+        result.append({
+            'id': str(tag.id),
+            'imei': tag.imei,
+            'device_name': tag.device_name,
+            'description': tag.description,
+            'tag_type': tag.tag_type,
+            'is_active': tag.is_active,
+            'last_seen': tag.last_seen.isoformat() if tag.last_seen else None,
+            'battery_level': tag.battery_level,
+            'device_state': {
+                'trip_subscribed': device_state.get('trip_subscribed', False),
+                'last_position_ts': device_state.get('last_position_ts').isoformat() if device_state.get('last_position_ts') else None,
+                'last_tracklist_pull_at': device_state.get('last_tracklist_pull_at').isoformat() if device_state.get('last_tracklist_pull_at') else None
+            } if device_state else None
+        })
+    
+    return result
