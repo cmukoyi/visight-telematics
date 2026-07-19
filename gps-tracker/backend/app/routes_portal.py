@@ -2428,13 +2428,12 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
 
     # Handle trip subscription (DeviceState management)
     if data.trip_subscribed is not None:
-        device_state = db.query(DeviceState).filter(DeviceState.imei == tag.imei).first()
+        device_state = db.query(DeviceState).filter(DeviceState.device_imei == tag.imei).first()
         if data.trip_subscribed:
             # Subscribe: create or update DeviceState
             if not device_state:
                 device_state = DeviceState(
-                    imei=tag.imei,
-                    device_name=tag.description or tag.device_name or tag.imei,
+                    device_imei=tag.imei,
                     trip_subscribed=True,
                 )
                 db.add(device_state)
@@ -2550,8 +2549,7 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
     if data.trip_subscribed:
         # Create DeviceState record for Trip Engine subscription
         device_state = DeviceState(
-            imei=imei,
-            device_name=data.description or imei,
+            device_imei=imei,
             trip_subscribed=True,
         )
         db.add(device_state)
