@@ -32,6 +32,7 @@ from app.models import (
     BLETag,
     PortalAlert,
     TagIndoorPosition,
+    DeviceState,
 )
 from app.admin_auth import (
     hash_password, verify_password, create_admin_access_token,
@@ -1219,7 +1220,6 @@ async def export_trip_logs(
         tar.addfile(info, BytesIO(stats_data.encode('utf-8')))
         
         # 5. Device states (trip subscriptions)
-        from app.models import DeviceState
         device_states = db.query(DeviceState).all()
         
         states_data = f"Device States (total): {len(device_states)}\n\n"
@@ -3659,7 +3659,7 @@ def list_tags_with_subscriptions(
     """
     get_admin_from_request(request, db)
     
-    from app.models import PortalUser, User, DeviceState, UserGroup
+    from app.models import PortalUser, User, UserGroup
     from uuid import UUID
     from sqlalchemy import or_
     
