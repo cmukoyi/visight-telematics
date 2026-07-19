@@ -3163,14 +3163,20 @@ input.hive-range::-moz-range-track {
             @media(max-width:1100px) { .mha-main { flex-direction:column; } }
             
             /* Assets Panel (266px) - Collapsible */
-            .mha-assets-panel { width:266px; flex:none; background:var(--bg-2); border:1px solid var(--border); border-radius:12px; display:flex; flex-direction:column; overflow:hidden; transition:width .3s, min-width .3s; max-height:100%; }
-            .mha-assets-panel.collapsed { width:40px; min-width:40px; }
+            .mha-assets-panel { width:266px; flex:none; background:var(--bg-2); border:1px solid var(--border); border-radius:12px; display:flex; flex-direction:column; overflow:hidden; transition:all .3s cubic-bezier(0.4,0,0.2,1); max-height:100%; }
+            .mha-assets-panel.collapsed { width:0; min-width:0; opacity:0; border:none; margin:0; }
+            .mha-assets-panel.collapsed .mha-ap-head { display:none; }
             .mha-assets-panel.collapsed .mha-ap-body { display:none; }
+            
+            /* Vertical "Show Assets" button when collapsed */
+            .mha-show-assets-btn { position:absolute; left:12px; top:50%; transform:translateY(-50%); z-index:1000; writing-mode:vertical-rl; background:var(--primary); color:white; border:none; padding:12px 8px; border-radius:8px; font-size:13px; font-weight:600; letter-spacing:0.5px; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.15); transition:all .2s; display:none; }
+            .mha-assets-panel.collapsed ~ .mha-map-panel .mha-show-assets-btn { display:block; }
+            .mha-show-assets-btn:hover { background:color-mix(in srgb, var(--primary) 85%, black); box-shadow:0 4px 12px rgba(0,0,0,0.25); transform:translateY(-50%) scale(1.05); }
+            .mha-show-assets-btn i { margin-bottom:6px; font-size:15px; }
+            
             .mha-ap-head { display:flex; align-items:center; gap:9px; padding:12px 14px; border-bottom:1px solid var(--border); font-weight:500; position:relative; flex-shrink:0; }
             .mha-ap-head i.fa-tags { color:var(--primary); font-size:16px; }
             .mha-ap-head span { flex:1; }
-            .mha-assets-panel.collapsed .mha-ap-head i.fa-tags { display:none; }
-            .mha-assets-panel.collapsed .mha-ap-head span { display:none; }
             .mha-ap-collapse { width:28px; height:28px; border-radius:6px; border:1px solid var(--border); background:var(--bg-3); color:var(--text-2); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:12px; transition:all .15s; flex-shrink:0; }
             .mha-ap-collapse:hover { background:var(--primary); color:white; border-color:var(--primary); }
             .mha-ap-body { display:flex; flex-direction:column; gap:11px; padding:12px; flex:1; min-height:0; overflow:hidden; }
@@ -3218,7 +3224,7 @@ input.hive-range::-moz-range-track {
             .mha-asset-row .badge.offline { background:var(--bg-3); color:var(--text-3); }
             
             /* Map Panel (flex) */
-            .mha-map-panel { flex:1; min-width:0; background:var(--bg-2); border:1px solid var(--border); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; }
+            .mha-map-panel { flex:1; min-width:0; background:var(--bg-2); border:1px solid var(--border); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; position:relative; }
             .mha-map-head { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--border); }
             .mha-map-head .t { display:flex; align-items:center; gap:9px; font-weight:500; }
             .mha-map-head .t i { color:var(--primary); font-size:16px; }
@@ -3468,6 +3474,12 @@ input.hive-range::-moz-range-track {
                     
                     <!-- Map Panel (Phase 5.4) -->
                     <div class="mha-map-panel">
+                        <!-- Vertical "Show Assets" button (appears when panel collapsed) -->
+                        <button class="mha-show-assets-btn" onclick="mhaToggleAssetsPanel()" title="Show Assets Panel">
+                            <i class="fa-solid fa-tags"></i>
+                            SHOW ASSETS
+                        </button>
+                        
                         <div class="mha-map-head">
                             <div class="t">
                                 <i class="fa-solid fa-map"></i>
@@ -15011,14 +15023,19 @@ function qrOpenHelp() {
   window.mhaToggleAssetsPanel = function() {
     const panel = document.querySelector('.mha-assets-panel');
     const btn = document.querySelector('.mha-ap-collapse i');
+    const isCollapsed = panel.classList.contains('collapsed');
+    
     panel.classList.toggle('collapsed');
-    // Chevron-left when expanded (collapse TO left), chevron-right when collapsed (expand FROM right)
-    btn.className = panel.classList.contains('collapsed') ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-left';
+    
+    // Update chevron icon in header button (chevron-left when expanded, chevron-right when showing it will collapse)
+    if (btn) {
+      btn.className = isCollapsed ? 'fa-solid fa-chevron-left' : 'fa-solid fa-chevron-right';
+    }
     
     // Invalidate map size after transition
     setTimeout(() => {
       if (_mhaMap) _mhaMap.invalidateSize();
-    }, 300);
+    }, 350);
   };
 
   // Plot all journeys on map
