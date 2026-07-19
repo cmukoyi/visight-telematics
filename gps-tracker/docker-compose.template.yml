@@ -78,6 +78,27 @@ services:
     # The poller is async/I-O-bound; a single worker event loop handles it well.
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
 
+  worker:
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+    container_name: __TENANT_PREFIX___worker
+    env_file:
+      - ./backend/.env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - __TENANT_PREFIX___network
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      - DEBUG=False
+      - ENVIRONMENT=production
+    # Background job worker for Trip Engine v2.2 batch operations
+    # Polls async_jobs table every 5s and processes batch backfill/reprocess
+    command: python -m app.services.async_job_worker
+
   admin-portal:
     build:
       context: ./admin-portal
