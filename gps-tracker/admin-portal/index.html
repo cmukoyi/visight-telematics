@@ -5282,8 +5282,8 @@ dashboard.welcome,Bienvenue</pre>
                             ? '<span style="color:#10b981;font-weight:600">✓ Subscribed</span>'
                             : '<span style="color:#6b7280">✗ Not Subscribed</span>';
                         const toggleButton = isSubscribed
-                            ? `<button class="btn btn-secondary btn-small" onclick="toggleSubscription('${device.imei}', false)" style="background:#ef4444;border-color:#ef4444">Unsubscribe</button>`
-                            : `<button class="btn btn-secondary btn-small" onclick="toggleSubscription('${device.imei}', true)" style="background:#10b981;border-color:#10b981">Subscribe</button>`;
+                            ? `<button class="btn btn-secondary btn-small" onclick="toggleSubscription('${device.imei}', false)" style="background:#ef4444;border-color:#ef4444;padding:6px 10px;font-size:12px">Unsubscribe</button>`
+                            : `<button class="btn btn-secondary btn-small" onclick="toggleSubscription('${device.imei}', true)" style="background:#10b981;border-color:#10b981;padding:6px 10px;font-size:12px">Subscribe</button>`;
                         
                         return `
                             <tr id="device-row-${device.imei}">
@@ -5294,8 +5294,8 @@ dashboard.welcome,Bienvenue</pre>
                                 <td>${device.device_state?.last_tracklist_pull_at || '—'}</td>
                                 <td style="white-space:nowrap">
                                     <span id="subscription-toggle-${device.imei}">${toggleButton}</span>
-                                    <button class="btn btn-secondary btn-small" onclick="openDeviceBackfillModal('${device.imei}')" ${!isSubscribed ? 'disabled' : ''}>⬇️ Backfill</button>
-                                    <button class="btn btn-secondary btn-small" onclick="openDeviceReprocessModal('${device.imei}')" ${!isSubscribed ? 'disabled' : ''}>🔄 Reprocess</button>
+                                    <button class="btn btn-secondary btn-small" onclick="openDeviceBackfillModal('${device.imei}')" ${!isSubscribed ? 'disabled' : ''} style="padding:6px 10px;font-size:12px">⬇️ Backfill</button>
+                                    <button class="btn btn-secondary btn-small" onclick="openDeviceReprocessModal('${device.imei}')" ${!isSubscribed ? 'disabled' : ''} style="padding:6px 10px;font-size:12px">🔄 Reprocess</button>
                                 </td>
                             </tr>
                         `;
@@ -5333,7 +5333,7 @@ dashboard.welcome,Bienvenue</pre>
                 
                 if (subscribe) {
                     statusCell.innerHTML = '<span style="color:#10b981;font-weight:600">✓ Subscribed</span>';
-                    toggleCell.innerHTML = `<button class="btn btn-secondary btn-small" onclick="toggleSubscription('${imei}', false)" style="background:#ef4444;border-color:#ef4444">Unsubscribe</button>`;
+                    toggleCell.innerHTML = `<button class="btn btn-secondary btn-small" onclick="toggleSubscription('${imei}', false)" style="background:#ef4444;border-color:#ef4444;padding:6px 10px;font-size:12px">Unsubscribe</button>`;
                     // Enable backfill/reprocess buttons
                     row.querySelectorAll('button').forEach(btn => {
                         if (btn.textContent.includes('Backfill') || btn.textContent.includes('Reprocess')) {
@@ -5342,7 +5342,7 @@ dashboard.welcome,Bienvenue</pre>
                     });
                 } else {
                     statusCell.innerHTML = '<span style="color:#6b7280">✗ Not Subscribed</span>';
-                    toggleCell.innerHTML = `<button class="btn btn-secondary btn-small" onclick="toggleSubscription('${imei}', true)" style="background:#10b981;border-color:#10b981">Subscribe</button>`;
+                    toggleCell.innerHTML = `<button class="btn btn-secondary btn-small" onclick="toggleSubscription('${imei}', true)" style="background:#10b981;border-color:#10b981;padding:6px 10px;font-size:12px">Subscribe</button>`;
                     // Disable backfill/reprocess buttons
                     row.querySelectorAll('button').forEach(btn => {
                         if (btn.textContent.includes('Backfill') || btn.textContent.includes('Reprocess')) {
