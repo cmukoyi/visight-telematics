@@ -3981,6 +3981,15 @@ input.hive-range::-moz-range-track {
                 </select>
             </div>
             <div class="form-group">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0">
+                    <input type="checkbox" id="tagMgmtTripSubscribed" style="cursor:pointer">
+                    <span style="font-weight:600">Enable Advanced Trip Analysis</span>
+                </label>
+                <p style="font-size:12px;color:var(--text-secondary);margin:6px 0 0 24px">
+                    Subscribe this device to the Trip Engine for journey detection, stationary tracking, and Movement History Advanced features.
+                </p>
+            </div>
+            <div class="form-group">
                 <label>Assign to User</label>
                 <select id="tagMgmtUser">
                     <option value="">Loading users…</option>
@@ -5484,6 +5493,8 @@ async function openAddTagModal() {
     openModal('tagMgmtModal');
     await Promise.all([_loadMobileUsersIntoSelect(), _loadPackagesIntoSelect(), _loadCategoriesIntoSelect()]);
     document.getElementById('tagMgmtCategory').value = '';
+    // Default trip subscription to unchecked for new tags
+    document.getElementById('tagMgmtTripSubscribed').checked = false;
 }
 
 async function openAssignTagModal(tagId, currentOwner) {
@@ -5616,6 +5627,8 @@ async function openTagMgmtModal(mode, imei) {
             if (catOpt) document.getElementById('tagMgmtCategory').value = catOpt.id;
         }
     }
+    // Load trip subscription status
+    document.getElementById('tagMgmtTripSubscribed').checked = tag.trip_subscribed || false;
 }
 
 // ── Series 1 IMEI validation helpers ──────────────────────────────────────
@@ -5712,7 +5725,7 @@ async function submitTagForm(e) {
     try {
         let res;
         if (tagId && mode === 'edit') {
-            // Full edit — description, tag_type, category, user reassignment, package
+            // Full edit — description, tag_type, category, user reassignment, package, trip_subscribed
             const _pkgVal = document.getElementById('tagMgmtPackage')?.value || '';
             res = await apiFetch(`/api/portal/tags/${tagId}`, {
                 method: 'PUT',
@@ -5723,6 +5736,7 @@ async function submitTagForm(e) {
                     user_id: userId || null,
                     category: categoryName,
                     package_id: _pkgVal || null,
+                    trip_subscribed: document.getElementById('tagMgmtTripSubscribed').checked,
                 }),
             });
         } else if (tagId) {
@@ -5748,6 +5762,7 @@ async function submitTagForm(e) {
                     user_id: userId || null,
                     package_id: packageId,
                     category: categoryName,
+                    trip_subscribed: document.getElementById('tagMgmtTripSubscribed').checked,
                 }),
             });
         }

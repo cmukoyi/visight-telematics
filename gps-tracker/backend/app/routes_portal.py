@@ -2183,6 +2183,7 @@ class PortalTagCreate(BaseModel):
     user_id: Optional[UUID] = None
     package_id: UUID  # mandatory — must select a package when adding a tag
     category: Optional[str] = None  # category name to store in attributes
+    trip_subscribed: Optional[bool] = False  # subscribe to Advanced Trip Analysis
 
 
 class PortalTagAssign(BaseModel):
@@ -2336,6 +2337,7 @@ class PortalTagUpdate(BaseModel):
     user_id: Optional[str] = None
     category: Optional[str] = None  # category name; empty string clears it
     package_id: Optional[str] = None  # UUID string; empty string clears package
+    trip_subscribed: Optional[bool] = None  # subscribe to Advanced Trip Analysis
 
 
 @router.put("/tags/{tag_id}", response_model=PortalTagOut)
@@ -2423,6 +2425,25 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
                         tag.expiry_date = tag.activation_date + timedelta(days=pkg.validity_days)
                     else:
                         tag.expiry_date = None  # pending first GPS fix
+
+    # Handle trip subscription (DeviceState management)
+    if data.trip_subscribed is not None:
+        device_state = db.query(DeviceState).filter(DeviceState.imei == tag.imei).first()
+        if data.trip_subscribed:
+            # Subscribe: create or update DeviceState
+            if not device_state:
+                device_state = DeviceState(
+                    imei=tag.imei,
+                    device_name=tag.description or tag.device_name or tag.imei,
+                    trip_subscribed=True,
+                )
+                db.add(device_state)
+            else:
+                device_state.trip_subscribed = True
+        else:
+            # Unsubscribe: update or delete DeviceState
+            if device_state:
+                device_state.trip_subscribed = False
 
     db.commit()
     db.refresh(tag)
@@ -2524,6 +2545,18 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
     db.add(tag)
     db.commit()
     db.refresh(tag)
+    
+    # Handle trip subscription (DeviceState management)
+    if data.trip_subscribed:
+        # Create DeviceState record for Trip Engine subscription
+        device_state = DeviceState(
+            imei=imei,
+            device_name=data.description or imei,
+            trip_subscribed=True,
+        )
+        db.add(device_state)
+        db.commit()
+    
     return _build_tag_out(tag, target_user.email if target_user else "unknown@unknown", db)
 
 
