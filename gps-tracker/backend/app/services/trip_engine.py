@@ -1531,24 +1531,42 @@ def validate_journey_invariants(db: Session, journey_id: str) -> Dict[str, any]:
     
     # INVARIANT 3: A persisted journey has leg_count >= 1
     if journey.leg_count < 1:
-        violations.append(f\"INVARIANT 3 VIOLATION: Journey {journey_id} has leg_count={journey.leg_count} (expected >= 1)\")\n    
+        violations.append(f"INVARIANT 3 VIOLATION: Journey {journey_id} has leg_count={journey.leg_count} (expected >= 1)")
+    
     # INVARIANT 4: A persisted leg has distance_m >= MIN_LEG_DISTANCE (except unknown-path and air)
     for leg in legs:
         if leg.mode not in ('air', 'unknown-path') and leg.distance_m < DEFAULT_MIN_LEG_DISTANCE_M:
-            violations.append(\n                f\"INVARIANT 4 VIOLATION: Leg {leg.id} has distance_m={leg.distance_m} \"\n                f\"(expected >= {DEFAULT_MIN_LEG_DISTANCE_M} for mode={leg.mode})\"\n            )\n    \n    # INVARIANT 5: sum(leg.distance_m) == journey.distance_m to within rounding
+            violations.append(
+                f"INVARIANT 4 VIOLATION: Leg {leg.id} has distance_m={leg.distance_m} "
+                f"(expected >= {DEFAULT_MIN_LEG_DISTANCE_M} for mode={leg.mode})"
+            )
+    
+    # INVARIANT 5: sum(leg.distance_m) == journey.distance_m to within rounding
     total_leg_distance = sum(leg.distance_m for leg in legs)
     distance_diff = abs(total_leg_distance - journey.total_distance_m)
     tolerance = max(1.0, journey.total_distance_m * 0.01)  # 1% tolerance or 1m minimum
-    \n    if distance_diff > tolerance:
-        violations.append(\n            f\"INVARIANT 5 VIOLATION: Journey {journey_id} total_distance_m={journey.total_distance_m} \"\n            f\"but sum(legs)={total_leg_distance} (diff={distance_diff:.2f}m > tolerance={tolerance:.2f}m)\"\n        )\n    \n    # INVARIANT 6: Two consecutive stationaries in one journey are always > R apart
+    
+    if distance_diff > tolerance:
+        violations.append(
+            f"INVARIANT 5 VIOLATION: Journey {journey_id} total_distance_m={journey.total_distance_m} "
+            f"but sum(legs)={total_leg_distance} (diff={distance_diff:.2f}m > tolerance={tolerance:.2f}m)"
+        )
+    
+    # INVARIANT 6: Two consecutive stationaries in one journey are always > R apart
     for i in range(1, len(stationaries)):
         prev_stat = stationaries[i-1]
         curr_stat = stationaries[i]
-        dist = haversine_distance(\n            prev_stat.anchor_lat, prev_stat.anchor_lng,
+        dist = haversine_distance(
+            prev_stat.anchor_lat, prev_stat.anchor_lng,
             curr_stat.anchor_lat, curr_stat.anchor_lng
         )
         if dist <= DEFAULT_ANCHOR_RADIUS_M:
-            violations.append(\n                f\"INVARIANT 6 VIOLATION: Stationaries {prev_stat.id} and {curr_stat.id} \"\n                f\"are only {dist:.1f}m apart (expected > {DEFAULT_ANCHOR_RADIUS_M}m) - merge failed\"\n            )\n    \n    return {
+            violations.append(
+                f"INVARIANT 6 VIOLATION: Stationaries {prev_stat.id} and {curr_stat.id} "
+                f"are only {dist:.1f}m apart (expected > {DEFAULT_ANCHOR_RADIUS_M}m) - merge failed"
+            )
+    
+    return {
         'valid': len(violations) == 0,
         'journey_id': journey_id,
         'leg_count': len(legs),
