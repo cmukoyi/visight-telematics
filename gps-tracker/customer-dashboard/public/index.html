@@ -3188,11 +3188,20 @@ input.hive-range::-moz-range-track {
             .mha-ap-stat.act .n { color:#22c55e; }
             .mha-ap-stat.idl .n { color:#f59e0b; }
             .mha-ap-stat.off .n { color:#ef4444; }
-            .mha-ap-list { flex:1; min-height:0; overflow-y:auto; margin:2px -12px -12px; border-top:1px solid var(--border); overscroll-behavior:contain; }
-            .mha-ap-list::-webkit-scrollbar { width:6px; }
-            .mha-ap-list::-webkit-scrollbar-track { background:transparent; }
-            .mha-ap-list::-webkit-scrollbar-thumb { background:var(--border-2); border-radius:3px; }
-            .mha-ap-list::-webkit-scrollbar-thumb:hover { background:var(--text-3); }
+            .mha-ap-list { flex:1; min-height:0; overflow-y:scroll; margin:2px -12px -12px; border-top:1px solid var(--border); overscroll-behavior:contain; scrollbar-gutter:stable; position:relative; --scroll-top-opacity:0; --scroll-bottom-opacity:1; }
+            /* Always visible, prominent scrollbar */
+            .mha-ap-list::-webkit-scrollbar { width:10px; }
+            .mha-ap-list::-webkit-scrollbar-track { background:var(--bg-3); border-left:1px solid var(--border); }
+            .mha-ap-list::-webkit-scrollbar-thumb { background:var(--text-3); border-radius:5px; border:2px solid var(--bg-3); min-height:40px; }
+            .mha-ap-list::-webkit-scrollbar-thumb:hover { background:var(--primary); }
+            .mha-ap-list::-webkit-scrollbar-thumb:active { background:var(--primary); }
+            /* Firefox scrollbar */
+            .mha-ap-list { scrollbar-width:thin; scrollbar-color:var(--text-3) var(--bg-3); }
+            /* Scroll indicators - shadows at top/bottom */
+            .mha-ap-list::before,
+            .mha-ap-list::after { content:''; position:absolute; left:0; right:10px; height:16px; pointer-events:none; z-index:10; transition:opacity .2s; }
+            .mha-ap-list::before { top:0; background:linear-gradient(to bottom, var(--bg-2) 0%, transparent 100%); opacity:var(--scroll-top-opacity); }
+            .mha-ap-list::after { bottom:0; background:linear-gradient(to top, var(--bg-2) 0%, transparent 100%); opacity:var(--scroll-bottom-opacity); }
             .mha-asset-row { display:flex; align-items:center; gap:10px; padding:9px 14px; cursor:pointer; border-left:2px solid transparent; border-bottom:1px solid var(--border); transition:all .12s; }
             .mha-asset-row:hover { background:var(--bg-3); }
             .mha-asset-row.active { background:color-mix(in srgb,var(--primary) 10%,transparent); border-left-color:var(--primary); }
@@ -13609,6 +13618,39 @@ function qrOpenHelp() {
           </div>
         </div>`;
     }).join('');
+    
+    // Add scroll listener to update scroll indicators
+    mhaUpdateScrollIndicators();
+  }
+  
+  // Update scroll indicators (shadows) based on scroll position
+  function mhaUpdateScrollIndicators() {
+    const list = document.getElementById('mha-asset-list');
+    if (!list) return;
+    
+    // Remove existing listener if any
+    list.removeEventListener('scroll', mhaScrollHandler);
+    
+    // Add scroll handler
+    list.addEventListener('scroll', mhaScrollHandler);
+    
+    // Initial update
+    mhaScrollHandler.call(list);
+  }
+  
+  function mhaScrollHandler() {
+    const scrollTop = this.scrollTop;
+    const scrollHeight = this.scrollHeight;
+    const clientHeight = this.clientHeight;
+    const scrollBottom = scrollHeight - scrollTop - clientHeight;
+    
+    // Show top shadow when scrolled down (more than 10px)
+    const topShadow = scrollTop > 10 ? '1' : '0';
+    // Show bottom shadow when there's more content below (more than 10px)
+    const bottomShadow = scrollBottom > 10 ? '1' : '0';
+    
+    this.style.setProperty('--scroll-top-opacity', topShadow);
+    this.style.setProperty('--scroll-bottom-opacity', bottomShadow);
   }
 
   // Get asset status
