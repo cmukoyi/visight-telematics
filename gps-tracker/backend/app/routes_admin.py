@@ -3,7 +3,7 @@ Admin API endpoints: authentication, logging, billing, user management
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from typing import List, Optional, Dict
 from uuid import UUID
 from pydantic import BaseModel, EmailStr, field_validator
@@ -1277,8 +1277,8 @@ async def export_trip_logs(
 class TripReprocessRequest(BaseModel):
     """Request to reprocess trip data for a device."""
     device_imei: str
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
+    start_date: Optional[date] = None  # Accepts "YYYY-MM-DD" format
+    end_date: Optional[date] = None    # Accepts "YYYY-MM-DD" format
 
 class TripReprocessResponse(BaseModel):
     """Result of trip reprocess operation."""
