@@ -2682,7 +2682,7 @@
                         <div id="dmDeviceSection" style="display:none">
                             <div class="card">
                                 <div class="card-header">
-                                    <h3 class="card-title">Subscribed Devices</h3>
+                                    <h3 class="card-title">GPS Devices</h3>
                                     <div style="display:flex;gap:8px">
                                         <button class="btn btn-secondary btn-small" onclick="openBatchBackfillModal()">⬇️ Batch Backfill</button>
                                         <button class="btn btn-secondary btn-small" onclick="openBatchReprocessModal()">🔄 Batch Reprocess</button>
@@ -2695,13 +2695,14 @@
                                             <tr>
                                                 <th>IMEI</th>
                                                 <th>Name</th>
+                                                <th>Subscription Status</th>
                                                 <th>Last Position</th>
                                                 <th>Last Pull</th>
                                                 <th>Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody id="dmDevicesTableBody">
-                                            <tr><td colspan="5" style="text-align:center;color:var(--gray);padding:2rem">Select a tenant to view devices</td></tr>
+                                            <tr><td colspan="6" style="text-align:center;color:var(--gray);padding:2rem">Select a tenant to view devices</td></tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -5269,35 +5270,91 @@ dashboard.welcome,Bienvenue</pre>
                     throw new Error(`API error: ${response.statusText}`);
                 }
                 
-                const allDevices = await response.json();
-                
-                // Filter for only subscribed devices
-                const devices = allDevices.filter(device => 
-                    device.device_state && device.device_state.trip_subscribed
-                );
+                const devices = await response.json();
 
                 const tbody = document.getElementById('dmDevicesTableBody');
                 if (devices.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--gray);padding:2rem">No subscribed devices found for this tenant</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:2rem">No GPS devices found for this tenant</td></tr>';
                 } else {
-                    tbody.innerHTML = devices.map(device => `
-                        <tr>
-                            <td><code>${device.imei}</code></td>
-                            <td>${device.device_name || device.description || '—'}</td>
-                            <td>${device.device_state?.last_position_ts || '—'}</td>
-                            <td>${device.device_state?.last_tracklist_pull_at || '—'}</td>
-                            <td>
-                                <button class="btn btn-secondary btn-small" onclick="openDeviceBackfillModal('${device.imei}')">⬇️ Backfill</button>
-                                <button class="btn btn-secondary btn-small" onclick="openDeviceReprocessModal('${device.imei}')">🔄 Reprocess</button>
-                            </td>
-                        </tr>
-                    `).join('');
+                    tbody.innerHTML = devices.map(device => {
+                        const isSubscribed = device.device_state?.trip_subscribed || false;
+                        const subscriptionBadge = isSubscribed 
+                            ? '<span style="color:#10b981;font-weight:600">✓ Subscribed</span>'
+                            : '<span style="color:#6b7280">✗ Not Subscribed</span>';
+                        const toggleButton = isSubscribed
+                            ? `<button class="btn btn-secondary btn-small" onclick="toggleSubscription('${device.imei}', false)" style="background:#ef4444;border-color:#ef4444">Unsubscribe</button>`
+                            : `<button class="btn btn-secondary btn-small" onclick="toggleSubscription('${device.imei}', true)" style="background:#10b981;border-color:#10b981">Subscribe</button>`;
+                        
+                        return `
+                            <tr id="device-row-${device.imei}">
+                                <td><code>${device.imei}</code></td>
+                                <td>${device.device_name || device.description || '—'}</td>
+                                <td id="subscription-status-${device.imei}">${subscriptionBadge}</td>
+                                <td>${device.device_state?.last_position_ts || '—'}</td>
+                                <td>${device.device_state?.last_tracklist_pull_at || '—'}</td>
+                                <td style="white-space:nowrap">
+                                    <span id="subscription-toggle-${device.imei}">${toggleButton}</span>
+                                    <button class="btn btn-secondary btn-small" onclick="openDeviceBackfillModal('${device.imei}')" ${!isSubscribed ? 'disabled' : ''}>⬇️ Backfill</button>
+                                    <button class="btn btn-secondary btn-small" onclick="openDeviceReprocessModal('${device.imei}')" ${!isSubscribed ? 'disabled' : ''}>🔄 Reprocess</button>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
                 }
 
                 document.getElementById('dmDeviceSection').style.display = 'block';
             } catch (error) {
                 console.error('Failed to load devices:', error);
                 showAlert('dmAlert', 'error', 'Failed to load devices: ' + error.message);
+            }
+        }
+
+        async function toggleSubscription(imei, subscribe) {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/devices/${imei}/trip-subscription`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ trip_subscribed: subscribe })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                
+                // Update UI
+                const statusCell = document.getElementById(`subscription-status-${imei}`);
+                const toggleCell = document.getElementById(`subscription-toggle-${imei}`);
+                const row = document.getElementById(`device-row-${imei}`);
+                
+                if (subscribe) {
+                    statusCell.innerHTML = '<span style="color:#10b981;font-weight:600">✓ Subscribed</span>';
+                    toggleCell.innerHTML = `<button class="btn btn-secondary btn-small" onclick="toggleSubscription('${imei}', false)" style="background:#ef4444;border-color:#ef4444">Unsubscribe</button>`;
+                    // Enable backfill/reprocess buttons
+                    row.querySelectorAll('button').forEach(btn => {
+                        if (btn.textContent.includes('Backfill') || btn.textContent.includes('Reprocess')) {
+                            btn.disabled = false;
+                        }
+                    });
+                } else {
+                    statusCell.innerHTML = '<span style="color:#6b7280">✗ Not Subscribed</span>';
+                    toggleCell.innerHTML = `<button class="btn btn-secondary btn-small" onclick="toggleSubscription('${imei}', true)" style="background:#10b981;border-color:#10b981">Subscribe</button>`;
+                    // Disable backfill/reprocess buttons
+                    row.querySelectorAll('button').forEach(btn => {
+                        if (btn.textContent.includes('Backfill') || btn.textContent.includes('Reprocess')) {
+                            btn.disabled = true;
+                        }
+                    });
+                }
+                
+                showAlert('dmAlert', 'success', result.message);
+            } catch (error) {
+                console.error('Failed to toggle subscription:', error);
+                showAlert('dmAlert', 'error', 'Failed to update subscription: ' + error.message);
             }
         }
 

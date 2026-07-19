@@ -3747,3 +3747,64 @@ def list_tags_with_subscriptions(
         })
     
     return result
+
+
+class TripSubscriptionUpdate(BaseModel):
+    trip_subscribed: bool
+
+
+@router.put("/devices/{imei}/trip-subscription")
+def update_device_trip_subscription(
+    imei: str,
+    data: TripSubscriptionUpdate,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Update trip subscription status for a device (manager+).
+    
+    Creates DeviceState if it doesn't exist.
+    """
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=403, detail="Requires manager role")
+    
+    # Verify device exists
+    device = db.query(BLETag).filter(BLETag.imei == imei).first()
+    if not device:
+        raise HTTPException(status_code=404, detail=f"Device {imei} not found")
+    
+    # Get or create DeviceState
+    device_state = db.query(DeviceState).filter(DeviceState.device_imei == imei).first()
+    if not device_state:
+        device_state = DeviceState(
+            device_imei=imei,
+            trip_subscribed=data.trip_subscribed
+        )
+        db.add(device_state)
+        logger.info(f"Created DeviceState for {imei} with trip_subscribed={data.trip_subscribed}")
+    else:
+        old_value = device_state.trip_subscribed
+        device_state.trip_subscribed = data.trip_subscribed
+        logger.info(f"Updated {imei} trip_subscribed: {old_value} → {data.trip_subscribed}")
+    
+    db.commit()
+    
+    # Log audit
+    log_audit(
+        db,
+        str(admin.id),
+        "update_trip_subscription",
+        "DeviceState",
+        imei,
+        old_value={"trip_subscribed": not data.trip_subscribed} if device_state else None,
+        new_value={"trip_subscribed": data.trip_subscribed},
+        description=f"{'Subscribed' if data.trip_subscribed else 'Unsubscribed'} device {imei} for trip processing",
+        ip_address=request.client.host if request.client else None
+    )
+    
+    return {
+        "imei": imei,
+        "trip_subscribed": device_state.trip_subscribed,
+        "message": f"Device {'subscribed' if data.trip_subscribed else 'unsubscribed'} successfully"
+    }
