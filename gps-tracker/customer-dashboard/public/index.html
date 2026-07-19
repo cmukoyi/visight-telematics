@@ -3419,11 +3419,9 @@ input.hive-range::-moz-range-track {
                             
                             <!-- Filter Pills -->
                             <div>
-                                <div class="mha-pills">
+                                <div class="mha-pills" id="mha-category-pills">
+                                    <!-- Dynamic category pills loaded from database -->
                                     <span class="mha-pill on" data-filter="all" onclick="mhaSetFilter('all', this)">All</span>
-                                    <span class="mha-pill" data-filter="newtags" onclick="mhaSetFilter('newtags', this)">New Tags</span>
-                                    <span class="mha-pill" data-filter="parcels" onclick="mhaSetFilter('parcels', this)">Parcels</span>
-                                    <span class="mha-pill" data-filter="qr" onclick="mhaSetFilter('qr', this)">QR Code</span>
                                 </div>
                             </div>
                             
@@ -8691,6 +8689,8 @@ async function loadCategories() {
     // Refresh dynamic filter bars everywhere
     renderLmCategoryFilters();
     alRenderCategoryChips();
+    // Refresh Movement History Advanced category pills
+    if (typeof mhaRenderCategoryPills === 'function') mhaRenderCategoryPills();
 }
 
 function renderCategoriesList() {
@@ -13451,6 +13451,9 @@ function qrOpenHelp() {
     
     // Load assets (Phase 5.3)
     await mhaLoadAssets();
+    
+    // Render category filter pills from database
+    mhaRenderCategoryPills();
   };
   
   // Map style switcher for MHA Journey Map
@@ -13735,7 +13738,7 @@ function qrOpenHelp() {
     }
   };
   
-  // Category filter (All, New Tags, Parcels, QR Code)
+  // Category filter - use actual category IDs from database
   window.mhaSetFilter = function(filter, el) {
     _mhaFilter = filter;
     
@@ -13746,6 +13749,29 @@ function qrOpenHelp() {
     // Apply category filter
     mhaFilterAssets();
     console.log(`[MHA] Filter set to: ${filter}`);
+  };
+  
+  // Render category filter pills from database categories
+  window.mhaRenderCategoryPills = function() {
+    const pillsContainer = document.getElementById('mha-category-pills');
+    if (!pillsContainer) return;
+    
+    // Start with "All" pill
+    let html = '<span class="mha-pill on" data-filter="all" onclick="mhaSetFilter(\'all\', this)">All</span>';
+    
+    // Add pill for each category in cache
+    if (_categoriesCache && _categoriesCache.length > 0) {
+      _categoriesCache.forEach(cat => {
+        const color = cat.color || '#6b7280';
+        const icon = cat.icon || 'fa-tag';
+        html += `<span class="mha-pill" data-filter="${esc(cat.id)}" onclick="mhaSetFilter('${esc(cat.id)}', this)">
+          <i class="fa-solid ${esc(icon)}" style="color:${esc(color)};margin-right:4px"></i>
+          ${esc(cat.name)}
+        </span>`;
+      });
+    }
+    
+    pillsContainer.innerHTML = html;
   };
   
   // Filter assets by status
@@ -13776,12 +13802,9 @@ function qrOpenHelp() {
       
       if (!searchMatch) return false;
       
-      // Category filter
+      // Category filter - match against category_id from tag
       if (_mhaFilter !== 'all') {
-        const assetType = (asset.asset_type || '').toLowerCase();
-        if (_mhaFilter === 'newtags' && assetType !== 'newtag') return false;
-        if (_mhaFilter === 'parcels' && assetType !== 'parcel') return false;
-        if (_mhaFilter === 'qr' && assetType !== 'qr') return false;
+        if (!asset.category_id || asset.category_id !== _mhaFilter) return false;
       }
       
       // Status filter
