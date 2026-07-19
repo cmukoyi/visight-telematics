@@ -13538,6 +13538,19 @@ function qrOpenHelp() {
     _mhaMap._ppCurrentStyle = style;
   };
 
+  // Update asset's last_seen timestamp in the assets list
+  // Called after loading journeys or positions to show accurate "last reported" time
+  function mhaUpdateAssetLastSeen(imei, timestamp) {
+    if (!imei || !timestamp) return;
+    
+    const asset = _mhaAssets.find(a => a.imei === imei);
+    if (asset) {
+      asset.last_seen = timestamp;
+      mhaUpdateStats(); // Refresh active/idle/offline counts
+      mhaRenderAssetList(); // Re-render to show updated time
+    }
+  }
+
   // Phase 5.3: Load and render assets
   async function mhaLoadAssets() {
     try {
@@ -13941,6 +13954,13 @@ function qrOpenHelp() {
       if (!res.ok) throw new Error('Failed to load journeys');
       
       const data = await res.json();
+      
+      // Update asset last_seen with most recent journey timestamp
+      if (data.journeys && data.journeys.length > 0) {
+        const mostRecentJourney = data.journeys[0]; // Journeys are sorted desc by started_at
+        const latestTimestamp = mostRecentJourney.ended_at || mostRecentJourney.started_at;
+        mhaUpdateAssetLastSeen(imei, latestTimestamp);
+      }
       
       // Get range label for display
       let rangeLabel = 'last 7 days';
@@ -14875,6 +14895,13 @@ function qrOpenHelp() {
       if (!res.ok) throw new Error('Failed to load positions');
       
       const data = await res.json();
+      
+      // Update asset last_seen with most recent position timestamp
+      if (data.positions && data.positions.length > 0) {
+        // Positions are sorted by observed_at desc, so first one is most recent
+        const mostRecentPosition = data.positions[0];
+        mhaUpdateAssetLastSeen(imei, mostRecentPosition.observed_at);
+      }
       
       if (data.positions.length === 0) {
         positionsBody.innerHTML = `
