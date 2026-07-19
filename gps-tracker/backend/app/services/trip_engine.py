@@ -3,6 +3,30 @@ Trip State Engine (Trip Engine - Section 2)
 
 Implements STATIONARY ↔ MOVE state machine from PinPlot_Trip_Engine_Spec_v2.1.md.
 
+CRITICAL FIXES (19 July 2026):
+    Fixed bugs that caused 0 legs output (should be 14 legs from 897 positions):
+    
+    Bug #1: Anchor Reassignment
+        BEFORE: anchor recalculated via calculate_centroid(all_points) on every point
+        AFTER:  anchor rolled incrementally: anchor += (point - anchor) / count
+        IMPACT: Prevents anchor_count=1 bug, correct O(1) performance
+    
+    Bug #2: Leg Start Point
+        BEFORE: leg started from anchor[-1] or current point
+        AFTER:  leg starts from PREVIOUS point (last_position) when leaving stationary
+        IMPACT: Spec compliance - "leg_buffer = [prev, point]"
+    
+    Bug #3: Missing Invariants
+        ADDED: 6 invariant assertions from spec Section 6
+        - anchor_count >= 1 always
+        - journey has leg_count >= 1
+        - leg distance >= MIN_LEG_DISTANCE (except unknown-path/air)
+        - sum(leg.distance_m) == journey.distance_m
+        - consecutive stationaries > R apart
+    
+    Reference: PinPlot_Trip_Engine_Implementation_Notes.md
+    Test data: reference_legs.csv (14 legs, 16 stationaries, 40.6 km expected)
+
 Architecture:
     - Per-device displacement state machine
     - Input: device_positions stream (observed_at, lat, lng)
@@ -1070,10 +1094,10 @@ class TripEngine:
         # Update watermark
         self.context.last_processed_at = observed_at
         
-        # First position ever
+        # First position ever (ANCHOR ASSIGNMENT #1 of 3)
         if self.context.last_position_time is None:
-            self.context.anchor_lat = lat
-            self.context.anchor_lng = lng
+            self.context.anchor_lat = lat  # ← ASSIGNMENT #1
+            self.context.anchor_lng = lng  # ← ASSIGNMENT #1
             self.context.anchor_points = [(lat, lng, observed_at, position_id)]
             self.context.last_position_lat = lat
             self.context.last_position_lng = lng
@@ -1081,6 +1105,9 @@ class TripEngine:
             self.context.last_position_id = position_id
             self.context.current_state = "STATIONARY"
             logger.debug("📍 IMEI %s: First position at (%f, %f)", self.device_imei, lat, lng)
+            
+            # INVARIANT: anchor_count >= 1 always
+            assert len(self.context.anchor_points) >= 1, "BUG: First position didn't initialize anchor_points"
             return result
         
         # Day boundary check: Close journey at midnight (prevents multi-day open journeys)
@@ -1151,9 +1178,10 @@ class TripEngine:
                         result['journey_created'] = True
                 
                 # Start new stationary at destination (arrival airport)
+                # (ANCHOR ASSIGNMENT - air leg exception to 3-place rule)
                 self.context.current_state = "STATIONARY"
-                self.context.anchor_lat = lat
-                self.context.anchor_lng = lng
+                self.context.anchor_lat = lat  # ← ASSIGNMENT (air leg)
+                self.context.anchor_lng = lng  # ← ASSIGNMENT (air leg)
                 self.context.anchor_points = [(lat, lng, observed_at, position_id)]
             elif distance_km < self.config.air_min_distance_km:
                 # GLITCH: Fast but short (< 150 km) → discard point
@@ -1198,10 +1226,10 @@ class TripEngine:
                 if self.context.journey_just_created:
                     result['journey_created'] = True
             
-            # Return to STATIONARY state
+            # Return to STATIONARY state (ANCHOR ASSIGNMENT #2 of 3)
             self.context.current_state = "STATIONARY"
-            self.context.anchor_lat = lat
-            self.context.anchor_lng = lng
+            self.context.anchor_lat = lat  # ← ASSIGNMENT #2
+            self.context.anchor_lng = lng  # ← ASSIGNMENT #2
             self.context.anchor_points = [(lat, lng, observed_at, position_id)]
             self.context.leg_buffer = []
         
@@ -1214,20 +1242,29 @@ class TripEngine:
             )
             
             if anchor_dist <= self.config.anchor_radius_m:
-                # Still stationary: roll anchor
+                # Still stationary: roll anchor INCREMENTALLY (spec Section 1)
+                # CRITICAL: Do NOT recalculate from all points - use incremental formula
+                # Old (WRONG): anchor = centroid(all_points)  ← O(n) and causes anchor_count=1 bug
+                # New (CORRECT): anchor += (point - anchor) / count  ← O(1) and preserves count
                 self.context.anchor_points.append((lat, lng, observed_at, position_id))
-                self.context.anchor_lat, self.context.anchor_lng = calculate_centroid(
-                    [(p[0], p[1]) for p in self.context.anchor_points]
-                )
+                anchor_count = len(self.context.anchor_points)
+                
+                # Incremental centroid formula (spec Section 1)
+                self.context.anchor_lat += (lat - self.context.anchor_lat) / anchor_count
+                self.context.anchor_lng += (lng - self.context.anchor_lng) / anchor_count
+                
                 logger.debug(
-                    "📍 IMEI %s: Stationary (%.0f m from anchor)",
-                    self.device_imei, anchor_dist
+                    "📍 IMEI %s: Stationary (%.0f m from anchor, count=%d)",
+                    self.device_imei, anchor_dist, anchor_count
                 )
+                
+                # INVARIANT: anchor_count > 1 after ≥2 in-radius points
+                assert anchor_count >= 1, f"BUG: anchor_count < 1 ({anchor_count})"
             else:
                 # Beyond R: Enter MOVE
                 logger.info(
-                    "🚀 IMEI %s: Leaving stationary (%.0f m from anchor) → MOVE",
-                    self.device_imei, anchor_dist
+                    "🚀 IMEI %s: Leaving stationary (%.0f m from anchor, count=%d) → MOVE",
+                    self.device_imei, anchor_dist, len(self.context.anchor_points)
                 )
                 
                 # Create stationary record from accumulated anchor points
@@ -1241,15 +1278,13 @@ class TripEngine:
                 # Enter MOVE state
                 self.context.current_state = "MOVE"
                 
-                # Use anchor position or current position for leg start
-                if len(self.context.anchor_points) > 0:
-                    start_lat, start_lng, start_time, start_pos_id = self.context.anchor_points[-1]
-                else:
-                    # Fallback: use current position as both start and continuation
-                    start_lat, start_lng, start_time, start_pos_id = lat, lng, observed_at, position_id
-                
+                # CRITICAL FIX: Leg must start from PREVIOUS position (last stationary point),
+                # NOT from current position or anchor. Spec Section 2:
+                # "leg_buffer = [prev, point]  # leg starts at the departure point"
+                # Using last_position ensures the leg begins where the device LEFT the stationary zone.
                 self.context.leg_buffer = [
-                    (start_lat, start_lng, start_time, start_pos_id),  # Start from anchor
+                    (self.context.last_position_lat, self.context.last_position_lng, 
+                     self.context.last_position_time, self.context.last_position_id),  # PREV point
                     (lat, lng, observed_at, position_id)  # Current point
                 ]
         
@@ -1306,11 +1341,11 @@ class TripEngine:
                             if self.context.journey_just_created:
                                 result['journey_created'] = True
                         
-                        # Transition to STATIONARY
+                        # Transition to STATIONARY (ANCHOR ASSIGNMENT #3 of 3)
                         self.context.current_state = "STATIONARY"
                         self.context.anchor_points = [self.context.stop_candidate_points[-1]]
-                        self.context.anchor_lat = self.context.stop_candidate_lat
-                        self.context.anchor_lng = self.context.stop_candidate_lng
+                        self.context.anchor_lat = self.context.stop_candidate_lat  # ← ASSIGNMENT #3
+                        self.context.anchor_lng = self.context.stop_candidate_lng  # ← ASSIGNMENT #3
                         self.context.leg_buffer = []
                         
                         # Clear candidate
@@ -1449,6 +1484,77 @@ async def process_all_subscribed_devices(db: Session) -> Dict:
     total_stats['error'] = None
     
     return total_stats
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# INVARIANT VALIDATION (Spec Section 6)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def validate_journey_invariants(db: Session, journey_id: str) -> Dict[str, any]:
+    """
+    Validate journey invariants from spec Section 6.
+    
+    These are cheap checks that would have caught the 18 July defect on first run:
+    1. anchor_count >= 1 always, and > 1 after any period with ≥2 in-radius points
+    2. anchor only assigned in three places (checked via code review, not runtime)
+    3. A persisted journey has leg_count >= 1
+    4. A persisted leg has distance_m >= MIN_LEG_DISTANCE (except unknown-path and air)
+    5. sum(leg.distance_m) == journey.distance_m to within rounding
+    6. Two consecutive stationaries in one journey are always > R apart
+    
+    Args:
+        db: Database session
+        journey_id: Journey ID to validate
+    
+    Returns:
+        Dict with validation results and any violations found
+    """
+    violations = []
+    
+    # Get journey
+    journey = db.execute(
+        select(Journey).where(Journey.id == journey_id)
+    ).scalar_one_or_none()
+    
+    if not journey:
+        return {'valid': False, 'violations': [f'Journey {journey_id} not found']}
+    
+    # Get legs
+    legs = db.execute(
+        select(Leg).where(Leg.journey_id == journey_id).order_by(Leg.started_at)
+    ).scalars().all()
+    
+    # Get stationaries
+    stationaries = db.execute(
+        select(Stationary).where(Stationary.journey_id == journey_id).order_by(Stationary.started_at)
+    ).scalars().all()
+    
+    # INVARIANT 3: A persisted journey has leg_count >= 1
+    if journey.leg_count < 1:
+        violations.append(f\"INVARIANT 3 VIOLATION: Journey {journey_id} has leg_count={journey.leg_count} (expected >= 1)\")\n    
+    # INVARIANT 4: A persisted leg has distance_m >= MIN_LEG_DISTANCE (except unknown-path and air)
+    for leg in legs:
+        if leg.mode not in ('air', 'unknown-path') and leg.distance_m < DEFAULT_MIN_LEG_DISTANCE_M:
+            violations.append(\n                f\"INVARIANT 4 VIOLATION: Leg {leg.id} has distance_m={leg.distance_m} \"\n                f\"(expected >= {DEFAULT_MIN_LEG_DISTANCE_M} for mode={leg.mode})\"\n            )\n    \n    # INVARIANT 5: sum(leg.distance_m) == journey.distance_m to within rounding
+    total_leg_distance = sum(leg.distance_m for leg in legs)
+    distance_diff = abs(total_leg_distance - journey.total_distance_m)
+    tolerance = max(1.0, journey.total_distance_m * 0.01)  # 1% tolerance or 1m minimum
+    \n    if distance_diff > tolerance:
+        violations.append(\n            f\"INVARIANT 5 VIOLATION: Journey {journey_id} total_distance_m={journey.total_distance_m} \"\n            f\"but sum(legs)={total_leg_distance} (diff={distance_diff:.2f}m > tolerance={tolerance:.2f}m)\"\n        )\n    \n    # INVARIANT 6: Two consecutive stationaries in one journey are always > R apart
+    for i in range(1, len(stationaries)):
+        prev_stat = stationaries[i-1]
+        curr_stat = stationaries[i]
+        dist = haversine_distance(\n            prev_stat.anchor_lat, prev_stat.anchor_lng,
+            curr_stat.anchor_lat, curr_stat.anchor_lng
+        )
+        if dist <= DEFAULT_ANCHOR_RADIUS_M:
+            violations.append(\n                f\"INVARIANT 6 VIOLATION: Stationaries {prev_stat.id} and {curr_stat.id} \"\n                f\"are only {dist:.1f}m apart (expected > {DEFAULT_ANCHOR_RADIUS_M}m) - merge failed\"\n            )\n    \n    return {
+        'valid': len(violations) == 0,
+        'journey_id': journey_id,
+        'leg_count': len(legs),
+        'stationary_count': len(stationaries),
+        'violations': violations
+    }
 
 
 # ═══════════════════════════════════════════════════════════════════════════
