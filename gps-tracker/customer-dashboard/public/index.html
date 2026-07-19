@@ -13624,11 +13624,11 @@ function qrOpenHelp() {
       const name = esc(asset.description || asset.device_name || asset.imei);
       const isActive = _mhaSelectedImei === asset.imei;
       
-      // Battery (if available)
-      const battery = asset.battery_level || asset.battery;
-      const batteryClass = battery ? (battery > 20 ? 'good' : 'low') : '';
-      const batteryHtml = battery ? 
-        `<span class="batt ${batteryClass}"><i class="fa-solid fa-battery-${battery > 75 ? 'full' : battery > 50 ? 'three-quarters' : battery > 25 ? 'half' : 'quarter'}"></i>${battery}%</span>` : '';
+      // Battery (if available) - show even if 0%
+      const battery = asset.battery_level ?? asset.battery;
+      const batteryClass = battery != null ? (battery > 20 ? 'good' : 'low') : '';
+      const batteryHtml = battery != null ? 
+        `<span class="batt ${batteryClass}"><i class="fa-solid fa-battery-${battery > 75 ? 'full' : battery > 50 ? 'three-quarters' : battery > 25 ? 'half' : battery > 0 ? 'quarter' : 'empty'}"></i>${battery}%</span>` : '';
       
       return `
         <div class="mha-asset-row ${isActive ? 'active' : ''}" onclick="mhaSelectAsset('${esc(asset.imei)}')">
