@@ -21,12 +21,12 @@ import logging
 import uuid
 from datetime import datetime, timezone
 from typing import List, Dict, Optional
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db_context
 from app.models_admin import AsyncJob
-from app.models import DeviceState, BLETag
+from app.models import DeviceState, BLETag, User, PortalUser, UserGroup
 # from app.services.trip_backfill_service import backfill_device_positions, BackfillPreset  # DISABLED: Import errors
 from app.services.trip_reprocess_service import replay_device_trips
 
@@ -176,12 +176,58 @@ async def execute_batch_reprocess(job: AsyncJob, db: Session) -> None:
     
     logger.info("🔄 Executing batch reprocess job %s: tenant=%s", job.id, tenant_id)
     
-    # Get all subscribed devices for this tenant
+    # Get the user group to check for email_domain
+    group = db.query(UserGroup).filter(UserGroup.id == tenant_id).first()
+    if not group:
+        logger.error("❌ User group not found: %s", tenant_id)
+        job.status = "failed"
+        job.error_message = f"User group not found: {tenant_id}"
+        job.completed_at = datetime.now(timezone.utc)
+        db.commit()
+        return
+    
+    # Build list of domains for this group
+    domains = []
+    if group.email_domain:
+        domains = [d.strip().lower() for d in group.email_domain.split(',') if d.strip()]
+    
+    user_ids = []
+    
+    # Source 1: Domain-matched users (auto-assigned via email domain)
+    if domains:
+        domain_filters = [User.email.ilike(f"%@{domain}") for domain in domains]
+        domain_users = db.query(User.id).filter(or_(*domain_filters)).all()
+        user_ids.extend([str(uid[0]) for uid in domain_users])
+    
+    # Source 2: Manually assigned users (via PortalUser table)
+    portal_users = (
+        db.query(User.id)
+        .join(PortalUser, User.email == PortalUser.email)
+        .filter(PortalUser.usergroup_id == tenant_id)
+        .all()
+    )
+    user_ids.extend([str(uid[0]) for uid in portal_users])
+    
+    # Remove duplicates
+    user_ids = list(set(user_ids))
+    
+    if not user_ids:
+        logger.warning("⚠️  No users found for tenant %s", tenant_id)
+        job.status = "completed"
+        job.total_devices = 0
+        job.completed_devices = 0
+        job.completed_at = datetime.now(timezone.utc)
+        db.commit()
+        return
+    
+    # Get all subscribed devices for these users
     devices = db.query(BLETag).join(
         DeviceState, BLETag.imei == DeviceState.device_imei
     ).filter(
         and_(
-            BLETag.user_group_id == tenant_id,
+            BLETag.user_id.in_(user_ids),
+            BLETag.imei.isnot(None),
+            BLETag.is_active == True,
             DeviceState.trip_subscribed == True
         )
     ).all()
