@@ -239,7 +239,7 @@ def deduplicate_consecutive_positions(
         if lat_match and lng_match and time_gap <= dedupe_window_s:
             # Duplicate - skip
             logger.debug(
-                \"⏭️  Skipping duplicate position at (%.6f, %.6f) within %.0f sec\",
+                "⏭️  Skipping duplicate position at (%.6f, %.6f) within %.0f sec",
                 curr.lat, curr.lng, time_gap
             )
             continue
@@ -248,7 +248,7 @@ def deduplicate_consecutive_positions(
     
     if len(deduped) < len(positions):
         logger.info(
-            \"🔧 Deduplicated %d positions → %d unique positions\",
+            "🔧 Deduplicated %d positions → %d unique positions",
             len(positions), len(deduped)
         )
     
