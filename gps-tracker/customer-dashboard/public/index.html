@@ -327,7 +327,7 @@
 
             <button class="nav-item" data-tab="history-advanced" onclick="switchTab('history-advanced')">
                 <span class="nav-icon"><i class="fa-solid fa-map-location-dot"></i></span>
-                <span class="nav-label">Movement History Advanced <span class="beta-badge">Beta</span></span>
+                <span class="nav-label">Movement Analytics <span class="beta-badge">Beta</span></span>
             </button>
 
             <button class="nav-item" data-tab="hive" onclick="switchTab('hive')">
@@ -3998,7 +3998,7 @@ input.hive-range::-moz-range-track {
                     <span style="font-weight:600">Enable Advanced Trip Analysis</span>
                 </label>
                 <p style="font-size:12px;color:var(--text-secondary);margin:6px 0 0 24px">
-                    Subscribe this device to the Trip Engine for journey detection, stationary tracking, and Movement History Advanced features.
+                    Subscribe this device to the Trip Engine for journey detection, stationary tracking, and Movement Analytics features.
                 </p>
             </div>
             <div class="form-group">
@@ -5136,7 +5136,7 @@ window.addEventListener('resize', function() {
 // ══════════════════════════════════════════
 // Tab switching
 // ══════════════════════════════════════════
-const TAB_TITLES = { livemap: 'Live Map', assets: 'Asset List', history: 'Movement History', 'history-advanced': 'Movement History Advanced', 'asset-mgmt': 'Asset Management', locations: 'Geofences', users: 'User Accounts', building: 'Floor Plan Sketch', floorplan: 'Floor Plan', settings: 'Settings', qr: 'QR / NFC Tags', 'reports-subscriptions': 'Tag Subscriptions Report', 'reports-activity': 'Asset Activity Summary', 'reports-trips': 'Movement / Journey Log', 'reports-battery': 'Battery & Offline Report', 'reports-alerts': 'Alerts Inbox', 'reports-geofence': 'Geofence Events', hive: 'Hive Tracking' };
+const TAB_TITLES = { livemap: 'Live Map', assets: 'Asset List', history: 'Movement History', 'history-advanced': 'Movement Analytics', 'asset-mgmt': 'Asset Management', locations: 'Geofences', users: 'User Accounts', building: 'Floor Plan Sketch', floorplan: 'Floor Plan', settings: 'Settings', qr: 'QR / NFC Tags', 'reports-subscriptions': 'Tag Subscriptions Report', 'reports-activity': 'Asset Activity Summary', 'reports-trips': 'Movement / Journey Log', 'reports-battery': 'Battery & Offline Report', 'reports-alerts': 'Alerts Inbox', 'reports-geofence': 'Geofence Events', hive: 'Hive Tracking' };
 let _mapInitialized = false;
 
 function switchTab(name) {
@@ -8737,7 +8737,7 @@ async function loadCategories() {
     // Refresh dynamic filter bars everywhere
     renderLmCategoryFilters();
     alRenderCategoryChips();
-    // Refresh Movement History Advanced category pills
+    // Refresh Movement Analytics category pills
     if (typeof mhaRenderCategoryPills === 'function') mhaRenderCategoryPills();
 }
 
@@ -13462,7 +13462,7 @@ function qrOpenHelp() {
 })();
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MOVEMENT HISTORY ADVANCED (Phases 5.3, 5.4, 5.5)
+// MOVEMENT ANALYTICS (Phases 5.3, 5.4, 5.5)
 // ═══════════════════════════════════════════════════════════════════════════
 (function() {
   let _mhaMap = null;
@@ -13477,9 +13477,9 @@ function qrOpenHelp() {
   let _mhaDateRange = '7d'; // today, yesterday, 7d, 30d, custom
   let _mhaFilter = 'all'; // all, newtags, parcels, qr
 
-  // Initialize Movement History Advanced tab
+  // Initialize Movement Analytics tab
   window.initHistoryAdvanced = async function() {
-    console.log('[MHA] Initializing Movement History Advanced');
+    console.log('[MHA] Initializing Movement Analytics');
     
     // Initialize map (Phase 5.4)
     if (!_mhaMapReady) {
@@ -15280,6 +15280,6 @@ function qrOpenHelp() {
     }
   };
 
-  console.log('[MHA] Movement History Advanced module loaded');
+  console.log('[MHA] Movement Analytics module loaded');
 })();
 </script>
