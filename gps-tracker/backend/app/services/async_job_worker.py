@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db_context
 from app.models_admin import AsyncJob
 from app.models import DeviceState, BLETag, User, PortalUser, UserGroup
-# from app.services.trip_backfill_service import backfill_device_positions, BackfillPreset  # DISABLED: Import errors
+from app.services.trip_backfill_service import backfill_device_positions, BackfillPreset
 from app.services.trip_reprocess_service import replay_device_trips
 
 logger = logging.getLogger(__name__)
@@ -340,11 +340,7 @@ async def process_pending_jobs(db: Session) -> None:
             
             # Execute job based on type
             if job.job_type == "batch_backfill":
-                # DISABLED: trip_backfill_service has import errors (calls non-existent functions)
-                logger.error("❌ batch_backfill is disabled (import errors in trip_backfill_service)")
-                job.status = "failed"
-                job.error_message = "batch_backfill is disabled pending tracksolid_track_service refactor"
-                db.commit()
+                await execute_batch_backfill(job, db)
             elif job.job_type == "batch_reprocess":
                 await execute_batch_reprocess(job, db)
             else:
