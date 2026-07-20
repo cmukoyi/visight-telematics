@@ -148,5 +148,6 @@ def replay_device_trips(
         "positions_processed": stats['positions_processed'],
         "journeys_created": stats.get('journeys_created', 0),
         "legs_created": stats.get('legs_created', 0),
-        "stationaries_created": stats.get('stationaries_created', 0)
+        "stationaries_created": stats.get('stationaries_created', 0),
+        "engine_version": ENGINE_VERSION,
     }
