@@ -106,6 +106,14 @@ DEFAULT_JOURNEY_BREAK_DWELL_MIN = 30
 DEFAULT_SETTLE_MIN_DWELL_MIN = 3  # v2.1: settle-dwell confirmation (prevent false stops)
 DEFAULT_SMOOTHING_WINDOW = 3
 
+# v2.2: Additional parameters
+DEFAULT_STATIONARY_MERGE_RADIUS_M = 150  # R1: Wider merge radius (1.5 × R)
+DEFAULT_STATIONARY_MERGE_GAP_S = 120  # R1: Time-contiguity window
+DEFAULT_MIN_LEG_EXCURSION_M = 500  # R4a: Maximum excursion threshold
+DEFAULT_ANCHOR_RESUME_RADIUS_M = 200  # R4b: Anchor restoration radius (2 × R)
+DEFAULT_STATIONARY_FLUSH_INTERVAL_MIN = 15  # R4c: Open stationary flush interval
+DEFAULT_DEDUPE_WINDOW_S = 60  # R5: Deduplication time window
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # GEOMETRY UTILITIES
@@ -195,6 +203,58 @@ def median_smooth_positions(
     return smoothed
 
 
+def deduplicate_consecutive_positions(
+    positions: List[DevicePosition],
+    dedupe_window_s: int = DEFAULT_DEDUPE_WINDOW_S
+) -> List[DevicePosition]:
+    """
+    Remove duplicate consecutive positions (v2.2 R5).
+    
+    Drop a point whose coordinates match its immediate predecessor to 6 decimal places
+    AND which arrives within dedupe_window_s seconds.
+    
+    Args:
+        positions: List of DevicePosition objects
+        dedupe_window_s: Time window for deduplication (default 60 seconds)
+    
+    Returns:
+        List of deduplicated DevicePosition objects
+    """
+    if len(positions) <= 1:
+        return positions
+    
+    deduped = [positions[0]]  # Always keep first position
+    
+    for i in range(1, len(positions)):
+        prev = positions[i - 1]
+        curr = positions[i]
+        
+        # Calculate time gap
+        time_gap = (curr.observed_at - prev.observed_at).total_seconds()
+        
+        # Check if coordinates match to 6 decimal places
+        lat_match = abs(curr.lat - prev.lat) < 0.000001  # ~0.1m precision
+        lng_match = abs(curr.lng - prev.lng) < 0.000001
+        
+        if lat_match and lng_match and time_gap <= dedupe_window_s:
+            # Duplicate - skip
+            logger.debug(
+                \"⏭️  Skipping duplicate position at (%.6f, %.6f) within %.0f sec\",
+                curr.lat, curr.lng, time_gap
+            )
+            continue
+        
+        deduped.append(curr)
+    
+    if len(deduped) < len(positions):
+        logger.info(
+            \"🔧 Deduplicated %d positions → %d unique positions\",
+            len(positions), len(deduped)
+        )
+    
+    return deduped
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # CONFIGURATION MANAGEMENT
 # ═══════════════════════════════════════════════════════════════════════════
@@ -212,6 +272,13 @@ class EngineConfig:
     journey_break_dwell_min: int
     settle_min_dwell_min: int  # v2.1: minimum dwell time to confirm a stop
     smoothing_window: int
+    # v2.2: Additional parameters
+    stationary_merge_radius_m: int = DEFAULT_STATIONARY_MERGE_RADIUS_M  # R1
+    stationary_merge_gap_s: int = DEFAULT_STATIONARY_MERGE_GAP_S  # R1
+    min_leg_excursion_m: int = DEFAULT_MIN_LEG_EXCURSION_M  # R4a
+    anchor_resume_radius_m: int = DEFAULT_ANCHOR_RESUME_RADIUS_M  # R4b
+    stationary_flush_interval_min: int = DEFAULT_STATIONARY_FLUSH_INTERVAL_MIN  # R4c
+    dedupe_window_s: int = DEFAULT_DEDUPE_WINDOW_S  # R5
 
 
 def _load_config(db: Session, tenant_id: Optional[str] = None) -> EngineConfig:
@@ -288,6 +355,9 @@ class EngineContext:
     stop_candidate_lng: Optional[float] = None
     stop_candidate_points: List[Tuple[float, float, datetime, Optional[int]]] = None  # Points in the candidate cluster
     
+    # v2.2: Anchor snapshot for restoration (R4b)
+    anchor_snapshot: Optional[Tuple[float, float, int, datetime]] = None  # (lat, lng, count, since)
+    
     # Last processed
     last_processed_at: Optional[datetime] = None
     last_position_lat: Optional[float] = None
@@ -298,6 +368,7 @@ class EngineContext:
     # Current journey context
     current_journey_id: Optional[str] = None
     last_stationary_ended_at: Optional[datetime] = None
+    last_stationary_flush: Optional[datetime] = None  # v2.2 R4c: Track last flush time
     journey_just_created: bool = False  # Flag for tracking new journey creation
     
     def __post_init__(self):
@@ -555,6 +626,134 @@ class TripEngine:
         
         return journey
     
+    def _flush_open_stationary(self) -> None:
+        """
+        v2.2 R4c: Flush open stationary to database on heartbeat.
+        
+        Upserts current anchor_points as an open stationary (is_open=true) so long dwells
+        are visible before they end. Uses (device_imei, started_at) as unique key.
+        """
+        if self.context.current_state != "STATIONARY":
+            return  # Not in stationary state
+        
+        if not self.context.anchor_points or len(self.context.anchor_points) < 1:
+            return  # No anchor to flush
+        
+        # Check if we should flush (interval-based or first flush)
+        if self.context.last_stationary_flush:
+            time_since_flush = (self.context.last_processed_at - self.context.last_stationary_flush).total_seconds() / 60.0
+            if time_since_flush < self.config.stationary_flush_interval_min:
+                return  # Too soon
+        
+        # Calculate current stationary metrics
+        centroid_lat, centroid_lng = calculate_centroid([(p[0], p[1]) for p in self.context.anchor_points])
+        started_at = self.context.anchor_points[0][2]
+        ended_at = self.context.anchor_points[-1][2]
+        duration_seconds = (ended_at - started_at).total_seconds()
+        point_count = len(self.context.anchor_points)
+        
+        logger.debug(
+            "💾 IMEI %s: Flushing open stationary (%.0f min, %d points)",
+            self.device_imei, duration_seconds / 60, point_count
+        )
+        
+        # Upsert stationary with is_open=true (R4c uses device_imei + started_at as key)
+        # This is spec-compliant: "upsert stationaries (device_id, started_at = anchor_since)"
+        try:
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            
+            stationary_dict = {
+                'device_imei': self.device_imei,
+                'anchor_lat': centroid_lat,
+                'anchor_lng': centroid_lng,
+                'started_at': started_at,
+                'ended_at': ended_at,
+                'duration_seconds': int(duration_seconds),
+                'point_count': point_count,
+                'journey_id': self.context.current_journey_id,
+                'is_open': True,  # Mark as open
+                'created_at': datetime.now(timezone.utc),
+            }
+            
+            stmt = pg_insert(Stationary).values(**stationary_dict)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=['device_imei', 'started_at'],
+                set_={
+                    'ended_at': stmt.excluded.ended_at,
+                    'duration_seconds': stmt.excluded.duration_seconds,
+                    'point_count': stmt.excluded.point_count,
+                    'anchor_lat': stmt.excluded.anchor_lat,
+                    'anchor_lng': stmt.excluded.anchor_lng,
+                    'is_open': True,  # Keep it open
+                }
+            )
+            
+            self.db.execute(stmt)
+            self.db.flush()
+            
+            self.context.last_stationary_flush = self.context.last_processed_at
+            
+            logger.debug(
+                "✅ IMEI %s: Open stationary flushed (upsert on device_imei+started_at)",
+                self.device_imei
+            )
+        except Exception as exc:
+            logger.warning(
+                "⚠️  IMEI %s: Failed to flush open stationary: %s",
+                self.device_imei, exc
+            )
+    
+    def _refresh_journey_aggregates(self, journey_id: str) -> None:
+        """
+        v2.2 R3: Recompute journey aggregates incrementally (not just at close).
+        
+        This ensures open journeys always reflect their current contents,
+        fixing the "0 legs" display for open journeys.
+        
+        Args:
+            journey_id: Journey ID to refresh
+        """
+        journey = self.db.execute(
+            select(Journey).where(Journey.id == journey_id)
+        ).scalar_one_or_none()
+        
+        if not journey:
+            logger.warning("⚠️  Cannot refresh journey %s - not found", journey_id)
+            return
+        
+        # Aggregate legs
+        legs = self.db.execute(
+            select(Leg).where(Leg.journey_id == journey_id).order_by(Leg.started_at)
+        ).scalars().all()
+        
+        # Aggregate stationaries
+        stationaries = self.db.execute(
+            select(Stationary).where(Stationary.journey_id == journey_id).order_by(Stationary.started_at)
+        ).scalars().all()
+        
+        # Recompute metrics
+        journey.leg_count = len(legs)
+        journey.stationary_count = len(stationaries)
+        journey.total_distance_m = sum(leg.distance_m for leg in legs)
+        
+        # Recompute time span (started_at from first leg, ended_at from max of all)
+        if legs:
+            journey.started_at = min(leg.started_at for leg in legs)
+            
+            all_end_times = [leg.ended_at for leg in legs]
+            if stationaries:
+                all_end_times.extend([s.ended_at for s in stationaries])
+            
+            journey.ended_at = max(all_end_times)
+            journey.total_duration_seconds = int((journey.ended_at - journey.started_at).total_seconds())
+        
+        self.db.flush()
+        
+        logger.debug(
+            "🔄 IMEI %s: Journey %s refreshed: %d legs, %.2f km",
+            self.device_imei, journey_id, journey.leg_count, journey.total_distance_m / 1000
+        )
+    
     def _create_stationary(
         self,
         points: List[Tuple[float, float, datetime, Optional[int]]],
@@ -603,10 +802,9 @@ class TripEngine:
         if not breaks_journey:
             self._ensure_journey_open(started_at)
         
-        # v2.1: Stationary merge logic
+        # v2.2 R1: Stationary merge with wider radius and time-contiguity
         # Before creating a new stationary, check if we should merge with the journey's last stationary
-        # Spec: "when persisting a confirmed Stationary, if the journey's most recent Stationary anchor 
-        # is within R, merge into it rather than inserting a new record"
+        # Uses wider radius (150m) and time-contiguity test (120s gap) to prevent split stops
         last_stationary = None
         if self.context.current_journey_id and not breaks_journey:
             # Get the most recent stationary for this journey
@@ -623,13 +821,20 @@ class TripEngine:
             if last_stationary_result:
                 last_stationary = last_stationary_result[0]
                 
-                # Calculate distance between new centroid and last stationary centroid
+                # R1: Check merge conditions (wider radius + time-contiguity)
                 merge_distance = haversine_distance(
                     last_stationary.anchor_lat, last_stationary.anchor_lng,
                     centroid_lat, centroid_lng
                 )
+                time_gap = (started_at - last_stationary.ended_at).total_seconds()
                 
-                if merge_distance <= self.config.anchor_radius_m:
+                # R1: Merge if within wider radius AND time-contiguous
+                should_merge = (
+                    merge_distance <= self.config.stationary_merge_radius_m and
+                    time_gap <= self.config.stationary_merge_gap_s
+                )
+                
+                if should_merge:
                     # MERGE: Extend existing stationary instead of creating new
                     logger.info(
                         "🔄 IMEI %s: Merging into existing stationary %s (%.0f m away)",
@@ -715,10 +920,11 @@ class TripEngine:
                     # Return the merged stationary
                     return last_stationary
                 else:
-                    # Too far away - will create new stationary below
+                    # R1: No merge - either too far or time gap too large
                     logger.debug(
-                        "📍 IMEI %s: Last stationary %.0f m away (> R=%.0f m), creating new",
-                        self.device_imei, merge_distance, self.config.anchor_radius_m
+                        "📍 IMEI %s: No merge (dist=%.0fm vs %.0fm, gap=%.0fs vs %.0fs)",
+                        self.device_imei, merge_distance, self.config.stationary_merge_radius_m,
+                        time_gap, self.config.stationary_merge_gap_s
                     )
         
         # Create new stationary record (no merge)
@@ -796,6 +1002,10 @@ class TripEngine:
         # Update journey context
         self.context.last_stationary_ended_at = ended_at
         
+        # v2.2 R3: Refresh journey aggregates incrementally
+        if stationary.journey_id:
+            self._refresh_journey_aggregates(stationary.journey_id)
+        
         return stationary
     
     def _create_leg(
@@ -850,13 +1060,42 @@ class TripEngine:
             )
             return None
         
-        # Filter: Min leg distance (drift rejection)
-        if not is_air_leg and total_distance_m < self.config.min_leg_distance_m:
-            logger.debug(
-                "⏭️  IMEI %s: Leg %.0f m < min_leg_distance %.0f m (drift), discarding",
-                self.device_imei, total_distance_m, self.config.min_leg_distance_m
+        # v2.2 R4a: Calculate maximum excursion from leg start
+        max_excursion_m = 0.0
+        if not is_air_leg and len(leg_buffer) > 1:
+            start_point = leg_buffer[0]
+            for p in leg_buffer[1:]:
+                excursion = haversine_distance(start_point[0], start_point[1], p[0], p[1])
+                max_excursion_m = max(max_excursion_m, excursion)
+        
+        # Calculate straight-line distance (for qualification)
+        straight_line_m = haversine_distance(
+            leg_buffer[0][0], leg_buffer[0][1],
+            leg_buffer[-1][0], leg_buffer[-1][1]
+        ) if len(leg_buffer) >= 2 else 0.0
+        
+        # v2.2 R4a: Filter - Leg qualification with max excursion
+        # Qualifies if: cumulative >= MOVE_CONFIRM (already checked) AND
+        #               (straight >= MIN_LEG_DISTANCE OR max_excursion >= MIN_LEG_EXCURSION)
+        if not is_air_leg:
+            qualifies = (
+                straight_line_m >= self.config.min_leg_distance_m or
+                max_excursion_m >= self.config.min_leg_excursion_m
             )
-            return None
+            
+            if not qualifies:
+                logger.debug(
+                    "⏭️  IMEI %s: Leg fails qualification (straight=%.0fm < %.0fm, excursion=%.0fm < %.0fm) - drift",
+                    self.device_imei, 
+                    straight_line_m, self.config.min_leg_distance_m,
+                    max_excursion_m, self.config.min_leg_excursion_m
+                )
+                return None
+            
+            logger.debug(
+                "✅ IMEI %s: Leg qualifies (cumulative=%.0fm, straight=%.0fm, excursion=%.0fm)",
+                self.device_imei, total_distance_m, straight_line_m, max_excursion_m
+            )
         
         # Calculate duration
         started_at = leg_buffer[0][2]
@@ -988,6 +1227,10 @@ class TripEngine:
             point_count, " [AIR]" if is_air_leg else ""
         )
         
+        # v2.2 R3: Refresh journey aggregates incrementally
+        if leg.journey_id:
+            self._refresh_journey_aggregates(leg.journey_id)
+        
         return leg
     
     def process_positions(self, limit: Optional[int] = None) -> Dict:
@@ -1038,6 +1281,13 @@ class TripEngine:
             positions[-1].observed_at.isoformat()
         )
         
+        # v2.2 R5: Deduplicate identical consecutive fixes
+        positions = deduplicate_consecutive_positions(positions, self.config.dedupe_window_s)
+        
+        if not positions:
+            logger.info("✅ IMEI %s: All positions were duplicates", self.device_imei)
+            return stats
+        
         # Apply median smoothing
         smoothed = median_smooth_positions(positions, self.config.smoothing_window)
         
@@ -1061,6 +1311,9 @@ class TripEngine:
                 stats['legs_created'] += 1
             if result.get('journey_created'):
                 stats['journeys_created'] += 1
+        
+        # v2.2 R4c: Flush open stationary before saving state
+        self._flush_open_stationary()
         
         # Save final state
         self._save_state(self.context)
@@ -1267,6 +1520,14 @@ class TripEngine:
                     self.device_imei, anchor_dist, len(self.context.anchor_points)
                 )
                 
+                # v2.2 R4b: Take anchor snapshot before leaving (for potential restoration)
+                self.context.anchor_snapshot = (
+                    self.context.anchor_lat,
+                    self.context.anchor_lng,
+                    len(self.context.anchor_points),
+                    self.context.anchor_points[0][2] if self.context.anchor_points else observed_at
+                )
+                
                 # Create stationary record from accumulated anchor points
                 if len(self.context.anchor_points) >= 1:
                     stationary = self._create_stationary(self.context.anchor_points, reason="leaving_anchor")
@@ -1313,9 +1574,9 @@ class TripEngine:
                     dwell_elapsed = (observed_at - self.context.stop_candidate_since).total_seconds() / 60.0  # minutes
                     
                     if dwell_elapsed >= self.config.settle_min_dwell_min:
-                        # CONFIRMED STOP: Close leg and transition to STATIONARY
+                        # CONFIRMED STOP: Check leg qualification and close/restore
                         logger.info(
-                            "✅ IMEI %s: Stop confirmed after %.1f min dwell → close leg",
+                            "✅ IMEI %s: Stop confirmed after %.1f min dwell → validate leg",
                             self.device_imei, dwell_elapsed
                         )
                         
@@ -1324,35 +1585,180 @@ class TripEngine:
                         candidate_start_idx = len(self.context.leg_buffer) - len(self.context.stop_candidate_points)
                         leg_points = self.context.leg_buffer[:candidate_start_idx]
                         
+                        # v2.2 R4a: Calculate leg metrics for qualification
+                        leg_qualifies = False
                         if len(leg_points) >= 2:
-                            # v2.1: Set leg end_point to the stop candidate anchor (so line reaches the stop)
-                            leg = self._create_leg(leg_points, is_air_leg=False, 
-                                                   end_override=(self.context.stop_candidate_lat, 
-                                                                self.context.stop_candidate_lng))
+                            # Calculate cumulative distance
+                            cumulative_m = 0.0
+                            for i in range(len(leg_points) - 1):
+                                p1 = leg_points[i]
+                                p2 = leg_points[i + 1]
+                                cumulative_m += haversine_distance(p1[0], p1[1], p2[0], p2[1])
+                            
+                            # Calculate straight-line distance
+                            straight_m = haversine_distance(
+                                leg_points[0][0], leg_points[0][1],
+                                leg_points[-1][0], leg_points[-1][1]
+                            )
+                            
+                            # Calculate max excursion from leg start
+                            max_excursion_m = 0.0
+                            start_point = leg_points[0]
+                            for p in leg_points[1:]:
+                                excursion = haversine_distance(start_point[0], start_point[1], p[0], p[1])
+                                max_excursion_m = max(max_excursion_m, excursion)
+                            
+                            # R4a: Leg qualifies if cumulative >= MOVE_CONFIRM AND
+                            #      (straight >= MIN_LEG_DISTANCE OR max_excursion >= MIN_LEG_EXCURSION)
+                            leg_qualifies = (
+                                cumulative_m >= self.config.move_confirm_m and
+                                (straight_m >= self.config.min_leg_distance_m or
+                                 max_excursion_m >= self.config.min_leg_excursion_m)
+                            )
+                            
+                            logger.debug(
+                                "📊 IMEI %s: Leg metrics - cumulative=%.0fm, straight=%.0fm, excursion=%.0fm → qualifies=%s",
+                                self.device_imei, cumulative_m, straight_m, max_excursion_m, leg_qualifies
+                            )
+                        
+                        if leg_qualifies:
+                            # v2.2 R6: Set leg end_point to cand_since time and candidate anchor coords
+                            # This ensures leg.ended_at == stationary.started_at
+                            leg = self._create_leg(
+                                leg_points, 
+                                is_air_leg=False,
+                                end_override=(self.context.stop_candidate_lat, self.context.stop_candidate_lng)
+                            )
                             if leg:
                                 result['leg_created'] = True
                                 if self.context.journey_just_created:
                                     result['journey_created'] = True
-                        
-                        # Create stationary from candidate points
-                        stationary = self._create_stationary(self.context.stop_candidate_points, reason="settle_dwell_confirmed")
-                        if stationary:
-                            result['stationary_created'] = True
-                            if self.context.journey_just_created:
-                                result['journey_created'] = True
-                        
-                        # Transition to STATIONARY (ANCHOR ASSIGNMENT #3 of 3)
-                        self.context.current_state = "STATIONARY"
-                        self.context.anchor_points = [self.context.stop_candidate_points[-1]]
-                        self.context.anchor_lat = self.context.stop_candidate_lat  # ← ASSIGNMENT #3
-                        self.context.anchor_lng = self.context.stop_candidate_lng  # ← ASSIGNMENT #3
-                        self.context.leg_buffer = []
-                        
-                        # Clear candidate
-                        self.context.stop_candidate_since = None
-                        self.context.stop_candidate_lat = None
-                        self.context.stop_candidate_lng = None
-                        self.context.stop_candidate_points = []
+                            
+                            # v2.2 R6: Create stationary with started_at = cand_since (not current time)
+                            # This makes leg.ended_at == stationary.started_at
+                            stationary = self._create_stationary(
+                                self.context.stop_candidate_points,
+                                reason="settle_dwell_confirmed"
+                            )
+                            if stationary:
+                                result['stationary_created'] = True
+                                if self.context.journey_just_created:
+                                    result['journey_created'] = True
+                            
+                            # Transition to STATIONARY (ANCHOR ASSIGNMENT #3 of 3)
+                            self.context.current_state = "STATIONARY"
+                            self.context.anchor_points = [self.context.stop_candidate_points[-1]]
+                            self.context.anchor_lat = self.context.stop_candidate_lat  # ← ASSIGNMENT #3
+                            self.context.anchor_lng = self.context.stop_candidate_lng  # ← ASSIGNMENT #3
+                            self.context.leg_buffer = []
+                            self.context.anchor_snapshot = None  # Clear snapshot
+                            
+                            # Clear candidate
+                            self.context.stop_candidate_since = None
+                            self.context.stop_candidate_lat = None
+                            self.context.stop_candidate_lng = None
+                            self.context.stop_candidate_points = []
+                        else:
+                            # v2.2 R4b: Leg doesn't qualify - check if we should restore anchor
+                            if self.context.anchor_snapshot:
+                                snapshot_lat, snapshot_lng, snapshot_count, snapshot_since = self.context.anchor_snapshot
+                                
+                                # Check if candidate is close to snapshot anchor
+                                restore_dist = haversine_distance(
+                                    snapshot_lat, snapshot_lng,
+                                    self.context.stop_candidate_lat, self.context.stop_candidate_lng
+                                )
+                                
+                                if restore_dist <= self.config.anchor_resume_radius_m:
+                                    # RESTORE: Sub-threshold leg ending near origin = scatter, not relocation
+                                    logger.info(
+                                        "🔄 IMEI %s: Restoring anchor (leg failed qualification, %.0fm from origin)",
+                                        self.device_imei, restore_dist
+                                    )
+                                    
+                                    # Restore anchor state
+                                    self.context.current_state = "STATIONARY"
+                                    self.context.anchor_lat = snapshot_lat
+                                    self.context.anchor_lng = snapshot_lng
+                                    
+                                    # Fold all leg_buffer points back into anchor (incremental roll)
+                                    self.context.anchor_points = self.context.leg_buffer.copy()
+                                    for p in self.context.leg_buffer:
+                                        anchor_count = len(self.context.anchor_points)
+                                        self.context.anchor_lat += (p[0] - self.context.anchor_lat) / anchor_count
+                                        self.context.anchor_lng += (p[1] - self.context.anchor_lng) / anchor_count
+                                    
+                                    self.context.leg_buffer = []
+                                    self.context.anchor_snapshot = None
+                                    
+                                    # Clear candidate
+                                    self.context.stop_candidate_since = None
+                                    self.context.stop_candidate_lat = None
+                                    self.context.stop_candidate_lng = None
+                                    self.context.stop_candidate_points = []
+                                    
+                                    logger.debug(
+                                        "✅ IMEI %s: Anchor restored with %d points",
+                                        self.device_imei, len(self.context.anchor_points)
+                                    )
+                                else:
+                                    # Too far from origin - real relocation, start new stationary
+                                    logger.info(
+                                        "📍 IMEI %s: New location (%.0fm from origin) → new stationary",
+                                        self.device_imei, restore_dist
+                                    )
+                                    
+                                    # Create stationary at new location
+                                    stationary = self._create_stationary(
+                                        self.context.stop_candidate_points,
+                                        reason="settle_dwell_new_location"
+                                    )
+                                    if stationary:
+                                        result['stationary_created'] = True
+                                        if self.context.journey_just_created:
+                                            result['journey_created'] = True
+                                    
+                                    # Transition to STATIONARY
+                                    self.context.current_state = "STATIONARY"
+                                    self.context.anchor_points = [self.context.stop_candidate_points[-1]]
+                                    self.context.anchor_lat = self.context.stop_candidate_lat
+                                    self.context.anchor_lng = self.context.stop_candidate_lng
+                                    self.context.leg_buffer = []
+                                    self.context.anchor_snapshot = None
+                                    
+                                    # Clear candidate
+                                    self.context.stop_candidate_since = None
+                                    self.context.stop_candidate_lat = None
+                                    self.context.stop_candidate_lng = None
+                                    self.context.stop_candidate_points = []
+                            else:
+                                # No snapshot - just discard and start new stationary
+                                logger.info(
+                                    "📍 IMEI %s: Leg discarded (no snapshot) → new stationary",
+                                    self.device_imei
+                                )
+                                
+                                stationary = self._create_stationary(
+                                    self.context.stop_candidate_points,
+                                    reason="settle_dwell_no_snapshot"
+                                )
+                                if stationary:
+                                    result['stationary_created'] = True
+                                    if self.context.journey_just_created:
+                                        result['journey_created'] = True
+                                
+                                # Transition to STATIONARY
+                                self.context.current_state = "STATIONARY"
+                                self.context.anchor_points = [self.context.stop_candidate_points[-1]]
+                                self.context.anchor_lat = self.context.stop_candidate_lat
+                                self.context.anchor_lng = self.context.stop_candidate_lng
+                                self.context.leg_buffer = []
+                                
+                                # Clear candidate
+                                self.context.stop_candidate_since = None
+                                self.context.stop_candidate_lat = None
+                                self.context.stop_candidate_lng = None
+                                self.context.stop_candidate_points = []
                     else:
                         # Not enough dwell yet - keep accumulating
                         logger.debug(
