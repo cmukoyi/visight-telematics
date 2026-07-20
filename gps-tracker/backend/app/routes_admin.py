@@ -1405,28 +1405,33 @@ async def backfill_device_trips(
     """
     Backfill historical positions from TrackSolid and reprocess trips (A3).
     
-    **TEMPORARILY DISABLED** - Requires refactoring to use device_providers/tracksolid_provider.py
+    Fetches historical GPS positions for a device using TrackSolid track.list API,
+    then reprocesses trips. The backfill window is clamped to the forward pipeline
+    high-water mark (last_position_ts) to prevent overlap with automated pulls.
     
-    The trip_backfill_service imports functions that were removed during the
-    TrackSolid API refactoring:
-    - call_track_list_api (removed)
-    - _upsert_track_positions (removed)
-    - _get_credentials (moved to tracksolid_batch_service)
-    - _get_access_token (moved to tracksolid_batch_service)
+    **Use cases:**
+    - Device wasn't subscribed when it moved (missing history)
+    - Gap in position data needs to be filled
+    - One-off historical analysis
     
-    TODO: Refactor trip_backfill_service.py to use:
-    - fetch_tracksolid_journey_points() from device_providers/tracksolid_provider.py
-    - _get_open_api_token() from tracksolid_batch_service
+    **Safe guarantees:**
+    - Never crosses forward pipeline boundary (last_position_ts)
+    - Idempotent position storage (duplicates ignored)
+    - Does NOT modify forward pipeline state
+    - Works for subscribed AND unsubscribed devices
     
-    For now, use batch reprocess instead.
+    Args:
+        data: Device IMEI and time window preset
+    
+    Returns:
+        Statistics about positions fetched, inserted, and trips created
+    
+    Note:
+        - Requires manager role
+        - Runs async (may take several seconds for large windows)
+        - Positions are upserted (idempotent on device_imei, observed_at)
     """
-    # DISABLED - see docstring
-    raise HTTPException(
-        status_code=503,
-        detail="Backfill temporarily disabled. Requires service refactoring. Use batch reprocess instead."
-    )
-    
-    # from app.services.trip_backfill_service import backfill_device_positions, BackfillPreset
+    from app.services.trip_backfill_service import backfill_device_positions, BackfillPreset
     
     admin = get_admin_from_request(request, db)
     if not check_role_permission(admin.role, "manager"):

@@ -23,15 +23,10 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Optional, Dict, List
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 
 from app.models import DeviceState, DevicePosition, BLETag
-from app.services.tracksolid_track_service import (
-    call_track_list_api,
-    _upsert_track_positions,
-    _get_credentials,
-    _get_access_token,
-)
+from app.services.device_providers.tracksolid_provider import fetch_tracksolid_journey_points
 from app.services.trip_reprocess_service import replay_device_trips
 
 logger = logging.getLogger(__name__)
@@ -86,6 +81,73 @@ def get_preset_window(preset: BackfillPreset) -> tuple[datetime, datetime]:
     
     else:
         raise ValueError(f"Unknown preset: {preset}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# POSITION UPSERT
+# ═══════════════════════════════════════════════════════════════════════════
+
+async def _upsert_backfill_positions(db: Session, imei: str, track_points: List[dict]) -> int:
+    """
+    Upsert backfilled track points to device_positions table.
+    
+    Args:
+        db: Database session
+        imei: Device IMEI
+        track_points: List of parsed GPS point dicts
+    
+    Returns:
+        Number of new positions inserted (excludes duplicates)
+    """
+    if not track_points:
+        return 0
+    
+    created_at = datetime.now(timezone.utc)
+    inserted_count = 0
+    
+    for point in track_points:
+        # Parse GPS time
+        gps_time_str = point.get('gpsTime')
+        if not gps_time_str:
+            continue
+        
+        try:
+            observed_at = datetime.strptime(str(gps_time_str), "%Y-%m-%d %H:%M:%S")
+            observed_at = observed_at.replace(tzinfo=timezone.utc)
+        except (ValueError, TypeError):
+            logger.warning("⚠️  Invalid gpsTime for IMEI %s: %s", imei, gps_time_str)
+            continue
+        
+        lat = point.get('lat')
+        lng = point.get('lng')
+        if lat is None or lng is None:
+            continue
+        
+        # Prepare position data
+        position_data = {
+            'device_imei': imei,
+            'lat': lat,
+            'lng': lng,
+            'observed_at': observed_at,
+            'direction': point.get('direction'),
+            'gps_speed': point.get('gpsSpeed'),
+            'source': 'backfill',
+            'created_at': created_at,
+        }
+        
+        # Upsert using PostgreSQL INSERT ... ON CONFLICT DO NOTHING
+        # This ensures idempotency (duplicate positions are silently ignored)
+        stmt = insert(DevicePosition).values(position_data)
+        stmt = stmt.on_conflict_do_nothing(
+            index_elements=['device_imei', 'observed_at']
+        )
+        
+        result = db.execute(stmt)
+        if result.rowcount > 0:
+            inserted_count += 1
+    
+    db.commit()
+    return inserted_count
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -171,51 +233,56 @@ async def backfill_device_positions(
         clamped
     )
     
-    # Get TrackSolid credentials
-    creds = _get_credentials(db)
-    if not creds:
-        raise ValueError("TrackSolid credentials not configured")
+    # Format times for TrackSolid API (requires "YYYY-MM-DD HH:MM:SS")
+    start_time_str = window_start.strftime("%Y-%m-%d %H:%M:%S")
+    end_time_str = window_end.strftime("%Y-%m-%d %H:%M:%S")
     
-    app_key, app_secret = creds
-    
-    # Get access token
-    access_token = await _get_access_token(app_key, app_secret)
-    if not access_token:
-        raise ValueError("Failed to get TrackSolid access token")
-    
-    # Call track.list API
-    logger.info("📡 Calling TrackSolid track.list API...")
-    api_response = await call_track_list_api(
-        access_token=access_token,
-        app_key=app_key,
-        app_secret=app_secret,
+    # Call TrackSolid journey points API
+    logger.info("📡 Calling TrackSolid getPointList API...")
+    track_data = await fetch_tracksolid_journey_points(
         imei=device_imei,
-        begin_time=window_start,
-        end_time=window_end,
-        map_type="GOOGLE"
+        start_time=start_time_str,
+        end_time=end_time_str,
     )
     
-    if not api_response:
-        raise Exception("TrackSolid API call failed (no response)")
-    
-    code = api_response.get('code', -1)
-    message = api_response.get('message', 'Unknown error')
-    
-    if code != 0:
-        # Code 10004 (no data) is not an error for backfill
-        if code == 10004:
-            logger.info("ℹ️  No track data in window (code 10004)")
-            track_points = []
-        else:
-            raise Exception(f"TrackSolid API error {code}: {message}")
+    if not track_data:
+        logger.warning("⚠️  No track data returned from TrackSolid")
+        track_points = []
     else:
-        track_points = api_response.get('result', [])
+        # Parse pipe-delimited GPS points
+        # Format: speed|direction|...|gpsTime|lat|lng|...
+        gps_point_strs = track_data.get('gpsPointStrList') or []
+        track_points = []
+        
+        for point_str in gps_point_strs:
+            try:
+                parts = point_str.split('|')
+                if len(parts) < 10:
+                    continue
+                
+                lat = float(parts[8])
+                lng = float(parts[9])
+                if lat == 0.0 and lng == 0.0:
+                    continue
+                
+                gps_time_str = parts[7]  # "YYYY-MM-DD HH:MM:SS"
+                
+                track_points.append({
+                    'lat': lat,
+                    'lng': lng,
+                    'gpsTime': gps_time_str,
+                    'direction': int(float(parts[1])) if parts[1] else None,
+                    'gpsSpeed': float(parts[0]) if parts[0] else None,
+                })
+            except (ValueError, IndexError) as e:
+                logger.warning("⚠️  Failed to parse GPS point: %s", e)
+                continue
     
     positions_fetched = len(track_points)
     logger.info("✅ Fetched %d positions from TrackSolid", positions_fetched)
     
     # Upsert positions (idempotent)
-    positions_inserted = await _upsert_track_positions(
+    positions_inserted = await _upsert_backfill_positions(
         db=db,
         imei=device_imei,
         track_points=track_points
