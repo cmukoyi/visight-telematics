@@ -1,7 +1,7 @@
 """v2.2 refinements: add is_open and unique constraint to stationaries
 
 Revision ID: v22_refinements
-Revises: (previous revision)
+Revises: 059_add_async_jobs
 Create Date: 2026-07-20
 
 Changes:
@@ -14,7 +14,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'v22_refinements'
-down_revision = None  # Update this to match your current latest revision
+down_revision = '059_add_async_jobs'
 branch_labels = None
 depends_on = None
 
