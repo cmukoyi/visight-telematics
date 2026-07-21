@@ -94,6 +94,9 @@ from app.models import (
 
 logger = logging.getLogger(__name__)
 
+# ── Engine Version (v2.2.0 - Fix Register) ────────────────────────────────
+ENGINE_VERSION = "2.2.0"
+
 # ── Configuration (defaults from spec validation) ─────────────────────────
 DEFAULT_ANCHOR_RADIUS_M = 100
 DEFAULT_MIN_LEG_DISTANCE_M = 300
@@ -106,12 +109,12 @@ DEFAULT_JOURNEY_BREAK_DWELL_MIN = 30
 DEFAULT_SETTLE_MIN_DWELL_MIN = 3  # v2.1: settle-dwell confirmation (prevent false stops)
 DEFAULT_SMOOTHING_WINDOW = 3
 
-# v2.2: Additional parameters
+# v2.2: Additional parameters (Fix Register)
 DEFAULT_STATIONARY_MERGE_RADIUS_M = 150  # R1: Wider merge radius (1.5 × R)
 DEFAULT_STATIONARY_MERGE_GAP_S = 120  # R1: Time-contiguity window
 DEFAULT_MIN_LEG_EXCURSION_M = 500  # R4a: Maximum excursion threshold
 DEFAULT_ANCHOR_RESUME_RADIUS_M = 200  # R4b: Anchor restoration radius (2 × R)
-DEFAULT_STATIONARY_FLUSH_INTERVAL_MIN = 15  # R4c: Open stationary flush interval
+DEFAULT_STATIONARY_FLUSH_INTERVAL_MIN = 0  # R4c: DISABLED until R2 verified (prevents 2.1.2 regression)
 DEFAULT_DEDUPE_WINDOW_S = 60  # R5: Deduplication time window
 
 
@@ -505,6 +508,14 @@ class TripEngine:
             total_duration_seconds=0,
             leg_count=0,
             stationary_count=0,
+            engine_version=ENGINE_VERSION,  # v2.2.0: Version tracking (Fix Register requirement)
+            engine_params={  # Snapshot of config parameters
+                'anchor_radius_m': self.config.anchor_radius_m,
+                'min_leg_distance_m': self.config.min_leg_distance_m,
+                'stationary_merge_radius_m': self.config.stationary_merge_radius_m,
+                'stationary_merge_gap_s': self.config.stationary_merge_gap_s,
+                'min_leg_excursion_m': self.config.min_leg_excursion_m,
+            },
             created_at=datetime.now(timezone.utc),
         )
         
@@ -612,6 +623,18 @@ class TripEngine:
         journey.total_distance_m = total_distance_m
         journey.leg_count = leg_count
         journey.stationary_count = stationary_count
+        
+        # v2.2 R3: Prevent 0-leg journeys from persisting
+        # If journey has no legs AND no stationaries, delete it instead of closing
+        if leg_count == 0 and stationary_count == 0:
+            logger.warning(
+                "🗑️  IMEI %s: Deleting empty journey %s (0 legs, 0 stationaries)",
+                self.device_imei, journey.id
+            )
+            self.db.delete(journey)
+            self.db.flush()
+            self.context.current_journey_id = None
+            return None
         
         self.db.flush()
         
@@ -1012,7 +1035,8 @@ class TripEngine:
         self,
         leg_buffer: List[Tuple[float, float, datetime, Optional[int]]],
         is_air_leg: bool = False,
-        end_override: Optional[Tuple[float, float]] = None  # v2.1: override end point (lat, lng) for stop arrival
+        end_override: Optional[Tuple[float, float]] = None,  # v2.1: override end point (lat, lng) for stop arrival
+        end_time_override: Optional[datetime] = None  # v2.2 R6: override end timestamp for leg termination at stop
     ) -> Optional[Leg]:
         """
         Create a Leg record from movement buffer with filtering.
@@ -1027,6 +1051,8 @@ class TripEngine:
             is_air_leg: Whether this is an air leg (teleport)
             end_override: Optional (lat, lng) to use as leg end point instead of last buffer point
                          (v2.1: for arrival at stop candidate anchor)
+            end_time_override: Optional timestamp to use as leg end time instead of last buffer timestamp
+                              (v2.2 R6: for leg termination at stop with zero gap)
         
         Returns:
             Created Leg object or None if filtered out
@@ -1099,7 +1125,8 @@ class TripEngine:
         
         # Calculate duration
         started_at = leg_buffer[0][2]
-        ended_at = leg_buffer[-1][2]
+        # v2.2 R6: Use end_time_override if provided (for leg termination at stop with zero gap)
+        ended_at = end_time_override if end_time_override else leg_buffer[-1][2]
         duration_seconds = (ended_at - started_at).total_seconds()
         point_count = len(leg_buffer)
         
@@ -1623,11 +1650,12 @@ class TripEngine:
                         
                         if leg_qualifies:
                             # v2.2 R6: Set leg end_point to cand_since time and candidate anchor coords
-                            # This ensures leg.ended_at == stationary.started_at
+                            # This ensures leg.ended_at == stationary.started_at (zero gap)
                             leg = self._create_leg(
                                 leg_points, 
                                 is_air_leg=False,
-                                end_override=(self.context.stop_candidate_lat, self.context.stop_candidate_lng)
+                                end_override=(self.context.stop_candidate_lat, self.context.stop_candidate_lng),
+                                end_time_override=self.context.stop_candidate_since  # R6: Leg terminates at stop start
                             )
                             if leg:
                                 result['leg_created'] = True
