@@ -13508,7 +13508,7 @@ function qrOpenHelp() {
       _mhaMap._ppCurrentStyle = 'streets';
       _mhaMapReady = true;
       
-      // DEBUG: Remove focus ring on ANY map interaction
+      // DEBUG: Remove focus ring on ANY map interaction (but skip programmatic zooms)
       _mhaMap.on('dragstart', function() {
         console.log('[MHA DEBUG] Map dragstart - removing focus ring');
         if (_mhaFocusRing) {
@@ -13519,6 +13519,10 @@ function qrOpenHelp() {
       });
       
       _mhaMap.on('zoomstart', function() {
+        if (_mhaProgrammaticZoom) {
+          console.log('[MHA DEBUG] Map zoomstart - SKIPPING (programmatic zoom)');
+          return;
+        }
         console.log('[MHA DEBUG] Map zoomstart - removing focus ring');
         if (_mhaFocusRing) {
           _mhaMap.removeLayer(_mhaFocusRing);
@@ -13537,6 +13541,10 @@ function qrOpenHelp() {
       });
       
       _mhaMap.on('movestart', function() {
+        if (_mhaProgrammaticZoom) {
+          console.log('[MHA DEBUG] Map movestart - SKIPPING (programmatic zoom)');
+          return;
+        }
         console.log('[MHA DEBUG] Map movestart - removing focus ring');
         if (_mhaFocusRing) {
           _mhaMap.removeLayer(_mhaFocusRing);
@@ -14364,6 +14372,7 @@ function qrOpenHelp() {
   let _mhaInitialBounds = null;
   let _mhaFocusRing = null;
   let _mhaFocusRingTimeout = null;
+  let _mhaProgrammaticZoom = false; // Flag to skip event handlers during programmatic zoom
   let _mhaGeofencesVisible = false;
   let _mhaGeofenceData = null;
   let _mhaGeofenceLayers = [];
@@ -14663,6 +14672,10 @@ function qrOpenHelp() {
       console.log('[MHA DEBUG] Existing focus ring removed');
     }
     
+    // Set flag to skip event handlers during programmatic zoom
+    _mhaProgrammaticZoom = true;
+    console.log('[MHA DEBUG] Set _mhaProgrammaticZoom = true');
+    
     // Zoom to point
     console.log('[MHA DEBUG] Setting view to:', { lat, lng, zoom: 16 });
     _mhaMap.setView([lat, lng], 16, {
@@ -14682,6 +14695,12 @@ function qrOpenHelp() {
     }).addTo(_mhaMap);
     console.log('[MHA DEBUG] Focus ring created and added to map');
     console.log('[MHA DEBUG] _mhaFocusRing object:', _mhaFocusRing);
+    
+    // Clear flag after zoom completes
+    setTimeout(() => {
+      _mhaProgrammaticZoom = false;
+      console.log('[MHA DEBUG] Set _mhaProgrammaticZoom = false');
+    }, 600); // Slightly longer than animation duration
     
     // Show reset view button
     document.getElementById('mha-reset-view').style.display = 'flex';
@@ -14703,14 +14722,20 @@ function qrOpenHelp() {
       console.log('[MHA DEBUG] No focus ring to remove');
     }
     
-    // Fit to initial bounds
+    // Fit to initial bounds (programmatic zoom, skip event handlers)
     if (_mhaInitialBounds && _mhaInitialBounds.length > 0) {
+      _mhaProgrammaticZoom = true;
+      console.log('[MHA DEBUG] Set _mhaProgrammaticZoom = true for fitBounds');
       _mhaMap.fitBounds(_mhaInitialBounds, { 
         padding: [50, 50], 
         maxZoom: 14,
         animate: true,
         duration: 0.5
       });
+      setTimeout(() => {
+        _mhaProgrammaticZoom = false;
+        console.log('[MHA DEBUG] Set _mhaProgrammaticZoom = false after fitBounds');
+      }, 600);
     }
     
     // Hide reset view button
