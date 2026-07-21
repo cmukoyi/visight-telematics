@@ -14696,11 +14696,9 @@ function qrOpenHelp() {
     console.log('[MHA DEBUG] Focus ring created and added to map');
     console.log('[MHA DEBUG] _mhaFocusRing object:', _mhaFocusRing);
     
-    // Clear flag after zoom completes
-    setTimeout(() => {
-      _mhaProgrammaticZoom = false;
-      console.log('[MHA DEBUG] Set _mhaProgrammaticZoom = false');
-    }, 600); // Slightly longer than animation duration
+    // Clear flag immediately so user interactions can remove the ring
+    _mhaProgrammaticZoom = false;
+    console.log('[MHA DEBUG] Set _mhaProgrammaticZoom = false (immediately after ring creation)');
     
     // Show reset view button
     document.getElementById('mha-reset-view').style.display = 'flex';
@@ -14732,10 +14730,9 @@ function qrOpenHelp() {
         animate: true,
         duration: 0.5
       });
-      setTimeout(() => {
-        _mhaProgrammaticZoom = false;
-        console.log('[MHA DEBUG] Set _mhaProgrammaticZoom = false after fitBounds');
-      }, 600);
+      // Clear flag immediately
+      _mhaProgrammaticZoom = false;
+      console.log('[MHA DEBUG] Set _mhaProgrammaticZoom = false (immediately after fitBounds)');
     }
     
     // Hide reset view button
