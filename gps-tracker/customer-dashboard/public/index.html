@@ -14088,7 +14088,7 @@ function qrOpenHelp() {
         // Journey card - MATCHING REFERENCE DESIGN
         const startDate = new Date(journey.started_at);
         const endDate = new Date(journey.ended_at);
-        const distance = (journey.total_distance_m / 1000).toFixed(1);
+        const distance = fmtDistance(journey.total_distance_m);
         const isSelected = _mhaActiveJourney === journey.id;
         const airTag = journey.is_air_journey ? ' <span class="airtag">✈ flight</span>' : '';
         
@@ -14105,7 +14105,7 @@ function qrOpenHelp() {
           <div class="mha-journey-card ${isSelected ? 'selected open' : ''}" data-journey-id="${journey.id}" onclick="mhaToggleJourney('${journey.id}', event)">
             <div class="mha-jhead">
               <span class="mha-jtitle">Journey ${journeyNumber}${airTag}</span>
-              <span class="mha-jkm">${distance} km</span>
+              <span class="mha-jkm">${distance}</span>
             </div>
             <div class="mha-jmeta">${metaLine}</div>
             <div class="mha-journey-steps" id="mha-steps-${journey.id}">
@@ -14215,7 +14215,7 @@ function qrOpenHelp() {
         if (item.type === 'leg') {
           legCounter++;
           const leg = item.data;
-          const distKm = (leg.distance_m / 1000).toFixed(1);
+          const distance = fmtDistance(leg.distance_m);
           const durationMin = Math.floor(leg.duration_seconds / 60);
           const posCount = leg.position_count || 0;
           const partialWarn = (posCount > 0 && posCount < 5) ? ' <span class="warn">· partial path</span>' : '';
@@ -14225,7 +14225,7 @@ function qrOpenHelp() {
               <i class="dot sd" style="background:#3b82f6;"></i>
               <div>
                 <span class="val">Leg ${legCounter}</span>
-                <span class="lbl"> · ${distKm} km${posCount > 0 ? ' · ' + posCount + ' positions' : ''} · ${durationMin} min${partialWarn}</span>
+                <span class="lbl"> · ${distance}${posCount > 0 ? ' · ' + posCount + ' positions' : ''} · ${durationMin} min${partialWarn}</span>
               </div>
             </div>`;
         } else {
@@ -14491,7 +14491,7 @@ function qrOpenHelp() {
           }
         ).addTo(_mhaMap);
         
-        journeyLine.bindPopup(`<b>Journey Path</b><br>Total Distance: ${(totalDistance / 1000).toFixed(2)} km<br>Positions: ${allJourneyCoordinates.length}`);
+        journeyLine.bindPopup(`<b>Journey Path</b><br>Total Distance: ${fmtDistance(totalDistance)}<br>Positions: ${allJourneyCoordinates.length}`);
         _mhaJourneyLayers.push(journeyLine);
         
         console.log(`[MHA] Drew continuous journey line with ${allJourneyCoordinates.length} total positions`);
@@ -14509,8 +14509,8 @@ function qrOpenHelp() {
             fillOpacity: 0.5
           }).addTo(_mhaMap);
           
-          const distKm = (info.leg.distance_m / 1000).toFixed(2);
-          legMarker.bindPopup(`<b>Leg ${legNum}</b><br>Distance: ${distKm} km<br>Duration: ${mhaFormatDuration(info.leg.duration_seconds)}${info.leg.mode === 'air' ? '<br>✈ Flight' : ''}<br>Positions: ${info.coordinates.length}`);
+          const distance = fmtDistance(info.leg.distance_m);
+          legMarker.bindPopup(`<b>Leg ${legNum}</b><br>Distance: ${distance}<br>Duration: ${mhaFormatDuration(info.leg.duration_seconds)}${info.leg.mode === 'air' ? '<br>✈ Flight' : ''}<br>Positions: ${info.coordinates.length}`);
           _mhaJourneyLayers.push(legMarker);
         }
       });
@@ -14604,8 +14604,8 @@ function qrOpenHelp() {
       }
       
       // Update journey badge
-      const distKm = (totalDistance / 1000).toFixed(1);
-      document.getElementById('mha-badge-distance').textContent = distKm + ' km';
+      const distance = fmtDistance(totalDistance);
+      document.getElementById('mha-badge-distance').textContent = distance;
       document.getElementById('mha-badge-legs').textContent = `${legCounter} leg${legCounter !== 1 ? 's' : ''}`;
       document.getElementById('mha-badge-stats').textContent = `${statCounter} ${statCounter !== 1 ? 'stationaries' : 'stationary'}`;
       document.getElementById('mha-badge-positions').textContent = `${positionCount} position${positionCount !== 1 ? 's' : ''}`;
