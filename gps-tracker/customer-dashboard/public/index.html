@@ -3271,7 +3271,10 @@ input.hive-range::-moz-range-track {
             
             /* Focus Ring (shown when zoomed to a point) */
             .mha-focus-ring { pointer-events:none; }
-            .mha-focus-ring-circle { animation:mha-focus-pulse 1.4s ease-out infinite; }
+            .mha-focus-ring-circle { 
+                /* Disabled animation - was causing bouncing effect during map zoom */
+                /* animation:mha-focus-pulse 1.4s ease-out infinite; */
+            }
             @keyframes mha-focus-pulse {
                 0%, 100% { opacity:0.95; transform:scale(1); }
                 50% { opacity:0.35; transform:scale(1.5); }
