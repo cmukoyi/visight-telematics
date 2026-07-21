@@ -13716,8 +13716,11 @@ function qrOpenHelp() {
     // Fresh: ≤15 minutes (green)
     if (minutes <= 15) return {text: `${minutes}m`, cssClass: 'fresh'};
     
-    // Recent: ≤3 hours (muted)
-    if (hours <= 3) return {text: `${minutes}m`, cssClass: 'recent'};
+    // Recent: ≤1 hour, show minutes (muted)
+    if (minutes < 60) return {text: `${minutes}m`, cssClass: 'recent'};
+    
+    // Recent: ≤3 hours, show hours (muted)
+    if (hours <= 3) return {text: `${hours}h`, cssClass: 'recent'};
     
     // Old: ≤24 hours (dim)
     if (hours < 24) return {text: `${hours}h`, cssClass: 'old'};
