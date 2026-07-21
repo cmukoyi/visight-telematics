@@ -3261,7 +3261,7 @@ input.hive-range::-moz-range-track {
             .mha-journey-badge strong { color:var(--text-1); font-weight:600; }
             
             /* Marker Animations & Interactions */
-            .mha-marker-stationary { cursor:pointer; }
+            .mha-marker-stationary { cursor:pointer; overflow:hidden; }
             .mha-marker-stationary:hover .mha-stat-inner { transform:translate(-50%,-50%) scale(1.15); box-shadow:0 0 0 2px white, 0 2px 10px rgba(0,0,0,0.4); }
             
             @keyframes mha-pulse {
@@ -14524,9 +14524,9 @@ function qrOpenHelp() {
               icon: L.divIcon({
                 className: 'mha-marker-stationary',
                 html: `
-                  <div style="position:relative;width:36px;height:36px;">
+                  <div style="position:relative;width:36px;height:36px;overflow:hidden;border-radius:50%;">
                     <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:36px;height:36px;border-radius:50%;background:#f59e0b;animation:mha-pulse 1.9s ease-out infinite;animation-delay:${animDelay}s;"></div>
-                    <div class="mha-stat-inner" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#f59e0b;width:20px;height:20px;border-radius:50%;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:#3a2402;font-weight:700;font-size:10px;transition:all .15s;">${statCounter}</div>
+                    <div class="mha-stat-inner" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#f59e0b;width:20px;height:20px;border-radius:50%;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:#3a2402;font-weight:700;font-size:10px;transition:all .15s;z-index:2;">${statCounter}</div>
                   </div>
                 `,
                 iconSize: [36, 36],
