@@ -13507,6 +13507,15 @@ function qrOpenHelp() {
       addPinplotBasemap(_mhaMap);
       _mhaMap._ppCurrentStyle = 'streets';
       _mhaMapReady = true;
+      
+      // Remove focus ring when user manually drags the map
+      // (but not on programmatic zoom via setView)
+      _mhaMap.on('dragstart', function() {
+        if (_mhaFocusRing) {
+          _mhaMap.removeLayer(_mhaFocusRing);
+          _mhaFocusRing = null;
+        }
+      });
     } else {
       _mhaMap.invalidateSize();
     }
@@ -14612,16 +14621,17 @@ function qrOpenHelp() {
   window.mhaFocusPointZoom = function(lat, lng, label) {
     console.log('[MHA] Focusing on point:', lat, lng, label);
     
+    // Remove existing focus ring first
+    if (_mhaFocusRing) {
+      _mhaMap.removeLayer(_mhaFocusRing);
+      _mhaFocusRing = null;
+    }
+    
     // Zoom to point
     _mhaMap.setView([lat, lng], 16, {
       animate: true,
       duration: 0.5
     });
-    
-    // Remove existing focus ring
-    if (_mhaFocusRing) {
-      _mhaMap.removeLayer(_mhaFocusRing);
-    }
     
     // Add focus ring with pulsing animation
     _mhaFocusRing = L.circle([lat, lng], {
