@@ -13965,12 +13965,9 @@ function qrOpenHelp() {
       
       const data = await res.json();
       
-      // Update asset last_seen with most recent journey timestamp
-      if (data.journeys && data.journeys.length > 0) {
-        const mostRecentJourney = data.journeys[0]; // Journeys are sorted desc by started_at
-        const latestTimestamp = mostRecentJourney.ended_at || mostRecentJourney.started_at;
-        mhaUpdateAssetLastSeen(imei, latestTimestamp);
-      }
+      // NOTE: Do NOT update asset.last_seen from journey timestamps
+      // Journey end time is when a trip ended, not when we last heard from the device
+      // The asset's last_seen from /api/portal/tags is the actual last position time
       
       // Get range label for display
       let rangeLabel = 'last 7 days';
