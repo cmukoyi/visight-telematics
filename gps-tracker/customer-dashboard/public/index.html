@@ -13508,12 +13508,40 @@ function qrOpenHelp() {
       _mhaMap._ppCurrentStyle = 'streets';
       _mhaMapReady = true;
       
-      // Remove focus ring when user manually drags the map
-      // (but not on programmatic zoom via setView)
+      // DEBUG: Remove focus ring on ANY map interaction
       _mhaMap.on('dragstart', function() {
+        console.log('[MHA DEBUG] Map dragstart - removing focus ring');
         if (_mhaFocusRing) {
           _mhaMap.removeLayer(_mhaFocusRing);
           _mhaFocusRing = null;
+          console.log('[MHA DEBUG] Focus ring removed on dragstart');
+        }
+      });
+      
+      _mhaMap.on('zoomstart', function() {
+        console.log('[MHA DEBUG] Map zoomstart - removing focus ring');
+        if (_mhaFocusRing) {
+          _mhaMap.removeLayer(_mhaFocusRing);
+          _mhaFocusRing = null;
+          console.log('[MHA DEBUG] Focus ring removed on zoomstart');
+        }
+      });
+      
+      _mhaMap.on('click', function() {
+        console.log('[MHA DEBUG] Map click - removing focus ring');
+        if (_mhaFocusRing) {
+          _mhaMap.removeLayer(_mhaFocusRing);
+          _mhaFocusRing = null;
+          console.log('[MHA DEBUG] Focus ring removed on click');
+        }
+      });
+      
+      _mhaMap.on('movestart', function() {
+        console.log('[MHA DEBUG] Map movestart - removing focus ring');
+        if (_mhaFocusRing) {
+          _mhaMap.removeLayer(_mhaFocusRing);
+          _mhaFocusRing = null;
+          console.log('[MHA DEBUG] Focus ring removed on movestart');
         }
       });
     } else {
@@ -14335,6 +14363,7 @@ function qrOpenHelp() {
   // Global variables for zoom/focus functionality
   let _mhaInitialBounds = null;
   let _mhaFocusRing = null;
+  let _mhaFocusRingTimeout = null;
   let _mhaGeofencesVisible = false;
   let _mhaGeofenceData = null;
   let _mhaGeofenceLayers = [];
@@ -14359,9 +14388,12 @@ function qrOpenHelp() {
     }
     
     // Remove focus ring if exists
+    console.log('[MHA DEBUG] mhaSelectJourney - checking focus ring');
     if (_mhaFocusRing) {
+      console.log('[MHA DEBUG] Removing focus ring in mhaSelectJourney');
       _mhaMap.removeLayer(_mhaFocusRing);
       _mhaFocusRing = null;
+      console.log('[MHA DEBUG] Focus ring removed in mhaSelectJourney');
     }
     
     // Hide reset view button
@@ -14619,21 +14651,27 @@ function qrOpenHelp() {
 
   // Focus map on a specific point (stationary) with zoom and focus ring
   window.mhaFocusPointZoom = function(lat, lng, label) {
-    console.log('[MHA] Focusing on point:', lat, lng, label);
+    console.log('[MHA DEBUG] === mhaFocusPointZoom called ===');
+    console.log('[MHA DEBUG] Focus params:', { lat, lng, label });
+    console.log('[MHA DEBUG] Current _mhaFocusRing exists?', !!_mhaFocusRing);
     
     // Remove existing focus ring first
     if (_mhaFocusRing) {
+      console.log('[MHA DEBUG] Removing existing focus ring');
       _mhaMap.removeLayer(_mhaFocusRing);
       _mhaFocusRing = null;
+      console.log('[MHA DEBUG] Existing focus ring removed');
     }
     
     // Zoom to point
+    console.log('[MHA DEBUG] Setting view to:', { lat, lng, zoom: 16 });
     _mhaMap.setView([lat, lng], 16, {
       animate: true,
       duration: 0.5
     });
     
     // Add focus ring with pulsing animation
+    console.log('[MHA DEBUG] Creating new focus ring');
     _mhaFocusRing = L.circle([lat, lng], {
       radius: 50,
       color: '#22c55e',
@@ -14642,19 +14680,27 @@ function qrOpenHelp() {
       fillOpacity: 0,
       className: 'mha-focus-ring-circle'
     }).addTo(_mhaMap);
+    console.log('[MHA DEBUG] Focus ring created and added to map');
+    console.log('[MHA DEBUG] _mhaFocusRing object:', _mhaFocusRing);
     
     // Show reset view button
     document.getElementById('mha-reset-view').style.display = 'flex';
+    console.log('[MHA DEBUG] === mhaFocusPointZoom complete ===');
   };
 
   // Reset view to show full journey
   window.mhaResetView = function() {
-    console.log('[MHA] Resetting view');
+    console.log('[MHA DEBUG] === mhaResetView called ===');
     
     // Remove focus ring
+    console.log('[MHA DEBUG] Checking for focus ring to remove');
     if (_mhaFocusRing) {
+      console.log('[MHA DEBUG] Removing focus ring in mhaResetView');
       _mhaMap.removeLayer(_mhaFocusRing);
       _mhaFocusRing = null;
+      console.log('[MHA DEBUG] Focus ring removed in mhaResetView');
+    } else {
+      console.log('[MHA DEBUG] No focus ring to remove');
     }
     
     // Fit to initial bounds
