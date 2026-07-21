@@ -10394,8 +10394,17 @@ async function _lmLoadTags() {
 function _lmPlaceMarkers() {
     Object.values(_lmMarkers).forEach(m => m.remove());
     _lmMarkers = {};
-    const located = _lmTags.filter(t => t.latitude && t.longitude &&
-        !isNaN(parseFloat(t.latitude)) && !isNaN(parseFloat(t.longitude)));
+    const located = _lmTags.filter(t => {
+        // Filter by location
+        if (!t.latitude || !t.longitude || isNaN(parseFloat(t.latitude)) || isNaN(parseFloat(t.longitude))) {
+            return false;
+        }
+        // Filter by status (active, idle, offline)
+        if (_lmStatusFilter !== 'all' && _lmStatusClass(t) !== _lmStatusFilter) {
+            return false;
+        }
+        return true;
+    });
     located.forEach(t => {
         const m = L.marker([parseFloat(t.latitude), parseFloat(t.longitude)], { icon: _lmMarkerIcon(t) })
             .addTo(_liveMap);
@@ -10736,6 +10745,7 @@ function lmFilterStatus(status, el) {
     document.querySelectorAll('#lm-stat-chips .stat-chip').forEach(c => c.classList.remove('selected'));
     if (el && status !== 'all') el.classList.add('selected');
     _lmRenderList();
+    _lmPlaceMarkers(); // Update map markers to match filter
 }
 
 // Build Live Map category filter bar from _categoriesCache
@@ -10785,6 +10795,10 @@ function lmClearAlertMarkers() {
     // Remove all alert markers from the map
     _lmAlertMarkers.forEach(marker => marker.remove());
     _lmAlertMarkers = [];
+    
+    // Also remove all tag markers
+    Object.values(_lmMarkers).forEach(m => m.remove());
+    _lmMarkers = {};
 }
 
 function _lmSelectTag(imei) {
