@@ -625,11 +625,12 @@ class TripEngine:
         journey.stationary_count = stationary_count
         
         # v2.2 R3: Prevent 0-leg journeys from persisting
-        # If journey has no legs AND no stationaries, delete it instead of closing
-        if leg_count == 0 and stationary_count == 0:
+        # If journey has no legs, delete it instead of closing
+        # (A journey is defined by movement; stationary-only periods don't qualify)
+        if leg_count == 0:
             logger.warning(
-                "🗑️  IMEI %s: Deleting empty journey %s (0 legs, 0 stationaries)",
-                self.device_imei, journey.id
+                "🗑️  IMEI %s: Deleting 0-leg journey %s (%d stationaries, %.2f km)",
+                self.device_imei, journey.id, stationary_count, total_distance_m / 1000
             )
             self.db.delete(journey)
             self.db.flush()
