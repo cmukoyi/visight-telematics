@@ -932,6 +932,12 @@
                         </button>
                     </li>
                     <li class="sidebar-item">
+                        <button class="sidebar-link" onclick="switchTab('trip-engine')">
+                            <span>🚗</span>
+                            <span>Trip Engine</span>
+                        </button>
+                    </li>
+                    <li class="sidebar-item">
                         <button class="sidebar-link" onclick="switchTab('jobs')">
                             <span>⚙️</span>
                             <span>Background Jobs</span>
@@ -2816,6 +2822,119 @@
                     </div>
                     <!-- END DEVICE MANAGEMENT TAB -->
 
+                    <!-- TRIP ENGINE TAB -->
+                    <div id="trip-engine" class="tab-content">
+                        <div class="page-header">
+                            <h2 class="page-title">🚗 Trip Engine v2.1.6</h2>
+                            <p class="page-subtitle">Reprocess trip segmentation for devices</p>
+                        </div>
+
+                        <!-- Reprocess Form -->
+                        <div class="card">
+                            <div class="card-header">Device Reprocessing</div>
+                            <p class="card-description" style="margin-bottom: 20px;">
+                                Deletes all derived trip data (journeys/legs/stationaries) for a device and replays 
+                                positions through the current engine (v2.1.6). Use this after engine updates to adopt 
+                                new logic. <strong>WARNING:</strong> This is a DESTRUCTIVE operation.
+                            </p>
+
+                            <form id="reprocessForm" style="display:flex;flex-direction:column;gap:16px;">
+                                <div class="form-group">
+                                    <label for="reprocessImei" class="form-label">Device IMEI</label>
+                                    <input 
+                                        type="text" 
+                                        id="reprocessImei" 
+                                        class="form-input" 
+                                        placeholder="780901807707363" 
+                                        required
+                                        pattern="[0-9]{15}"
+                                        title="15-digit IMEI"
+                                    />
+                                    <small style="color: var(--gray); margin-top: 4px; display: block;">
+                                        Enter the 15-digit IMEI of the device to reprocess
+                                    </small>
+                                </div>
+
+                                <div style="display:flex;gap:12px;align-items:center">
+                                    <button type="submit" class="btn btn-primary">
+                                        🔄 Reprocess Trips
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" onclick="clearReprocessForm()">
+                                        Clear
+                                    </button>
+                                </div>
+                            </form>
+
+                            <div id="reprocessAlert" class="alert" style="display:none;margin-top:16px">
+                                <span id="reprocessAlertText"></span>
+                            </div>
+
+                            <div id="reprocessResults" style="display:none;margin-top:24px;">
+                                <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 12px;">Results</h3>
+                                <div style="background: var(--light); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
+                                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                                        <div>
+                                            <div style="font-size: 0.875rem; color: var(--gray);">Positions Processed</div>
+                                            <div style="font-size: 1.25rem; font-weight: 600; color: var(--dark);" id="positionsProcessed">-</div>
+                                        </div>
+                                        <div>
+                                            <div style="font-size: 0.875rem; color: var(--gray);">Journeys Created</div>
+                                            <div style="font-size: 1.25rem; font-weight: 600; color: var(--primary);" id="journeysCreated">-</div>
+                                        </div>
+                                        <div>
+                                            <div style="font-size: 0.875rem; color: var(--gray);">Legs Created</div>
+                                            <div style="font-size: 1.25rem; font-weight: 600; color: var(--secondary);" id="legsCreated">-</div>
+                                        </div>
+                                        <div>
+                                            <div style="font-size: 0.875rem; color: var(--gray);">Stops Created</div>
+                                            <div style="font-size: 1.25rem; font-weight: 600; color: var(--warning);" id="stationariesCreated">-</div>
+                                        </div>
+                                    </div>
+                                    <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+                                        <div style="font-size: 0.875rem; color: var(--gray);">Engine Version</div>
+                                        <div style="font-size: 1rem; font-weight: 500; color: var(--dark);" id="engineVersion">-</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Test Devices Quick Actions -->
+                        <div class="card">
+                            <div class="card-header">Test Devices (v2.1.6 Validation)</div>
+                            <p class="card-description" style="margin-bottom: 20px;">
+                                Quick actions for the 4 test devices from the v2.1.6 specification.
+                            </p>
+                            
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px;">
+                                <button class="btn btn-secondary" onclick="reprocessDevice('780901807707363')">
+                                    Device 907 (363)
+                                </button>
+                                <button class="btn btn-secondary" onclick="reprocessDevice('780901807707767')">
+                                    Device 767
+                                </button>
+                                <button class="btn btn-secondary" onclick="reprocessDevice('780901807707502')">
+                                    Device 571 (Air Test)
+                                </button>
+                                <button class="btn btn-secondary" onclick="reprocessDevice('863844069007363')">
+                                    Device 363
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Engine Info -->
+                        <div class="card">
+                            <div class="card-header">Engine v2.1.6 Features</div>
+                            <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
+                                <li><strong>B1:</strong> Duplicate leg prevention (3-layer defense)</li>
+                                <li><strong>B2:</strong> Zero-gap leg termination at stops</li>
+                                <li><strong>B3:</strong> Air travel detection with 60-minute minimum gap</li>
+                                <li><strong>B4:</strong> Journey break consistency</li>
+                                <li><strong>B5:</strong> Terminal stop detachment + journey aggregate refresh</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <!-- END TRIP ENGINE TAB -->
+
                     <!-- JOBS TAB -->
                     <div id="jobs" class="tab-content">
                         <div class="page-header">
@@ -3242,6 +3361,7 @@ dashboard.welcome,Bienvenue</pre>
                 'translations': 'Translation Manager',
                 'languages': 'Language Manager',
                 'device-management': 'Device Management',
+                'trip-engine': 'Trip Engine v2.1.6',
                 'jobs': 'Background Jobs'
             };
             document.getElementById('pageTitle').textContent = titles[tabName];
@@ -3265,6 +3385,7 @@ dashboard.welcome,Bienvenue</pre>
             if (tabName === 'translations') { loadTranslations(); }
             if (tabName === 'languages') { loadLanguages(); }
             if (tabName === 'device-management') { loadTenantOptions(); }
+            if (tabName === 'trip-engine') { setupTripEngineForm(); }
             if (tabName === 'jobs') { loadJobs(); }
         }
 
@@ -7232,6 +7353,84 @@ dashboard.welcome,Bienvenue</pre>
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    // ── TRIP ENGINE ──────────────────────────────────────────────────────────
+    
+    function setupTripEngineForm() {
+        const form = document.getElementById('reprocessForm');
+        if (!form) return;
+        
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const imei = document.getElementById('reprocessImei').value.trim();
+            if (!imei) return;
+            await reprocessDevice(imei);
+        };
+    }
+
+    async function reprocessDevice(imei) {
+        const alertDiv = document.getElementById('reprocessAlert');
+        const alertText = document.getElementById('reprocessAlertText');
+        const resultsDiv = document.getElementById('reprocessResults');
+        
+        // Set IMEI in form
+        document.getElementById('reprocessImei').value = imei;
+        
+        // Hide previous results
+        resultsDiv.style.display = 'none';
+        alertDiv.style.display = 'none';
+        
+        // Show loading
+        alertDiv.className = 'alert';
+        alertText.textContent = `🔄 Reprocessing device ${imei}... This may take a few seconds.`;
+        alertDiv.style.display = 'block';
+        
+        try {
+            const response = await fetch('/api/admin/trips/reprocess', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    device_imei: imei,
+                    start_date: null,
+                    end_date: null
+                })
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Reprocessing failed');
+            }
+            
+            const result = await response.json();
+            
+            // Show success
+            alertDiv.className = 'alert alert-success';
+            alertText.textContent = `✅ Successfully reprocessed device ${imei}`;
+            
+            // Display results
+            document.getElementById('positionsProcessed').textContent = result.positions_processed.toLocaleString();
+            document.getElementById('journeysCreated').textContent = result.journeys_created.toLocaleString();
+            document.getElementById('legsCreated').textContent = result.legs_created.toLocaleString();
+            document.getElementById('stationariesCreated').textContent = result.stationaries_created.toLocaleString();
+            document.getElementById('engineVersion').textContent = result.engine_version;
+            
+            resultsDiv.style.display = 'block';
+            
+        } catch (error) {
+            alertDiv.className = 'alert alert-error';
+            alertText.textContent = `❌ Error: ${error.message}`;
+            alertDiv.style.display = 'block';
+        }
+    }
+
+    function clearReprocessForm() {
+        document.getElementById('reprocessImei').value = '';
+        document.getElementById('reprocessAlert').style.display = 'none';
+        document.getElementById('reprocessResults').style.display = 'none';
     }
 
     </script>
