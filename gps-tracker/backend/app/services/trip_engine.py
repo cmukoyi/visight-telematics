@@ -380,6 +380,10 @@ class EngineContext:
     last_stationary_flush: Optional[datetime] = None  # v2.2 R4c: Track last flush time
     journey_just_created: bool = False  # Flag for tracking new journey creation
     
+    # v2.1.6 B1: Re-entrancy guards
+    leg_persisted_this_invocation: bool = False
+    stationary_persisted_this_invocation: bool = False
+    
     def __post_init__(self):
         if self.anchor_points is None:
             self.anchor_points = []
@@ -821,6 +825,9 @@ class TripEngine:
             journey.ended_at = max(leg.ended_at for leg in legs)  # B5: Legs only!
             journey.total_duration_seconds = int((journey.ended_at - journey.started_at).total_seconds())
         
+        # v2.1.6 B3: Set is_air_journey flag if any leg has mode='air'
+        journey.is_air_journey = any(leg.is_air_leg for leg in legs)
+        
         self.db.flush()
         
         logger.debug(
@@ -1007,6 +1014,40 @@ class TripEngine:
                     )
         
         # Create new stationary record (no merge)
+        # v2.1.6 B1: Re-entrancy guard - check if already persisted in this invocation
+        # Note: This only applies to NEW stationaries, not merged ones
+        if self.context.stationary_persisted_this_invocation:
+            logger.error(
+                "🚨 IMEI %s: Re-entrancy violation! Already persisted a stationary in this invocation",
+                self.device_imei
+            )
+            raise RuntimeError("Re-entrancy violation: stationary already persisted in this invocation")
+        
+        # v2.1.6 B1: Overlap guard - reject if overlaps existing stationary
+        # Route through merge check first - if it qualifies for merge, that's handled above
+        # This check catches cases where overlap exists but merge criteria not met
+        overlap_check = self.db.execute(
+            select(Stationary).where(
+                and_(
+                    Stationary.device_imei == self.device_imei,
+                    Stationary.started_at != started_at,  # Different stationary
+                    or_(
+                        and_(Stationary.started_at <= started_at, Stationary.ended_at > started_at),
+                        and_(Stationary.started_at < ended_at, Stationary.ended_at >= ended_at),
+                        and_(Stationary.started_at >= started_at, Stationary.ended_at <= ended_at)
+                    )
+                )
+            )
+        ).scalar_one_or_none()
+        
+        if overlap_check:
+            logger.error(
+                "🚨 IMEI %s: Overlap violation! Stationary %s → %s overlaps existing %s → %s",
+                self.device_imei, started_at, ended_at, overlap_check.started_at, overlap_check.ended_at
+            )
+            # Log and discard per spec - never insert overlapping rows
+            return None
+        
         # v2.2 FIX: Use upsert to handle backfill idempotency
         # If a stationary with same (device_imei, started_at) exists, update it
         from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -1046,6 +1087,9 @@ class TripEngine:
         # Fetch the stationary object
         stationary = self.db.query(Stationary).filter(Stationary.id == returned_id).one()
         self.db.flush()
+        
+        # v2.1.6 B1: Set re-entrancy guard flag
+        self.context.stationary_persisted_this_invocation = True
         
         # Build PostGIS Point geometry for the centroid
         try:
@@ -1229,6 +1273,37 @@ class TripEngine:
         # Ensure journey is open
         self._ensure_journey_open(started_at)
         
+        # v2.1.6 B1: Re-entrancy guard - assert we haven't already persisted a leg in this invocation
+        if self.context.leg_persisted_this_invocation:
+            logger.error(
+                "🚨 IMEI %s: Re-entrancy violation! Already persisted a leg in this invocation",
+                self.device_imei
+            )
+            raise RuntimeError("Re-entrancy violation: leg already persisted in this invocation")
+        
+        # v2.1.6 B1: Overlap guard - reject if overlaps existing leg
+        overlap_check = self.db.execute(
+            select(Leg).where(
+                and_(
+                    Leg.device_imei == self.device_imei,
+                    Leg.started_at != started_at,  # Different leg
+                    or_(
+                        and_(Leg.started_at <= started_at, Leg.ended_at > started_at),  # Existing leg covers our start
+                        and_(Leg.started_at < ended_at, Leg.ended_at >= ended_at),      # Existing leg covers our end
+                        and_(Leg.started_at >= started_at, Leg.ended_at <= ended_at)    # Our leg covers existing
+                    )
+                )
+            )
+        ).scalar_one_or_none()
+        
+        if overlap_check:
+            logger.error(
+                "🚨 IMEI %s: Overlap violation! Leg %s → %s overlaps existing leg %s → %s",
+                self.device_imei, started_at, ended_at, overlap_check.started_at, overlap_check.ended_at
+            )
+            # Log and discard per spec - never insert overlapping rows
+            return None
+        
         # v2.1.6 B1: Use upsert to prevent duplicates
         # If a leg with same (device_imei, started_at) exists, update it
         from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -1272,6 +1347,9 @@ class TripEngine:
         # Fetch the leg object
         leg = self.db.query(Leg).filter(Leg.id == returned_id).one()
         self.db.flush()
+        
+        # v2.1.6 B1: Set re-entrancy guard flag
+        self.context.leg_persisted_this_invocation = True
         
         # Build PostGIS geometry for the leg path
         # v2.1: Air legs use great-circle (straight line), ground legs use all points
@@ -1479,6 +1557,10 @@ class TripEngine:
             Dict with actions taken (stationary_created, leg_created, etc.)
         """
         result = {}
+        
+        # v2.1.6 B1: Clear re-entrancy flags at start of each position processing
+        self.context.leg_persisted_this_invocation = False
+        self.context.stationary_persisted_this_invocation = False
         
         # Update watermark
         self.context.last_processed_at = observed_at
