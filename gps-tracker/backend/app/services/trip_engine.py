@@ -96,7 +96,7 @@ from app.models import (
 logger = logging.getLogger(__name__)
 
 # ── Engine Version (v2.2.0 - Fix Register) ────────────────────────────────
-ENGINE_VERSION = "2.2.0"
+ENGINE_VERSION = "2.1.6"
 
 # ── Configuration (defaults from spec validation) ─────────────────────────
 DEFAULT_ANCHOR_RADIUS_M = 100
@@ -117,6 +117,9 @@ DEFAULT_MIN_LEG_EXCURSION_M = 500  # R4a: Maximum excursion threshold
 DEFAULT_ANCHOR_RESUME_RADIUS_M = 200  # R4b: Anchor restoration radius (2 × R)
 DEFAULT_STATIONARY_FLUSH_INTERVAL_MIN = 0  # R4c: DISABLED until R2 verified (prevents 2.1.2 regression)
 DEFAULT_DEDUPE_WINDOW_S = 60  # R5: Deduplication time window
+
+# v2.1.6 B3: Air leg gate parameters
+DEFAULT_AIR_MIN_GAP_MIN = 60  # B3: Minimum gap in minutes for air leg classification
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -283,6 +286,8 @@ class EngineConfig:
     anchor_resume_radius_m: int = DEFAULT_ANCHOR_RESUME_RADIUS_M  # R4b
     stationary_flush_interval_min: int = DEFAULT_STATIONARY_FLUSH_INTERVAL_MIN  # R4c
     dedupe_window_s: int = DEFAULT_DEDUPE_WINDOW_S  # R5
+    # v2.1.6 B3: Air leg parameters
+    air_min_gap_min: int = DEFAULT_AIR_MIN_GAP_MIN  # B3: Minimum gap for air classification
 
 
 def _load_config(db: Session, tenant_id: Optional[str] = None) -> EngineConfig:
@@ -1159,17 +1164,30 @@ class TripEngine:
         start_position_id = leg_buffer[0][3] if leg_buffer[0][3] else None
         end_position_id = leg_buffer[-1][3] if leg_buffer[-1][3] else None
         
+        # v2.1.6 B2: Leg termination at stop
+        # Build the geometry buffer INCLUDING the stop candidate point if provided
+        geometry_buffer = list(leg_buffer)  # Copy the leg buffer
+        
         # v2.1: Use end_override if provided (for arrival at stop candidate)
         if end_override:
             end_lat, end_lng = end_override
+            # v2.1.6 B2: Append stop candidate as terminal vertex to geometry
+            # This ensures the rendered line reaches the stop marker
+            geometry_buffer.append((end_lat, end_lng, ended_at, end_position_id))
         else:
             end_lat, end_lng = leg_buffer[-1][0], leg_buffer[-1][1]
         
         # Ensure journey is open
         self._ensure_journey_open(started_at)
         
-        # Create record
-        leg = Leg(
+        # v2.1.6 B1: Use upsert to prevent duplicates
+        # If a leg with same (device_imei, started_at) exists, update it
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+        
+        leg_id = uuid4()
+        
+        stmt = pg_insert(Leg).values(
+            id=leg_id,
             device_imei=self.device_imei,
             distance_m=int(total_distance_m),
             duration_seconds=int(duration_seconds),
@@ -1185,10 +1203,26 @@ class TripEngine:
             is_air_leg=is_air_leg,
             journey_id=self.context.current_journey_id,
             created_at=datetime.now(timezone.utc),
-        )
+        ).on_conflict_do_update(
+            index_elements=['device_imei', 'started_at'],  # ux_leg_device_start
+            set_={
+                'ended_at': ended_at,  # B1: Take the later ended_at (longer leg is correct)
+                'duration_seconds': int(duration_seconds),
+                'distance_m': int(total_distance_m),
+                'point_count': point_count,
+                'end_lat': end_lat,
+                'end_lng': end_lng,
+                'end_position_id': end_position_id,
+                'journey_id': self.context.current_journey_id,
+            }
+        ).returning(Leg.id)
         
-        self.db.add(leg)
-        self.db.flush()  # Get ID without committing
+        result = self.db.execute(stmt)
+        returned_id = result.scalar_one()
+        
+        # Fetch the leg object
+        leg = self.db.query(Leg).filter(Leg.id == returned_id).one()
+        self.db.flush()
         
         # Build PostGIS geometry for the leg path
         # v2.1: Air legs use great-circle (straight line), ground legs use all points
@@ -1212,11 +1246,12 @@ class TripEngine:
                 )
             else:
                 # Ground leg: Full path through all points
+                # v2.1.6 B2: Use geometry_buffer which includes stop candidate if provided
                 # Build array of points for ST_MakeLine: ARRAY[ST_MakePoint(lng, lat), ...]
                 # Note: PostGIS uses (lng, lat) order, not (lat, lng)
                 points_array = ", ".join([
                     f"ST_MakePoint({p[1]}, {p[0]})"  # lng, lat
-                    for p in leg_buffer
+                    for p in geometry_buffer  # B2: geometry_buffer includes terminal point
                 ])
                 
                 # Create full-resolution path
@@ -1443,21 +1478,22 @@ class TripEngine:
             implied_speed_kmh = (distance_m / time_diff_seconds) * 3.6
         
         # Step 1: Outlier/air gate (spec Section 2.3, 2.4a)
+        # v2.1.6 B3: Compare KILOMETRES to AIR_MIN_KM (not metres!)
         if implied_speed_kmh > self.config.max_speed_kmh:
-            # v2.1: 3-part AND for air leg classification (prevents discarding real flights)
+            # v2.1.6 B3: 3-part AND for air leg classification (prevents discarding real flights)
             # Spec 2.4a: "glitches are fast but short (sub-100 km, sub-minute)"
             distance_km = distance_m / 1000
-            time_diff_hours = time_diff_seconds / 3600
+            time_diff_min = time_diff_seconds / 60  # B3: Use minutes
             
             is_air_speed = implied_speed_kmh >= self.config.air_speed_kmh  # ≥300 km/h
-            is_air_distance = distance_km >= self.config.air_min_distance_km  # ≥150 km
-            is_multi_hour_gap = time_diff_hours >= 1.0  # Multi-hour reporting gap
+            is_air_distance = distance_km >= self.config.air_min_distance_km  # B3: ≥150 km (KILOMETRES!)
+            is_air_gap = time_diff_min >= self.config.air_min_gap_min  # B3: ≥60 min (replaces "multi-hour")
             
-            if is_air_speed and is_air_distance and is_multi_hour_gap:
+            if is_air_speed and is_air_distance and is_air_gap:
                 # AIR LEG: All 3 conditions met (validated on Dublin⇄Split flights)
                 logger.info(
-                    "✈️  IMEI %s: Air leg detected: %.0f km @ %.0f km/h over %.1f hr gap",
-                    self.device_imei, distance_km, implied_speed_kmh, time_diff_hours
+                    "✈️  IMEI %s: Air leg detected: %.0f km @ %.0f km/h over %.1f min gap",
+                    self.device_imei, distance_km, implied_speed_kmh, time_diff_min
                 )
                 
                 # If in MOVE state, close current leg first
