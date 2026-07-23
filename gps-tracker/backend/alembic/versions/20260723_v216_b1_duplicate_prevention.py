@@ -32,30 +32,41 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     conn = op.get_bind()
     
-    # Step 1: Delete existing duplicate legs using row numbering
-    # Keep ONE leg per (device_imei, started_at) group:
-    # - Prefer longer distance_m (ORDER BY distance_m DESC)
-    # - Use id as tiebreaker for deterministic results
-    # This handles cases where duplicates have identical distance_m
+    # Step 1: Delete duplicate legs using USING self-join
+    # For each duplicate group, keep the leg with:
+    # - Longest distance_m, OR
+    # - Smallest id (tiebreaker if distance_m equal)
     deleted = conn.execute(text("""
-        DELETE FROM legs
-        WHERE id IN (
-            SELECT id
-            FROM (
-                SELECT id,
-                       ROW_NUMBER() OVER (
-                           PARTITION BY device_imei, started_at 
-                           ORDER BY distance_m DESC, id ASC
-                       ) as rn
-                FROM legs
-            ) ranked
-            WHERE rn > 1
-        )
+        DELETE FROM legs l1
+        USING legs l2
+        WHERE l1.device_imei = l2.device_imei
+          AND l1.started_at = l2.started_at
+          AND (
+              l1.distance_m < l2.distance_m
+              OR (l1.distance_m = l2.distance_m AND l1.id > l2.id)
+          )
     """))
     
-    print(f"Deleted {deleted.rowcount} duplicate leg rows (kept longer leg per group)")
+    print(f"🗑️  Deleted {deleted.rowcount} duplicate leg rows")
     
-    # Step 2: Add unique constraint to prevent future duplicates
+    # Step 2: Verify no duplicates remain before creating constraint
+    check = conn.execute(text("""
+        SELECT device_imei, started_at, COUNT(*) as cnt
+        FROM legs
+        GROUP BY device_imei, started_at
+        HAVING COUNT(*) > 1
+        LIMIT 5
+    """))
+    
+    remaining = list(check)
+    if remaining:
+        for row in remaining:
+            print(f"⚠️  Still duplicated: {row.device_imei} at {row.started_at} ({row.cnt} rows)")
+        raise Exception(f"Cannot create unique constraint: {len(remaining)} duplicate groups still exist")
+    
+    print("✅ Verification passed: No duplicates remain")
+    
+    # Step 3: Add unique constraint to prevent future duplicates
     # This enables the upsert pattern in trip_engine.py
     op.create_unique_constraint(
         'ux_leg_device_start',  # Constraint name
