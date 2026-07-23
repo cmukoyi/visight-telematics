@@ -78,6 +78,7 @@ from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
 from math import radians, cos, sin, asin, sqrt
 from statistics import median
+from uuid import uuid4
 
 from sqlalchemy import select, and_
 from sqlalchemy.orm import Session
@@ -955,9 +956,8 @@ class TripEngine:
         # v2.2 FIX: Use upsert to handle backfill idempotency
         # If a stationary with same (device_imei, started_at) exists, update it
         from sqlalchemy.dialects.postgresql import insert as pg_insert
-        from app.models import get_uuid_column
         
-        stationary_id = get_uuid_column()
+        stationary_id = uuid4()
         
         stmt = pg_insert(Stationary).values(
             id=stationary_id,
