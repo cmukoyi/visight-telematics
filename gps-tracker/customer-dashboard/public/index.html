@@ -3174,6 +3174,12 @@ input.hive-range::-moz-range-track {
             .mha-show-assets-btn:hover { background:color-mix(in srgb, var(--primary) 85%, black); box-shadow:0 4px 12px rgba(0,0,0,0.25); transform:translateY(-50%) scale(1.05); }
             .mha-show-assets-btn i { margin-bottom:6px; font-size:15px; }
             
+            /* Vertical "Show Journeys" button when collapsed */
+            .mha-show-journeys-btn { position:absolute; right:12px; top:50%; transform:translateY(-50%); z-index:1000; writing-mode:vertical-rl; background:var(--primary); color:white; border:none; padding:12px 8px; border-radius:8px; font-size:13px; font-weight:600; letter-spacing:0.5px; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.15); transition:all .2s; display:none; }
+            .mha-journeys-panel.collapsed ~ .mha-map-panel .mha-show-journeys-btn { display:block; }
+            .mha-show-journeys-btn:hover { background:color-mix(in srgb, var(--primary) 85%, black); box-shadow:0 4px 12px rgba(0,0,0,0.25); transform:translateY(-50%) scale(1.05); }
+            .mha-show-journeys-btn i { margin-bottom:6px; font-size:15px; }
+            
             .mha-ap-head { display:flex; align-items:center; gap:9px; padding:12px 14px; border-bottom:1px solid var(--border); font-weight:500; position:relative; flex-shrink:0; }
             .mha-ap-head i.fa-tags { color:var(--primary); font-size:16px; }
             .mha-ap-head span { flex:1; }
@@ -3481,6 +3487,12 @@ input.hive-range::-moz-range-track {
                         <button class="mha-show-assets-btn" onclick="mhaToggleAssetsPanel()" title="Show Assets Panel">
                             <i class="fa-solid fa-tags"></i>
                             SHOW ASSETS
+                        </button>
+                        
+                        <!-- Vertical "Show Journeys" button (appears when panel collapsed) -->
+                        <button class="mha-show-journeys-btn" onclick="mhaTogglePanel()" title="Show Journeys Panel">
+                            <i class="fa-solid fa-route"></i>
+                            SHOW JOURNEYS
                         </button>
                         
                         <div class="mha-map-head">
