@@ -654,7 +654,53 @@ class TripEngine:
         # Clear journey context
         self.context.current_journey_id = None
         
+        # v2.1.6 B5: Detach terminal stationaries (those after final leg)
+        self._detach_terminal_stationaries(journey.id)
+        
         return journey
+    
+    def _detach_terminal_stationaries(self, journey_id: str) -> None:
+        """
+        v2.1.6 B5: Detach terminal stationaries from journey.
+        
+        A stationary that follows the final leg of a journey is terminal (arrival stop)
+        and should be detached (journey_id = NULL). Stationaries between legs remain
+        attached as waypoints. This makes origin and terminal stops symmetric and
+        prevents journeys from reporting departure time instead of arrival time.
+        
+        Args:
+            journey_id: Journey ID to process
+        """
+        # Get all legs and stationaries for this journey ordered by time
+        legs = self.db.execute(
+            select(Leg).where(Leg.journey_id == journey_id).order_by(Leg.started_at)
+        ).scalars().all()
+        
+        if not legs:
+            return  # No legs, nothing to detach
+        
+        # Find the last leg's end time
+        last_leg_ended_at = max(leg.ended_at for leg in legs)
+        
+        # Detach any stationary that starts at or after the last leg ended
+        # These are terminal stops (arrival at destination)
+        detached_count = self.db.execute(
+            text("""
+                UPDATE stationaries
+                SET journey_id = NULL
+                WHERE journey_id = :journey_id
+                  AND started_at >= :last_leg_ended_at
+            """),
+            {"journey_id": str(journey_id), "last_leg_ended_at": last_leg_ended_at}
+        ).rowcount
+        
+        if detached_count > 0:
+            logger.info(
+                "🔓 IMEI %s: Detached %d terminal stationary(ies) from journey %s",
+                self.device_imei, detached_count, str(journey_id)[:8]
+            )
+        
+        self.db.flush()
     
     def _flush_open_stationary(self) -> None:
         """
@@ -736,6 +782,7 @@ class TripEngine:
     def _refresh_journey_aggregates(self, journey_id: str) -> None:
         """
         v2.2 R3: Recompute journey aggregates incrementally (not just at close).
+        v2.1.6 B5: Journey ends at arrival (uses legs only), terminal stops detached.
         
         This ensures open journeys always reflect their current contents,
         fixing the "0 legs" display for open journeys.
@@ -756,25 +803,22 @@ class TripEngine:
             select(Leg).where(Leg.journey_id == journey_id).order_by(Leg.started_at)
         ).scalars().all()
         
-        # Aggregate stationaries
+        # Aggregate stationaries (B5: only counts attached waypoints, not terminal stops)
         stationaries = self.db.execute(
             select(Stationary).where(Stationary.journey_id == journey_id).order_by(Stationary.started_at)
         ).scalars().all()
         
         # Recompute metrics
         journey.leg_count = len(legs)
-        journey.stationary_count = len(stationaries)
+        journey.stationary_count = len(stationaries)  # B5: Only waypoints (terminal stops excluded)
         journey.total_distance_m = sum(leg.distance_m for leg in legs)
         
-        # Recompute time span (started_at from first leg, ended_at from max of all)
+        # v2.1.6 B5: Recompute time span
+        # started_at: first leg start (unchanged)
+        # ended_at: last leg end (NOT including stationaries - journey ends at arrival)
         if legs:
             journey.started_at = min(leg.started_at for leg in legs)
-            
-            all_end_times = [leg.ended_at for leg in legs]
-            if stationaries:
-                all_end_times.extend([s.ended_at for s in stationaries])
-            
-            journey.ended_at = max(all_end_times)
+            journey.ended_at = max(leg.ended_at for leg in legs)  # B5: Legs only!
             journey.total_duration_seconds = int((journey.ended_at - journey.started_at).total_seconds())
         
         self.db.flush()
@@ -813,11 +857,16 @@ class TripEngine:
         start_position_id = points[0][3] if len(points) > 0 and points[0][3] else None
         end_position_id = points[-1][3] if len(points) > 0 and points[-1][3] else None
         
-        # Journey grouping: Check if this stationary breaks the journey (dwell > 30 min)
-        # Skip journey-breaking logic if called from journey_close (prevents recursive close)
+        # v2.1.6 B4: Journey grouping must only apply to finalized stationaries
+        # Check if this stationary breaks the journey (dwell > 30 min)
+        # Skip journey-breaking logic if:
+        # - called from journey_close (prevents recursive close)
+        # - called from R4c flush (duration not final yet)
+        is_flush_operation = (reason == "heartbeat_flush")
         breaks_journey = (
             duration_seconds > (self.config.journey_break_dwell_min * 60) 
             and reason != "journey_close"
+            and not is_flush_operation  # B4: Don't evaluate breaks for open stationaries
         )
         
         if breaks_journey and self.context.current_journey_id:
