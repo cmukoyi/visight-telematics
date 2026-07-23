@@ -400,6 +400,7 @@ jobs:
 
           # Hardened .env excludes — covers .env, .env.local, .env.production,
           # .env.example, anything matching *.env, in any subdirectory.
+          # Documentation excludes — skip *.md files (guides, implementation docs)
           rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
             --exclude '.git' \
@@ -412,6 +413,12 @@ jobs:
             --exclude '.env' \
             --exclude '*.env' \
             --exclude '.env.*' \
+            --exclude '*.md' \
+            --exclude '*.MD' \
+            --exclude 'README*' \
+            --exclude 'DEPLOY_*' \
+            --exclude 'TRIP_ENGINE_*' \
+            --exclude 'features_dev/' \
             --filter='protect .env' \
             --filter='protect *.env' \
             --filter='protect .env.*' \
