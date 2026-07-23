@@ -41,6 +41,7 @@ def upgrade() -> None:
         USING legs l2
         WHERE l1.device_imei = l2.device_imei
           AND l1.started_at = l2.started_at
+          AND l1.id != l2.id
           AND (
               l1.distance_m < l2.distance_m
               OR (l1.distance_m = l2.distance_m AND l1.id > l2.id)
