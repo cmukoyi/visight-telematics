@@ -88,6 +88,29 @@ TRIP_ENGINE_*.md
 TROUBLESHOOT_*.md
 scripts/*_DEPLOYMENT.md
 scripts/*_CANARY.md
+DEPLOY_*.md
+*_IMPLEMENTATION*.md
+*_COMPLETE.md
+*_FIX*.md
+*_STATUS.md
+*_GUIDE.md
+*_RUNBOOK.md
+*_TRACKER.md
+HIVE_*.md
+PROJECT_STRUCTURE.md
+QUICK_REFERENCE.md
+SENDGRID_SETUP.md
+TAGS_NOT_SHOWING_FIX.md
+PRODUCTION_SECRETS_AUDIT.md
+POST_DEPLOYMENT_STEPS.md
+GITHUB_SECRETS.md
+GEOFENCE_STATE_TRACKING.md
+DEPLOYMENT_SAFETY.md
+DEPLOYMENT.md
+
+# Keep only essential root-level documentation
+!README.MD
+!README.md
 
 # Test and debug shell scripts — keep local only
 test_*.sh
