@@ -3176,7 +3176,7 @@ input.hive-range::-moz-range-track {
             
             /* Vertical "Show Journeys" button when collapsed */
             .mha-show-journeys-btn { position:absolute; right:12px; top:50%; transform:translateY(-50%); z-index:1000; writing-mode:vertical-rl; background:var(--primary); color:white; border:none; padding:12px 8px; border-radius:8px; font-size:13px; font-weight:600; letter-spacing:0.5px; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.15); transition:all .2s; display:none; }
-            .mha-journeys-panel.collapsed ~ .mha-map-panel .mha-show-journeys-btn { display:block; }
+            .mha-main:has(.mha-journeys-panel.collapsed) .mha-show-journeys-btn { display:block; }
             .mha-show-journeys-btn:hover { background:color-mix(in srgb, var(--primary) 85%, black); box-shadow:0 4px 12px rgba(0,0,0,0.25); transform:translateY(-50%) scale(1.05); }
             .mha-show-journeys-btn i { margin-bottom:6px; font-size:15px; }
             
@@ -15117,8 +15117,19 @@ function qrOpenHelp() {
   window.mhaTogglePanel = function() {
     const panel = document.querySelector('.mha-journeys-panel');
     const btn = document.querySelector('.mha-jp-collapse i');
+    const showBtn = document.querySelector('.mha-show-journeys-btn');
+    
     panel.classList.toggle('collapsed');
-    btn.className = panel.classList.contains('collapsed') ? 'fa-solid fa-chevron-left' : 'fa-solid fa-chevron-right';
+    const isCollapsed = panel.classList.contains('collapsed');
+    btn.className = isCollapsed ? 'fa-solid fa-chevron-left' : 'fa-solid fa-chevron-right';
+    
+    // Debug logging
+    console.log('[Movement Analytics] Panel toggled:', {
+      collapsed: isCollapsed,
+      showButtonExists: !!showBtn,
+      showButtonDisplay: showBtn ? window.getComputedStyle(showBtn).display : 'N/A',
+      panelHasClass: panel.className
+    });
     
     // Invalidate map size after transition
     setTimeout(() => {
@@ -15143,6 +15154,38 @@ function qrOpenHelp() {
     setTimeout(() => {
       if (_mhaMap) _mhaMap.invalidateSize();
     }, 350);
+  };
+
+  // Debug helper for SHOW JOURNEYS button
+  window.mhaDebugShowButton = function() {
+    const panel = document.querySelector('.mha-journeys-panel');
+    const showBtn = document.querySelector('.mha-show-journeys-btn');
+    const mainContainer = document.querySelector('.mha-main');
+    
+    console.log('=== SHOW JOURNEYS Button Debug ===');
+    console.log('Button element exists:', !!showBtn);
+    if (showBtn) {
+      const styles = window.getComputedStyle(showBtn);
+      console.log('Button computed display:', styles.display);
+      console.log('Button position:', styles.position);
+      console.log('Button right:', styles.right);
+      console.log('Button z-index:', styles.zIndex);
+    }
+    console.log('Panel exists:', !!panel);
+    if (panel) {
+      console.log('Panel has collapsed class:', panel.classList.contains('collapsed'));
+      console.log('Panel classes:', panel.className);
+    }
+    console.log('Main container exists:', !!mainContainer);
+    console.log('CSS :has() supported:', CSS.supports('selector(:has(*))'));
+    console.log('=================================');
+    
+    return {
+      buttonExists: !!showBtn,
+      buttonDisplay: showBtn ? window.getComputedStyle(showBtn).display : null,
+      panelCollapsed: panel ? panel.classList.contains('collapsed') : null,
+      hasSupport: CSS.supports('selector(:has(*))')
+    };
   };
 
   // Plot all journeys on map
