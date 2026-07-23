@@ -32,25 +32,24 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     conn = op.get_bind()
     
-    # Step 1: Delete existing duplicate legs
-    # Keep the longer leg (max distance_m) for each (device_imei, started_at) group
-    # This matches the upsert behavior in trip_engine.py
+    # Step 1: Delete existing duplicate legs using row numbering
+    # Keep ONE leg per (device_imei, started_at) group:
+    # - Prefer longer distance_m (ORDER BY distance_m DESC)
+    # - Use id as tiebreaker for deterministic results
+    # This handles cases where duplicates have identical distance_m
     deleted = conn.execute(text("""
         DELETE FROM legs
         WHERE id IN (
-            -- Find all duplicate legs
-            SELECT l.id
-            FROM legs l
-            INNER JOIN (
-                -- Group by device + start time
-                SELECT device_imei, started_at, MAX(distance_m) as max_distance
+            SELECT id
+            FROM (
+                SELECT id,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY device_imei, started_at 
+                           ORDER BY distance_m DESC, id ASC
+                       ) as rn
                 FROM legs
-                GROUP BY device_imei, started_at
-                HAVING COUNT(*) > 1
-            ) dupes ON dupes.device_imei = l.device_imei 
-                   AND dupes.started_at = l.started_at
-            -- Delete the shorter legs (keep the longer one)
-            WHERE l.distance_m < dupes.max_distance
+            ) ranked
+            WHERE rn > 1
         )
     """))
     
