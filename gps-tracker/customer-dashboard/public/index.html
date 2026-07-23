@@ -13639,17 +13639,17 @@ function qrOpenHelp() {
       if (!res.ok) throw new Error('Failed to load assets');
       
       _mhaAllAssets = await res.json();
-      _mhaAssets = _mhaAllAssets;
       
-      // Sort by last_seen (most recent first)
-      _mhaAssets.sort((a, b) => {
+      // Sort all assets by last_seen (most recent first)
+      _mhaAllAssets.sort((a, b) => {
         const aTime = a.last_seen ? new Date(a.last_seen).getTime() : 0;
         const bTime = b.last_seen ? new Date(b.last_seen).getTime() : 0;
         return bTime - aTime;
       });
       
-      mhaUpdateStats();
-      mhaRenderAssetList();
+      // Apply filters (will filter by trip_subscribed, search, category, status)
+      // This also updates stats and renders the list
+      mhaFilterAssets();
     } catch (err) {
       console.error('[MHA] Error loading assets:', err);
       document.getElementById('mha-asset-list').innerHTML =
@@ -13958,7 +13958,8 @@ function qrOpenHelp() {
 
   // Filter assets by search query
   window.mhaFilterAssets = function() {
-    _mhaSearchQuery = document.getElementById('mha-search-input').value.toLowerCase();
+    const searchInput = document.getElementById('mha-search-input');
+    _mhaSearchQuery = searchInput ? searchInput.value.toLowerCase() : '';
     
     _mhaAssets = _mhaAllAssets.filter(asset => {
       // v2.1: Only show trip-subscribed assets (spec Section 3.2)
@@ -13990,6 +13991,10 @@ function qrOpenHelp() {
       return status === _mhaFilterStatus;
     });
     
+    // Update stats to reflect filtered assets
+    mhaUpdateStats();
+    
+    // Render filtered list
     mhaRenderAssetList();
   };
 
