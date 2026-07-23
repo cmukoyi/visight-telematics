@@ -952,7 +952,15 @@ class TripEngine:
                     )
         
         # Create new stationary record (no merge)
-        stationary = Stationary(
+        # v2.2 FIX: Use upsert to handle backfill idempotency
+        # If a stationary with same (device_imei, started_at) exists, update it
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+        from app.models import get_uuid_column
+        
+        stationary_id = get_uuid_column()
+        
+        stmt = pg_insert(Stationary).values(
+            id=stationary_id,
             device_imei=self.device_imei,
             anchor_lat=centroid_lat,
             anchor_lng=centroid_lng,
@@ -963,11 +971,27 @@ class TripEngine:
             start_position_id=start_position_id,
             end_position_id=end_position_id,
             journey_id=self.context.current_journey_id,  # NULL for journey-breaking stationaries
+            is_open=False,
             created_at=datetime.now(timezone.utc),
-        )
+        ).on_conflict_do_update(
+            index_elements=['device_imei', 'started_at'],  # uq_stationary_device_started
+            set_={
+                'ended_at': ended_at,
+                'duration_seconds': int(duration_seconds),
+                'point_count': point_count,
+                'end_position_id': end_position_id,
+                'anchor_lat': centroid_lat,
+                'anchor_lng': centroid_lng,
+                'journey_id': self.context.current_journey_id,
+            }
+        ).returning(Stationary.id)
         
-        self.db.add(stationary)
-        self.db.flush()  # Get ID without committing
+        result = self.db.execute(stmt)
+        returned_id = result.scalar_one()
+        
+        # Fetch the stationary object
+        stationary = self.db.query(Stationary).filter(Stationary.id == returned_id).one()
+        self.db.flush()
         
         # Build PostGIS Point geometry for the centroid
         try:
