@@ -1026,6 +1026,10 @@ class TripEngine:
             )
             raise RuntimeError("Re-entrancy violation: stationary already persisted in this invocation")
         
+        # CRITICAL: Set flag IMMEDIATELY after check, BEFORE journey break detection
+        # This prevents recursive calls to _create_stationary during _close_journey
+        self.context.stationary_persisted_this_invocation = True
+        
         # v2.1.6 B1: Overlap guard - reject if overlaps existing stationary
         # Route through merge check first - if it qualifies for merge, that's handled above
         # This check catches cases where overlap exists but merge criteria not met
@@ -1090,9 +1094,6 @@ class TripEngine:
         # Fetch the stationary object
         stationary = self.db.query(Stationary).filter(Stationary.id == returned_id).one()
         self.db.flush()
-        
-        # v2.1.6 B1: Set re-entrancy guard flag
-        self.context.stationary_persisted_this_invocation = True
         
         # Build PostGIS Point geometry for the centroid
         try:
