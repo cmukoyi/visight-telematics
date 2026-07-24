@@ -567,7 +567,10 @@ class TripEngine:
         
         # Flush any pending stationary data (anchor_points)
         # If we're in STATIONARY state with accumulated anchor points, create stationary now
-        if self.context.current_state == "STATIONARY" and len(self.context.anchor_points) >= 1:
+        # CRITICAL: Don't flush if we're already inside _create_stationary (re-entrancy guard)
+        if (self.context.current_state == "STATIONARY" and 
+            len(self.context.anchor_points) >= 1 and
+            not self.context.stationary_persisted_this_invocation):  # Don't re-enter
             # Don't create journey-breaking stationary here (would recursively close journey)
             # Just flush to a normal stationary
             logger.debug(
