@@ -624,6 +624,12 @@ def branding():
     frontend reads this at boot and overrides <title>, theme-color, header
     text, primary colour, etc. PinPlot defaults are kept for back-compat when
     no env vars are set."""
+    
+    # Parse disabled features from env (comma-separated)
+    disabled_features = [
+        f.strip() for f in os.getenv("TENANT_DISABLED_FEATURES", "").split(",") if f.strip()
+    ]
+    
     return {
         "name":         os.getenv("BRAND_NAME", "PinPlot"),
         "product":      os.getenv("BRAND_PRODUCT", "PinPlot Customer Portal"),
@@ -636,6 +642,9 @@ def branding():
         # Per-tenant MapTiler key. No default — each tenant MUST set
         # MAPTILER_KEY in backend/.env (free-tier keys are origin-restricted).
         "maptilerKey":  os.getenv("MAPTILER_KEY") or None,
+        # Feature gates: list of feature keys (tab names) that should be hidden
+        # from navigation and disabled at API level. Set via TENANT_DISABLED_FEATURES env.
+        "disabledFeatures": disabled_features,
     }
 
 

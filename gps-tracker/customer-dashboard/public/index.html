@@ -78,6 +78,16 @@
           if (typeof window._ppRefreshAllBasemaps === 'function') {
             try { window._ppRefreshAllBasemaps(); } catch (_) {}
           }
+          // Hide navigation items for tenant-disabled features
+          if (b.disabledFeatures && Array.isArray(b.disabledFeatures)) {
+            b.disabledFeatures.forEach(function(featureKey) {
+              const navItem = document.querySelector('.nav-item[data-tab="' + featureKey + '"]');
+              if (navItem) {
+                navItem.style.display = 'none';
+                console.log('[Branding] Feature gate: hiding navigation for "' + featureKey + '"');
+              }
+            });
+          }
         }
         window._ppApplyBrand = _ppApplyBrand;
         try {
