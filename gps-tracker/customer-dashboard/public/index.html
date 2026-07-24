@@ -3947,11 +3947,7 @@ function _generateCaptcha() {
     const el = document.getElementById('captchaQuestion');
     if (el) {
         el.textContent = `${a} + ${b} = ?`;
-        // Apply the primary text color based on current theme
-        const theme = document.documentElement.getAttribute('data-theme') || 'dark';
-        const color = theme === 'dark' ? '#E8EDF8' : '#0F172A';
-        el.style.cssText = `font-weight: 600; color: ${color} !important;`;
-        console.log('Captcha generated with theme:', theme, 'color:', color);
+        el.style.cssText = 'font-weight: 600; color: var(--text-1) !important;';
     }
     const inp = document.getElementById('loginCaptcha');
     if (inp) inp.value = '';
@@ -4357,8 +4353,7 @@ function applyTheme(theme) {
     // Update captcha color if it exists
     const el = document.getElementById('captchaQuestion');
     if (el && el.textContent) {
-        const color = theme === 'dark' ? '#E8EDF8' : '#0F172A';
-        el.style.cssText = `font-weight: 600; color: ${color} !important;`;
+        el.style.cssText = 'font-weight: 600; color: var(--text-1) !important;';
     }
 }
 function toggleTheme() {
