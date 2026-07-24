@@ -3287,8 +3287,8 @@ input.hive-range::-moz-range-track {
             }
             
             /* Journeys/Positions Panel (340px) - Collapsible */
-            .mha-journeys-panel { flex:none; width:340px; min-width:300px; background:var(--bg-2); border:1px solid var(--border); border-radius:12px; display:flex; flex-direction:column; overflow:hidden; transition:width .3s, min-width .3s; }
-            .mha-journeys-panel.collapsed { width:40px; min-width:40px; }
+            .mha-journeys-panel { flex:none; width:340px; min-width:300px; background:var(--bg-2); border:1px solid var(--border); border-radius:12px; display:flex; flex-direction:column; overflow:hidden; transition:width .3s, min-width .3s, opacity .3s; }
+            .mha-journeys-panel.collapsed { width:0; min-width:0; opacity:0; border:none; margin:0; }
             .mha-jp-tabs { display:flex; border-bottom:1px solid var(--border); position:relative; }
             .mha-jp-tab { flex:1; text-align:center; padding:13px 0; font-size:13px; color:var(--text-2); cursor:pointer; border-bottom:2px solid transparent; display:flex; align-items:center; justify-content:center; gap:6px; transition:all .15s; }
             .mha-jp-tab i { font-size:15px; }
@@ -3296,6 +3296,7 @@ input.hive-range::-moz-range-track {
             .mha-jp-tab.active { color:var(--text-1); border-bottom-color:var(--primary); }
             .mha-jp-collapse { position:absolute; right:4px; top:50%; transform:translateY(-50%); width:28px; height:28px; border-radius:6px; border:1px solid var(--border); background:var(--bg-3); color:var(--text-2); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:12px; transition:all .15s; }
             .mha-jp-collapse:hover { background:var(--primary); color:white; border-color:var(--primary); }
+            .mha-journeys-panel.collapsed .mha-jp-tabs { display:none; }
             .mha-journeys-panel.collapsed .mha-jp-tab span { display:none; }
             .mha-journeys-panel.collapsed .mha-jp-body { display:none; }
             .mha-jp-body { overflow:auto; padding:12px; flex:1; }
