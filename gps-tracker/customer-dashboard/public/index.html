@@ -3335,6 +3335,14 @@ input.hive-range::-moz-range-track {
             .battery-wrap.low { color:#ef4444; }
             .battery-wrap.good { color:#22c55e; }
             
+            /* Live Map Time Badges */
+            .lm-time-badge { font-size:10px; font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
+            .lm-time-fresh { color:#22c55e; } /* ≤15 min */
+            .lm-time-recent { color:var(--text-2); } /* ≤3 h */
+            .lm-time-old { color:var(--text-3); } /* older */
+            .lm-time-offline { color:#ef4444; } /* offline */
+            .asset-row-right { display:flex; align-items:center; gap:6px; }
+            
             /* Date Headers */
             .mha-date-group { margin-bottom:6px; }
             .mha-date-hd { position:sticky; top:0; background:var(--bg-2); font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:var(--text-3); padding:8px 2px 6px; border-bottom:1px solid var(--border); z-index:1; }
@@ -10730,6 +10738,11 @@ function _lmRenderList(query) {
         const batCls  = batPct == null ? '' : batPct > 20 ? 'good' : 'low';
         const battery = batPct != null
             ? `<span class="battery-wrap ${batCls}"><i class="fa-solid fa-battery-full"></i> <small>${batPct}%</small></span>` : '';
+        
+        // Time badge (last seen)
+        const {text: timeText, cssClass: timeClass} = mhaGetTimeBadge(t.last_seen);
+        const timeBadge = `<span class="lm-time-badge lm-time-${timeClass}">${timeText}</span>`;
+        
         return `<div class="asset-row${cls}" data-imei="${esc(t.imei)}" onclick="lmSelectFromList('${esc(t.imei)}')">
             <div class="asset-row-icon" style="background:${iconBg};color:${iconClr}">
                 <i class="fa-solid ${faIcon}"></i>
@@ -10739,8 +10752,9 @@ function _lmRenderList(query) {
                 <span class="asset-row-tag mono">${esc(t.imei)}</span>
             </div>
             <div class="asset-row-right">
-                <span class="status-dot status-${status}"></span>
+                ${timeBadge}
                 ${battery}
+                <span class="status-dot status-${status}"></span>
             </div>
         </div>`;
     }).join('');
