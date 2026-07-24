@@ -436,6 +436,15 @@
                         <i class="fa-solid fa-eraser"></i>
                         <span>Clear Markers</span>
                     </button>
+                    <!-- Map Style Switcher for Live Map -->
+                    <div class="map-style-switcher" id="live-style-switcher">
+                        <button class="map-style-btn active" data-style="streets" onclick="liveSwitchMapStyle('streets')">
+                            Streets
+                        </button>
+                        <button class="map-style-btn" data-style="satellite" onclick="liveSwitchMapStyle('satellite')">
+                            Satellite
+                        </button>
+                    </div>
                     <div id="liveMap"></div>
                 </div>
             </div>
@@ -1370,6 +1379,14 @@ input.hive-range::-moz-range-track {
   #tab-hive .hive-tl-item { grid-template-columns:44px 12px 1fr; gap:8px; }
   #tab-hive .hive-tl-time { font-size:10px; }
 }
+
+/* ── Map Style Switcher (Satellite Maps) ──────────────── */
+.map-style-switcher { position:absolute; top:12px; left:50%; transform:translateX(-50%); z-index:1000; background:var(--bg-2); border:1px solid var(--border); border-radius:8px; overflow:hidden; display:flex; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
+.map-style-btn { padding:6px 10px; font-size:11px; color:var(--text-2); cursor:pointer; border:none; background:transparent; font-family:inherit; transition:all .15s; display:flex; align-items:center; gap:5px; border-right:1px solid var(--border); }
+.map-style-btn:last-child { border-right:none; }
+.map-style-btn:hover { color:var(--text-1); background:var(--bg-3); }
+.map-style-btn.active { color:var(--primary); background:color-mix(in srgb,var(--primary) 10%,transparent); font-weight:600; }
+.map-style-btn i { font-size:13px; }
 /* ═══════════════════════════════════════════════════════ */
             </style>
 
@@ -9540,16 +9557,41 @@ async function initLiveMap() {
     // are now included in /api/portal/tags and rendered with regular markers.
 }
 
-async function _lmLoadTags() {
-    document.getElementById('lm-asset-list').innerHTML =
-        '<div style="padding:20px;text-align:center;color:var(--text-3)"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</div>';
-    try {
-        const res = await apiFetch('/api/portal/tags');
-        if (!res.ok) throw new Error((await res.json()).detail || 'Failed');
-        _lmTags = await res.json();
-    } catch (err) {
-        document.getElementById('lm-asset-list').innerHTML =
-            `<div style="padding:20px;text-align:center;color:var(--danger)"><i class="fa-solid fa-triangle-exclamation"></i> ${esc(err.message)}</div>`;
+// Map style switcher for Live Map
+window.liveSwitchMapStyle = function(style) {
+    if (!_liveMap) return;
+    
+    // Update button states
+    document.querySelectorAll('#live-style-switcher .map-style-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.style === style);
+    });
+    
+    // Get MapTiler style name
+    let tileStyle;
+    switch(style) {
+        case 'satellite':
+            tileStyle = 'hybrid-v4'; // satellite with labels - most useful
+            break;
+        case 'hybrid':
+            tileStyle = 'hybrid-v2';
+            break;
+        default:
+            tileStyle = _ppMapTilerStyle(); // streets (theme-aware)
+    }
+    
+    // Replace tile layer
+    _ppMapTilerLayers.forEach(entry => {
+        if (entry.map === _liveMap) {
+            _liveMap.removeLayer(entry.layer);
+            const newLayer = L.tileLayer(_ppMapTilerUrl(tileStyle), {
+                maxZoom: 19,
+                attribution: '© <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap contributors</a>'
+            });
+            newLayer.addTo(_liveMap);
+            entry.layer = newLayer;
+        }
+    });
+};
         return;
     }
     _lmPlaceMarkers();
