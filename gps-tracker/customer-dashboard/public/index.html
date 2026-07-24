@@ -3329,6 +3329,12 @@ input.hive-range::-moz-range-track {
             .mha-asset-row .sdot.idle { background:#f59e0b; }
             .mha-asset-row .sdot.offline { background:#ef4444; }
             
+            /* Live Map & Asset List Battery Colors (unified with Movement Analytics) */
+            .battery-wrap { font-size:10px; display:flex; align-items:center; gap:3px; }
+            .battery-wrap i { font-size:13px; }
+            .battery-wrap.low { color:#ef4444; }
+            .battery-wrap.good { color:#22c55e; }
+            
             /* Date Headers */
             .mha-date-group { margin-bottom:6px; }
             .mha-date-hd { position:sticky; top:0; background:var(--bg-2); font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:var(--text-3); padding:8px 2px 6px; border-bottom:1px solid var(--border); z-index:1; }
@@ -10721,7 +10727,7 @@ function _lmRenderList(query) {
         const iconClr = statusColors[status];
         const faIcon  = hasGPS ? 'fa-location-dot' : 'fa-tag';
         const batPct  = t.battery_level;
-        const batCls  = batPct == null ? '' : batPct <= 20 ? 'battery-critical' : batPct <= 50 ? 'battery-low' : 'battery-ok';
+        const batCls  = batPct == null ? '' : batPct > 20 ? 'good' : 'low';
         const battery = batPct != null
             ? `<span class="battery-wrap ${batCls}"><i class="fa-solid fa-battery-full"></i> <small>${batPct}%</small></span>` : '';
         return `<div class="asset-row${cls}" data-imei="${esc(t.imei)}" onclick="lmSelectFromList('${esc(t.imei)}')">
@@ -10980,7 +10986,7 @@ function alRenderTable() {
         const typeLabel = _tagTypeLabel(t.tag_type);
         const typeColor = typeLabel === 'Series 1' ? 'var(--primary)' : typeLabel === 'Series 2' ? 'var(--warning,#f59e0b)' : 'var(--text-3)';
         const batPct = t.battery_level != null ? t.battery_level : null;
-        const batCls = batPct == null ? '' : batPct <= 20 ? 'battery-critical' : batPct <= 50 ? 'battery-low' : 'battery-ok';
+        const batCls = batPct == null ? '' : batPct > 20 ? 'good' : 'low';
         const batHtml= batPct != null
             ? `<span class="battery-wrap ${batCls}"><i class="fa-solid fa-battery-full"></i> <small>${batPct}%</small></span>` : '—';
         const hasGPS = !!(t.latitude && t.longitude);
@@ -11446,7 +11452,7 @@ function amRenderCards() {
             expiryDisplay = daysLeft;
         }
         const batPct   = t.battery_level;
-        const batCls   = batPct == null ? '' : batPct <= 20 ? 'battery-critical' : batPct <= 50 ? 'battery-low' : 'battery-ok';
+        const batCls   = batPct == null ? '' : batPct > 20 ? 'good' : 'low';
         const batHtml  = batPct != null
             ? `<span class="battery-wrap ${batCls}"><i class="fa-solid fa-battery-full"></i> ${batPct}%</span>` : '—';
         return `<div class="asset-card">
