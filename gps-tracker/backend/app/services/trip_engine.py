@@ -567,10 +567,8 @@ class TripEngine:
         
         # Flush any pending stationary data (anchor_points)
         # If we're in STATIONARY state with accumulated anchor points, create stationary now
-        # CRITICAL: Don't flush if we're already inside _create_stationary (re-entrancy guard)
         if (self.context.current_state == "STATIONARY" and 
-            len(self.context.anchor_points) >= 1 and
-            not self.context.stationary_persisted_this_invocation):  # Don't re-enter
+            len(self.context.anchor_points) >= 1):
             # Don't create journey-breaking stationary here (would recursively close journey)
             # Just flush to a normal stationary
             logger.debug(
@@ -1006,9 +1004,6 @@ class TripEngine:
                     # Update journey context
                     self.context.last_stationary_ended_at = new_ended_at
                     
-                    # CRITICAL: Set re-entrancy flag before returning (merged counts as persisted)
-                    self.context.stationary_persisted_this_invocation = True
-                    
                     # Return the merged stationary
                     return last_stationary
                 else:
@@ -1020,19 +1015,6 @@ class TripEngine:
                     )
         
         # Create new stationary record (no merge)
-        # v2.1.6 B1: Re-entrancy guard - check if already persisted in this invocation
-        # Note: This only applies to NEW stationaries, not merged ones
-        if self.context.stationary_persisted_this_invocation:
-            logger.error(
-                "🚨 IMEI %s: Re-entrancy violation! Already persisted a stationary in this invocation",
-                self.device_imei
-            )
-            raise RuntimeError("Re-entrancy violation: stationary already persisted in this invocation")
-        
-        # CRITICAL: Set flag IMMEDIATELY after check, BEFORE journey break detection
-        # This prevents recursive calls to _create_stationary during _close_journey
-        self.context.stationary_persisted_this_invocation = True
-        
         # v2.1.6 B1: Overlap guard - reject if overlaps existing stationary
         # Route through merge check first - if it qualifies for merge, that's handled above
         # This check catches cases where overlap exists but merge criteria not met
@@ -1565,9 +1547,8 @@ class TripEngine:
         """
         result = {}
         
-        # v2.1.6 B1: Clear re-entrancy flags at start of each position processing
+        # v2.1.6 B1: Clear leg re-entrancy flag at start of each position processing
         self.context.leg_persisted_this_invocation = False
-        self.context.stationary_persisted_this_invocation = False
         
         # Update watermark
         self.context.last_processed_at = observed_at
