@@ -4679,7 +4679,7 @@ function _generateCaptcha() {
     const el = document.getElementById('captchaQuestion');
     if (el) {
         el.textContent = `${a} + ${b} = ?`;
-        el.style.cssText = 'font-weight: 600; color: var(--text-1) !important;';
+        el.style.cssText = 'font-weight: 600; color: var(--text) !important;';
     }
     const inp = document.getElementById('loginCaptcha');
     if (inp) inp.value = '';
@@ -5089,7 +5089,7 @@ function applyTheme(theme) {
     // Update captcha color if it exists
     const el = document.getElementById('captchaQuestion');
     if (el && el.textContent) {
-        el.style.cssText = 'font-weight: 600; color: var(--text-1) !important;';
+        el.style.cssText = 'font-weight: 600; color: var(--text) !important;';
     }
 }
 function toggleTheme() {
