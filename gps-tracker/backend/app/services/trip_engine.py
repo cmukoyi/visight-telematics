@@ -96,7 +96,7 @@ from app.models import (
 logger = logging.getLogger(__name__)
 
 # ── Engine Version (v2.2.0 - Fix Register) ────────────────────────────────
-ENGINE_VERSION = "2.1.6"
+ENGINE_VERSION = "2.1.11"  # v2.1.11: D1 late arrivals, D2 journey states
 
 # ── Configuration (defaults from spec validation) ─────────────────────────
 DEFAULT_ANCHOR_RADIUS_M = 100
@@ -368,7 +368,8 @@ class EngineContext:
     anchor_snapshot: Optional[Tuple[float, float, int, datetime]] = None  # (lat, lng, count, since)
     
     # Last processed
-    last_processed_at: Optional[datetime] = None
+    last_processed_at: Optional[datetime] = None  # Still used for reporting
+    last_received_at: Optional[datetime] = None  # v2.1.11 D1: Checkpoint on arrival time
     last_position_lat: Optional[float] = None
     last_position_lng: Optional[float] = None
     last_position_time: Optional[datetime] = None
@@ -477,6 +478,7 @@ class TripEngine:
             current_leg_id=None,  # TODO: Track open leg ID
             current_journey_id=context.current_journey_id,
             last_processed_at=context.last_processed_at,
+            last_received_at=context.last_received_at,  # v2.1.11 D1: Arrival checkpoint
             updated_at=datetime.now(timezone.utc),
         ).on_conflict_do_update(
             index_elements=['device_imei'],
@@ -487,6 +489,7 @@ class TripEngine:
                 'anchor_count': len(context.anchor_points),
                 'current_journey_id': context.current_journey_id,
                 'last_processed_at': context.last_processed_at,
+                'last_received_at': context.last_received_at,  # v2.1.11 D1: Arrival checkpoint
                 'updated_at': datetime.now(timezone.utc),
             }
         )
@@ -1450,16 +1453,18 @@ class TripEngine:
         self.context = self._load_state()
         
         # Get unprocessed positions
+        # v2.1.11 D1: Query by received_at (arrival time) to capture late positions
         query = select(DevicePosition).where(
             DevicePosition.device_imei == self.device_imei
         )
         
-        # Filter to unprocessed only
-        if self.context.last_processed_at:
+        # Filter to unprocessed only (checkpoint on arrival time)
+        if self.context.last_received_at:
             query = query.where(
-                DevicePosition.observed_at > self.context.last_processed_at
+                DevicePosition.received_at > self.context.last_received_at
             )
         
+        # Process in observed_at order (chronological), but checkpoint on received_at
         query = query.order_by(DevicePosition.observed_at)
         
         if limit:
@@ -1491,6 +1496,23 @@ class TripEngine:
             logger.info("✅ IMEI %s: All positions were duplicates", self.device_imei)
             return stats
         
+        # v2.1.11 D1: Detect late-arriving positions (out-of-order timestamps)
+        # If any position has observed_at < last_processed_at, we must rebuild state
+        if self.context.last_processed_at:
+            min_observed = min(p.observed_at for p in positions)
+            if min_observed < self.context.last_processed_at:
+                logger.warning(
+                    "⚠️  D1 late arrivals detected: min(observed_at)=%s < last_processed_at=%s",
+                    min_observed.isoformat(),
+                    self.context.last_processed_at.isoformat()
+                )
+                logger.warning(
+                    "⚠️  State rebuild required - use reprocess or wait for next scheduled reprocess"
+                )
+                # NOTE: Full state rebuild requires reprocessing from earliest position
+                # For incremental runs, we log the issue but continue processing
+                # Reprocess jobs will handle full state reconstruction
+        
         # Apply median smoothing
         smoothed = median_smooth_positions(positions, self.config.smoothing_window)
         
@@ -1514,6 +1536,16 @@ class TripEngine:
                 stats['legs_created'] += 1
             if result.get('journey_created'):
                 stats['journeys_created'] += 1
+        
+        # v2.1.11 D1: Update received_at checkpoint (arrival time, not observation time)
+        # This allows late-arriving buffered positions to be captured
+        if positions:
+            self.context.last_received_at = max(p.received_at for p in positions)
+            logger.debug(
+                "📌 D1 checkpoint: received_at=%s (last observed_at=%s)",
+                self.context.last_received_at.isoformat(),
+                self.context.last_processed_at.isoformat()
+            )
         
         # v2.2 R4c: Flush open stationary before saving state
         self._flush_open_stationary()

@@ -864,6 +864,9 @@ class DevicePosition(Base):
     lng = Column(Float, nullable=False)
     observed_at = Column(DateTime(timezone=True), nullable=False, index=True)
     
+    # v2.1.11 D1: Track arrival time (for late-arriving buffered positions)
+    received_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), index=True)
+    
     # Movement metadata
     direction = Column(Integer, nullable=True)           # 0-360 degrees
     gps_speed = Column(Float, nullable=True)             # km/h
@@ -961,6 +964,9 @@ class EngineState(Base):
     
     # Processing watermark
     last_processed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # v2.1.11 D1: Arrival-time checkpoint (captures late-arriving positions)
+    last_received_at = Column(DateTime(timezone=True), nullable=True)
     
     # Metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now())
