@@ -10698,6 +10698,11 @@ function _lmRenderList(query) {
         if (!query) return true;
         const haystack = [t.imei, t.description, t.device_name, t.owner_email].join(' ').toLowerCase();
         return haystack.includes(query);
+    }).sort((a, b) => {
+        // Sort by last_seen: most recent first
+        const aTime = a.last_seen ? new Date(a.last_seen).getTime() : 0;
+        const bTime = b.last_seen ? new Date(b.last_seen).getTime() : 0;
+        return bTime - aTime; // descending order (newest first)
     });
     const container = document.getElementById('lm-asset-list');
     if (!list.length) {
