@@ -96,7 +96,7 @@ from app.models import (
 logger = logging.getLogger(__name__)
 
 # ── Engine Version (v2.2.0 - Fix Register) ────────────────────────────────
-ENGINE_VERSION = "2.1.11"  # v2.1.11: D1 late arrivals, D2 journey states
+ENGINE_VERSION = "2.1.11"  # v2.1.11: D1 late arrivals + C1 leg terminus alignment
 
 # ── Configuration (defaults from spec validation) ─────────────────────────
 DEFAULT_ANCHOR_RADIUS_M = 100
@@ -2036,7 +2036,10 @@ class TripEngine:
                 if d12 <= self.config.anchor_radius_m and d23 <= self.config.anchor_radius_m and d13 <= self.config.anchor_radius_m:
                     # New stop CANDIDATE detected - open it but stay in MOVE
                     candidate_centroid = calculate_centroid([(p[0], p[1]) for p in last_3])
-                    self.context.stop_candidate_since = observed_at
+                    # v2.1.7 C1: Set cand_since to FIRST point timestamp (when stop began)
+                    # NOT current point timestamp (when we detected it).
+                    # This ensures leg.ended_at == stationary.started_at with zero gap.
+                    self.context.stop_candidate_since = last_3[0][2]  # First point, not observed_at
                     self.context.stop_candidate_lat = candidate_centroid[0]
                     self.context.stop_candidate_lng = candidate_centroid[1]
                     self.context.stop_candidate_points = [
