@@ -1685,6 +1685,8 @@ class TripEngine:
                     result['leg_created'] = True
                     if self.context.journey_just_created:
                         result['journey_created'] = True
+                # CRITICAL: Clear leg_buffer immediately to prevent re-entrancy in _create_stationary
+                self.context.leg_buffer = []
             
             # Create stationary from last position until now
             gap_stationary_points = [
