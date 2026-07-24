@@ -2,6 +2,7 @@
 Admin API endpoints: authentication, logging, billing, user management
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, date
 from typing import List, Optional, Dict
@@ -3661,7 +3662,6 @@ def list_tags_with_subscriptions(
     
     from app.models import PortalUser, User, UserGroup
     from uuid import UUID
-    from sqlalchemy import or_
     
     # Validate UUID
     try:
