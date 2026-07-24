@@ -1755,6 +1755,8 @@ class TripEngine:
                 # Create stationary record from accumulated anchor points
                 if len(self.context.anchor_points) >= 1:
                     stationary = self._create_stationary(self.context.anchor_points, reason="leaving_anchor")
+                    # CRITICAL: Clear anchor_points IMMEDIATELY after creation (re-entrancy fix)
+                    self.context.anchor_points = []
                     if stationary:
                         result['stationary_created'] = True
                         if self.context.journey_just_created:
