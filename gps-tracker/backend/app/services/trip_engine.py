@@ -80,7 +80,7 @@ from math import radians, cos, sin, asin, sqrt
 from statistics import median
 from uuid import uuid4
 
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
