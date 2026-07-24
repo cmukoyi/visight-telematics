@@ -13811,7 +13811,8 @@ function qrOpenHelp() {
   }
 
   // Get time badge with color coding (matching reference design)
-  function mhaGetTimeBadge(lastSeen) {
+  // Exposed globally for use in Live Map and other tabs
+  window.mhaGetTimeBadge = function(lastSeen) {
     if (!lastSeen) return {text: 'offline', cssClass: 'offline'};
     
     const now = Date.now();
@@ -13836,7 +13837,7 @@ function qrOpenHelp() {
     if (days < 7) return {text: `${days}d`, cssClass: 'offline'};
     
     return {text: 'offline', cssClass: 'offline'};
-  }
+  };
   
   // Format last seen time (legacy - kept for compatibility)
   function mhaFormatLastSeen(lastSeen) {
