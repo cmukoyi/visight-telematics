@@ -1006,6 +1006,9 @@ class TripEngine:
                     # Update journey context
                     self.context.last_stationary_ended_at = new_ended_at
                     
+                    # CRITICAL: Set re-entrancy flag before returning (merged counts as persisted)
+                    self.context.stationary_persisted_this_invocation = True
+                    
                     # Return the merged stationary
                     return last_stationary
                 else:
