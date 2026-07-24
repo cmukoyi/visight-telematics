@@ -1855,6 +1855,8 @@ class TripEngine:
                                 result['leg_created'] = True
                                 if self.context.journey_just_created:
                                     result['journey_created'] = True
+                            # CRITICAL: Clear leg_buffer immediately to prevent re-entrancy in _create_stationary
+                            self.context.leg_buffer = []
                             
                             # v2.2 R6: Create stationary with started_at = cand_since (not current time)
                             # This makes leg.ended_at == stationary.started_at
@@ -1872,7 +1874,6 @@ class TripEngine:
                             self.context.anchor_points = [self.context.stop_candidate_points[-1]]
                             self.context.anchor_lat = self.context.stop_candidate_lat  # ← ASSIGNMENT #3
                             self.context.anchor_lng = self.context.stop_candidate_lng  # ← ASSIGNMENT #3
-                            self.context.leg_buffer = []
                             self.context.anchor_snapshot = None  # Clear snapshot
                             
                             # Clear candidate
