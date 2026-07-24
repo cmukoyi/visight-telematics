@@ -3335,13 +3335,14 @@ input.hive-range::-moz-range-track {
             .battery-wrap.low { color:#ef4444; }
             .battery-wrap.good { color:#22c55e; }
             
-            /* Live Map Time Badges */
-            .lm-time-badge { font-size:10px; font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
+            /* Live Map Time Badges (matching Movement Analytics style) */
+            .lm-time-badge { font-size:10.5px; font-weight:600; font-variant-numeric:tabular-nums; line-height:1; border:1px solid currentColor; border-radius:5px; padding:2px 6px; text-align:center; min-width:65px; white-space:nowrap; }
             .lm-time-fresh { color:#22c55e; } /* ≤15 min */
             .lm-time-recent { color:var(--text-2); } /* ≤3 h */
             .lm-time-old { color:var(--text-3); } /* older */
             .lm-time-offline { color:#ef4444; } /* offline */
-            .asset-row-right { display:flex; align-items:center; gap:6px; }
+            .asset-row-right { display:flex; flex-direction:column; align-items:flex-end; gap:3px; }
+            .asset-row-meta { display:flex; align-items:center; gap:6px; }
             
             /* Date Headers */
             .mha-date-group { margin-bottom:6px; }
@@ -10753,8 +10754,10 @@ function _lmRenderList(query) {
             </div>
             <div class="asset-row-right">
                 ${timeBadge}
-                ${battery}
-                <span class="status-dot status-${status}"></span>
+                <div class="asset-row-meta">
+                    ${battery}
+                    <span class="status-dot status-${status}"></span>
+                </div>
             </div>
         </div>`;
     }).join('');
