@@ -13666,9 +13666,16 @@ function qrOpenHelp() {
     const day = 24 * 60 * 60 * 1000;
     const week = 7 * day;
     
-    let active = 0, idle = 0, offline = 0;
+    let total = 0, active = 0, idle = 0, offline = 0;
     
-    _mhaAssets.forEach(asset => {
+    // Count from ALL trip-subscribed devices, not filtered assets
+    // Stats should always show total counts regardless of search/category filters
+    _mhaAllAssets.forEach(asset => {
+      // Only count trip-subscribed devices (spec Section 3.2)
+      if (!asset.trip_subscribed) return;
+      
+      total++;
+      
       if (!asset.last_seen) {
         offline++;
         return;
@@ -13684,7 +13691,7 @@ function qrOpenHelp() {
     document.getElementById('mha-stat-active').textContent = active;
     document.getElementById('mha-stat-idle').textContent = idle;
     document.getElementById('mha-stat-offline').textContent = offline;
-    document.getElementById('mha-stat-total').textContent = _mhaAssets.length;
+    document.getElementById('mha-stat-total').textContent = total;
   }
 
   // Render asset list with color-coded time badges, battery, status dots
