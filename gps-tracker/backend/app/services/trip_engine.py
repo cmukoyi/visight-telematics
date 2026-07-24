@@ -1038,7 +1038,7 @@ class TripEngine:
                     )
                 )
             )
-        ).first()  # Use .first() instead of .scalar_one_or_none() to handle multiple overlaps
+        ).scalars().first()  # Use .scalars().first() to get model object, handles multiple overlaps
         
         if overlap_check:
             logger.error(
@@ -1294,7 +1294,7 @@ class TripEngine:
                     )
                 )
             )
-        ).first()  # Use .first() instead of .scalar_one_or_none() to handle multiple overlaps
+        ).scalars().first()  # Use .scalars().first() to get model object, handles multiple overlaps
         
         if overlap_check:
             logger.error(
