@@ -531,6 +531,16 @@
                         <button id="hist-panel-btn" class="map-panel-toggle" onclick="toggleHistPanel()" title="Toggle journeys panel" style="display:none">
                             <i class="fa-solid fa-route"></i>
                         </button>
+                        
+                        <!-- Map Style Switcher -->
+                        <div class="map-style-switcher" id="hist-style-switcher">
+                            <button class="map-style-btn active" data-style="streets" onclick="histSwitchMapStyle('streets')">
+                                Streets
+                            </button>
+                            <button class="map-style-btn" data-style="satellite" onclick="histSwitchMapStyle('satellite')">
+                                Satellite
+                            </button>
+                        </div>
                     </div>
 
                     <aside class="hist-timeline-panel" id="hist-timeline-panel">
@@ -10258,6 +10268,7 @@ async function initHistoryTab() {
     if (!_histMapReady) {
         _histMap = L.map('hist-map', { zoomControl: true, attributionControl: false }).setView([51.5074, -0.1278], 11);
         addPinplotBasemap(_histMap);
+        _histMap._ppCurrentStyle = 'streets';
         _histMapReady = true;
     } else {
         _histMap.invalidateSize();
@@ -10279,6 +10290,47 @@ function histPreselect(imei) {
     const sel = document.getElementById('hist-asset-select');
     if (sel) { sel.value = imei; histChangeAsset(imei); }
 }
+
+// Map style switcher for Movement History Journey Map
+window.histSwitchMapStyle = function(style) {
+    if (!_histMap) return;
+    
+    // Update button states
+    document.querySelectorAll('#hist-style-switcher .map-style-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.style === style);
+    });
+    
+    // Get MapTiler style name
+    let tileStyle;
+    switch(style) {
+        case 'satellite':
+            tileStyle = 'hybrid-v4'; // satellite with labels - most useful
+            break;
+        case 'hybrid':
+            tileStyle = 'hybrid-v2';
+            break;
+        default:
+            tileStyle = _ppMapTilerStyle(); // streets (theme-aware)
+    }
+    
+    // Replace tile layer
+    _ppMapTilerLayers.forEach(entry => {
+        if (entry.map === _histMap) {
+            _histMap.removeLayer(entry.layer);
+            const newLayer = L.tileLayer(_ppMapTilerUrl(tileStyle), {
+                maxZoom: 20,
+                tileSize: 512,
+                zoomOffset: -1,
+                crossOrigin: true,
+                attribution: '&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors'
+            }).addTo(_histMap);
+            entry.layer = newLayer;
+            _histMap.invalidateSize({ animate: false });
+        }
+    });
+    
+    _histMap._ppCurrentStyle = style;
+};
 
 /* ── Load trips list for selected asset + date range ─────────────────────── */
 async function histLoadTrips() {
