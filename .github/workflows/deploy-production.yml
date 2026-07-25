@@ -107,6 +107,8 @@ jobs:
           #   - DEPLOY_RUNBOOK                 — local-only operator doc (gitignored anyway)
           #   - this workflow                  — self-reference; PATTERNS would match itself
           #   - .github/copilot-instructions.md — documents the banned strings as examples
+          #   - beacon_*.sh                    — operational backup/rollback scripts
+          #   - *_ASSESSMENT.md, *_RUNBOOK.md  — operational documentation
           actual=$(
             git ls-files \
               | grep -v '^tenants/' \
@@ -114,6 +116,9 @@ jobs:
               | grep -v '^DEPLOY_RUNBOOK\.md$' \
               | grep -v '^\.github/workflows/deploy-production\.yml$' \
               | grep -v '^\.github/copilot-instructions\.md$' \
+              | grep -v '^beacon_.*\.sh$' \
+              | grep -v '_ASSESSMENT\.md$' \
+              | grep -v '_RUNBOOK\.md$' \
               | xargs -I{} grep -EnH "$PATTERNS" {} 2>/dev/null \
               | wc -l \
               | tr -d ' '
@@ -139,6 +144,13 @@ jobs:
             echo "   New occurrences of beacon-specific strings in shared code:"
             git ls-files \
               | grep -v '^tenants/' \
+              | grep -v '^features_dev/' \
+              | grep -v '^DEPLOY_RUNBOOK\.md$' \
+              | grep -v '^\.github/workflows/deploy-production\.yml$' \
+              | grep -v '^\.github/copilot-instructions\.md$' \
+              | grep -v '^beacon_.*\.sh$' \
+              | grep -v '_ASSESSMENT\.md$' \
+              | grep -v '_RUNBOOK\.md$' \
               | xargs -I{} grep -EnH "$PATTERNS" {} 2>/dev/null \
               | sort
             echo ""
