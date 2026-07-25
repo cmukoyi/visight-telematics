@@ -9596,7 +9596,21 @@ window.liveSwitchMapStyle = function(style) {
             entry.layer = newLayer;
         }
     });
+    
+    _liveMap._ppCurrentStyle = style;
 };
+
+// LIVE MAP - Load tags (markers)
+async function _lmLoadTags() {
+    document.getElementById('lm-asset-list').innerHTML =
+        '<div style="padding:20px;text-align:center;color:var(--text-3)"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</div>';
+    try {
+        const res = await apiFetch('/api/portal/tags');
+        if (!res.ok) throw new Error((await res.json()).detail || 'Failed');
+        _lmTags = await res.json();
+    } catch (err) {
+        document.getElementById('lm-asset-list').innerHTML =
+            `<div style="padding:20px;text-align:center;color:var(--danger)"><i class="fa-solid fa-triangle-exclamation"></i> ${esc(err.message)}</div>`;
         return;
     }
     _lmPlaceMarkers();
