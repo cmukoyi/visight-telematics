@@ -307,13 +307,13 @@ static_dir = "/app/static"
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # Asset landing page route (when QR code is scanned)
-@app.get("/asset/{asset_id}")
+@app.get("/asset/{asset_id}", include_in_schema=False)
 async def asset_landing_page(asset_id: str):
     """Serve the phone scan landing page for QR/NFC scans"""
     return FileResponse(os.path.join(static_dir, "asset.html"))
 
 # Scanner tool route
-@app.get("/scanner.html")
+@app.get("/scanner.html", include_in_schema=False)
 async def scanner_tool():
     """Serve the bulk scanner tool for stocktake operations"""
     return FileResponse(os.path.join(static_dir, "scanner.html"))
@@ -656,7 +656,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     
     return user
 
-@app.get("/")
+@app.get("/", include_in_schema=False)
 def root():
     """Root endpoint"""
     return {
@@ -666,7 +666,7 @@ def root():
         "timestamp": datetime.utcnow().isoformat()
     }
 
-@app.get("/health")
+@app.get("/health", include_in_schema=False)
 def health_check():
     """Health check endpoint"""
     return {
@@ -674,7 +674,7 @@ def health_check():
         "timestamp": datetime.utcnow().isoformat()
     }
 
-@app.get("/api/health")
+@app.get("/api/health", include_in_schema=False)
 def api_health_check():
     """API health check endpoint"""
     return {
@@ -682,7 +682,7 @@ def api_health_check():
         "timestamp": datetime.utcnow().isoformat()
     }
 
-@app.get("/api/branding")
+@app.get("/api/branding", include_in_schema=False)
 def branding():
     """Public branding endpoint — drives per-tenant white-label theming.
 
@@ -715,7 +715,7 @@ def branding():
     }
 
 
-@app.get("/api/manifest")
+@app.get("/api/manifest", include_in_schema=False)
 def manifest():
     """Deployment manifest endpoint - lists API capabilities and version info"""
     return {
@@ -1007,7 +1007,7 @@ def refresh_token(current_user: User = Depends(get_current_user)):
     
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.post("/api/v1/auth/send-verification-code")
+@app.post("/api/v1/auth/send-verification-code", include_in_schema=False)
 def send_verification_code(request: SendVerificationCodeRequest, db: Session = Depends(get_db)):
     """Send verification PIN to email"""
     # Check if user exists
@@ -1055,7 +1055,7 @@ def send_verification_code(request: SendVerificationCodeRequest, db: Session = D
         "expires_in_minutes": 10
     }
 
-@app.post("/api/v1/auth/verify-pin")
+@app.post("/api/v1/auth/verify-pin", include_in_schema=False)
 def verify_pin(request: VerifyPINRequest, db: Session = Depends(get_db)):
     """Verify PIN — confirms email ownership. User is NOT created here."""
     _debug_mode = os.getenv('DEBUG', 'False').lower() == 'true'
@@ -1111,7 +1111,7 @@ def verify_pin(request: VerifyPINRequest, db: Session = Depends(get_db)):
     
     return {"success": True, "message": "Email verified successfully"}
 
-@app.post("/api/v1/auth/forgot-password")
+@app.post("/api/v1/auth/forgot-password", include_in_schema=False)
 def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
     """Request password reset - sends email with reset link"""
     # Check if user exists
