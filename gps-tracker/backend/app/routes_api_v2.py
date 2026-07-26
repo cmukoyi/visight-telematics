@@ -428,7 +428,7 @@ def get_hive_breaches(
             hive_id=str(event.hive_id),
             hive_name=hive.name if hive else "Unknown",
             tag_id=str(event.tag_id),
-            tag_name=tag.name if tag else "Unknown",
+            tag_name=tag.device_name if tag else "Unknown",
             breach_start=event.created_at,
             breach_end=event.breach_ended_at,
             duration_seconds=duration,
@@ -462,7 +462,7 @@ def get_geofences(
     )
     
     if armed_only:
-        query = query.filter(POI.is_armed == True)
+        query = query.filter(POI.is_active == True)
     
     pois = query.order_by(POI.created_at.desc()).all()
     
@@ -470,10 +470,10 @@ def get_geofences(
         GeofenceResponse(
             id=str(poi.id),
             name=poi.name,
-            is_armed=poi.is_armed,
+            is_armed=poi.is_active,
             latitude=poi.latitude,
             longitude=poi.longitude,
-            radius_m=poi.radius_m,
+            radius_m=poi.radius,
             created_at=poi.created_at
         )
         for poi in pois
@@ -543,7 +543,7 @@ def get_alerts(
             alert_type=alert.alert_type,
             message=alert.message,
             tag_id=str(alert.tag_id) if alert.tag_id else None,
-            tag_name=tag.name if tag else None,
+            tag_name=tag.device_name if tag else None,
             geofence_name=geofence.name if geofence else None,
             created_at=alert.created_at,
             is_read=alert.is_read
