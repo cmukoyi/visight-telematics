@@ -93,6 +93,12 @@ def login(
     """
     Authenticate and receive a bearer token for API access.
     
+    **Supported Roles:**
+    - `admin` - Full dashboard + API access
+    - `manager` - Dashboard tracking/management + API access
+    - `reporter` - Dashboard reports + API access
+    - `api_only` - **API access ONLY** (no dashboard login)
+    
     **Rate Limit:** 5 failed attempts per 60 seconds → 15 minute lockout
     
     **Token Expiry:** 12 hours
@@ -123,6 +129,9 @@ def login(
     ```
     Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
     ```
+    
+    **Note:** Users with `api_only` role can authenticate here and use API v2 endpoints,
+    but cannot access the customer dashboard at /customer/
     """
     ip = _client_ip(request)
     _login_check_rate(ip)
