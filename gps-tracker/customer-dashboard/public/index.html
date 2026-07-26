@@ -414,6 +414,16 @@
             </button>
         </div>
 
+        <div class="nav-section" id="nav-section-developers" style="display:none">
+            <div class="nav-section-label">Developers</div>
+
+            <a class="nav-item" href="https://pinplot.me/docs" target="_blank" rel="noopener noreferrer" title="Open API Documentation in new tab">
+                <span class="nav-icon"><i class="fa-solid fa-code"></i></span>
+                <span class="nav-label">API Docs</span>
+                <span class="nav-icon" style="margin-left:auto;font-size:11px"><i class="fa-solid fa-arrow-up-right-from-square"></i></span>
+            </a>
+        </div>
+
         <div class="sidebar-footer">
             <button class="btn btn-ghost btn-sm" onclick="handleLogout()" style="width:100%;justify-content:center">
                 <i class="fa-solid fa-right-from-bracket"></i>
@@ -4953,6 +4963,20 @@ function applyNavFeatures(features) {
     });
 }
 
+/**
+ * Show/hide the Developers nav section based on user role.
+ * Only users with 'admin', 'system_admin', or 'api_only' roles can see developer tools.
+ */
+function applyDeveloperNavAccess(user) {
+    const devSection = document.getElementById('nav-section-developers');
+    if (!devSection) return;
+    
+    const userRole = (user.role || '').toLowerCase();
+    const hasDevAccess = userRole === 'admin' || userRole === 'system_admin' || userRole === 'api_only';
+    
+    devSection.style.display = hasDevAccess ? '' : 'none';
+}
+
 function showDashboard(user, group, effectiveFeatures) {
     document.getElementById('loginPage').style.display     = 'none';
     document.getElementById('dashboardPage').style.display = 'block';
@@ -4973,6 +4997,9 @@ function showDashboard(user, group, effectiveFeatures) {
     // Apply nav feature visibility (use stored features if not passed directly)
     const features = effectiveFeatures || getSession().features;
     applyNavFeatures(features);
+    
+    // Apply developer nav access based on user role
+    applyDeveloperNavAccess(user);
 
     // Defer map init so the browser has painted the dashboard container
     // and Leaflet can read real pixel dimensions (avoids 0×0 tile issue on login).

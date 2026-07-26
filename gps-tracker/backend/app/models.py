@@ -420,11 +420,12 @@ class PortalUser(Base):
     is_group_admin  = Column(Boolean, nullable=False, default=False)
     expires_at      = Column(DateTime(timezone=True), nullable=True)
     # Portal RBAC
-    # role: 'admin' | 'manager' | 'reporter' | 'custom'
+    # role: 'admin' | 'manager' | 'reporter' | 'custom' | 'api_only'
     # admin    – all features allowed by the usergroup
     # manager  – tracking + management sections only
     # reporter – reports section only
     # custom   – exactly the keys in custom_features (intersected with usergroup)
+    # api_only – API access only (no dashboard), can use bearer token for API v2 endpoints
     role            = Column(String(20), nullable=False, default='admin')
     custom_features = Column(JSON, nullable=True)  # only used when role = 'custom'
     created_at      = Column(DateTime(timezone=True), server_default=func.now())
