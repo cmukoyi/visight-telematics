@@ -403,36 +403,34 @@ def get_hive_breaches(
         HiveEvent.event_type.in_(['breach', 'breach_start', 'breach_end'])
     )
     
-    if active_only:
-        query = query.filter(HiveEvent.breach_ended_at.is_(None))
+    # Note: active_only filter removed (HiveEvent doesn't track breach end)
     
     if start_date:
-        query = query.filter(HiveEvent.created_at >= start_date)
+        query = query.filter(HiveEvent.occurred_at >= start_date)
     
     if end_date:
-        query = query.filter(HiveEvent.created_at <= end_date)
+        query = query.filter(HiveEvent.occurred_at <= end_date)
     
-    events = query.order_by(HiveEvent.created_at.desc()).all()
+    events = query.order_by(HiveEvent.occurred_at.desc()).all()
     
     breaches = []
     for event in events:
         # Get tag info
-        tag = db.query(BLETag).filter(BLETag.id == event.tag_id).first()
-        hive = db.query(Hive).filter(Hive.id == event.hive_id).first()
+        tag = None
+        if event.triggering_tag_id:
+            tag = db.query(BLETag).filter(BLETag.id == event.triggering_tag_id).first()
         
-        duration = None
-        if event.breach_ended_at and event.created_at:
-            duration = int((event.breach_ended_at - event.created_at).total_seconds())
+        hive = db.query(Hive).filter(Hive.id == event.hive_id).first()
         
         breaches.append(HiveBreachResponse(
             hive_id=str(event.hive_id),
             hive_name=hive.name if hive else "Unknown",
-            tag_id=str(event.tag_id),
+            tag_id=str(event.triggering_tag_id) if event.triggering_tag_id else "unknown",
             tag_name=tag.device_name if tag else "Unknown",
-            breach_start=event.created_at,
-            breach_end=event.breach_ended_at,
-            duration_seconds=duration,
-            is_active=event.breach_ended_at is None
+            breach_start=event.occurred_at,
+            breach_end=None,  # HiveEvent stores individual events, not paired start/end
+            duration_seconds=None,
+            is_active=event.event_type == 'breach_start'
         ))
     
     return breaches
