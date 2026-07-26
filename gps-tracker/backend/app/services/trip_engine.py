@@ -96,7 +96,7 @@ from app.models import (
 logger = logging.getLogger(__name__)
 
 # ── Engine Version (v2.2.0 - Fix Register) ────────────────────────────────
-ENGINE_VERSION = "2.1.11"  # v2.1.11: D1 late arrivals + C1 leg terminus alignment
+ENGINE_VERSION = "2.1.13"  # v2.1.13: C2 journey break stationary continuity
 
 # ── Configuration (defaults from spec validation) ─────────────────────────
 DEFAULT_ANCHOR_RADIUS_M = 100
@@ -563,9 +563,17 @@ class TripEngine:
         
         return self.context.current_journey_id
     
-    def _close_journey(self) -> Optional[Journey]:
+    def _close_journey(self, skip_anchor_flush: bool = False) -> Optional[Journey]:
         """
         Close the current journey and calculate aggregate metrics.
+        
+        v2.1.13 C2: Added skip_anchor_flush parameter to prevent terminating
+        stationaries during journey break. When a stationary crosses 30 min,
+        the journey closes but the stationary continues as a single record.
+        
+        Args:
+            skip_anchor_flush: If True, don't flush anchor_points (used when
+                             journey break detected during stationary)
         
         Returns:
             Closed Journey object or None if no journey was open
@@ -586,9 +594,11 @@ class TripEngine:
                 logger.debug("✅ IMEI %s: Flushed leg %s before journey close", self.device_imei, leg.id)
             self.context.leg_buffer = []
         
-        # Flush any pending stationary data (anchor_points)
-        # If we're in STATIONARY state with accumulated anchor points, create stationary now
-        if (self.context.current_state == "STATIONARY" and 
+        # v2.1.13 C2: Flush anchor_points ONLY if not a journey break
+        # When journey breaks during a stationary (dwell > 30 min), the stationary
+        # should continue as a single record (not be split). Skip flush in that case.
+        if (not skip_anchor_flush and 
+            self.context.current_state == "STATIONARY" and 
             len(self.context.anchor_points) >= 1):
             # Don't create journey-breaking stationary here (would recursively close journey)
             # Just flush to a normal stationary
@@ -899,12 +909,13 @@ class TripEngine:
         )
         
         if breaks_journey and self.context.current_journey_id:
-            # Close current journey before creating the stationary
+            # v2.1.13 C2: Close journey WITHOUT flushing anchor_points
+            # Let the stationary continue as a single record (not split)
             logger.info(
                 "🔚 IMEI %s: Journey break detected (stationary %.0f min > threshold %.0f min)",
                 self.device_imei, duration_seconds / 60, self.config.journey_break_dwell_min
             )
-            self._close_journey()
+            self._close_journey(skip_anchor_flush=True)
         
         # Ensure journey is open (unless this is a journey-breaking stationary)
         if not breaks_journey:
@@ -1155,10 +1166,22 @@ class TripEngine:
             " [JOURNEY BREAK]" if breaks_journey else ""
         )
         
+        # v2.1.13 C2: Detach journey-breaking stationaries
+        # A stationary that crosses JOURNEY_BREAK_DWELL should be unattached (journey_id = NULL)
+        # as it's the terminal stop of the journey it closed AND the origin of the next
+        if breaks_journey and stationary.journey_id:
+            stationary.journey_id = None
+            self.db.flush()
+            logger.info(
+                "🔓 IMEI %s: Detached crossing stationary %s (journey_id = NULL)",
+                self.device_imei, stationary.id
+            )
+        
         # Update journey context
         self.context.last_stationary_ended_at = ended_at
         
         # v2.2 R3: Refresh journey aggregates incrementally
+        # Skip if stationary was detached (journey_id = NULL)
         if stationary.journey_id:
             self._refresh_journey_aggregates(stationary.journey_id)
         
