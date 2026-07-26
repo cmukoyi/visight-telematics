@@ -322,19 +322,6 @@ def get_movement_history(
         total=len(position_items),
         positions=position_items
     )
-            battery_level=pos.battery_level,
-            address=pos.address,
-        )
-        for pos in positions
-    ]
-    
-    return MovementHistoryResponse(
-        imei=imei,
-        total_positions=len(position_items),
-        start_date=start_date,
-        end_date=end_date,
-        positions=position_items
-    )
 
 
 @router.get("/hive-breaches", response_model=List[HiveBreachResponse])
