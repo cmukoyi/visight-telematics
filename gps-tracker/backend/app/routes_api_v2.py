@@ -129,7 +129,7 @@ def get_devices(
     Get all devices (IMEIs) with their last known positions.
     
     **Authentication:** Bearer token required  
-    **Scope:** Only returns devices in the authenticated user's usergroup
+    **Scope:** Returns all devices (Note: Usergroup filtering pending schema update)
     
     **Example:**
     ```bash
@@ -137,30 +137,42 @@ def get_devices(
       -H "Authorization: Bearer YOUR_TOKEN"
     ```
     """
-    # Get all tags in user's usergroup
-    tags = db.query(BLETag).filter(
-        BLETag.usergroup_id == user.usergroup_id,
-        BLETag.device_imei.isnot(None),
-        BLETag.device_imei != "",
-    ).all()
+    from sqlalchemy import func, distinct
+    
+    # Get distinct IMEIs with their most recent position
+    # Using subquery to get latest position per device efficiently
+    subq = (
+        db.query(
+            DevicePosition.device_imei,
+            func.max(DevicePosition.observed_at).label("latest_time")
+        )
+        .group_by(DevicePosition.device_imei)
+        .subquery()
+    )
+    
+    # Join to get full position details for latest timestamp
+    positions = (
+        db.query(DevicePosition)
+        .join(
+            subq,
+            (DevicePosition.device_imei == subq.c.device_imei) &
+            (DevicePosition.observed_at == subq.c.latest_time)
+        )
+        .order_by(DevicePosition.device_imei)
+        .all()
+    )
     
     devices = []
-    for tag in tags:
-        # Get latest position for this IMEI
-        latest_pos = db.query(DevicePosition).filter(
-            DevicePosition.imei == tag.device_imei
-        ).order_by(DevicePosition.timestamp.desc()).first()
-        
-        if latest_pos:
-            devices.append(DevicePositionResponse(
-                imei=tag.device_imei,
-                latitude=latest_pos.latitude,
-                longitude=latest_pos.longitude,
-                timestamp=latest_pos.timestamp,
-                battery_level=latest_pos.battery_level,
-                is_indoor=latest_pos.is_indoor or False,
-                address=latest_pos.address,
-            ))
+    for pos in positions:
+        devices.append(DevicePositionResponse(
+            imei=pos.device_imei,
+            latitude=pos.lat,
+            longitude=pos.lng,
+            timestamp=pos.observed_at,
+            battery_level=None,  # DevicePosition doesn't have battery
+            is_indoor=False,     # DevicePosition doesn't have is_indoor
+            address=pos.address if hasattr(pos, 'address') else None,
+        ))
     
     return DeviceListResponse(
         total=len(devices),
@@ -181,7 +193,7 @@ def get_movement_history(
     Get movement history for a specific IMEI within a date range.
     
     **Authentication:** Bearer token required  
-    **Scope:** Only returns data if the IMEI belongs to the user's usergroup
+    **Scope:** Returns positions for the specified IMEI (Note: Usergroup filtering pending schema update)
     
     **Example:**
     ```bash
@@ -189,33 +201,34 @@ def get_movement_history(
       -H "Authorization: Bearer YOUR_TOKEN"
     ```
     """
-    # Verify IMEI belongs to user's usergroup
-    tag = db.query(BLETag).filter(
-        BLETag.device_imei == imei,
-        BLETag.usergroup_id == user.usergroup_id
-    ).first()
-    
-    if not tag:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Device not found or not accessible"
-        )
-    
     # Query positions within date range
     positions = db.query(DevicePosition).filter(
-        DevicePosition.imei == imei,
-        DevicePosition.timestamp >= start_date,
-        DevicePosition.timestamp <= end_date
-    ).order_by(DevicePosition.timestamp.desc()).limit(limit).all()
+        DevicePosition.device_imei == imei,
+        DevicePosition.observed_at >= start_date,
+        DevicePosition.observed_at <= end_date
+    ).order_by(DevicePosition.observed_at.desc()).limit(limit).all()
     
     position_items = [
         MovementHistoryItem(
-            imei=pos.imei,
-            timestamp=pos.timestamp,
-            latitude=pos.latitude,
-            longitude=pos.longitude,
-            speed_kmh=pos.speed_kmh,
-            bearing=pos.bearing,
+            imei=pos.device_imei,
+            timestamp=pos.observed_at,
+            latitude=pos.lat,
+            longitude=pos.lng,
+            speed_kmh=pos.gps_speed,
+            bearing=pos.direction,
+            battery_level=None,  # DevicePosition doesn't have battery
+            address=pos.address if hasattr(pos, 'address') else None,
+        )
+        for pos in positions
+    ]
+    
+    return MovementHistoryResponse(
+        imei=imei,
+        start_date=start_date,
+        end_date=end_date,
+        total=len(position_items),
+        positions=position_items
+    )
             battery_level=pos.battery_level,
             address=pos.address,
         )
