@@ -181,8 +181,36 @@ class UserWithTags(BaseModel):
 
 app = FastAPI(
     title="PinPlot API",
-    version="1.0.0",
-    description="Real-time BLE tag tracking and asset management platform. Authenticate with POST /api/v1/auth/login to receive a Bearer token, then include it in the Authorization header for all subsequent requests.",
+    version="2.0.0",
+    description="""
+## PinPlot Real-time Asset Tracking API
+
+Complete asset tracking platform with BLE tag monitoring, geofencing, and movement analytics.
+
+### Authentication
+
+**All API endpoints require Bearer token authentication.**
+
+1. **Get Token:** `POST /api/portal/login` with email and password
+2. **Use Token:** Include in `Authorization: Bearer <token>` header for all requests
+3. **Token Scope:** All responses are scoped to your usergroup (multi-tenant isolation)
+
+### API v2 Endpoints (Recommended)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/v2/devices` | List all devices with last known positions |
+| `GET /api/v2/movement-history/{imei}` | Get position history by date range |
+| `GET /api/v2/hive-breaches` | Get Hive breach events |
+| `GET /api/v2/geofences` | List all geofences (POIs) |
+| `GET /api/v2/alerts` | Get alerts by type and date range |
+
+### Interactive Documentation
+
+- **Swagger UI:** [/docs](/docs) - Test APIs interactively
+- **ReDoc:** [/redoc](/redoc) - Detailed API reference
+- **OpenAPI Spec:** [/openapi.json](/openapi.json) - Machine-readable spec
+    """,
     contact={
         "name": "PinPlot Support",
         "email": "support@pinplot.me",
