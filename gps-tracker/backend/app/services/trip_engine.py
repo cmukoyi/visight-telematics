@@ -96,7 +96,7 @@ from app.models import (
 logger = logging.getLogger(__name__)
 
 # ── Engine Version (v2.2.0 - Fix Register) ────────────────────────────────
-ENGINE_VERSION = "2.1.14"  # v2.1.14: C2a journey break on flush + C3 journey end at arrival
+ENGINE_VERSION = "2.1.15"  # v2.1.15: C2b journey break on departure checks dwell
 
 # ── Configuration (defaults from spec validation) ─────────────────────────
 DEFAULT_ANCHOR_RADIUS_M = 100
@@ -1845,6 +1845,21 @@ class TripEngine:
                         result['stationary_created'] = True
                         if self.context.journey_just_created:
                             result['journey_created'] = True
+                        
+                        # v2.1.15 C2b: Departure-triggered break must check dwell
+                        # Same logic as C2a flush-triggered break, but for closed stationaries on departure.
+                        # If this closed stop exceeds JOURNEY_BREAK_DWELL (30 min), close the journey.
+                        dwell_min = stationary.duration_seconds / 60.0
+                        if (dwell_min > self.config.journey_break_dwell_min and 
+                            self.context.current_journey_id):
+                            logger.info(
+                                "🔚 IMEI %s: C2b departure-triggered break (stationary %.1f min > %.0f min)",
+                                self.device_imei, dwell_min, self.config.journey_break_dwell_min
+                            )
+                            # Close journey WITHOUT flushing stationary (already closed above)
+                            # The closed stop becomes the terminal unattached stop
+                            # The next leg (below) will open a new journey
+                            self._close_journey(skip_anchor_flush=True)
                 
                 # Enter MOVE state
                 self.context.current_state = "MOVE"
