@@ -5130,11 +5130,11 @@ function applyTheme(theme) {
     } catch (_) {}
 }
 function toggleTheme() {
-    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    const current = document.documentElement.getAttribute('data-theme') || 'light';
     applyTheme(current === 'dark' ? 'light' : 'dark');
 }
 // Apply saved theme immediately (before login check)
-applyTheme(localStorage.getItem('pp-theme') || 'dark');
+applyTheme(localStorage.getItem('pp-theme') || 'light');
 
 // Reflect saved "Light maps" preference in the dropdown checkbox once the DOM is ready.
 document.addEventListener('DOMContentLoaded', () => {
@@ -12797,13 +12797,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Open the HIVE user manual in a new tab, propagating the current theme.
 function hiveOpenHelp() {
-    const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+    const theme = document.documentElement.getAttribute('data-theme') || 'light';
     window.open('/customer/help/HIVE_User_Manual.html?theme=' + encodeURIComponent(theme),
                 '_blank', 'noopener,noreferrer');
 }
 
 function qrOpenHelp() {
-    const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+    const theme = document.documentElement.getAttribute('data-theme') || 'light';
     // Detect tenant from branding - use Beacon guide if tenant name contains 'beacon' (case-insensitive)
     // Note: QR_NFC_Guide_Beacon.html must be deployed separately to Beacon servers at /customer/help/
     // Only QR_NFC_Guide_Pinplot.html is in the shared PinPlot-HPS repository to avoid tenant brand drift
