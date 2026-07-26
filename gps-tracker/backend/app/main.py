@@ -206,13 +206,6 @@ Complete asset tracking platform with BLE tag monitoring, geofencing, and moveme
 
 
     """,
-    contact={
-        "name": "PinPlot Support",
-        "email": "support@pinplot.me",
-    },
-    license_info={
-        "name": "Proprietary",
-    },
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
