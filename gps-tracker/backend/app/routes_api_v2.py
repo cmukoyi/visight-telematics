@@ -106,13 +106,13 @@ def _get_usergroup_device_imeis(usergroup_id: str, db: Session) -> List[str]:
 # =============================================================================
 
 class DevicePositionResponse(BaseModel):
-    """Device with last known position."""
+    """Device with last known position (position fields are None if device has no GPS data)."""
     imei: str
-    latitude: float
-    longitude: float
-    timestamp: datetime
+    latitude: Optional[float]
+    longitude: Optional[float]
+    timestamp: Optional[datetime]
     battery_level: Optional[int]
-    is_indoor: bool
+    is_indoor: Optional[bool]
     address: Optional[str]
 
     class Config:
@@ -208,6 +208,9 @@ def get_devices(
     **Authentication:** Bearer token required  
     **Scope:** ✅ Only returns devices in the authenticated user's usergroup (multi-tenant isolation)
     
+    **Returns:** All devices in your usergroup, even if they haven't sent GPS data yet.
+    Position fields will be `null` for devices without GPS data.
+    
     **Example:**
     ```bash
     curl -X GET https://pinplot.me/api/v2/devices \\
@@ -222,19 +225,20 @@ def get_devices(
     if not allowed_imeis:
         return DeviceListResponse(total=0, devices=[])
     
-    # Get distinct IMEIs with their most recent position
-    # Using subquery to get latest position per device efficiently
+    # Build position lookup: IMEI -> latest position
+    position_map = {}
+    
+    # Get latest position for each device
     subq = (
         db.query(
             DevicePosition.device_imei,
             func.max(DevicePosition.observed_at).label("latest_time")
         )
-        .filter(DevicePosition.device_imei.in_(allowed_imeis))  # 🔒 SECURITY: usergroup filter
+        .filter(DevicePosition.device_imei.in_(allowed_imeis))
         .group_by(DevicePosition.device_imei)
         .subquery()
     )
     
-    # Join to get full position details for latest timestamp
     positions = (
         db.query(DevicePosition)
         .join(
@@ -242,21 +246,39 @@ def get_devices(
             (DevicePosition.device_imei == subq.c.device_imei) &
             (DevicePosition.observed_at == subq.c.latest_time)
         )
-        .order_by(DevicePosition.device_imei)
         .all()
     )
     
-    devices = []
     for pos in positions:
-        devices.append(DevicePositionResponse(
-            imei=pos.device_imei,
-            latitude=pos.lat,
-            longitude=pos.lng,
-            timestamp=pos.observed_at,
-            battery_level=None,  # DevicePosition doesn't have battery
-            is_indoor=False,     # DevicePosition doesn't have is_indoor
-            address=pos.address if hasattr(pos, 'address') else None,
-        ))
+        position_map[pos.device_imei] = pos
+    
+    # Return ALL devices in usergroup (with or without positions)
+    devices = []
+    for imei in allowed_imeis:
+        pos = position_map.get(imei)
+        
+        if pos:
+            # Device has GPS data
+            devices.append(DevicePositionResponse(
+                imei=imei,
+                latitude=pos.lat,
+                longitude=pos.lng,
+                timestamp=pos.observed_at,
+                battery_level=None,
+                is_indoor=False,
+                address=pos.address if hasattr(pos, 'address') else None,
+            ))
+        else:
+            # Device exists but no GPS data yet
+            devices.append(DevicePositionResponse(
+                imei=imei,
+                latitude=None,
+                longitude=None,
+                timestamp=None,
+                battery_level=None,
+                is_indoor=None,
+                address=None,
+            ))
     
     return DeviceListResponse(
         total=len(devices),
