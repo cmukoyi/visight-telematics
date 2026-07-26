@@ -847,7 +847,7 @@ def _get_mobile_allowed_tag_types(db: Session, user: User) -> Optional[List[str]
     return [str(tag_type).lower() for tag_type in group.allowed_tag_types if str(tag_type).strip()]
 
 
-@app.post("/api/v1/auth/register", response_model=Token, tags=["Authentication"])
+@app.post("/api/v1/auth/register", response_model=Token, tags=["Authentication"], include_in_schema=False)
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
     """
     ## Register New User
@@ -924,7 +924,7 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     access_token = create_access_token(data={"sub": str(db_user.id)})
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.post("/api/v1/auth/login", response_model=Token, tags=["Authentication"])
+@app.post("/api/v1/auth/login", response_model=Token, tags=["Authentication"], include_in_schema=False)
 def login(credentials: UserLogin, db: Session = Depends(get_db)):
     """
     ## Login (Get Access Token)
@@ -981,7 +981,7 @@ def login(credentials: UserLogin, db: Session = Depends(get_db)):
     
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.post("/api/v1/auth/refresh", response_model=Token, tags=["Authentication"])
+@app.post("/api/v1/auth/refresh", response_model=Token, tags=["Authentication"], include_in_schema=False)
 def refresh_token(current_user: User = Depends(get_current_user)):
     """
     ## Refresh Access Token
@@ -1163,7 +1163,7 @@ def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db
         "message": "If an account exists with this email, a password reset link has been sent."
     }
 
-@app.post("/api/v1/auth/reset-password")
+@app.post("/api/v1/auth/reset-password", include_in_schema=False)
 def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
     """Reset password using reset token"""
     # Find valid reset token
@@ -1208,7 +1208,7 @@ def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db))
         "message": "Password has been reset successfully"
     }
 
-@app.get("/api/v1/auth/me", response_model=UserResponse, tags=["User Profile"])
+@app.get("/api/v1/auth/me", response_model=UserResponse, tags=["User Profile"], include_in_schema=False)
 def get_me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     ## Get Current User Profile
@@ -1244,7 +1244,7 @@ def get_me(current_user: User = Depends(get_current_user), db: Session = Depends
 class UserPreferencesUpdate(BaseModel):
     email_alerts_enabled: Optional[bool] = None
 
-@app.put("/api/v1/user/preferences", response_model=UserResponse)
+@app.put("/api/v1/user/preferences", response_model=UserResponse, include_in_schema=False)
 def update_user_preferences(
     preferences: UserPreferencesUpdate,
     current_user: User = Depends(get_current_user),
@@ -1262,7 +1262,7 @@ def update_user_preferences(
 class EmailUpdate(BaseModel):
     email: str
 
-@app.put("/api/v1/user/email", response_model=UserResponse)
+@app.put("/api/v1/user/email", response_model=UserResponse, include_in_schema=False)
 def update_user_email(
     email_data: EmailUpdate,
     current_user: User = Depends(get_current_user),
@@ -1298,7 +1298,7 @@ def update_user_email(
     return current_user
 
 # BLE Tag Management endpoints
-@app.post("/api/v1/ble-tags", response_model=BLETagResponse, tags=["BLE Tags"])
+@app.post("/api/v1/ble-tags", response_model=BLETagResponse, tags=["BLE Tags"], include_in_schema=False)
 async def add_ble_tag(
     tag_data: BLETagCreate,
     current_user: User = Depends(get_current_user),
@@ -1419,7 +1419,7 @@ class BLETagValidateResponse(BaseModel):
     battery_level: Optional[int] = None  # Battery % for TrackSolid tags
 
 
-@app.post("/api/v1/ble-tags/validate", response_model=BLETagValidateResponse)
+@app.post("/api/v1/ble-tags/validate", response_model=BLETagValidateResponse, include_in_schema=False)
 async def validate_ble_tag(
     request: BLETagValidateRequest,
     current_user: User = Depends(get_current_user),
@@ -1446,7 +1446,7 @@ async def validate_ble_tag(
     )
 
 
-@app.get("/api/v1/ble-tags/supported-types")
+@app.get("/api/v1/ble-tags/supported-types", include_in_schema=False)
 async def get_supported_tag_types(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Return mobile-supported BLE tag types for the current user.
 
@@ -1469,7 +1469,7 @@ async def get_supported_tag_types(current_user: User = Depends(get_current_user)
     return {"types": filtered}
 
 
-@app.get("/api/v1/ble-tags", response_model=List[BLETagResponse], tags=["BLE Tags"])
+@app.get("/api/v1/ble-tags", response_model=List[BLETagResponse], tags=["BLE Tags"], include_in_schema=False)
 def list_user_ble_tags(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -1504,7 +1504,7 @@ def list_user_ble_tags(
     # Convert ORM objects to Pydantic models with UUID serialization
     return [BLETagResponse.from_orm(tag) for tag in tags]
 
-@app.get("/api/v1/ble-tags/{tag_id}", response_model=BLETagResponse, tags=["BLE Tags"])
+@app.get("/api/v1/ble-tags/{tag_id}", response_model=BLETagResponse, tags=["BLE Tags"], include_in_schema=False)
 def get_ble_tag(
     tag_id: str,
     current_user: User = Depends(get_current_user),
@@ -1538,7 +1538,7 @@ def get_ble_tag(
     
     return tag
 
-@app.get("/api/v1/validate-imei/{imei}")
+@app.get("/api/v1/validate-imei/{imei}", include_in_schema=False)
 def validate_imei(
     imei: str,
     current_user: User = Depends(get_current_user)
@@ -1633,7 +1633,7 @@ def validate_imei(
             }
         )
 
-@app.delete("/api/v1/ble-tags/{tag_id}", tags=["BLE Tags"])
+@app.delete("/api/v1/ble-tags/{tag_id}", tags=["BLE Tags"], include_in_schema=False)
 def remove_ble_tag(
     tag_id: str,
     current_user: User = Depends(get_current_user),
@@ -1672,7 +1672,7 @@ def remove_ble_tag(
     return {"success": True, "message": "Tag removed successfully"}
 
 # Admin endpoints
-@app.get("/api/v1/admin/users", response_model=List[UserResponse])
+@app.get("/api/v1/admin/users", response_model=List[UserResponse], include_in_schema=False)
 def list_users(db: Session = Depends(get_db)):
     """List all users (admin only - auth temporarily disabled for development)"""
     # TODO: Re-enable authentication in production
@@ -1685,7 +1685,7 @@ def list_users(db: Session = Depends(get_db)):
     users = db.query(User).all()
     return users
 
-@app.get("/api/v1/admin/billing/tags", response_model=List[BLETagWithUser])
+@app.get("/api/v1/admin/billing/tags", response_model=List[BLETagWithUser], include_in_schema=False)
 def list_all_tags_with_users(db: Session = Depends(get_db)):
     """
     List all BLE tags with user information for billing purposes
@@ -1714,7 +1714,7 @@ def list_all_tags_with_users(db: Session = Depends(get_db)):
     
     return result
 
-@app.get("/api/v1/admin/billing/users", response_model=List[UserWithTags])
+@app.get("/api/v1/admin/billing/users", response_model=List[UserWithTags], include_in_schema=False)
 def list_users_with_tags(db: Session = Depends(get_db)):
     """
     List all users with their BLE tags and tag count for billing purposes
@@ -1757,7 +1757,7 @@ def list_users_with_tags(db: Session = Depends(get_db)):
     
     return result
 
-@app.get("/api/v1/admin/end-users")
+@app.get("/api/v1/admin/end-users", include_in_schema=False)
 def list_end_users_with_tags(db: Session = Depends(get_db)):
     """
     List all end users with their tag assignments for Admin Portal "End Users" section
@@ -1820,7 +1820,7 @@ def list_end_users_with_tags(db: Session = Depends(get_db)):
     
     return result
 
-@app.get("/api/v1/admin/end-users/{user_id}/editor")
+@app.get("/api/v1/admin/end-users/{user_id}/editor", include_in_schema=False)
 def get_end_user_editor_data(
     user_id: str,
     request: Request,
@@ -1865,7 +1865,7 @@ def get_end_user_editor_data(
         ]
     }
 
-@app.put("/api/v1/admin/end-users/{user_id}")
+@app.put("/api/v1/admin/end-users/{user_id}", include_in_schema=False)
 def update_end_user(
     user_id: str,
     payload: EndUserAdminUpdateRequest,
@@ -1968,7 +1968,7 @@ def update_end_user(
         "changes": changes,
     }
 
-@app.post("/api/v1/admin/impersonate/{user_id}")
+@app.post("/api/v1/admin/impersonate/{user_id}", include_in_schema=False)
 def impersonate_user(
     user_id: str,
     request: Request,
@@ -2028,7 +2028,7 @@ def impersonate_user(
     }
 
 
-@app.post("/api/v1/admin/generate-verification-pin")
+@app.post("/api/v1/admin/generate-verification-pin", include_in_schema=False)
 def admin_generate_verification_pin(
     request: Request,
     email: str,
@@ -2085,7 +2085,7 @@ def admin_generate_verification_pin(
     }
 
 
-@app.get("/api/v1/admin/imei")
+@app.get("/api/v1/admin/imei", include_in_schema=False)
 def list_all_imei_details(db: Session = Depends(get_db)):
     """
     List all IMEI/tags with user, usergroup, expiry, package, and activation date
@@ -2140,7 +2140,7 @@ def list_all_imei_details(db: Session = Depends(get_db)):
     return result
 
 # Demo tag endpoints (will be replaced with external API calls)
-@app.get("/api/v1/tags")
+@app.get("/api/v1/tags", include_in_schema=False)
 def get_tags(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> List[Dict]:
     """
     Return the BLE tags registered to the current user.
@@ -2168,7 +2168,7 @@ def get_tags(current_user: User = Depends(get_current_user), db: Session = Depen
         for t in tags
     ]
 
-@app.get("/api/v1/tags/{tag_id}")
+@app.get("/api/v1/tags/{tag_id}", include_in_schema=False)
 def get_tag_details(tag_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Dict:
     """
     Get specific tag details for the current user.
@@ -2195,7 +2195,7 @@ def get_tag_details(tag_id: str, current_user: User = Depends(get_current_user),
         "expiry_date": tag.expiry_date.isoformat() if tag.expiry_date else None,
     }
 
-@app.get("/api/v1/tags/{tag_id}/location")
+@app.get("/api/v1/tags/{tag_id}/location", include_in_schema=False)
 def get_tag_location(tag_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Dict:
     """
     Get latest GPS location of a tag (demo data)
@@ -2238,7 +2238,7 @@ def get_tag_location(tag_id: str, current_user: User = Depends(get_current_user)
     
     return location
 
-@app.get("/api/v1/tags/{tag_id}/history")
+@app.get("/api/v1/tags/{tag_id}/history", include_in_schema=False)
 def get_location_history(tag_id: str, current_user: User = Depends(get_current_user), limit: int = 10) -> List[Dict]:
     """
     Get location history (demo data)
@@ -2265,26 +2265,26 @@ def get_location_history(tag_id: str, current_user: User = Depends(get_current_u
 # Mobile App Compatibility Endpoints (without /v1)
 # ============================================================================
 
-@app.post("/api/auth/send-pin")
+@app.post("/api/auth/send-pin", include_in_schema=False)
 def send_pin_compat(request: SendVerificationCodeRequest, db: Session = Depends(get_db)):
     """Mobile app compatibility endpoint for send-verification-code"""
     return send_verification_code(request, db)
 
 
-@app.post("/api/auth/verify-pin")
+@app.post("/api/auth/verify-pin", include_in_schema=False)
 def verify_pin_compat(request: VerifyPINRequest, db: Session = Depends(get_db)):
     """Mobile app compatibility endpoint for verify-pin"""
     verify_pin(request, db)
     return {"success": True, "message": "Email verified successfully"}
 
 
-@app.get("/api/auth/me", response_model=UserResponse)
+@app.get("/api/auth/me", response_model=UserResponse, include_in_schema=False)
 def get_me_compat(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Mobile app compatibility endpoint for current user"""
     return get_me(current_user, db)
 
 
-@app.post("/api/tags/add")
+@app.post("/api/tags/add", include_in_schema=False)
 def add_tag_compat(
     tag_data: BLETagCreate,
     current_user: User = Depends(get_current_user),
@@ -2395,7 +2395,7 @@ def add_tag_compat(
         }
 
 
-@app.get("/api/tags/list")
+@app.get("/api/tags/list", include_in_schema=False)
 def list_tags_compat(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -2428,7 +2428,7 @@ def list_tags_compat(
         }
 
 
-@app.delete("/api/tags/remove/{imei}")
+@app.delete("/api/tags/remove/{imei}", include_in_schema=False)
 def remove_tag_compat(
     imei: str,
     current_user: User = Depends(get_current_user),
@@ -2462,7 +2462,7 @@ def remove_tag_compat(
         }
 
 
-@app.put("/api/tags/{imei}/attributes")
+@app.put("/api/tags/{imei}/attributes", include_in_schema=False)
 def update_tag_attributes(
     imei: str,
     attributes_data: dict,
@@ -2558,7 +2558,7 @@ def update_tag_attributes(
         )
 
 
-@app.post("/api/vehicles")
+@app.post("/api/vehicles", include_in_schema=False)
 def get_vehicles(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -2640,7 +2640,7 @@ def get_vehicles(
 
 # ==================== Trips / Journeys Management ====================
 
-@app.post("/api/trips")
+@app.post("/api/trips", include_in_schema=False)
 async def get_trips(
     request: dict,
     current_user: User = Depends(get_current_user),
@@ -2849,7 +2849,7 @@ async def get_trips(
         }
 
 
-@app.get("/api/trips/{trip_id}/events")
+@app.get("/api/trips/{trip_id}/events", include_in_schema=False)
 async def get_trip_events(
     trip_id: str,
     current_user: User = Depends(get_current_user),
@@ -2950,7 +2950,7 @@ async def get_trip_events(
 
 # ==================== POI / Geofence Management ====================
 
-@app.post("/api/v1/pois", response_model=POIResponse)
+@app.post("/api/v1/pois", response_model=POIResponse, include_in_schema=False)
 def create_poi(
     poi_data: POICreate,
     current_user: User = Depends(get_current_user),
@@ -2997,7 +2997,7 @@ def create_poi(
     )
 
 
-@app.get("/api/v1/pois", response_model=List[POIWithArmedStatus])
+@app.get("/api/v1/pois", response_model=List[POIWithArmedStatus], include_in_schema=False)
 def list_pois(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -3038,7 +3038,7 @@ def list_pois(
     return result
 
 
-@app.get("/api/v1/pois/{poi_id}", response_model=POIWithArmedStatus)
+@app.get("/api/v1/pois/{poi_id}", response_model=POIWithArmedStatus, include_in_schema=False)
 def get_poi(
     poi_id: str,
     current_user: User = Depends(get_current_user),
@@ -3082,7 +3082,7 @@ def get_poi(
     )
 
 
-@app.put("/api/v1/pois/{poi_id}", response_model=POIResponse)
+@app.put("/api/v1/pois/{poi_id}", response_model=POIResponse, include_in_schema=False)
 def update_poi(
     poi_id: str,
     poi_update: POIUpdate,
@@ -3133,7 +3133,7 @@ def update_poi(
     )
 
 
-@app.delete("/api/v1/pois/{poi_id}")
+@app.delete("/api/v1/pois/{poi_id}", include_in_schema=False)
 def delete_poi(
     poi_id: str,
     current_user: User = Depends(get_current_user),
@@ -3160,7 +3160,7 @@ def delete_poi(
 
 # ==================== POI-Tracker ARM/DISARM ====================
 
-@app.post("/api/v1/pois/{poi_id}/arm/{tracker_id}")
+@app.post("/api/v1/pois/{poi_id}/arm/{tracker_id}", include_in_schema=False)
 def arm_poi_to_tracker(
     poi_id: str,
     tracker_id: str,
@@ -3246,7 +3246,7 @@ def arm_poi_to_tracker(
     return {"message": f"POI armed to tracker successfully (state: {initial_state.value})"}
 
 
-@app.post("/api/v1/pois/{poi_id}/disarm/{tracker_id}")
+@app.post("/api/v1/pois/{poi_id}/disarm/{tracker_id}", include_in_schema=False)
 def disarm_poi_from_tracker(
     poi_id: str,
     tracker_id: str,
@@ -3283,7 +3283,7 @@ def disarm_poi_from_tracker(
 
 # ==================== Geofence Alerts ====================
 
-@app.get("/api/v1/alerts", response_model=AlertsListResponse)
+@app.get("/api/v1/alerts", response_model=AlertsListResponse, include_in_schema=False)
 def get_alerts(
     limit: int = 50,
     offset: int = 0,
@@ -3336,7 +3336,7 @@ def get_alerts(
     )
 
 
-@app.post("/api/v1/alerts/{alert_id}/mark-read")
+@app.post("/api/v1/alerts/{alert_id}/mark-read", include_in_schema=False)
 def mark_alert_read(
     alert_id: str,
     current_user: User = Depends(get_current_user),
@@ -3351,7 +3351,7 @@ def mark_alert_read(
     return {"message": "Alert marked as read"}
 
 
-@app.post("/api/v1/alerts/mark-all-read")
+@app.post("/api/v1/alerts/mark-all-read", include_in_schema=False)
 def mark_all_alerts_read(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -3364,7 +3364,7 @@ def mark_all_alerts_read(
 
 # ==================== Postcode Search ====================
 
-@app.post("/api/v1/search/postcode", response_model=PostcodeSearchResponse)
+@app.post("/api/v1/search/postcode", response_model=PostcodeSearchResponse, include_in_schema=False)
 async def search_postcode(request: PostcodeSearchRequest):
     """
     Search for a UK postcode using postcodes.io (free UK postcode API)
@@ -3420,7 +3420,7 @@ async def search_postcode(request: PostcodeSearchRequest):
         raise HTTPException(status_code=500, detail=f"Error searching postcode: {str(e)}")
 
 
-@app.post("/api/v1/test/mock-location", tags=["Testing"])
+@app.post("/api/v1/test/mock-location", tags=["Testing"], include_in_schema=False)
 async def mock_location_test(
     request: MockLocationTestRequest,
     current_user: User = Depends(get_current_user),
@@ -3492,7 +3492,7 @@ async def mock_location_test(
         raise HTTPException(status_code=500, detail=f"Error running mock test: {str(e)}")
 
 
-@app.post("/api/v1/trips")
+@app.post("/api/v1/trips", include_in_schema=False)
 def get_trips_v1(
     request: dict,
     current_user: User = Depends(get_current_user),
@@ -3656,7 +3656,7 @@ def get_trips_v1(
 # App Feature Flags (public — mobile app fetches on login)
 # ---------------------------------------------------------------------------
 
-@app.get("/api/v1/app-features")
+@app.get("/api/v1/app-features", include_in_schema=False)
 def get_app_features_public(db: Session = Depends(get_db)):
     """Return the global app feature flags. No auth required so the app
     can fetch them before (or immediately after) login."""
