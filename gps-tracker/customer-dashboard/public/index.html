@@ -5128,11 +5128,6 @@ function applyTheme(theme) {
         const stored = JSON.parse(localStorage.getItem('pinplot_branding') || 'null');
         if (stored && typeof applyBranding === 'function') applyBranding(stored);
     } catch (_) {}
-    // Update captcha color if it exists
-    const el = document.getElementById('captchaQuestion');
-    if (el && el.textContent) {
-        el.style.cssText = 'font-weight: 600; color: var(--text) !important;';
-    }
 }
 function toggleTheme() {
     const current = document.documentElement.getAttribute('data-theme') || 'dark';
