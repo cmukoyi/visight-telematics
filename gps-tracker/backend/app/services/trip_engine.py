@@ -512,8 +512,23 @@ class TripEngine:
             self.context.journey_just_created = False
             return self.context.current_journey_id
         
-        # Create new journey
-        journey = Journey(
+        # v2.1.12 E1: Upsert journey on conflict (handles D1 replay + reprocess convergence)
+        # If replay re-encounters same (device_imei, started_at), return existing journey.id
+        # instead of creating duplicate. Preserves ux_journey_device_start uniqueness.
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+        from uuid import uuid4
+        
+        journey_id = uuid4()
+        engine_params = {
+            'anchor_radius_m': self.config.anchor_radius_m,
+            'min_leg_distance_m': self.config.min_leg_distance_m,
+            'stationary_merge_radius_m': self.config.stationary_merge_radius_m,
+            'stationary_merge_gap_s': self.config.stationary_merge_gap_s,
+            'min_leg_excursion_m': self.config.min_leg_excursion_m,
+        }
+        
+        stmt = pg_insert(Journey).values(
+            id=journey_id,
             device_imei=self.device_imei,
             started_at=timestamp,
             ended_at=timestamp,  # Will be updated as journey progresses
@@ -521,26 +536,29 @@ class TripEngine:
             total_duration_seconds=0,
             leg_count=0,
             stationary_count=0,
-            engine_version=ENGINE_VERSION,  # v2.2.0: Version tracking (Fix Register requirement)
-            engine_params={  # Snapshot of config parameters
-                'anchor_radius_m': self.config.anchor_radius_m,
-                'min_leg_distance_m': self.config.min_leg_distance_m,
-                'stationary_merge_radius_m': self.config.stationary_merge_radius_m,
-                'stationary_merge_gap_s': self.config.stationary_merge_gap_s,
-                'min_leg_excursion_m': self.config.min_leg_excursion_m,
-            },
+            engine_version=ENGINE_VERSION,
+            engine_params=engine_params,
             created_at=datetime.now(timezone.utc),
-        )
+        ).on_conflict_do_update(
+            index_elements=['device_imei', 'started_at'],  # ux_journey_device_start
+            set_={
+                'ended_at': timestamp,  # Update end to current timestamp
+                # Do NOT update created_at - preserve original journey creation time
+                # Do NOT update id - return the existing row's id
+            }
+        ).returning(Journey.id)
         
-        self.db.add(journey)
-        self.db.flush()  # Get ID
+        result_id = self.db.execute(stmt).scalar_one()
         
-        self.context.current_journey_id = str(journey.id)
-        self.context.journey_just_created = True  # Flag for stats tracking
+        self.context.current_journey_id = str(result_id)
+        self.context.journey_just_created = (result_id == journey_id)  # True only if inserted new
         
         logger.info(
-            "🆕 IMEI %s: Journey %s started at %s",
-            self.device_imei, journey.id, timestamp.isoformat()
+            "%s IMEI %s: Journey %s %s at %s",
+            "🆕" if self.context.journey_just_created else "♻️ ",
+            self.device_imei, result_id,
+            "started" if self.context.journey_just_created else "resumed",
+            timestamp.isoformat()
         )
         
         return self.context.current_journey_id
