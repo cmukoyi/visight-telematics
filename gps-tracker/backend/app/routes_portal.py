@@ -254,9 +254,20 @@ def _create_portal_token(portal_user_id: str, usergroup_id: str) -> str:
 
 def _decode_portal_token(token: str) -> Optional[dict]:
     try:
-        payload = jwt.decode(token, PORTAL_SECRET_KEY, algorithms=[PORTAL_ALGORITHM])
+        # Allow tokens without expiration (admin impersonation tokens)
+        payload = jwt.decode(
+            token, 
+            PORTAL_SECRET_KEY, 
+            algorithms=[PORTAL_ALGORITHM],
+            options={"verify_exp": False}  # Support impersonation tokens with no exp field
+        )
         if payload.get("type") != "portal":
             return None
+        # If token has exp field, verify it manually
+        if "exp" in payload:
+            exp_timestamp = payload["exp"]
+            if datetime.utcnow().timestamp() > exp_timestamp:
+                return None  # Token expired
         return payload
     except jwt.ExpiredSignatureError:
         return None
