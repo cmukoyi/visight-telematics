@@ -96,7 +96,7 @@ from app.models import (
 logger = logging.getLogger(__name__)
 
 # ── Engine Version (v2.2.0 - Fix Register) ────────────────────────────────
-ENGINE_VERSION = "2.1.13"  # v2.1.13: C2 journey break stationary continuity
+ENGINE_VERSION = "2.1.14"  # v2.1.14: C2a journey break on flush + C3 journey end at arrival
 
 # ── Configuration (defaults from spec validation) ─────────────────────────
 DEFAULT_ANCHOR_RADIUS_M = 100
@@ -385,6 +385,9 @@ class EngineContext:
     leg_persisted_this_invocation: bool = False
     stationary_persisted_this_invocation: bool = False
     
+    # v2.1.14 C2a: Journey break on open stop
+    journey_break_fired_this_stop: bool = False
+    
     def __post_init__(self):
         if self.anchor_points is None:
             self.anchor_points = []
@@ -649,7 +652,8 @@ class TripEngine:
         leg_count = len(legs)
         stationary_count = len(stationaries)
         
-        # Update journey end time and metrics
+        # v2.1.14 C3: Journey end must be arrival (legs only), not departure (legs + stationaries)
+        # Update journey time span - ended_at from legs only, started_at from earliest timestamp
         all_timestamps = []
         if legs:
             all_timestamps.extend([leg.started_at, leg.ended_at] for leg in legs)
@@ -658,8 +662,11 @@ class TripEngine:
         
         if all_timestamps:
             flat_timestamps = [t for pair in all_timestamps for t in pair]
-            journey.ended_at = max(flat_timestamps)
-            journey.started_at = min(flat_timestamps)  # Ensure started_at is earliest
+            journey.started_at = min(flat_timestamps)  # Earliest of legs and stationaries
+        
+        # C3: ended_at from legs only (arrival time, not departure)
+        if legs:
+            journey.ended_at = max(leg.ended_at for leg in legs)
             journey.total_duration_seconds = int((journey.ended_at - journey.started_at).total_seconds())
         
         journey.total_distance_m = total_distance_m
@@ -741,6 +748,7 @@ class TripEngine:
     def _flush_open_stationary(self) -> None:
         """
         v2.2 R4c: Flush open stationary to database on heartbeat.
+        v2.1.14 C2a: Fire journey break if open stationary crosses JOURNEY_BREAK_DWELL.
         
         Upserts current anchor_points as an open stationary (is_open=true) so long dwells
         are visible before they end. Uses (device_imei, started_at) as unique key.
@@ -762,7 +770,25 @@ class TripEngine:
         started_at = self.context.anchor_points[0][2]
         ended_at = self.context.anchor_points[-1][2]
         duration_seconds = (ended_at - started_at).total_seconds()
+        dwell_min = duration_seconds / 60.0
         point_count = len(self.context.anchor_points)
+        
+        # v2.1.14 C2a: Fire journey break if open stop crosses threshold
+        # This catches still-accumulating stops that never get evaluated on departure
+        if (self.context.current_journey_id and 
+            dwell_min > self.config.journey_break_dwell_min and
+            not self.context.journey_break_fired_this_stop):
+            
+            logger.info(
+                "🔓 IMEI %s: Journey break on OPEN stop (%.1f min dwell exceeds %d min threshold)",
+                self.device_imei, dwell_min, self.config.journey_break_dwell_min
+            )
+            
+            # Close journey WITHOUT flushing stationary (same as C2 departure-triggered break)
+            self._close_journey(skip_anchor_flush=True)
+            
+            # Mark that break has fired - prevent re-firing on subsequent flushes
+            self.context.journey_break_fired_this_stop = True
         
         logger.debug(
             "💾 IMEI %s: Flushing open stationary (%.0f min, %d points)",
@@ -1822,6 +1848,9 @@ class TripEngine:
                 
                 # Enter MOVE state
                 self.context.current_state = "MOVE"
+                
+                # v2.1.14 C2a: Reset journey break flag when leaving stationary
+                self.context.journey_break_fired_this_stop = False
                 
                 # CRITICAL FIX: Leg must start from PREVIOUS position (last stationary point),
                 # NOT from current position or anchor. Spec Section 2:
