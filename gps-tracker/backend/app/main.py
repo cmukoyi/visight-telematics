@@ -227,41 +227,57 @@ Complete asset tracking platform with BLE tag monitoring, geofencing, and moveme
     }
 )
 
-# Include admin router
-app.include_router(admin_router)
+# ==============================================================================
+# PUBLIC API - Visible in /docs
+# ==============================================================================
 
-# Include portal router (customer portal auth)
+# Authentication API (login)
+from app.routes_auth import router as auth_router  # noqa: E402
+app.include_router(auth_router)
+
+# API v2 (production endpoints)
+from app.routes_api_v2 import router as api_v2_router  # noqa: E402
+app.include_router(api_v2_router)
+
+# ==============================================================================
+# INTERNAL APIS - Hidden from /docs (dashboard/admin use only)
+# ==============================================================================
+
+# Include admin router (hidden from public API docs)
+app.include_router(admin_router, include_in_schema=False)
+
+# Include portal router (dashboard internal endpoints - hidden)
 from app.routes_portal import router as portal_router  # noqa: E402
-app.include_router(portal_router)
+app.include_router(portal_router, include_in_schema=False)
 
-# Include beacon-scan router
+# Include beacon-scan router (hidden from public API docs)
 from app.routes_beacons import router as beacons_router  # noqa: E402
-app.include_router(beacons_router)
+app.include_router(beacons_router, include_in_schema=False)
 
-# Include admin ops router (Docker container management)
+# Include admin ops router (Docker container management - hidden)
 from app.routes_ops import router as ops_router  # noqa: E402
-app.include_router(ops_router)
+app.include_router(ops_router, include_in_schema=False)
 
-# Include HIVE tracking router
+# Include HIVE tracking router (hidden from public API docs)
 from app.routes_hive import router as hive_router  # noqa: E402
-app.include_router(hive_router)
+app.include_router(hive_router, include_in_schema=False)
 
-# Include Floor Plan router (BLE indoor tracking via Pareto Anywhere)
+# Include Floor Plan router (BLE indoor tracking - hidden)
 from app.routes_floorplan import router as floorplan_router  # noqa: E402
-app.include_router(floorplan_router)
+app.include_router(floorplan_router, include_in_schema=False)
 
-# Include Asset Tracking routers (QR/NFC scanning)
+# Include Asset Tracking routers (QR/NFC scanning - hidden)
 from app.routes_assets import router as assets_router  # noqa: E402
-app.include_router(assets_router)
+app.include_router(assets_router, include_in_schema=False)
 
 from app.routes_scan import router as scan_router  # noqa: E402
-app.include_router(scan_router)
+app.include_router(scan_router, include_in_schema=False)
 
 from app.routes_i18n import router as i18n_router  # noqa: E402
-app.include_router(i18n_router)
+app.include_router(i18n_router, include_in_schema=False)
 
 from app.routes_admin_i18n import router as admin_i18n_router  # noqa: E402
-app.include_router(admin_i18n_router)
+app.include_router(admin_i18n_router, include_in_schema=False)
 
 # Static files for asset tracking (baked into Docker image at build time)
 static_dir = "/app/static"
