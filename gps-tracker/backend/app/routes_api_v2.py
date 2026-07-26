@@ -372,7 +372,7 @@ def get_movement_history(
         imei=imei,
         start_date=start_date,
         end_date=end_date,
-        total=len(position_items),
+        total_positions=len(position_items),
         positions=position_items
     )
 
