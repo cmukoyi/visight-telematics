@@ -206,7 +206,7 @@ Complete asset tracking platform with BLE tag monitoring, geofencing, and moveme
 
 ---
 
-© 2026 PinPlot. All rights reserved.
+
 
     """,
     docs_url="/docs",
