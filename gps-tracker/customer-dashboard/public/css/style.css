@@ -1824,6 +1824,11 @@ tbody tr:hover { background: var(--bg-3); }
 .login-remember input[type="checkbox"] {
   width: auto; accent-color: var(--primary); cursor: pointer;
 }
+#captchaQuestion {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 14px;
+}
 
 /* ── Top bar (inside main content, shows page title + company) ── */
 .top-bar {

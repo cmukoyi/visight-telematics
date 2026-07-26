@@ -4701,8 +4701,10 @@ function _generateCaptcha() {
     const el = document.getElementById('captchaQuestion');
     if (el) {
         el.textContent = `${a} + ${b} = ?`;
-        // Use explicit color instead of CSS variable in inline style (better browser compatibility)
-        el.style.cssText = 'font-weight: 600; color: #E8EDF8 !important; font-size: 14px;';
+        // Use theme-aware CSS variable for color (works in both dark and light modes)
+        el.style.fontWeight = '600';
+        el.style.fontSize = '14px';
+        // Don't set color inline - let it inherit from label (var(--text-3)) or add as CSS class
     }
     const inp = document.getElementById('loginCaptcha');
     if (inp) inp.value = '';
