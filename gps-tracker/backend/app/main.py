@@ -180,10 +180,10 @@ class UserWithTags(BaseModel):
         from_attributes = True
 
 app = FastAPI(
-    title="PinPlot API",
+    title="Asset Tracking API",
     version="2.0.0",
     description="""
-## PinPlot Real-time Asset Tracking API
+## Real-time Asset Tracking API
 
 Complete asset tracking platform with BLE tag monitoring, geofencing, and movement analytics.
 
