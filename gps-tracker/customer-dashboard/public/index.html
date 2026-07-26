@@ -4701,7 +4701,10 @@ function _generateCaptcha() {
     const el = document.getElementById('captchaQuestion');
     if (el) {
         el.textContent = `${a} + ${b} = ?`;
-        el.style.cssText = 'font-weight: 600; color: var(--text) !important;';
+        // Use theme-aware CSS variable for color (works in both dark and light modes)
+        el.style.fontWeight = '600';
+        el.style.fontSize = '14px';
+        // Don't set color inline - let it inherit from label (var(--text-3)) or add as CSS class
     }
     const inp = document.getElementById('loginCaptcha');
     if (inp) inp.value = '';
@@ -5125,18 +5128,13 @@ function applyTheme(theme) {
         const stored = JSON.parse(localStorage.getItem('pinplot_branding') || 'null');
         if (stored && typeof applyBranding === 'function') applyBranding(stored);
     } catch (_) {}
-    // Update captcha color if it exists
-    const el = document.getElementById('captchaQuestion');
-    if (el && el.textContent) {
-        el.style.cssText = 'font-weight: 600; color: var(--text) !important;';
-    }
 }
 function toggleTheme() {
-    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    const current = document.documentElement.getAttribute('data-theme') || 'light';
     applyTheme(current === 'dark' ? 'light' : 'dark');
 }
 // Apply saved theme immediately (before login check)
-applyTheme(localStorage.getItem('pp-theme') || 'dark');
+applyTheme(localStorage.getItem('pp-theme') || 'light');
 
 // Reflect saved "Light maps" preference in the dropdown checkbox once the DOM is ready.
 document.addEventListener('DOMContentLoaded', () => {
@@ -12799,13 +12797,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Open the HIVE user manual in a new tab, propagating the current theme.
 function hiveOpenHelp() {
-    const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+    const theme = document.documentElement.getAttribute('data-theme') || 'light';
     window.open('/customer/help/HIVE_User_Manual.html?theme=' + encodeURIComponent(theme),
                 '_blank', 'noopener,noreferrer');
 }
 
 function qrOpenHelp() {
-    const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+    const theme = document.documentElement.getAttribute('data-theme') || 'light';
     // Detect tenant from branding - use Beacon guide if tenant name contains 'beacon' (case-insensitive)
     // Note: QR_NFC_Guide_Beacon.html must be deployed separately to Beacon servers at /customer/help/
     // Only QR_NFC_Guide_Pinplot.html is in the shared PinPlot-HPS repository to avoid tenant brand drift
@@ -14314,6 +14312,69 @@ function qrOpenHelp() {
     return Math.floor((start - end) / 1000);
   }
 
+  // Helper: Interpolate great-circle path between two points
+  // Returns array of [lat, lng] coordinates along the great-circle arc
+  function mhaGreatCirclePath(lat1, lng1, lat2, lng2, numPoints = 64) {
+    const toRad = deg => deg * Math.PI / 180;
+    const toDeg = rad => rad * 180 / Math.PI;
+    
+    const φ1 = toRad(lat1);
+    const λ1 = toRad(lng1);
+    const φ2 = toRad(lat2);
+    const λ2 = toRad(lng2);
+    
+    // Calculate angular distance (great-circle distance on unit sphere)
+    const Δφ = φ2 - φ1;
+    const Δλ = λ2 - λ1;
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const angularDist = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    
+    // Interpolate points along the great circle
+    const points = [];
+    for (let i = 0; i <= numPoints; i++) {
+      const f = i / numPoints; // Fraction along path
+      
+      // Spherical linear interpolation (slerp)
+      const A = Math.sin((1-f) * angularDist) / Math.sin(angularDist);
+      const B = Math.sin(f * angularDist) / Math.sin(angularDist);
+      
+      const x = A * Math.cos(φ1) * Math.cos(λ1) + B * Math.cos(φ2) * Math.cos(λ2);
+      const y = A * Math.cos(φ1) * Math.sin(λ1) + B * Math.cos(φ2) * Math.sin(λ2);
+      const z = A * Math.sin(φ1) + B * Math.sin(φ2);
+      
+      const φ = Math.atan2(z, Math.sqrt(x*x + y*y));
+      const λ = Math.atan2(y, x);
+      
+      points.push([toDeg(φ), toDeg(λ)]);
+    }
+    
+    return points;
+  }
+
+  // Helper: Calculate great-circle midpoint between two points
+  function mhaGreatCircleMidpoint(lat1, lng1, lat2, lng2) {
+    const toRad = deg => deg * Math.PI / 180;
+    const toDeg = rad => rad * 180 / Math.PI;
+    
+    const φ1 = toRad(lat1);
+    const λ1 = toRad(lng1);
+    const φ2 = toRad(lat2);
+    const λ2 = toRad(lng2);
+    
+    const Bx = Math.cos(φ2) * Math.cos(λ2 - λ1);
+    const By = Math.cos(φ2) * Math.sin(λ2 - λ1);
+    
+    const φm = Math.atan2(
+      Math.sin(φ1) + Math.sin(φ2),
+      Math.sqrt((Math.cos(φ1) + Bx) * (Math.cos(φ1) + Bx) + By * By)
+    );
+    const λm = λ1 + Math.atan2(By, Math.cos(φ1) + Bx);
+    
+    return [toDeg(φm), toDeg(λm)];
+  }
+
   // Toggle journey card expansion
   window.mhaToggleJourney = async function(journeyId, event) {
     event.stopPropagation();
@@ -14403,16 +14464,30 @@ function qrOpenHelp() {
           const distance = fmtDistance(leg.distance_m);
           const durationMin = Math.floor(leg.duration_seconds / 60);
           const posCount = leg.position_count || 0;
-          const partialWarn = (posCount > 0 && posCount < 5) ? ' <span class="warn">· partial path</span>' : '';
+          const isAirLeg = leg.is_air_leg || leg.mode === 'air';
           
-          stepsHtml += `
-            <div class="mha-step" data-leg-id="${leg.id}" onclick="mhaFocusLegById(event, '${leg.id}')">
-              <i class="dot sd" style="background:#3b82f6;"></i>
-              <div>
-                <span class="val">Leg ${legCounter}</span>
-                <span class="lbl"> · ${distance}${posCount > 0 ? ' · ' + posCount + ' positions' : ''} · ${durationMin} min${partialWarn}</span>
-              </div>
-            </div>`;
+          // Air leg: show air-specific label
+          if (isAirLeg) {
+            stepsHtml += `
+              <div class="mha-step" data-leg-id="${leg.id}" onclick="mhaFocusLegById(event, '${leg.id}')">
+                <i class="dot sd" style="background:#3b82f6;"></i>
+                <div>
+                  <span class="val">✈ Air leg</span>
+                  <span class="lbl"> · ${distance} · ${durationMin} min · great-circle · path unknown</span>
+                </div>
+              </div>`;
+          } else {
+            // Road leg: show standard label
+            const partialWarn = (posCount > 0 && posCount < 5) ? ' <span class="warn">· partial path</span>' : '';
+            stepsHtml += `
+              <div class="mha-step" data-leg-id="${leg.id}" onclick="mhaFocusLegById(event, '${leg.id}')">
+                <i class="dot sd" style="background:#3b82f6;"></i>
+                <div>
+                  <span class="val">Leg ${legCounter}</span>
+                  <span class="lbl"> · ${distance}${posCount > 0 ? ' · ' + posCount + ' positions' : ''} · ${durationMin} min${partialWarn}</span>
+                </div>
+              </div>`;
+          }
         } else {
           statCounter++;
           const stat = item.data;
@@ -14623,7 +14698,7 @@ function qrOpenHelp() {
       const allJourneyCoordinates = [];
       const legInfoMap = new Map(); // Store leg details for popups
       
-      // Process legs to build continuous path
+      // Process legs to build continuous path and render air legs separately
       (journeyData.legs || []).forEach((leg, idx) => {
         legCounter++;
         totalDistance += leg.distance_m || 0;
@@ -14635,36 +14710,89 @@ function qrOpenHelp() {
         const endLng = leg.end_lng || leg.longitude;
         
         if (startLat && startLng && endLat && endLng) {
-          // Get full path from GeoJSON if available
-          const legGeometry = legGeometries[leg.id];
-          let coordinates = [[startLat, startLng], [endLat, endLng]]; // Fallback to straight line
+          const isAirLeg = leg.is_air_leg || leg.mode === 'air';
           
-          if (legGeometry && legGeometry.type === 'LineString' && legGeometry.coordinates) {
-            // GeoJSON uses [lng, lat] format, Leaflet uses [lat, lng]
-            coordinates = legGeometry.coordinates.map(coord => [coord[1], coord[0]]);
-            console.log(`[MHA] Leg ${legCounter} has ${coordinates.length} positions`);
+          if (isAirLeg) {
+            // AIR LEG: Render as separate dashed great-circle arc
+            const arcCoordinates = mhaGreatCirclePath(startLat, startLng, endLat, endLng, 64);
+            
+            const airLegLine = L.polyline(
+              arcCoordinates,
+              {
+                color: '#3b82f6',
+                weight: 3,
+                opacity: 0.7,
+                dashArray: '8 6',
+                lineCap: 'round',
+                lineJoin: 'round'
+              }
+            ).addTo(_mhaMap);
+            
+            airLegLine.bindPopup(`<b>Air Leg</b><br>Distance: ${fmtDistance(leg.distance_m)}<br>Duration: ${mhaFormatDuration(leg.duration_seconds)}<br>✈ Flight<br>Great-circle path (path unknown)`);
+            _mhaJourneyLayers.push(airLegLine);
+            
+            // Add Flight pill at great-circle midpoint
+            const midpoint = mhaGreatCircleMidpoint(startLat, startLng, endLat, endLng);
+            const flightPill = L.marker(midpoint, {
+              icon: L.divIcon({
+                className: 'mha-flight-pill',
+                html: `<div style="background:white;border:2px solid #3b82f6;border-radius:12px;padding:4px 10px;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#3b82f6;box-shadow:0 2px 8px rgba(0,0,0,0.2);white-space:nowrap;"><span style="font-size:14px;">✈</span> Flight</div>`,
+                iconSize: [80, 24],
+                iconAnchor: [40, 12]
+              }),
+              zIndexOffset: 1000
+            }).addTo(_mhaMap);
+            
+            flightPill.bindPopup(`<b>Air Leg</b><br>Distance: ${fmtDistance(leg.distance_m)}<br>Duration: ${mhaFormatDuration(leg.duration_seconds)}<br>Great-circle path (path unknown)`);
+            _mhaJourneyLayers.push(flightPill);
+            
+            // Add arc endpoints to bounds
+            arcCoordinates.forEach(coord => bounds.push(coord));
+            
+            // Store leg info (using midpoint for consistency)
+            legInfoMap.set(legCounter, {
+              leg: leg,
+              coordinates: arcCoordinates,
+              midpoint: midpoint,
+              legNumber: legCounter,
+              isAirLeg: true
+            });
+            
+            console.log(`[MHA] Air Leg ${legCounter} rendered as dashed great-circle arc with ${arcCoordinates.length} points`);
           } else {
-            console.warn(`[MHA] Leg ${legCounter} has no path geometry, using straight line`);
+            // ROAD LEG: Add to continuous journey line
+            // Get full path from GeoJSON if available
+            const legGeometry = legGeometries[leg.id];
+            let coordinates = [[startLat, startLng], [endLat, endLng]]; // Fallback to straight line
+            
+            if (legGeometry && legGeometry.type === 'LineString' && legGeometry.coordinates) {
+              // GeoJSON uses [lng, lat] format, Leaflet uses [lat, lng]
+              coordinates = legGeometry.coordinates.map(coord => [coord[1], coord[0]]);
+              console.log(`[MHA] Leg ${legCounter} has ${coordinates.length} positions`);
+            } else {
+              console.warn(`[MHA] Leg ${legCounter} has no path geometry, using straight line`);
+            }
+            
+            // Append to continuous journey line (skip first point if not first leg to avoid duplicates)
+            if (idx === 0) {
+              allJourneyCoordinates.push(...coordinates);
+            } else {
+              allJourneyCoordinates.push(...coordinates.slice(1));
+            }
+            
+            // Store leg info for interactive markers
+            const midpoint = coordinates[Math.floor(coordinates.length / 2)];
+            legInfoMap.set(legCounter, {
+              leg: leg,
+              coordinates: coordinates,
+              midpoint: midpoint,
+              legNumber: legCounter,
+              isAirLeg: false
+            });
+            
+            // Add bounds from all coordinates
+            coordinates.forEach(coord => bounds.push(coord));
           }
-          
-          // Append to continuous journey line (skip first point if not first leg to avoid duplicates)
-          if (idx === 0) {
-            allJourneyCoordinates.push(...coordinates);
-          } else {
-            allJourneyCoordinates.push(...coordinates.slice(1));
-          }
-          
-          // Store leg info for interactive markers
-          const midpoint = coordinates[Math.floor(coordinates.length / 2)];
-          legInfoMap.set(legCounter, {
-            leg: leg,
-            coordinates: coordinates,
-            midpoint: midpoint,
-            legNumber: legCounter
-          });
-          
-          // Add bounds from all coordinates
-          coordinates.forEach(coord => bounds.push(coord));
         }
       });
       
@@ -14687,9 +14815,9 @@ function qrOpenHelp() {
         console.log(`[MHA] Drew continuous journey line with ${allJourneyCoordinates.length} total positions`);
       }
       
-      // Add invisible clickable markers at leg midpoints for leg details
+      // Add invisible clickable markers at leg midpoints for leg details (skip air legs - they have flight pills)
       legInfoMap.forEach((info, legNum) => {
-        if (info.midpoint) {
+        if (info.midpoint && !info.isAirLeg) {
           const legMarker = L.circleMarker(info.midpoint, {
             radius: 8,
             fillColor: '#3b82f6',
@@ -14700,7 +14828,7 @@ function qrOpenHelp() {
           }).addTo(_mhaMap);
           
           const distance = fmtDistance(info.leg.distance_m);
-          legMarker.bindPopup(`<b>Leg ${legNum}</b><br>Distance: ${distance}<br>Duration: ${mhaFormatDuration(info.leg.duration_seconds)}${info.leg.mode === 'air' ? '<br>✈ Flight' : ''}<br>Positions: ${info.coordinates.length}`);
+          legMarker.bindPopup(`<b>Leg ${legNum}</b><br>Distance: ${distance}<br>Duration: ${mhaFormatDuration(info.leg.duration_seconds)}<br>Positions: ${info.coordinates.length}`);
           _mhaJourneyLayers.push(legMarker);
         }
       });
