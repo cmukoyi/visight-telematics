@@ -204,11 +204,7 @@ Complete asset tracking platform with BLE tag monitoring, geofencing, and moveme
 | `GET /api/v2/geofences` | List all geofences (POIs) |
 | `GET /api/v2/alerts` | Get alerts by type and date range |
 
-### Interactive Documentation
 
-- **Swagger UI:** [/docs](/docs) - Test APIs interactively
-- **ReDoc:** [/redoc](/redoc) - Detailed API reference
-- **OpenAPI Spec:** [/openapi.json](/openapi.json) - Machine-readable spec
     """,
     contact={
         "name": "PinPlot Support",
