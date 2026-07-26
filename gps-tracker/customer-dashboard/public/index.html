@@ -4965,14 +4965,14 @@ function applyNavFeatures(features) {
 
 /**
  * Show/hide the Developers nav section based on user role.
- * Only users with 'admin' or 'api_only' roles can see developer tools.
+ * Only users with 'admin', 'system_admin', or 'api_only' roles can see developer tools.
  */
 function applyDeveloperNavAccess(user) {
     const devSection = document.getElementById('nav-section-developers');
     if (!devSection) return;
     
     const userRole = (user.role || '').toLowerCase();
-    const hasDevAccess = userRole === 'admin' || userRole === 'api_only';
+    const hasDevAccess = userRole === 'admin' || userRole === 'system_admin' || userRole === 'api_only';
     
     devSection.style.display = hasDevAccess ? '' : 'none';
 }
