@@ -12,8 +12,9 @@ from pydantic import BaseModel
 import logging
 
 from app.database import get_db
-from app.models import BLETag, DevicePosition, PortalUser, HiveEvent, Hive, POI, PortalAlert
+from app.models import BLETag, DevicePosition, PortalUser, HiveEvent, Hive, POI, PortalAlert, User, UserGroup
 from app.routes_portal import get_portal_user_from_request
+from sqlalchemy import or_
 
 router = APIRouter(prefix="/api/v2", tags=["API v2"])
 logger = logging.getLogger(__name__)
@@ -22,6 +23,82 @@ logger = logging.getLogger(__name__)
 def get_current_portal_user(request: Request, db: Session = Depends(get_db)) -> PortalUser:
     """Dependency: Verify bearer token and return authenticated PortalUser."""
     return get_portal_user_from_request(request, db)
+
+
+def _get_usergroup_device_imeis(usergroup_id: str, db: Session) -> List[str]:
+    """
+    Get all device IMEIs belonging to a usergroup.
+    
+    Implements proper multi-tenant isolation by:
+    1. Finding users whose email domain matches the group's domain
+    2. Finding users explicitly linked via PortalUser table
+    3. Querying BLETag where user_id matches OR tag was created by the group
+    4. Returning distinct IMEIs for devices owned by the group
+    """
+    # Get the usergroup
+    group = db.query(UserGroup).filter(UserGroup.id == usergroup_id).first()
+    if not group:
+        return []
+    
+    # Helper to extract domains from group
+    def _domains(g):
+        domain = g.email_domain
+        if not domain or not domain.strip():
+            return []
+        return [d.strip().lower() for d in domain.split(",") if d.strip()]
+    
+    # Helper to build domain filter
+    def _domain_filter(domains):
+        conditions = []
+        for d in domains:
+            conditions.append(User.email.ilike(f"%@{d}"))
+        return or_(*conditions) if conditions else False
+    
+    domains = _domains(group)
+    group_id = str(group.id)
+    
+    # Source 1: Domain-matched users (auto-assigned via email domain)
+    domain_user_ids = []
+    if domains:
+        domain_user_rows = db.query(User.id).filter(_domain_filter(domains)).all()
+        domain_user_ids = [str(uid) for (uid,) in domain_user_rows]
+    
+    # Source 2: Manually assigned users (via PortalUser table)
+    portal_user_rows = (
+        db.query(User.id)
+        .join(PortalUser, User.email == PortalUser.email)
+        .filter(PortalUser.usergroup_id == usergroup_id)
+        .all()
+    )
+    portal_user_ids = [str(uid) for (uid,) in portal_user_rows]
+    
+    # UNION: All users in this group
+    all_owner_ids = list(set(domain_user_ids + portal_user_ids))
+    
+    # Query BLETag with group scope filter
+    tag_scope_filter = (
+        or_(
+            BLETag.user_id.in_(all_owner_ids),
+            BLETag.attributes.op("->>")("_created_usergroup_id") == group_id,
+        )
+        if all_owner_ids
+        else BLETag.attributes.op("->>")("_created_usergroup_id") == group_id
+    )
+    
+    # Get all IMEIs for this group's devices
+    tags = (
+        db.query(BLETag.imei)
+        .filter(
+            tag_scope_filter,
+            BLETag.is_active == True,
+            BLETag.imei.isnot(None),
+            BLETag.imei != "",
+        )
+        .distinct()
+        .all()
+    )
+    
+    return [imei for (imei,) in tags]
 
 
 # =============================================================================
@@ -129,7 +206,7 @@ def get_devices(
     Get all devices (IMEIs) with their last known positions.
     
     **Authentication:** Bearer token required  
-    **Scope:** Returns all devices (Note: Usergroup filtering pending schema update)
+    **Scope:** ✅ Only returns devices in the authenticated user's usergroup (multi-tenant isolation)
     
     **Example:**
     ```bash
@@ -137,7 +214,13 @@ def get_devices(
       -H "Authorization: Bearer YOUR_TOKEN"
     ```
     """
-    from sqlalchemy import func, distinct
+    from sqlalchemy import func
+    
+    # Get IMEIs for this usergroup ONLY (multi-tenant isolation)
+    allowed_imeis = _get_usergroup_device_imeis(str(user.usergroup_id), db)
+    
+    if not allowed_imeis:
+        return DeviceListResponse(total=0, devices=[])
     
     # Get distinct IMEIs with their most recent position
     # Using subquery to get latest position per device efficiently
@@ -146,6 +229,7 @@ def get_devices(
             DevicePosition.device_imei,
             func.max(DevicePosition.observed_at).label("latest_time")
         )
+        .filter(DevicePosition.device_imei.in_(allowed_imeis))  # 🔒 SECURITY: usergroup filter
         .group_by(DevicePosition.device_imei)
         .subquery()
     )
@@ -193,7 +277,7 @@ def get_movement_history(
     Get movement history for a specific IMEI within a date range.
     
     **Authentication:** Bearer token required  
-    **Scope:** Returns positions for the specified IMEI (Note: Usergroup filtering pending schema update)
+    **Scope:** ✅ Only returns data if the IMEI belongs to the user's usergroup (multi-tenant isolation)
     
     **Example:**
     ```bash
@@ -201,6 +285,15 @@ def get_movement_history(
       -H "Authorization: Bearer YOUR_TOKEN"
     ```
     """
+    # 🔒 SECURITY: Verify IMEI belongs to user's usergroup
+    allowed_imeis = _get_usergroup_device_imeis(str(user.usergroup_id), db)
+    
+    if imei not in allowed_imeis:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Device not found or not accessible"
+        )
+    
     # Query positions within date range
     positions = db.query(DevicePosition).filter(
         DevicePosition.device_imei == imei,

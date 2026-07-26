@@ -187,13 +187,25 @@ app = FastAPI(
 
 Complete asset tracking platform with BLE tag monitoring, geofencing, and movement analytics.
 
+### 🔒 Security & Multi-Tenant Isolation
+
+**Every API response is scoped to your usergroup** — you only see your own organization's data:
+
+- ✅ Devices filtered by usergroup ownership
+- ✅ Position history filtered by usergroup
+- ✅ Hive breaches filtered by usergroup
+- ✅ Geofences filtered by usergroup
+- ✅ Alerts filtered by usergroup
+
+**Zero data leakage between tenants.**
+
 ### Authentication
 
 **All API endpoints require Bearer token authentication.**
 
 1. **Get Token:** `POST /api/auth/login` with email and password
 2. **Use Token:** Include in `Authorization: Bearer <token>` header for all requests
-3. **Token Scope:** All responses are scoped to your usergroup (multi-tenant isolation)
+3. **Token Scope:** JWT contains `usergroup_id` — all queries filter by this value
 
 ### User Roles
 
