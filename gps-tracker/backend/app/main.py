@@ -204,6 +204,9 @@ Complete asset tracking platform with BLE tag monitoring, geofencing, and moveme
 | `GET /api/v2/geofences` | List all geofences (POIs) |
 | `GET /api/v2/alerts` | Get alerts by type and date range |
 
+---
+
+© 2026 PinPlot. All rights reserved.
 
     """,
     docs_url="/docs",
