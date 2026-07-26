@@ -228,7 +228,7 @@ def get_devices(
     # Build position lookup: IMEI -> latest position
     position_map = {}
     
-    # Get latest position for each device
+    # Source 1: device_positions table (for GPS trackers - Series 2)
     subq = (
         db.query(
             DevicePosition.device_imei,
@@ -239,7 +239,7 @@ def get_devices(
         .subquery()
     )
     
-    positions = (
+    gps_positions = (
         db.query(DevicePosition)
         .join(
             subq,
@@ -249,24 +249,55 @@ def get_devices(
         .all()
     )
     
-    for pos in positions:
-        position_map[pos.device_imei] = pos
+    for pos in gps_positions:
+        position_map[pos.device_imei] = {
+            'latitude': pos.lat,
+            'longitude': pos.lng,
+            'timestamp': pos.observed_at,
+            'address': pos.address if hasattr(pos, 'address') else None,
+        }
+    
+    # Source 2: ble_tags table (for Series 3 QR and BLE devices)
+    # These store position directly on the tag record
+    tags_with_positions = (
+        db.query(BLETag)
+        .filter(
+            BLETag.imei.in_(allowed_imeis),
+            BLETag.latitude.isnot(None),
+            BLETag.longitude.isnot(None),
+        )
+        .all()
+    )
+    
+    for tag in tags_with_positions:
+        # Only use ble_tags position if not already found in device_positions
+        if tag.imei not in position_map:
+            try:
+                position_map[tag.imei] = {
+                    'latitude': float(tag.latitude) if tag.latitude else None,
+                    'longitude': float(tag.longitude) if tag.longitude else None,
+                    'timestamp': tag.last_seen,
+                    'address': tag.location_description,
+                }
+            except (ValueError, TypeError):
+                # Skip if latitude/longitude can't be converted to float
+                pass
     
     # Return ALL devices in usergroup (with or without positions)
     devices = []
     for imei in allowed_imeis:
-        pos = position_map.get(imei)
+        pos_data = position_map.get(imei)
         
-        if pos:
-            # Device has GPS data
+        if pos_data:
+            # Device has GPS data (from either source)
             devices.append(DevicePositionResponse(
                 imei=imei,
-                latitude=pos.lat,
-                longitude=pos.lng,
-                timestamp=pos.observed_at,
+                latitude=pos_data['latitude'],
+                longitude=pos_data['longitude'],
+                timestamp=pos_data['timestamp'],
                 battery_level=None,
                 is_indoor=False,
-                address=pos.address if hasattr(pos, 'address') else None,
+                address=pos_data['address'],
             ))
         else:
             # Device exists but no GPS data yet
