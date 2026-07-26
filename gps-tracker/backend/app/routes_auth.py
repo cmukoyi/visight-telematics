@@ -172,6 +172,7 @@ def login(
     # Create JWT token
     expire = datetime.utcnow() + timedelta(hours=PORTAL_TOKEN_EXPIRE_HOURS)
     token_data = {
+        "type": "portal",  # Required by _decode_portal_token verification
         "portal_user_id": str(user.id),
         "usergroup_id": str(user.usergroup_id),
         "email": user.email,
