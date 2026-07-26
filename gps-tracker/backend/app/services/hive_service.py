@@ -45,11 +45,11 @@ UTC = timezone.utc
 import os as _os
 HIVE_BREACH_RENOTIFY_HOURS = float(_os.getenv("HIVE_BREACH_RENOTIFY_HOURS", "24"))
 
-# v1.2 Persistence-based confirmation thresholds (Fix 4)
-# Breach confirms when BOTH duration and evaluation count are satisfied.
-# Default: 6 minutes AND at least 3 consecutive evaluations in BREACH_PENDING.
-HIVE_PERSISTENCE_DURATION_SECONDS = int(_os.getenv("HIVE_PERSISTENCE_DURATION_SECONDS", "360"))  # 6 min
-HIVE_PERSISTENCE_MIN_EVALUATIONS = int(_os.getenv("HIVE_PERSISTENCE_MIN_EVALUATIONS", "3"))
+# Duration-based breach persistence thresholds (v1.2 confirmation fix).
+# A breach must persist for at least T_PERSIST_MINUTES AND T_PERSIST_EVALS
+# to confirm, and must be backed by fresh evidence (not a stale snapshot).
+T_PERSIST_MINUTES = float(_os.getenv("HIVE_PERSIST_MINUTES", "6"))
+T_PERSIST_EVALS = int(_os.getenv("HIVE_PERSIST_EVALS", "3"))
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Geometry helpers
@@ -125,6 +125,7 @@ def pairwise_temporal_eval(
     positions: List[Tuple[str, float, float, datetime]],
     threshold_m: float,
     coherence_window_s: int,
+    prior_positions_by_tag: Optional[Dict[str, Tuple[float, float]]] = None,
 ) -> Tuple[
     Optional[float],  # display diameter (all candidate pairs)
     Optional[float],  # coherent diameter (only temporally coherent pairs)
@@ -206,38 +207,83 @@ def pairwise_temporal_eval(
                 outlier = str(candidates[0])
                 outlier_selection_reason = "most_breaching_pairs"
             else:
-                centroid_source = [
-                    coords for tid, coords in coherent_positions_by_tag.items()
-                    if tid in coherent_tag_ids
-                ]
-                if centroid_source:
-                    centroid_lat = sum(lat for lat, _ in centroid_source) / len(centroid_source)
-                    centroid_lng = sum(lng for _, lng in centroid_source) / len(centroid_source)
-                    dist_by_candidate: Dict[str, float] = {}
+                # ─── Fix B (v1.3): Movement tiebreak for 2-tag case ───────────────
+                # When only 2 tags are coherent (sparse edge case), centroid sits
+                # between them and cannot identify which moved. Instead, rank by
+                # displacement from each tag's own prior position.
+                
+                # Check if we have a stable cluster (3+ tags) or a 2-tag sparsity case
+                coherent_tag_count = len(coherent_tag_ids)
+                
+                if coherent_tag_count == 2 and prior_positions_by_tag:
+                    # 2-tag case: use movement tiebreak
+                    # Rank candidates by displacement from own prior position
+                    displacement_by_candidate: Dict[str, float] = {}
+                    
                     for tid in candidates:
                         coords = coherent_positions_by_tag.get(str(tid))
-                        if not coords:
-                            continue
-                        lat, lng = coords
-                        dist_by_candidate[str(tid)] = haversine_m(lat, lng, centroid_lat, centroid_lng)
-                    if dist_by_candidate:
-                        max_dist = max(dist_by_candidate.values())
-                        distance_winners = [
-                            tid for tid, dist in dist_by_candidate.items()
-                            if dist == max_dist
+                        prior_coords = prior_positions_by_tag.get(str(tid))
+                        
+                        if coords and prior_coords:
+                            lat, lng = coords
+                            prior_lat, prior_lng = prior_coords
+                            displacement = haversine_m(lat, lng, prior_lat, prior_lng)
+                            displacement_by_candidate[str(tid)] = displacement
+                    
+                    if displacement_by_candidate:
+                        # Tag with largest displacement moved furthest → outlier
+                        max_displacement = max(displacement_by_candidate.values())
+                        movement_winners = [
+                            tid for tid, disp in displacement_by_candidate.items()
+                            if disp == max_displacement
                         ]
-                        if len(distance_winners) == 1:
-                            outlier = distance_winners[0]
-                            outlier_selection_reason = "tiebreak_distance"
+                        
+                        if len(movement_winners) == 1:
+                            outlier = movement_winners[0]
+                            outlier_selection_reason = "tiebreak_movement"
                         else:
-                            outlier = sorted(distance_winners)[0]
+                            # Still tied on movement → alphabetical fallback
+                            outlier = sorted(movement_winners)[0]
+                            outlier_selection_reason = "tiebreak_alphabetical"
+                    else:
+                        # No prior positions for candidates → alphabetical fallback
+                        outlier = sorted(str(tid) for tid in candidates)[0]
+                        outlier_selection_reason = "tiebreak_alphabetical"
+                
+                else:
+                    # 3+ tags (stable cluster exists): use centroid-based tiebreak
+                    centroid_source = [
+                        coords for tid, coords in coherent_positions_by_tag.items()
+                        if tid in coherent_tag_ids
+                    ]
+                    if centroid_source:
+                        centroid_lat = sum(lat for lat, _ in centroid_source) / len(centroid_source)
+                        centroid_lng = sum(lng for _, lng in centroid_source) / len(centroid_source)
+                        dist_by_candidate: Dict[str, float] = {}
+                        for tid in candidates:
+                            coords = coherent_positions_by_tag.get(str(tid))
+                            if not coords:
+                                continue
+                            lat, lng = coords
+                            dist_by_candidate[str(tid)] = haversine_m(lat, lng, centroid_lat, centroid_lng)
+                        if dist_by_candidate:
+                            max_dist = max(dist_by_candidate.values())
+                            distance_winners = [
+                                tid for tid, dist in dist_by_candidate.items()
+                                if dist == max_dist
+                            ]
+                            if len(distance_winners) == 1:
+                                outlier = distance_winners[0]
+                                outlier_selection_reason = "tiebreak_distance"
+                            else:
+                                outlier = sorted(distance_winners)[0]
+                                outlier_selection_reason = "tiebreak_alphabetical"
+                        else:
+                            outlier = sorted(str(tid) for tid in candidates)[0]
                             outlier_selection_reason = "tiebreak_alphabetical"
                     else:
                         outlier = sorted(str(tid) for tid in candidates)[0]
                         outlier_selection_reason = "tiebreak_alphabetical"
-                else:
-                    outlier = sorted(str(tid) for tid in candidates)[0]
-                    outlier_selection_reason = "tiebreak_alphabetical"
 
     # Fix 3 correction: separated-tag count is cluster-based, not the number of
     # non-zero breaching-pair entries (which double-counts both sides of a split).
@@ -309,17 +355,59 @@ def _snapshot_fingerprint(positions: List[Tuple[str, float, float, datetime]]) -
     return "|".join(f"{item['tag_id']}@{item['observed_at']}" for item in payload)
 
 
-def _positions_used_payload(positions: List[Tuple[str, float, float, datetime]]) -> List[Dict[str, str]]:
-    """Canonical JSON-safe representation of the position set used for evaluation."""
-    payload: List[Dict[str, str]] = []
-    for tid, _lat, _lng, ts in positions:
+def _positions_used_payload(positions: List[Tuple[str, float, float, datetime]]) -> List[Dict[str, Any]]:
+    """Canonical JSON-safe representation of the position set used for evaluation.
+    
+    Enhanced in v1.2.1 to include coordinates (lat, lon) for trajectory analysis.
+    source_id and accuracy_m not yet available from upstream ingestion.
+    """
+    payload: List[Dict[str, Any]] = []
+    for tid, lat, lng, ts in positions:
         ts_utc = ts if ts.tzinfo else ts.replace(tzinfo=UTC)
         payload.append({
             "tag_id": str(tid),
             "observed_at": ts_utc.astimezone(UTC).isoformat(),
+            "lat": round(lat, 6),  # 6 decimal places = ~0.11m precision
+            "lon": round(lng, 6),
+            # "source_id": None,  # Not yet tracked in BLETag model
+            # "accuracy_m": None,  # Not yet available from upstream
         })
     payload.sort(key=lambda item: (item["tag_id"], item["observed_at"]))
     return payload
+
+
+def _tag_fix_history_payload(memberships: List, db: Session, now: datetime) -> Dict[str, List[Dict[str, Any]]]:
+    """Capture recent fix history per tag for trajectory analysis.
+    
+    Currently returns only the latest fix per tag. Full history (last 5 fixes
+    or 30 minutes) requires a dedicated position history table not yet implemented.
+    
+    TODO: Once position history table exists, query last 5 fixes or 30 min per tag.
+    """
+    history: Dict[str, List[Dict[str, Any]]] = {}
+    
+    for m in memberships:
+        tag = db.query(BLETag).filter(BLETag.id == m.tag_id).first()
+        if not tag or not tag.latitude or not tag.longitude or not tag.last_seen:
+            continue
+        
+        try:
+            lat, lon = float(tag.latitude), float(tag.longitude)
+        except (TypeError, ValueError):
+            continue
+        
+        ts = tag.last_seen if tag.last_seen.tzinfo else tag.last_seen.replace(tzinfo=UTC)
+        
+        # Current fix only - will be expanded when position history table available
+        history[str(m.tag_id)] = [{
+            "observed_at": ts.astimezone(UTC).isoformat(),
+            "lat": round(lat, 6),
+            "lon": round(lon, 6),
+            # "source_id": None,  # Not yet tracked
+            # "accuracy_m": None,  # Not yet available
+        }]
+    
+    return history
 
 
 def _previous_snapshot_fingerprint(hive_id: str, db: Session) -> Optional[str]:
@@ -440,6 +528,26 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
     # ── Compute diameter with v1.2 temporal coherence rules ───────────
     threshold_m = cfg.distance_threshold_m
     coherence_window_s = _profile_coherence_window_s(getattr(cfg, "mobility_profile", None))
+    
+    # Fix B (v1.3): Get prior positions for movement tiebreak
+    # Query the most recent HiveEvaluation to extract each tag's prior position
+    prior_positions_by_tag: Dict[str, Tuple[float, float]] = {}
+    recent_eval = db.query(HiveEvaluation).filter(
+        HiveEvaluation.hive_id == hive_id
+    ).order_by(HiveEvaluation.evaluated_at.desc()).first()
+    
+    if recent_eval and recent_eval.positions_used:
+        try:
+            positions_used = json.loads(recent_eval.positions_used)
+            for item in positions_used:
+                tag_id = item.get("tag_id")
+                lat = item.get("lat")
+                lng = item.get("lng")
+                if tag_id and lat is not None and lng is not None:
+                    prior_positions_by_tag[str(tag_id)] = (float(lat), float(lng))
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+            pass  # No usable prior positions
+    
     if len(candidate_positions) >= 2:
         (
             display_diameter_m,
@@ -453,7 +561,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
             separated_tag_count,
             pairwise_detail,
         ) = (
-            pairwise_temporal_eval(candidate_positions, threshold_m, coherence_window_s)
+            pairwise_temporal_eval(candidate_positions, threshold_m, coherence_window_s, prior_positions_by_tag)
         )
     else:
         display_diameter_m = None
@@ -544,10 +652,11 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
         if prev_state == "OK":
             if is_breaching and can_advance_breach:
                 live.pending_breach_since = now
-                live.consecutive_confirms = 1
-                # v1.2 Fix 4: Initialize persistence tracking
-                live.breach_persistence_eval_count = 1
-                live.breach_persistence_first_fingerprint = snapshot_fp
+                # v1.2 duration-based persistence
+                live.persistence_eval_count = 1
+                live.persistence_snapshot_fp_at_start = snapshot_fp
+                live.persistence_has_new_evidence = False
+                live.consecutive_confirms = 1  # legacy field
                 if confidence == "high" and 1 >= required_confirms:
                     new_state = "BREACHING"
                 else:
@@ -556,44 +665,165 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
                     new_state = "BREACH_PENDING"
 
         elif prev_state == "BREACH_PENDING":
-            if not is_breaching:
-                # Fresh fix shows reunion (contradiction) — reset persistence
+            # ─── v1.2 Duration-based persistence confirmation ────────────────
+            # Replaces "two consecutive fixes from separated tag" with:
+            #   1. Persistence duration: ≥T_PERSIST_MINUTES AND ≥T_PERSIST_EVALS
+            #   2. Fresh evidence: at least one eval with new fingerprint
+            #   3. No contradiction: breach still active
+            #
+            # v1.2.2 Sparse tag fix: A breach can only clear with fresh coherent
+            # in-range evidence of the outlier tag. Absence of coherent evidence
+            # (due to staleness) HOLDS the state rather than resetting it.
+            
+            # Determine if we have fresh coherent evidence about the outlier
+            has_fresh_coherent_evidence = (
+                coherent_pair_count > 0 and
+                not stale_snapshot
+            )
+            
+            if has_fresh_coherent_evidence and not is_breaching:
+                # Fresh coherent data shows breach cleared → reset to OK
                 new_state = "OK"
                 live.pending_breach_since = None
-                live.consecutive_confirms = 0
-                live.breach_persistence_eval_count = 0
-                live.breach_persistence_first_fingerprint = None
-            elif can_advance_breach:
-                # v1.2 Fix 4: Duration-based persistence confirmation
-                # Increment evaluation count
-                live.breach_persistence_eval_count = (live.breach_persistence_eval_count or 0) + 1
+                live.persistence_eval_count = 0
+                live.persistence_snapshot_fp_at_start = None
+                live.persistence_has_new_evidence = False
+                live.consecutive_confirms = 0  # legacy field
+            
+            elif has_fresh_coherent_evidence and is_breaching:
+                # Breach still active with fresh coherent evidence
+                live.persistence_eval_count = (live.persistence_eval_count or 0) + 1
                 
-                # Check persistence criteria (BOTH must be satisfied)
-                persistence_duration_met = False
+                # Track if new position data has arrived (not same frozen snapshot)
+                if live.persistence_eval_count == 1:
+                    # First evaluation in BREACH_PENDING → record starting fingerprint
+                    live.persistence_snapshot_fp_at_start = snapshot_fp
+                    live.persistence_has_new_evidence = False
+                else:
+                    # Subsequent evaluation → check if fingerprint differs
+                    if snapshot_fp and snapshot_fp != live.persistence_snapshot_fp_at_start:
+                        live.persistence_has_new_evidence = True
+                
+                # Calculate elapsed time since breach started
+                elapsed_minutes = 0.0
                 if live.pending_breach_since:
-                    elapsed_seconds = (now - live.pending_breach_since).total_seconds()
-                    persistence_duration_met = elapsed_seconds >= HIVE_PERSISTENCE_DURATION_SECONDS
+                    pending_since = live.pending_breach_since if live.pending_breach_since.tzinfo else live.pending_breach_since.replace(tzinfo=UTC)
+                    elapsed_td = now - pending_since
+                    elapsed_minutes = elapsed_td.total_seconds() / 60.0
                 
-                persistence_eval_count_met = live.breach_persistence_eval_count >= HIVE_PERSISTENCE_MIN_EVALUATIONS
+                # Check both persistence conditions
+                duration_met = (elapsed_minutes >= T_PERSIST_MINUTES and 
+                               live.persistence_eval_count >= T_PERSIST_EVALS)
                 
-                # Fresh evidence guard: position fingerprint must have changed since first breach
-                has_fresh_evidence = (
-                    snapshot_fp is not None
-                    and live.breach_persistence_first_fingerprint is not None
-                    and snapshot_fp != live.breach_persistence_first_fingerprint
+                fresh_evidence_guard = live.persistence_has_new_evidence
+                
+                # Fix A (v1.3): Confirmation requires persistence PLUS a real, coherent breach
+                # in the FIRING evaluation. Persistence may accumulate across stale/incoherent
+                # evaluations, but the transition to BREACHING may only fire when the current
+                # evaluation demonstrates:
+                #   1. Coherent evidence (not stale snapshot, not incoherent-only)
+                #   2. At least one breaching pair exists
+                #   3. A valid outlier is selectable
+                has_breaching_pairs = any(count > 0 for count in breaching_pair_counts.values())
+                has_valid_outlier = outlier_id is not None
+                is_coherent_breach = (
+                    not stale_snapshot and 
+                    coherent_pair_count > 0 and 
+                    coherent_diameter_m is not None and 
+                    coherent_diameter_m > threshold
                 )
                 
-                # Confirm if duration, evaluation count, and fresh evidence all satisfied
-                if persistence_duration_met and persistence_eval_count_met and has_fresh_evidence:
+                # Confirm if persistence is satisfied AND current evaluation is coherent breach
+                if duration_met and fresh_evidence_guard and is_coherent_breach and has_breaching_pairs and has_valid_outlier:
                     new_state = "BREACHING"
-                # else: stay in BREACH_PENDING, accumulating persistence
-            # stale snapshot: hold BREACH_PENDING without incrementing eval count
+                    log.info(
+                        f"HIVE {hive_id}: BREACH_PENDING → BREACHING (coherent breach confirmed)",
+                        extra={
+                            "hive_id": hive_id,
+                            "elapsed_minutes": round(elapsed_minutes, 2),
+                            "eval_count": live.persistence_eval_count,
+                            "has_new_evidence": live.persistence_has_new_evidence,
+                            "coherent_diameter_m": round(coherent_diameter_m, 1) if coherent_diameter_m else None,
+                            "has_breaching_pairs": has_breaching_pairs,
+                            "has_valid_outlier": has_valid_outlier,
+                            "outlier_tag_id": str(outlier_id) if outlier_id else None,
+                            "persistence_rule": "v1.3_coherent_confirm_only"
+                        }
+                    )
+                elif duration_met and fresh_evidence_guard:
+                    # Persistence satisfied but current evaluation lacks coherent breach evidence
+                    # HOLD in BREACH_PENDING until next coherent evaluation
+                    log.info(
+                        f"HIVE {hive_id}: Persistence satisfied but firing evaluation not coherent - HOLD in BREACH_PENDING",
+                        extra={
+                            "hive_id": hive_id,
+                            "elapsed_minutes": round(elapsed_minutes, 2),
+                            "eval_count": live.persistence_eval_count,
+                            "stale_snapshot": stale_snapshot,
+                            "coherent_pair_count": coherent_pair_count,
+                            "has_breaching_pairs": has_breaching_pairs,
+                            "has_valid_outlier": has_valid_outlier,
+                            "fix": "v1.3_coherent_confirm_only"
+                        }
+                    )
+                
+                # Legacy field for compatibility (not used in confirmation decision)
+                live.consecutive_confirms = live.persistence_eval_count
+            
+            else:
+                # No fresh coherent evidence (outlier fix is stale/incoherent)
+                # → HOLD state, accumulate persistence, do NOT reset
+                # This is the sparse tag fix: absence of data ≠ reunion
+                live.persistence_eval_count = (live.persistence_eval_count or 0) + 1
+                
+                # Calculate elapsed time for persistence check
+                elapsed_minutes = 0.0
+                if live.pending_breach_since:
+                    pending_since = live.pending_breach_since if live.pending_breach_since.tzinfo else live.pending_breach_since.replace(tzinfo=UTC)
+                    elapsed_td = now - pending_since
+                    elapsed_minutes = elapsed_td.total_seconds() / 60.0
+                
+                # Check persistence conditions even during hold
+                duration_met = (elapsed_minutes >= T_PERSIST_MINUTES and 
+                               live.persistence_eval_count >= T_PERSIST_EVALS)
+                
+                # Fix A (v1.3): Persistence may ACCUMULATE during stale/incoherent evals,
+                # but confirmation transition (BREACH_PENDING → BREACHING) may only FIRE
+                # on a coherent evaluation. If persistence is satisfied here (on a stale
+                # evaluation), HOLD in BREACH_PENDING; confirmation will fire on the next
+                # coherent evaluation that still shows breach.
+                if duration_met:
+                    log.info(
+                        f"HIVE {hive_id}: Persistence satisfied but no coherent evidence - HOLD in BREACH_PENDING",
+                        extra={
+                            "hive_id": hive_id,
+                            "elapsed_minutes": round(elapsed_minutes, 2),
+                            "eval_count": live.persistence_eval_count,
+                            "breach_evidence": breach_evidence,
+                            "fix": "v1.3_coherent_confirm_only"
+                        }
+                    )
+                # stays BREACH_PENDING (persistence met but waiting for coherent evidence)
+                
+                # Legacy field for compatibility
+                live.consecutive_confirms = live.persistence_eval_count
 
         elif prev_state == "BREACHING":
-            if is_cleared and can_advance_clear:
+            # v1.2.2 Sparse tag fix: Only clear with fresh coherent in-range evidence
+            has_fresh_coherent_evidence = (
+                coherent_pair_count > 0 and
+                not stale_snapshot
+            )
+            
+            if has_fresh_coherent_evidence and is_cleared:
+                # Fresh coherent data shows cleared (within hysteresis) → RESOLVING
                 new_state = "RESOLVING"
                 live.pending_clear_since = now
-            # else stays BREACHING
+            elif not has_fresh_coherent_evidence:
+                # No fresh coherent evidence → HOLD BREACHING state
+                # (outlier fix is stale, home cluster still present)
+                pass  # stays BREACHING
+            # else: stays BREACHING (fresh evidence still shows breach)
 
         elif prev_state == "RESOLVING":
             if not is_cleared:
@@ -604,8 +834,6 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
                 new_state = "OK"
                 live.pending_clear_since = None
                 live.consecutive_confirms = 0
-                live.breach_persistence_eval_count = 0
-                live.breach_persistence_first_fingerprint = None
 
     state_changed = new_state != prev_state
     alert_diameter_m = coherent_diameter_m if coherent_diameter_m is not None else diameter_m
@@ -654,6 +882,13 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
                 "recent_count": len(fresh_recent_positions) - len(fresh_positions),
                 "stale_count": composition.get("stale", 0),
                 "lost_count": composition.get("lost", 0),
+                "persistence": {
+                    "eval_count": live.persistence_eval_count if prev_state == "BREACH_PENDING" else 0,
+                    "has_new_evidence": live.persistence_has_new_evidence if prev_state == "BREACH_PENDING" else False,
+                    "snapshot_fp_at_start": live.persistence_snapshot_fp_at_start if prev_state == "BREACH_PENDING" else None,
+                    "elapsed_minutes": round((now - live.pending_breach_since).total_seconds() / 60.0, 2) 
+                                      if live.pending_breach_since else 0.0,
+                },
             },
             "alert_state_before": prev_state,
             "alert_state_after": new_state,
@@ -685,8 +920,15 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
             "separated_tag_count": separated_tag_count,
             "stale_snapshot": stale_snapshot,
             "breach_evidence": breach_evidence,
+            # Enhanced logging metadata (v1.2.1)
+            "accuracy_available": False,  # Not yet tracked in upstream ingestion
+            "source_id_available": False,  # Not yet tracked in BLETag model
+            "position_history_available": False,  # Requires dedicated history table
         },
     }
+    
+    # Enhanced position logging (v1.2.1) - for trajectory analysis
+    tag_fix_history_payload = _tag_fix_history_payload(memberships, db, now)
 
     eval_rec = HiveEvaluation(
         id=eval_id,
@@ -710,6 +952,7 @@ def evaluate_hive(hive_id: str, db: Session) -> Optional[str]:
         coherent_pair_count=coherent_pair_count,
         incoherent_pair_count=incoherent_pair_count,
         breach_evidence=breach_evidence,
+        tag_fix_history=json.dumps(tag_fix_history_payload) if tag_fix_history_payload else None,
     )
     db.add(eval_rec)
 

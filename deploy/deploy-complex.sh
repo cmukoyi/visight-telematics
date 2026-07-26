@@ -2,7 +2,7 @@
 set -e
 
 ################################################################################
-# Beacon Telematics Deployment Script
+# GPS Tracker Deployment Script
 # 
 # This script handles all deployment logic for production deployments.
 # It's designed to be:

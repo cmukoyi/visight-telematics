@@ -201,3 +201,50 @@ class CriticalServiceAlertSubscription(Base):
     last_alert_sent_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class AsyncJob(Base):
+    """
+    Background job queue for long-running admin operations (v2.2 A5).
+    
+    Supports:
+    - batch_backfill: Backfill multiple devices in a tenant
+    - batch_reprocess: Reprocess multiple devices in a tenant
+    
+    Status flow: pending → running → completed/failed/cancelled
+    """
+    __tablename__ = "async_jobs"
+    
+    id = get_uuid_column()
+    job_type = Column(String(50), nullable=False, index=True)  # batch_backfill | batch_reprocess
+    status = Column(String(20), nullable=False, index=True)    # pending | running | completed | failed | cancelled
+    created_by = Column(String(255), nullable=False)           # Admin email
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Job parameters (JSONB for flexibility)
+    params = Column(JSON, nullable=False)
+    # Example for batch_backfill: {"tenant_id": "uuid", "preset": "last_7_days"}
+    # Example for batch_reprocess: {"tenant_id": "uuid", "device_imeis": ["imei1", "imei2"]}
+    
+    # Progress tracking
+    total_devices = Column(Integer, nullable=True)
+    completed_devices = Column(Integer, default=0, nullable=False)
+    failed_devices = Column(Integer, default=0, nullable=False)
+    
+    # Results (JSONB - accumulated stats)
+    results = Column(JSON, nullable=True)
+    # Example: {"positions_fetched": 10000, "journeys_created": 150, "errors": [...]}
+    
+    # Error tracking
+    error_message = Column(Text, nullable=True)
+    
+    # Resumability
+    last_processed_imei = Column(String(20), nullable=True)
+    
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+# Create composite index for status queries
+Index('ix_async_jobs_status_created', AsyncJob.status, AsyncJob.created_at)

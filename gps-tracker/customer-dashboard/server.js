@@ -64,9 +64,65 @@ app.get('/api/manifest', (req, res) => {
   });
 });
 
-// Serve index.html for SPA routing
+// Serve index.html with server-side tenant-specific meta tag injection
+// This ensures social media scrapers (WhatsApp, Facebook, Slack) that don't
+// execute JavaScript see the correct tenant branding in Open Graph meta tags.
 app.get('/', (req, res) => {
-  res.sendFile(path.join(publicDir, 'index.html'));
+  const indexPath = path.join(publicDir, 'index.html');
+  
+  // Read the HTML file
+  let html = fs.readFileSync(indexPath, 'utf8');
+  
+  // Read tenant branding from environment variables (same as /api/branding endpoint)
+  const brandName = process.env.BRAND_NAME || 'PinPlot';
+  const brandProduct = process.env.BRAND_PRODUCT || 'Customer Portal — Asset Tracking';
+  const brandDomain = process.env.BRAND_DOMAIN || 'pinplot.me';
+  const brandTagline = process.env.BRAND_TAGLINE || 'Live asset tracking, geofencing, and reporting for your fleet of GPS and BLE-tagged assets.';
+  
+  // Inject tenant-specific values into meta tags
+  // These replacements target the generic placeholder values in the static HTML
+  html = html
+    .replace(/<title>Customer Portal — Asset Tracking<\/title>/, `<title>${brandProduct}</title>`)
+    .replace(
+      /<meta name="description" content="Customer Portal — Live asset tracking[^"]*">/,
+      `<meta name="description" content="${brandProduct} — ${brandTagline}">`
+    )
+    .replace(
+      /<meta property="og:title" content="Customer Portal — Asset Tracking">/,
+      `<meta property="og:title" content="${brandProduct}">`
+    )
+    .replace(
+      /<meta property="og:description" content="Live asset tracking[^"]*">/,
+      `<meta property="og:description" content="${brandTagline}">`
+    )
+    .replace(
+      /<meta property="og:url" content="__OG_URL__">/,
+      `<meta property="og:url" content="https://${brandDomain}/customer">`
+    )
+    .replace(
+      /<meta property="og:site_name" content="Customer Portal">/,
+      `<meta property="og:site_name" content="${brandName}">`
+    )
+    .replace(
+      /<meta property="og:image" content="__OG_IMAGE__">/,
+      `<meta property="og:image" content="https://${brandDomain}/customer/assets/logo.png">`
+    )
+    .replace(
+      /<meta property="og:image:alt" content="Customer Portal Logo">/,
+      `<meta property="og:image:alt" content="${brandName} Logo">`
+    )
+    .replace(
+      /<meta name="twitter:title" content="Customer Portal — Asset Tracking">/,
+      `<meta name="twitter:title" content="${brandProduct}">`
+    )
+    .replace(
+      /<meta name="twitter:description" content="Live asset tracking[^"]*">/,
+      `<meta name="twitter:description" content="${brandTagline}">`
+    );
+  
+  // Send the modified HTML
+  res.set('Content-Type', 'text/html');
+  res.send(html);
 });
 
 // Proxy API requests to backend

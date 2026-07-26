@@ -913,13 +913,31 @@
                             <span>IMEI</span>
                         </button>
                     </li>
+                    <li class="sidebar-item">
+                        <button class="sidebar-link" onclick="switchTab('translations')">
+                            <span>🌍</span>
+                            <span>Translations</span>
+                        </button>
+                    </li>
+                    <li class="sidebar-item">
+                        <button class="sidebar-link" onclick="switchTab('languages')">
+                            <span>🗣️</span>
+                            <span>Languages</span>
+                        </button>
+                    </li>
+                    <li class="sidebar-item">
+                        <button class="sidebar-link" onclick="switchTab('device-management')">
+                            <span>🔧</span>
+                            <span>Device Management</span>
+                        </button>
+                    </li>
+                    <li class="sidebar-item">
+                        <button class="sidebar-link" onclick="switchTab('jobs')">
+                            <span>⚙️</span>
+                            <span>Background Jobs</span>
+                        </button>
+                    </li>
                 </ul>
-
-                <div style="position: absolute; bottom: 24px; left: 24px; right: 24px;">
-                    <button class="btn btn-secondary" onclick="handleLogout()" style="width: 100%;">
-                        <span>Logout</span>
-                    </button>
-                </div>
             </div>
 
             <!-- MAIN CONTENT -->
@@ -936,6 +954,9 @@
                             <div style="font-size: 12px; color: var(--gray);" id="currentRole">Administrator</div>
                         </div>
                         <div class="user-avatar" id="userAvatar">A</div>
+                        <button class="btn btn-secondary btn-small" onclick="handleLogout()" style="padding:8px 16px;font-size:13px;width:auto;margin-left:8px">
+                            Logout
+                        </button>
                     </div>
                 </div>
 
@@ -996,6 +1017,7 @@
                             <button class="tab"         id="logsrc-nginx-access" onclick="switchLogSource('nginx-access')">🌐 Nginx Access</button>
                             <button class="tab"         id="logsrc-nginx-error"  onclick="switchLogSource('nginx-error')">🚨 Nginx Error</button>
                             <button class="tab"         id="logsrc-hive"  onclick="switchLogSource('hive')">🛡️ Hive Logs</button>
+                            <button class="tab"         id="logsrc-trip"  onclick="switchLogSource('trip')">🚗 Trip Engine Logs</button>
                         </div>
 
                         <!-- APP LOGS (table view) -->
@@ -1122,6 +1144,47 @@
                                     <li><strong>hive-evaluations.txt</strong> — Recent evaluation results</li>
                                     <li><strong>hive-events.txt</strong> — State change events and triggers</li>
                                     <li><strong>hive-tag-membership.txt</strong> — Tag to HIVE associations</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- TRIP ENGINE LOGS EXPORT -->
+                        <div id="logview-trip" style="display:none;" class="card">
+                            <div style="margin-bottom:20px;padding:20px;background:var(--surface);border-radius:8px;border-left:4px solid var(--primary);">
+                                <h3 style="margin:0 0 12px 0;font-size:16px;">📦 Export Trip Engine Logs & Data</h3>
+                                <p style="margin:0 0 16px 0;color:var(--gray);font-size:14px;">
+                                    Download a complete bundle of Trip Engine logs and database data including journeys, legs, stationaries, and device states.
+                                </p>
+                                <div class="filters" style="margin-bottom:16px;">
+                                    <div class="filter-group">
+                                        <label>Time Range</label>
+                                        <select id="tripDaysFilter">
+                                            <option value="1">Last 24 hours</option>
+                                            <option value="3">Last 3 days</option>
+                                            <option value="7" selected>Last 7 days</option>
+                                            <option value="14">Last 14 days</option>
+                                            <option value="30">Last 30 days</option>
+                                            <option value="90">Last 90 days</option>
+                                        </select>
+                                    </div>
+                                    <div class="filter-group">
+                                        <button class="btn btn-primary" onclick="exportTripLogs()" id="tripExportBtn">
+                                            <i class="fa-solid fa-download"></i> Export Logs
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="tripExportStatus" style="display:none;padding:12px;background:var(--background);border-radius:4px;font-size:13px;"></div>
+                            </div>
+
+                            <div style="padding:20px;background:var(--surface);border-radius:8px;">
+                                <h4 style="margin:0 0 12px 0;font-size:14px;color:var(--gray);">📋 Export Contents</h4>
+                                <ul style="margin:0;padding-left:20px;color:var(--gray);font-size:13px;line-height:1.8;">
+                                    <li><strong>backend-trip-logs.log</strong> — Backend logs with Trip Engine processing details</li>
+                                    <li><strong>journeys.txt</strong> — All journeys with distance, duration, and leg counts</li>
+                                    <li><strong>legs.txt</strong> — Movement legs with paths and distances</li>
+                                    <li><strong>stationaries.txt</strong> — Stops and dwells with durations</li>
+                                    <li><strong>device-states.txt</strong> — Device subscription and position tracking status</li>
+                                    <li><strong>engine-states.txt</strong> — Trip engine processing state per device</li>
                                 </ul>
                             </div>
                         </div>
@@ -1348,6 +1411,19 @@
                                         </select>
                                     </div>
                                     <div class="form-group">
+                                        <label class="form-label">Default Language <span style="font-weight:normal;color:var(--text-secondary)">(optional)</span></label>
+                                        <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 10px">Portal users in this group will see the platform in this language. Defaults to English.</p>
+                                        <select id="cgLanguage" class="form-input">
+                                            <option value="en">Loading...</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Trip Data Refresh Rate (minutes) <span style="font-weight:normal;color:var(--text-secondary)">(optional)</span></label>
+                                        <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 10px">Min interval between TrackSolid pulls per device. Lower = fresher data but more API calls. Leave empty for global default (120 min).</p>
+                                        <input type="number" id="cgCoalesceFloor" class="form-input" placeholder="120" min="5" max="1440">
+                                        <p style="font-size:12px;color:var(--text-secondary);margin:6px 0 0">Recommended: 60-240 minutes. Applies to all subscribed devices in this group.</p>
+                                    </div>
+                                    <div class="form-group">
                                         <label class="form-label">Allowed Tag Types <span style="font-weight:normal;color:var(--text-secondary)">(optional)</span></label>
                                         <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 10px">Select which tag types this group can add. Leave all unchecked to allow all types.</p>
                                         <div style="display:flex;gap:16px;flex-wrap:wrap">
@@ -1406,6 +1482,13 @@
                                             <span style="font-size:14px;color:var(--text-secondary)">@</span>
                                             <input type="text" id="egDomain" class="form-input" placeholder="e.g. acmecorp.com" style="flex:1">
                                         </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Default Language</label>
+                                        <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 10px">Portal users in this group will see the platform in this language.</p>
+                                        <select id="egLanguage" class="form-input">
+                                            <option value="en">Loading...</option>
+                                        </select>
                                     </div>
                                     <!-- Portal Feature Access -->
                                     <div class="form-group">
@@ -2477,6 +2560,323 @@
                     </div>
                     <!-- END IMEI TAB -->
 
+                    <!-- TRANSLATIONS TAB -->
+                    <div id="translations" class="tab-content">
+                        <div class="page-header">
+                            <h2 class="page-title">🌍 Translation Manager</h2>
+                            <p class="page-subtitle">Manage translations for multi-language support</p>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Translation Keys</h3>
+                                <div style="display:flex;gap:8px;align-items:center;">
+                                    <select id="translationCategoryFilter" onchange="loadTranslations()" style="padding:8px;border-radius:6px;border:1px solid var(--border);">
+                                        <option value="">All Categories</option>
+                                        <option value="common">Common</option>
+                                        <option value="dashboard">Dashboard</option>
+                                        <option value="fleet">Fleet</option>
+                                        <option value="geofences">Geofences</option>
+                                        <option value="trips">Trips</option>
+                                        <option value="alerts">Alerts</option>
+                                        <option value="settings">Settings</option>
+                                        <option value="auth">Auth</option>
+                                    </select>
+                                    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+                                        <input type="checkbox" id="translationMissingOnly" onchange="loadTranslations()">
+                                        Show missing only
+                                    </label>
+                                    <input type="text" id="translationSearchInput" placeholder="Search keys..." style="padding:8px;border-radius:6px;border:1px solid var(--border);min-width:200px;" oninput="debounceTranslationSearch()">
+                                    <button class="btn btn-success btn-small" onclick="autoTranslateAll()" title="Auto-translate all missing translations using Google Translate API">🤖 Auto-Translate All</button>
+                                    <button class="btn btn-primary btn-small" onclick="openAddTranslationKeyModal()">+ Add Key</button>
+                                    <button class="btn btn-primary btn-small" onclick="loadTranslations()">↻ Refresh</button>
+                                </div>
+                            </div>
+                            <div id="translationStats" style="padding:16px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;gap:24px;">
+                                <div style="font-size:13px;color:var(--gray);">
+                                    <strong id="translationTotalKeys">0</strong> total keys
+                                </div>
+                                <div style="font-size:13px;color:var(--gray);" id="translationCompletionStats">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
+                            <div class="table-wrapper" style="overflow-x:auto;">
+                                <table id="translationsTable">
+                                    <thead id="translationsTableHead">
+                                        <tr>
+                                            <th style="width:180px;position:sticky;left:0;background:var(--surface);z-index:2;">Key</th>
+                                            <th style="width:100px;">Category</th>
+                                            <th style="width:220px;">English (Default)</th>
+                                            <!-- Language columns populated by JS -->
+                                        </tr>
+                                    </thead>
+                                    <tbody id="translationsTableBody">
+                                        <tr><td colspan="20" style="text-align:center;color:var(--gray);padding:2rem">Click ↻ Refresh to load translations</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END TRANSLATIONS TAB -->
+
+                    <!-- LANGUAGES TAB -->
+                    <div id="languages" class="tab-content">
+                        <div class="page-header">
+                            <h2 class="page-title">🗣️ Language Manager</h2>
+                            <p class="page-subtitle">Manage available languages and view translation progress</p>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Active Languages</h3>
+                                <div style="display:flex;gap:8px;">
+                                    <button class="btn btn-primary btn-small" onclick="openAddLanguageModal()">+ Add Language</button>
+                                    <button class="btn btn-primary btn-small" onclick="loadLanguages()">↻ Refresh</button>
+                                </div>
+                            </div>
+                            <div class="table-wrapper">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Code</th>
+                                            <th>Language Name</th>
+                                            <th>Status</th>
+                                            <th>Translated Keys</th>
+                                            <th>Completion</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="languagesTableBody">
+                                        <tr><td colspan="6" style="text-align:center;color:var(--gray);padding:2rem">Click ↻ Refresh to load languages</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END LANGUAGES TAB -->
+
+                    <!-- DEVICE MANAGEMENT TAB -->
+                    <div id="device-management" class="tab-content">
+                        <div class="page-header">
+                            <h2 class="page-title">🔧 Device Management</h2>
+                            <p class="page-subtitle">Backfill historical data and reprocess trips for subscribed devices</p>
+                        </div>
+
+                        <!-- Tenant Selector -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Select Tenant</h3>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">User Group (Tenant)</label>
+                                <select id="dmTenantSelect" class="form-input" onchange="loadDevicesForTenant()">
+                                    <option value="">— Select a tenant —</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Device List -->
+                        <div id="dmDeviceSection" style="display:none">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">GPS Devices</h3>
+                                    <div style="display:flex;gap:8px">
+                                        <button class="btn btn-secondary btn-small" onclick="openBatchBackfillModal()" style="width:auto">⬇️ Batch Backfill</button>
+                                        <button class="btn btn-secondary btn-small" onclick="openBatchReprocessModal()" style="width:auto">🔄 Batch Reprocess</button>
+                                    </div>
+                                </div>
+                                <div id="dmAlert" class="alert" style="display:none"><span id="dmAlertText"></span></div>
+                                <div class="table-wrapper">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>IMEI</th>
+                                                <th>Name</th>
+                                                <th>Subscription Status</th>
+                                                <th>Last Position</th>
+                                                <th>Last Pull</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="dmDevicesTableBody">
+                                            <tr><td colspan="6" style="text-align:center;color:var(--gray);padding:2rem">Select a tenant to view devices</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Single Device Backfill Modal -->
+                        <div id="deviceBackfillModal" class="modal">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h3 class="modal-title">Backfill Device</h3>
+                                    <button class="modal-close" onclick="closeModal('deviceBackfillModal')">×</button>
+                                </div>
+                                <div id="dbAlert" class="alert" style="display:none"><span id="dbAlertText"></span></div>
+                                <form id="deviceBackfillForm" onsubmit="submitDeviceBackfill(event)">
+                                    <div class="form-group">
+                                        <label class="form-label">Device IMEI</label>
+                                        <input type="text" id="dbImei" class="form-input" readonly>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Time Window</label>
+                                        <select id="dbPreset" class="form-input" required>
+                                            <option value="today">Today</option>
+                                            <option value="yesterday">Yesterday</option>
+                                            <option value="last_7_days" selected>Last 7 Days</option>
+                                            <option value="last_30_days">Last 30 Days</option>
+                                        </select>
+                                        <p style="font-size:12px;color:var(--gray);margin-top:6px">Fetches historical positions from TrackSolid and reprocesses trips.</p>
+                                    </div>
+                                    <div style="display:flex;gap:12px;justify-content:flex-end">
+                                        <button type="button" class="btn btn-secondary" onclick="closeModal('deviceBackfillModal')">Cancel</button>
+                                        <button type="submit" class="btn btn-primary" id="dbSubmitBtn">⬇️ Start Backfill</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- Single Device Reprocess Modal -->
+                        <div id="deviceReprocessModal" class="modal">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h3 class="modal-title">Reprocess Device</h3>
+                                    <button class="modal-close" onclick="closeModal('deviceReprocessModal')">×</button>
+                                </div>
+                                <div id="drAlert" class="alert" style="display:none"><span id="drAlertText"></span></div>
+                                <form id="deviceReprocessForm" onsubmit="submitDeviceReprocess(event)">
+                                    <div class="form-group">
+                                        <label class="form-label">Device IMEI</label>
+                                        <input type="text" id="drImei" class="form-input" readonly>
+                                    </div>
+                                    <p style="font-size:13px;color:var(--gray);margin-bottom:16px">Rebuilds trip segmentation from stored positions using the current engine version and parameters.</p>
+                                    <div style="display:flex;gap:12px;justify-content:flex-end">
+                                        <button type="button" class="btn btn-secondary" onclick="closeModal('deviceReprocessModal')">Cancel</button>
+                                        <button type="submit" class="btn btn-primary" id="drSubmitBtn">🔄 Start Reprocess</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- Batch Backfill Modal -->
+                        <div id="batchBackfillModal" class="modal">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h3 class="modal-title">Batch Backfill</h3>
+                                    <button class="modal-close" onclick="closeModal('batchBackfillModal')">×</button>
+                                </div>
+                                <div id="bbAlert" class="alert" style="display:none"><span id="bbAlertText"></span></div>
+                                <form id="batchBackfillForm" onsubmit="submitBatchBackfill(event)">
+                                    <div class="form-group">
+                                        <label class="form-label">Tenant</label>
+                                        <input type="text" id="bbTenantName" class="form-input" readonly>
+                                        <input type="hidden" id="bbTenantId">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Time Window</label>
+                                        <select id="bbPreset" class="form-input" required>
+                                            <option value="today">Today</option>
+                                            <option value="yesterday">Yesterday</option>
+                                            <option value="last_7_days" selected>Last 7 Days</option>
+                                            <option value="last_30_days">Last 30 Days</option>
+                                        </select>
+                                        <p style="font-size:12px;color:var(--gray);margin-top:6px">Backfills all subscribed devices in this tenant. Runs as background job.</p>
+                                    </div>
+                                    <div style="display:flex;gap:12px;justify-content:flex-end">
+                                        <button type="button" class="btn btn-secondary" onclick="closeModal('batchBackfillModal')">Cancel</button>
+                                        <button type="submit" class="btn btn-primary" id="bbSubmitBtn">⬇️ Queue Batch Job</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- Batch Reprocess Modal -->
+                        <div id="batchReprocessModal" class="modal">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h3 class="modal-title">Batch Reprocess</h3>
+                                    <button class="modal-close" onclick="closeModal('batchReprocessModal')">×</button>
+                                </div>
+                                <div id="brAlert" class="alert" style="display:none"><span id="brAlertText"></span></div>
+                                <form id="batchReprocessForm" onsubmit="submitBatchReprocess(event)">
+                                    <div class="form-group">
+                                        <label class="form-label">Tenant</label>
+                                        <input type="text" id="brTenantName" class="form-input" readonly>
+                                        <input type="hidden" id="brTenantId">
+                                    </div>
+                                    <p style="font-size:13px;color:var(--gray);margin-bottom:16px">Reprocesses all subscribed devices in this tenant. Runs as background job.</p>
+                                    <div style="display:flex;gap:12px;justify-content:flex-end">
+                                        <button type="button" class="btn btn-secondary" onclick="closeModal('batchReprocessModal')">Cancel</button>
+                                        <button type="submit" class="btn btn-primary" id="brSubmitBtn">🔄 Queue Batch Job</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END DEVICE MANAGEMENT TAB -->
+
+                    <!-- JOBS TAB -->
+                    <div id="jobs" class="tab-content">
+                        <div class="page-header">
+                            <h2 class="page-title">⚙️ Background Jobs</h2>
+                            <p class="page-subtitle">Monitor async backfill and reprocess operations</p>
+                            <button class="btn btn-secondary" onclick="loadJobs()">↻ Refresh</button>
+                        </div>
+
+                        <!-- Status Filter -->
+                        <div class="card">
+                            <div style="display:flex;gap:12px;align-items:center">
+                                <label class="form-label" style="margin:0">Filter by Status:</label>
+                                <select id="jobStatusFilter" class="form-input" style="width:auto" onchange="loadJobs()">
+                                    <option value="">All Statuses</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="running" selected>Running</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="failed">Failed</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Jobs List -->
+                        <div class="card">
+                            <div id="jobsAlert" class="alert" style="display:none"><span id="jobsAlertText"></span></div>
+                            <div class="table-wrapper">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Job ID</th>
+                                            <th>Type</th>
+                                            <th>Status</th>
+                                            <th>Progress</th>
+                                            <th>Created By</th>
+                                            <th>Started</th>
+                                            <th>Completed</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="jobsTableBody">
+                                        <tr><td colspan="8" style="text-align:center;color:var(--gray);padding:2rem">Click ↻ Refresh to load jobs</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Job Details Modal -->
+                        <div id="jobDetailsModal" class="modal">
+                            <div class="modal-content" style="max-width:800px">
+                                <div class="modal-header">
+                                    <h3 class="modal-title">Job Details</h3>
+                                    <button class="modal-close" onclick="closeModal('jobDetailsModal')">×</button>
+                                </div>
+                                <div id="jobDetailsContent" style="max-height:70vh;overflow-y:auto">
+                                    <p style="text-align:center;color:var(--gray);padding:2rem">Loading...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END JOBS TAB -->
+
                 </div>
             </div>
         </div>
@@ -2527,6 +2927,194 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('addUserModal')">Cancel</button>
                     <button type="submit" class="btn btn-primary">Create User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ADD TRANSLATION KEY MODAL -->
+    <div id="addTranslationKeyModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Add Translation Key</span>
+                    <button class="close-btn" onclick="closeModal('addTranslationKeyModal')">×</button>
+                </div>
+            </div>
+
+            <form id="addTranslationKeyForm" onsubmit="handleAddTranslationKey(event)">
+                <div class="form-group">
+                    <label>Key <span style="color:var(--danger)">*</span></label>
+                    <input type="text" id="addKeyName" required placeholder="e.g. dashboard.welcome" pattern="^[a-z0-9._-]+$">
+                    <small style="color:var(--gray);">Lowercase, dots for namespacing (e.g. category.subcategory.key)</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Category</label>
+                    <select id="addKeyCategory">
+                        <option value="">None</option>
+                        <option value="common">Common</option>
+                        <option value="dashboard">Dashboard</option>
+                        <option value="fleet">Fleet</option>
+                        <option value="geofences">Geofences</option>
+                        <option value="trips">Trips</option>
+                        <option value="alerts">Alerts</option>
+                        <option value="settings">Settings</option>
+                        <option value="auth">Auth</option>
+                        <option value="reports">Reports</option>
+                        <option value="notifications">Notifications</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Default Text (English) <span style="color:var(--danger)">*</span></label>
+                    <textarea id="addKeyDefaultText" required placeholder="Enter the English text" rows="3"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Context (for translators)</label>
+                    <textarea id="addKeyContext" placeholder="Optional: describe where this text appears or how it's used" rows="2"></textarea>
+                </div>
+
+                <div id="addTranslationKeyError" class="error" style="display: none;"></div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('addTranslationKeyModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Key</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- EDIT TRANSLATION MODAL -->
+    <div id="editTranslationModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Edit Translation</span>
+                    <button class="close-btn" onclick="closeModal('editTranslationModal')">×</button>
+                </div>
+            </div>
+
+            <form id="editTranslationForm" onsubmit="handleEditTranslation(event)">
+                <input type="hidden" id="editTranslationKey">
+                
+                <div class="form-group">
+                    <label>Key</label>
+                    <input type="text" id="editTranslationKeyDisplay" disabled style="background:var(--light);cursor:not-allowed;">
+                </div>
+
+                <div class="form-group">
+                    <label>Language</label>
+                    <select id="editTranslationLanguage" required>
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Default Text (English)</label>
+                    <textarea id="editTranslationDefault" disabled rows="2" style="background:var(--light);cursor:not-allowed;"></textarea>
+                    <small style="color:var(--gray);">Reference only - cannot be edited here</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Translated Text <span style="color:var(--danger)">*</span></label>
+                    <textarea id="editTranslationText" required placeholder="Enter the translated text" rows="3"></textarea>
+                </div>
+
+                <div class="form-group" id="editTranslationContextGroup" style="display:none;">
+                    <label>Context</label>
+                    <textarea id="editTranslationContext" disabled rows="2" style="background:var(--light);cursor:not-allowed;font-size:12px;"></textarea>
+                </div>
+
+                <div id="editTranslationError" class="error" style="display: none;"></div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('editTranslationModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Translation</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ADD LANGUAGE MODAL -->
+    <div id="addLanguageModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Add Language</span>
+                    <button class="close-btn" onclick="closeModal('addLanguageModal')">×</button>
+                </div>
+            </div>
+
+            <form id="addLanguageForm" onsubmit="handleAddLanguage(event)">
+                <div class="form-group">
+                    <label>Language Code <span style="color:var(--danger)">*</span></label>
+                    <input type="text" id="addLanguageCode" required placeholder="e.g. fr, es, de" pattern="^[a-z]{2,5}$" maxlength="5">
+                    <small style="color:var(--gray);">2-5 lowercase letters (ISO 639-1 or similar)</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Language Name <span style="color:var(--danger)">*</span></label>
+                    <input type="text" id="addLanguageName" required placeholder="e.g. Français, Español">
+                </div>
+
+                <div class="form-group">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="checkbox" id="addLanguageActive" checked>
+                        Active
+                    </label>
+                    <small style="color:var(--gray);">Only active languages are available to users</small>
+                </div>
+
+                <div id="addLanguageError" class="error" style="display: none;"></div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('addLanguageModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Language</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- IMPORT TRANSLATIONS MODAL -->
+    <div id="importTranslationsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Import Translations</span>
+                    <button class="close-btn" onclick="closeModal('importTranslationsModal')">×</button>
+                </div>
+            </div>
+
+            <form id="importTranslationsForm" onsubmit="handleImportTranslations(event)">
+                <div class="form-group">
+                    <label>Target Language <span style="color:var(--danger)">*</span></label>
+                    <select id="importTranslationLanguage" required>
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>CSV File <span style="color:var(--danger)">*</span></label>
+                    <input type="file" id="importTranslationFile" required accept=".csv">
+                    <small style="color:var(--gray);">Expected columns: key, translated_text</small>
+                </div>
+
+                <div style="padding:12px;background:var(--surface);border-radius:6px;margin-bottom:16px;font-size:13px;">
+                    <strong style="color:var(--dark);">CSV Format:</strong>
+                    <pre style="margin-top:8px;font-size:11px;color:var(--gray);overflow-x:auto;">key,translated_text
+common.save,Enregistrer
+common.cancel,Annuler
+dashboard.welcome,Bienvenue</pre>
+                </div>
+
+                <div id="importTranslationsError" class="error" style="display: none;"></div>
+                <div id="importTranslationsSuccess" style="display: none; padding:12px; background:#d4edda; color:#155724; border-radius:6px; margin-bottom:16px;"></div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('importTranslationsModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Import</button>
                 </div>
             </form>
         </div>
@@ -2650,7 +3238,11 @@
                 'email-alert-stats': 'Email Alert Stats',
                 'endusers': 'End Users',
                 'flutter-users': 'Manage Flutter Users',
-                'imei': 'IMEI / Tags'
+                'imei': 'IMEI / Tags',
+                'translations': 'Translation Manager',
+                'languages': 'Language Manager',
+                'device-management': 'Device Management',
+                'jobs': 'Background Jobs'
             };
             document.getElementById('pageTitle').textContent = titles[tabName];
 
@@ -2670,6 +3262,10 @@
             if (tabName === 'email-alert-stats') { loadEmailAlertStats(); }
             if (tabName === 'endusers') { loadEndUsers(); }
             if (tabName === 'imei') { loadIMEI(); }
+            if (tabName === 'translations') { loadTranslations(); }
+            if (tabName === 'languages') { loadLanguages(); }
+            if (tabName === 'device-management') { loadTenantOptions(); }
+            if (tabName === 'jobs') { loadJobs(); }
         }
 
         // ── BLE TAGS ─────────────────────────────────────────────────────────
@@ -3013,15 +3609,16 @@
 
         function switchLogSource(src) {
             currentLogSource = src;
-            ['app','backend','nginx-access','nginx-error','hive'].forEach(function(k) {
+            ['app','backend','nginx-access','nginx-error','hive','trip'].forEach(function(k) {
                 var el = document.getElementById('logsrc-' + k);
                 if (el) el.classList.toggle('active', k === src);
             });
             document.getElementById('logview-app').style.display = src === 'app' ? '' : 'none';
-            document.getElementById('logview-container').style.display = (src !== 'app' && src !== 'hive') ? '' : 'none';
+            document.getElementById('logview-container').style.display = (src !== 'app' && src !== 'hive' && src !== 'trip') ? '' : 'none';
             document.getElementById('logview-hive').style.display = src === 'hive' ? '' : 'none';
+            document.getElementById('logview-trip').style.display = src === 'trip' ? '' : 'none';
             if (src === 'app') { loadLogs(); } 
-            else if (src === 'hive') { /* Export on demand, nothing to auto-load */ }
+            else if (src === 'hive' || src === 'trip') { /* Export on demand, nothing to auto-load */ }
             else { loadContainerLogs(); }
         }
 
@@ -3186,6 +3783,69 @@
                 const blob = await response.blob();
                 const contentDisposition = response.headers.get('Content-Disposition');
                 let filename = 'hive-logs.tar.gz';
+                if (contentDisposition) {
+                    const matches = /filename="([^"]+)"/.exec(contentDisposition);
+                    if (matches && matches[1]) filename = matches[1];
+                }
+
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(downloadUrl);
+
+                if (statusEl) {
+                    statusEl.style.color = '#86efac';
+                    statusEl.innerHTML = '<i class="fa-solid fa-check-circle"></i> Export completed! Check your downloads folder for <strong>' + filename + '</strong>';
+                }
+            } catch (error) {
+                if (statusEl) {
+                    statusEl.style.color = '#f87171';
+                    statusEl.innerHTML = '<i class="fa-solid fa-exclamation-circle"></i> Export failed: ' + error.message;
+                }
+            } finally {
+                if (btnEl) btnEl.disabled = false;
+            }
+        }
+
+        // TRIP ENGINE LOGS EXPORT
+        async function exportTripLogs() {
+            const authToken = localStorage.getItem('adminToken');
+            if (!authToken) {
+                alert('Please log in first');
+                return;
+            }
+            
+            const daysEl = document.getElementById('tripDaysFilter');
+            const days = daysEl ? daysEl.value : '7';
+            const statusEl = document.getElementById('tripExportStatus');
+            const btnEl = document.getElementById('tripExportBtn');
+            
+            if (btnEl) btnEl.disabled = true;
+            if (statusEl) {
+                statusEl.style.display = 'block';
+                statusEl.style.color = 'var(--gray)';
+                statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Extracting Trip Engine logs and database data...';
+            }
+
+            try {
+                const url = API_URL + '/api/admin/trip-logs/export?days=' + days;
+                const response = await fetch(url, { 
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.detail || response.statusText);
+                }
+
+                // Download the file
+                const blob = await response.blob();
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = 'trip-logs.tar.gz';
                 if (contentDisposition) {
                     const matches = /filename="([^"]+)"/.exec(contentDisposition);
                     if (matches && matches[1]) filename = matches[1];
@@ -3490,7 +4150,7 @@
                         <td>${badge}</td>
                         <td>${date}</td>
                         <td style="display:flex;gap:6px;flex-wrap:wrap">
-                            <button class="btn btn-secondary" style="padding:4px 10px;font-size:12px" onclick="openEditGroupModal('${g.id}','${escHtml(g.name)}','${escHtml(g.email_domain||'')}',${JSON.stringify(g.allowed_sections||null).replace(/"/g,'&quot;')},${JSON.stringify(g.allowed_tag_types||null).replace(/"/g,'&quot;')})">Edit</button>
+                            <button class="btn btn-secondary" style="padding:4px 10px;font-size:12px" onclick="openEditGroupModal('${g.id}','${escHtml(g.name)}','${escHtml(g.email_domain||'')}',${JSON.stringify(g.allowed_sections||null).replace(/"/g,'&quot;')},${JSON.stringify(g.allowed_tag_types||null).replace(/"/g,'&quot;')},'${escHtml(g.default_language||'en')}')">Edit</button>
                             <button class="btn btn-secondary" style="padding:4px 10px;font-size:12px" onclick="openSysAdminModal('${g.id}','${escHtml(g.name)}')" title="Manage Built-in System Admins">🔑 Sys Admins</button>
                             ${deactivateBtn}
                         </td>
@@ -3530,6 +4190,23 @@
                     });
                 }
             } catch (_) {}
+            // Populate language dropdown
+            const langSel = document.getElementById('cgLanguage');
+            langSel.innerHTML = '<option value="en">English (default)</option>';
+            try {
+                const res = await fetch(`${API_URL}/api/admin/i18n/languages`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+                if (res.ok) {
+                    const langs = await res.json();
+                    langSel.innerHTML = '';
+                    langs.filter(l => l.is_active).forEach(l => {
+                        const opt = document.createElement('option');
+                        opt.value = l.code;
+                        opt.textContent = l.name;
+                        opt.selected = l.code === 'en';
+                        langSel.appendChild(opt);
+                    });
+                }
+            } catch (_) {}
         }
 
         async function submitCreateGroup(e) {
@@ -3545,6 +4222,10 @@
             if (document.getElementById('cgTypeSeries2').checked) allowedTypes.push('series2');
             if (document.getElementById('cgTypeSeries3').checked) allowedTypes.push('series3');
             
+            // Parse coalesce_floor_minutes (optional Trip Engine config v2.2)
+            const coalesceFloorRaw = document.getElementById('cgCoalesceFloor').value.trim();
+            const coalesceFloor = coalesceFloorRaw ? parseInt(coalesceFloorRaw, 10) : null;
+            
             const payload = {
                 name: document.getElementById('cgName').value.trim(),
                 admin_email: document.getElementById('cgEmail').value.trim(),
@@ -3553,6 +4234,8 @@
                 email_domain: document.getElementById('cgDomain').value.trim() || null,
                 package_id: document.getElementById('cgPackage').value || null,
                 allowed_tag_types: allowedTypes.length > 0 ? allowedTypes : null,
+                default_language: document.getElementById('cgLanguage').value || 'en',
+                coalesce_floor_minutes: coalesceFloor
             };
             try {
                 const res = await fetch(`${API_URL}/api/admin/usergroups`, {
@@ -3730,7 +4413,7 @@
             navigator.clipboard.writeText(pwd).catch(() => {});
         }
 
-        async function openEditGroupModal(groupId, groupName, emailDomain, allowedSections, allowedTagTypes) {
+        async function openEditGroupModal(groupId, groupName, emailDomain, allowedSections, allowedTagTypes, defaultLanguage) {
             document.getElementById('egGroupId').value = groupId;
             document.getElementById('egGroupName').textContent = groupName;
             document.getElementById('egDomain').value = emailDomain || '';
@@ -3747,6 +4430,25 @@
             document.getElementById('egTypeSeries1').checked = types.includes('series1');
             document.getElementById('egTypeSeries2').checked = types.includes('series2');
             document.getElementById('egTypeSeries3').checked = types.includes('series3');
+            // Populate language dropdown
+            const langSel = document.getElementById('egLanguage');
+            langSel.innerHTML = '<option value="en">Loading...</option>';
+            try {
+                const res = await fetch(`${API_URL}/api/admin/i18n/languages`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+                if (res.ok) {
+                    const langs = await res.json();
+                    langSel.innerHTML = '';
+                    langs.filter(l => l.is_active).forEach(l => {
+                        const opt = document.createElement('option');
+                        opt.value = l.code;
+                        opt.textContent = l.name;
+                        opt.selected = l.code === (defaultLanguage || 'en');
+                        langSel.appendChild(opt);
+                    });
+                }
+            } catch (_) {
+                langSel.innerHTML = '<option value="en">English</option>';
+            }
             document.getElementById('editGroupModal').classList.add('active');
             // Load all packages + this group's assigned packages in parallel
             await _egRefreshPackages(groupId);
@@ -3868,6 +4570,7 @@
                         email_domain: domain,
                         allowed_sections: allowedSections.length === 3 ? null : allowedSections,
                         allowed_tag_types: allowedTagTypes.length === 3 ? null : allowedTagTypes,
+                        default_language: document.getElementById('egLanguage').value || 'en',
                     })
                 });
                 if (res.status === 401) { handle401(); return; }
@@ -4520,6 +5223,445 @@
                 _editorMap.fitBounds(bounds, { padding: [20,20] });
             };
             reader.readAsDataURL(file);
+        }
+
+        // ====================================================================
+        // DEVICE MANAGEMENT (v2.2 A6)
+        // ====================================================================
+
+        let currentTenantId = null;
+        let currentTenantName = null;
+
+        async function loadTenantOptions() {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/usergroups`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const tenants = await response.json();
+                
+                const select = document.getElementById('dmTenantSelect');
+                select.innerHTML = '<option value="">— Select a tenant —</option>' + 
+                    tenants.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+            } catch (error) {
+                console.error('Failed to load tenants:', error);
+            }
+        }
+
+        async function loadDevicesForTenant() {
+            const tenantId = document.getElementById('dmTenantSelect').value;
+            if (!tenantId) {
+                document.getElementById('dmDeviceSection').style.display = 'none';
+                return;
+            }
+
+            currentTenantId = tenantId;
+            currentTenantName = document.getElementById('dmTenantSelect').selectedOptions[0].text;
+
+            try {
+                // Get GPS tracker tags for this tenant with trip subscription status
+                const response = await fetch(`${API_URL}/api/admin/tags-with-subscriptions?usergroup_id=${tenantId}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.statusText}`);
+                }
+                
+                const devices = await response.json();
+
+                const tbody = document.getElementById('dmDevicesTableBody');
+                if (devices.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:2rem">No GPS devices found for this tenant</td></tr>';
+                } else {
+                    tbody.innerHTML = devices.map(device => {
+                        const isSubscribed = device.device_state?.trip_subscribed || false;
+                        const subscriptionBadge = isSubscribed 
+                            ? '<span style="color:#10b981;font-weight:600">✓ Subscribed</span>'
+                            : '<span style="color:#6b7280">✗ Not Subscribed</span>';
+                        const toggleButton = isSubscribed
+                            ? `<button class="btn btn-secondary btn-small" onclick="toggleSubscription('${device.imei}', false)" style="background:#ef4444;border-color:#ef4444;padding:6px 10px;font-size:12px;width:auto;min-width:95px">Unsubscribe</button>`
+                            : `<button class="btn btn-secondary btn-small" onclick="toggleSubscription('${device.imei}', true)" style="background:#10b981;border-color:#10b981;padding:6px 10px;font-size:12px;width:auto;min-width:95px">Subscribe</button>`;
+                        
+                        return `
+                            <tr id="device-row-${device.imei}">
+                                <td><code>${device.imei}</code></td>
+                                <td>${device.device_name || device.description || '—'}</td>
+                                <td id="subscription-status-${device.imei}">${subscriptionBadge}</td>
+                                <td>${device.device_state?.last_position_ts || '—'}</td>
+                                <td>${device.device_state?.last_tracklist_pull_at || '—'}</td>
+                                <td style="white-space:nowrap">
+                                    <span id="subscription-toggle-${device.imei}">${toggleButton}</span>
+                                    <button class="btn btn-secondary btn-small" onclick="openDeviceBackfillModal('${device.imei}')" ${!isSubscribed ? 'disabled' : ''} style="padding:6px 10px;font-size:12px;width:auto;min-width:80px">⬇️ Backfill</button>
+                                    <button class="btn btn-secondary btn-small" onclick="openDeviceReprocessModal('${device.imei}')" ${!isSubscribed ? 'disabled' : ''} style="padding:6px 10px;font-size:12px;width:auto;min-width:80px">🔄 Reprocess</button>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+
+                document.getElementById('dmDeviceSection').style.display = 'block';
+            } catch (error) {
+                console.error('Failed to load devices:', error);
+                showAlert('dmAlert', 'error', 'Failed to load devices: ' + error.message);
+            }
+        }
+
+        async function toggleSubscription(imei, subscribe) {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/devices/${imei}/trip-subscription`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ trip_subscribed: subscribe })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                
+                // Update UI
+                const statusCell = document.getElementById(`subscription-status-${imei}`);
+                const toggleCell = document.getElementById(`subscription-toggle-${imei}`);
+                const row = document.getElementById(`device-row-${imei}`);
+                
+                if (subscribe) {
+                    statusCell.innerHTML = '<span style="color:#10b981;font-weight:600">✓ Subscribed</span>';
+                    toggleCell.innerHTML = `<button class="btn btn-secondary btn-small" onclick="toggleSubscription('${imei}', false)" style="background:#ef4444;border-color:#ef4444;padding:6px 10px;font-size:12px;width:auto;min-width:95px">Unsubscribe</button>`;
+                    // Enable backfill/reprocess buttons
+                    row.querySelectorAll('button').forEach(btn => {
+                        if (btn.textContent.includes('Backfill') || btn.textContent.includes('Reprocess')) {
+                            btn.disabled = false;
+                        }
+                    });
+                } else {
+                    statusCell.innerHTML = '<span style="color:#6b7280">✗ Not Subscribed</span>';
+                    toggleCell.innerHTML = `<button class="btn btn-secondary btn-small" onclick="toggleSubscription('${imei}', true)" style="background:#10b981;border-color:#10b981;padding:6px 10px;font-size:12px;width:auto;min-width:95px">Subscribe</button>`;
+                    // Disable backfill/reprocess buttons
+                    row.querySelectorAll('button').forEach(btn => {
+                        if (btn.textContent.includes('Backfill') || btn.textContent.includes('Reprocess')) {
+                            btn.disabled = true;
+                        }
+                    });
+                }
+                
+                showAlert('dmAlert', 'success', result.message);
+            } catch (error) {
+                console.error('Failed to toggle subscription:', error);
+                showAlert('dmAlert', 'error', 'Failed to update subscription: ' + error.message);
+            }
+        }
+
+        function openDeviceBackfillModal(imei) {
+            document.getElementById('dbImei').value = imei;
+            openModal('deviceBackfillModal');
+        }
+
+        async function submitDeviceBackfill(event) {
+            event.preventDefault();
+            const btn = document.getElementById('dbSubmitBtn');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+
+            try {
+                const response = await fetch(`${API_URL}/api/admin/trips/backfill`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        device_imei: document.getElementById('dbImei').value,
+                        preset: document.getElementById('dbPreset').value
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.detail || 'Backfill failed');
+                }
+
+                showAlert('dbAlert', 'success', `Backfill complete: ${result.positions_fetched} fetched, ${result.positions_inserted} inserted, ${result.journeys_created} journeys created`);
+                
+                setTimeout(() => {
+                    closeModal('deviceBackfillModal');
+                    loadDevicesForTenant();
+                }, 2000);
+            } catch (error) {
+                showAlert('dbAlert', 'error', error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
+        function openDeviceReprocessModal(imei) {
+            document.getElementById('drImei').value = imei;
+            openModal('deviceReprocessModal');
+        }
+
+        async function submitDeviceReprocess(event) {
+            event.preventDefault();
+            const btn = document.getElementById('drSubmitBtn');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+
+            try {
+                const response = await fetch(`${API_URL}/api/admin/trips/reprocess`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        device_imei: document.getElementById('drImei').value
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.detail || 'Reprocess failed');
+                }
+
+                showAlert('drAlert', 'success', `Reprocess complete: ${result.positions_processed} positions → ${result.journeys_created} journeys`);
+                
+                setTimeout(() => {
+                    closeModal('deviceReprocessModal');
+                    loadDevicesForTenant();
+                }, 2000);
+            } catch (error) {
+                showAlert('drAlert', 'error', error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
+        function openBatchBackfillModal() {
+            document.getElementById('bbTenantId').value = currentTenantId;
+            document.getElementById('bbTenantName').value = currentTenantName;
+            openModal('batchBackfillModal');
+        }
+
+        async function submitBatchBackfill(event) {
+            event.preventDefault();
+            const btn = document.getElementById('bbSubmitBtn');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Queueing...';
+
+            try {
+                const response = await fetch(`${API_URL}/api/admin/jobs/batch-backfill`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        tenant_id: document.getElementById('bbTenantId').value,
+                        preset: document.getElementById('bbPreset').value
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.detail || 'Failed to queue job');
+                }
+
+                showAlert('bbAlert', 'success', `Job queued successfully! ID: ${result.id}. Switch to Jobs tab to monitor progress.`);
+                
+                setTimeout(() => {
+                    closeModal('batchBackfillModal');
+                }, 2000);
+            } catch (error) {
+                showAlert('bbAlert', 'error', error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
+        function openBatchReprocessModal() {
+            document.getElementById('brTenantId').value = currentTenantId;
+            document.getElementById('brTenantName').value = currentTenantName;
+            openModal('batchReprocessModal');
+        }
+
+        async function submitBatchReprocess(event) {
+            event.preventDefault();
+            const btn = document.getElementById('brSubmitBtn');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Queueing...';
+
+            try {
+                const response = await fetch(`${API_URL}/api/admin/jobs/batch-reprocess`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        tenant_id: document.getElementById('brTenantId').value
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.detail || 'Failed to queue job');
+                }
+
+                showAlert('brAlert', 'success', `Job queued successfully! ID: ${result.id}. Switch to Jobs tab to monitor progress.`);
+                
+                setTimeout(() => {
+                    closeModal('batchReprocessModal');
+                }, 2000);
+            } catch (error) {
+                showAlert('brAlert', 'error', error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
+        // ====================================================================
+        // BACKGROUND JOBS (v2.2 A6)
+        // ====================================================================
+
+        async function loadJobs() {
+            const statusFilter = document.getElementById('jobStatusFilter').value;
+            const url = statusFilter 
+                ? `${API_URL}/api/admin/jobs?status=${statusFilter}&limit=100`
+                : `${API_URL}/api/admin/jobs?limit=100`;
+
+            try {
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const jobs = await response.json();
+
+                const tbody = document.getElementById('jobsTableBody');
+                if (jobs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--gray);padding:2rem">No jobs found</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = jobs.map(job => {
+                    const statusBadge = getJobStatusBadge(job.status);
+                    const progress = job.total_devices 
+                        ? `${job.completed_devices}/${job.total_devices} (${Math.round(job.completed_devices/job.total_devices*100)}%)`
+                        : '—';
+                    
+                    return `
+                        <tr>
+                            <td><code style="font-size:11px">${job.id.substring(0,8)}...</code></td>
+                            <td>${job.job_type.replace('batch_', '').replace('_', ' ')}</td>
+                            <td>${statusBadge}</td>
+                            <td>${progress}</td>
+                            <td>${job.created_by}</td>
+                            <td>${job.started_at ? new Date(job.started_at).toLocaleString() : '—'}</td>
+                            <td>${job.completed_at ? new Date(job.completed_at).toLocaleString() : '—'}</td>
+                            <td><button class="btn btn-secondary btn-small" onclick="viewJobDetails('${job.id}')">View</button></td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Failed to load jobs:', error);
+                showAlert('jobsAlert', 'error', 'Failed to load jobs: ' + error.message);
+            }
+        }
+
+        function getJobStatusBadge(status) {
+            const colors = {
+                pending: '#ffa500',
+                running: '#3182ce',
+                completed: '#48bb78',
+                failed: '#f44336',
+                cancelled: '#718096'
+            };
+            return `<span style="display:inline-block;padding:4px 8px;border-radius:4px;background:${colors[status] || '#ccc'};color:white;font-size:12px;font-weight:600">${status}</span>`;
+        }
+
+        async function viewJobDetails(jobId) {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/jobs/${jobId}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const job = await response.json();
+
+                const html = `
+                    <div style="padding:1rem">
+                        <h4 style="margin:0 0 16px">Job ${job.id.substring(0,8)}...</h4>
+                        
+                        <div style="display:grid;grid-template-columns:150px 1fr;gap:12px;font-size:14px">
+                            <strong>Type:</strong><span>${job.job_type}</span>
+                            <strong>Status:</strong><span>${getJobStatusBadge(job.status)}</span>
+                            <strong>Created By:</strong><span>${job.created_by}</span>
+                            <strong>Created At:</strong><span>${new Date(job.created_at).toLocaleString()}</span>
+                            <strong>Started At:</strong><span>${job.started_at ? new Date(job.started_at).toLocaleString() : '—'}</span>
+                            <strong>Completed At:</strong><span>${job.completed_at ? new Date(job.completed_at).toLocaleString() : '—'}</span>
+                            <strong>Total Devices:</strong><span>${job.total_devices || '—'}</span>
+                            <strong>Completed:</strong><span style="color:#48bb78;font-weight:600">${job.completed_devices}</span>
+                            <strong>Failed:</strong><span style="color:#f44336;font-weight:600">${job.failed_devices}</span>
+                            <strong>Last Processed:</strong><span>${job.last_processed_imei || '—'}</span>
+                        </div>
+
+                        ${job.error_message ? `
+                            <div style="margin-top:16px;padding:12px;background:#fee;border-left:4px solid #f44336;border-radius:4px">
+                                <strong style="color:#c53030">Error:</strong><br>
+                                <code style="font-size:12px">${job.error_message}</code>
+                            </div>
+                        ` : ''}
+
+                        ${job.results ? `
+                            <div style="margin-top:16px">
+                                <h5 style="margin:0 0 8px">Results:</h5>
+                                <pre style="background:#f7fafc;padding:12px;border-radius:4px;font-size:12px;overflow-x:auto">${JSON.stringify(job.results, null, 2)}</pre>
+                            </div>
+                        ` : ''}
+
+                        <div style="margin-top:16px">
+                            <h5 style="margin:0 0 8px">Parameters:</h5>
+                            <pre style="background:#f7fafc;padding:12px;border-radius:4px;font-size:12px;overflow-x:auto">${JSON.stringify(job.params, null, 2)}</pre>
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('jobDetailsContent').innerHTML = html;
+                openModal('jobDetailsModal');
+            } catch (error) {
+                console.error('Failed to load job details:', error);
+                alert('Failed to load job details: ' + error.message);
+            }
+        }
+
+        // Helper function to show alerts
+        function showAlert(elementId, type, message) {
+            const alert = document.getElementById(elementId);
+            const textEl = document.getElementById(elementId + 'Text') || alert.querySelector('span');
+            
+            alert.className = 'alert';
+            if (type === 'error') alert.classList.add('alert-error');
+            else if (type === 'success') alert.classList.add('alert-success');
+            
+            if (textEl) textEl.textContent = message;
+            else alert.textContent = message;
+            
+            alert.style.display = 'block';
+            
+            // Auto-hide success messages
+            if (type === 'success') {
+                setTimeout(() => { alert.style.display = 'none'; }, 5000);
+            }
         }
 
     </script>
@@ -5331,6 +6473,765 @@
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    }
+
+    // ========================================================================
+    // I18N / TRANSLATIONS FUNCTIONS (REDESIGNED WITH ALL LANGUAGES AS COLUMNS)
+    // ========================================================================
+
+    let translationSearchTimeout = null;
+    let allTranslationKeys = [];
+    let allLanguages = [];
+
+    async function loadTranslations() {
+        try {
+            const category = document.getElementById('translationCategoryFilter').value;
+            const missingOnly = document.getElementById('translationMissingOnly').checked;
+            const search = document.getElementById('translationSearchInput').value;
+
+            // Fetch languages first
+            const langResponse = await fetch('/api/admin/i18n/languages?include_inactive=false', {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            if (!langResponse.ok) throw new Error('Failed to load languages');
+            allLanguages = await langResponse.json();
+
+            // Build URL with filters
+            let url = '/api/admin/i18n/translation-keys';
+            const params = [];
+            if (category) params.push(`category=${encodeURIComponent(category)}`);
+            if (search) params.push(`search=${encodeURIComponent(search)}`);
+            if (params.length > 0) url += '?' + params.join('&');
+
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+
+            if (!response.ok) throw new Error('Failed to load translations');
+
+            let keys = await response.json();
+            
+            // Apply missing-only filter client-side if needed
+            if (missingOnly) {
+                const nonEnglishLangs = allLanguages.filter(l => l.code !== 'en');
+                keys = keys.filter(key => {
+                    return nonEnglishLangs.some(lang => !key.translations || !key.translations[lang.code]);
+                });
+            }
+
+            allTranslationKeys = keys;
+
+            // Update stats
+            const totalKeysEl = document.getElementById('translationTotalKeys');
+            const completionStatsEl = document.getElementById('translationCompletionStats');
+            totalKeysEl.textContent = keys.length;
+
+            // Calculate completion stats per language
+            let statsHTML = '';
+            for (const lang of allLanguages) {
+                if (lang.code === 'en') continue; // Skip English (default)
+                let translated = 0;
+                keys.forEach(key => {
+                    if (key.translations && key.translations[lang.code]) translated++;
+                });
+                const percent = keys.length > 0 ? Math.round((translated / keys.length) * 100) : 0;
+                const color = percent === 100 ? 'var(--primary)' : percent > 50 ? 'var(--warning)' : 'var(--danger)';
+                statsHTML += `<span style="color:${color};margin-right:16px;"><strong>${lang.code.toUpperCase()}:</strong> ${percent}% (${translated}/${keys.length})</span>`;
+            }
+            completionStatsEl.innerHTML = statsHTML;
+
+            // Build table header with all language columns
+            const thead = document.getElementById('translationsTableHead');
+            const nonEnglishLangs = allLanguages.filter(l => l.code !== 'en');
+            const langColumns = nonEnglishLangs.map(lang => 
+                `<th style="width:220px;">
+                    ${escapeHtml(lang.name)} (${lang.code.toUpperCase()})
+                    <button class="btn btn-small" onclick="autoTranslateColumn('${lang.code}')" style="margin-left:8px;font-size:10px;padding:2px 6px;" title="Auto-translate this language">🤖 Auto</button>
+                    <button class="btn btn-small" onclick="cleanFailedTranslations('${lang.code}')" style="margin-left:4px;font-size:10px;padding:2px 6px;background:var(--danger);" title="Delete failed translations">🗑️ Clean</button>
+                </th>`
+            ).join('');
+            thead.innerHTML = `
+                <tr>
+                    <th style="width:180px;position:sticky;left:0;background:var(--surface);z-index:2;">Key</th>
+                    <th style="width:100px;">Category</th>
+                    <th style="width:220px;">English (Default)</th>
+                    ${langColumns}
+                </tr>
+            `;
+
+            // Build table rows
+            const tbody = document.getElementById('translationsTableBody');
+            if (!keys || keys.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${3 + nonEnglishLangs.length}" style="text-align:center;color:var(--gray);padding:2rem">No translation keys found</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = keys.map(key => {
+                const translations = key.translations || {};
+                const translationCells = nonEnglishLangs.map(lang => {
+                    const translation = translations[lang.code] || '';
+                    const isMissing = !translation;
+                    const cellId = `cell-${escapeHtml(key.key).replace(/\./g, '_')}-${lang.code}`;
+                    return `<td 
+                        id="${cellId}"
+                        data-key="${escapeHtml(key.key)}" 
+                        data-lang="${lang.code}"
+                        data-default="${escapeHtml(key.default_text)}"
+                        onclick="editTranslationCell(this)"
+                        style="cursor:pointer;background:${isMissing ? 'var(--danger-light,#fff1f0)' : 'transparent'};font-size:12px;position:relative;padding:8px;"
+                        title="${isMissing ? 'Click to add translation' : 'Click to edit translation'}"
+                    >${translation ? escapeHtml(translation) : '<span style="color:var(--danger);">⚠️ Missing</span>'}</td>`;
+                }).join('');
+
+                return `
+                    <tr>
+                        <td style="position:sticky;left:0;background:var(--surface);z-index:1;"><code style="font-size:11px;">${escapeHtml(key.key)}</code></td>
+                        <td><span class="badge" style="font-size:11px;">${key.category || '-'}</span></td>
+                        <td style="font-size:12px;">${escapeHtml(key.default_text)}</td>
+                        ${translationCells}
+                    </tr>
+                `;
+            }).join('');
+
+        } catch (e) {
+            console.error('Error loading translations:', e);
+            const tbody = document.getElementById('translationsTableBody');
+            tbody.innerHTML = `<tr><td colspan="20" style="text-align:center;color:var(--danger);padding:2rem">Error loading translations: ${e.message}</td></tr>`;
+        }
+    }
+
+    // Inline cell editing
+    function editTranslationCell(cell) {
+        const key = cell.getAttribute('data-key');
+        const lang = cell.getAttribute('data-lang');
+        const currentText = cell.textContent.includes('Missing') ? '' : cell.textContent.trim();
+
+        // Replace cell with textarea
+        const textarea = document.createElement('textarea');
+        textarea.value = currentText;
+        textarea.style.width = '100%';
+        textarea.style.minHeight = '60px';
+        textarea.style.padding = '6px';
+        textarea.style.fontSize = '12px';
+        textarea.style.border = '2px solid var(--primary)';
+        textarea.style.borderRadius = '4px';
+        textarea.style.resize = 'vertical';
+
+        const saveBtn = document.createElement('button');
+        saveBtn.textContent = '💾 Save';
+        saveBtn.className = 'btn btn-small btn-primary';
+        saveBtn.style.marginTop = '4px';
+        saveBtn.style.marginRight = '4px';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = '✖ Cancel';
+        cancelBtn.className = 'btn btn-small btn-secondary';
+        cancelBtn.style.marginTop = '4px';
+
+        const container = document.createElement('div');
+        container.appendChild(textarea);
+        container.appendChild(saveBtn);
+        container.appendChild(cancelBtn);
+
+        cell.innerHTML = '';
+        cell.appendChild(container);
+        cell.onclick = null; // Disable click while editing
+        textarea.focus();
+
+        saveBtn.onclick = async () => {
+            const newText = textarea.value.trim();
+            if (!newText) {
+                alert('Translation cannot be empty');
+                return;
+            }
+            await saveTranslation(key, lang, newText, cell);
+        };
+
+        cancelBtn.onclick = () => {
+            loadTranslations(); // Reload to restore original state
+        };
+
+        // Save on Ctrl+Enter
+        textarea.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                saveBtn.click();
+            }
+        });
+    }
+
+    async function saveTranslation(key, langCode, translatedText, cell) {
+        try {
+            const response = await fetch('/api/admin/i18n/translations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({
+                    language_code: langCode,
+                    translation_key: key,
+                    translated_text: translatedText
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to save translation');
+            }
+
+            // Update cell with new text
+            cell.textContent = translatedText;
+            cell.style.background = 'var(--success-light, #d4edda)';
+            cell.onclick = () => editTranslationCell(cell);
+
+            // Reset background after animation
+            setTimeout(() => {
+                cell.style.background = 'transparent';
+            }, 2000);
+
+        } catch (e) {
+            alert('Error saving translation: ' + e.message);
+            loadTranslations(); // Reload on error
+        }
+    }
+
+    // Auto-translate functions using Google Translate API
+    async function autoTranslateColumn(langCode) {
+        if (!confirm(`Auto-translate all missing translations to ${langCode.toUpperCase()}?\n\nThis will use LibreTranslate API. Review translations after generation.`)) {
+            return;
+        }
+
+        // Filter for missing translations OR failed translations (starting with [AUTO-TRANSLATE-FAILED])
+        const missingKeys = allTranslationKeys.filter(key => {
+            const translation = key.translations?.[langCode];
+            return !translation || translation.startsWith('[AUTO-TRANSLATE-FAILED]');
+        });
+
+        if (missingKeys.length === 0) {
+            alert(`All keys already translated to ${langCode.toUpperCase()}!`);
+            return;
+        }
+
+        const progressDiv = document.createElement('div');
+        progressDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:24px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.3);z-index:10000;min-width:300px;';
+        progressDiv.innerHTML = `
+            <h3 style="margin:0 0 12px 0;">🤖 Auto-translating to ${langCode.toUpperCase()}...</h3>
+            <p id="autoTranslateProgress" style="margin:0;font-size:14px;color:var(--gray);">0 / ${missingKeys.length}</p>
+            <div style="margin-top:8px;background:var(--border);border-radius:4px;height:8px;overflow:hidden;">
+                <div id="autoTranslateBar" style="background:var(--primary);height:100%;width:0%;transition:width 0.3s;"></div>
+            </div>
+        `;
+        document.body.appendChild(progressDiv);
+
+        let success = 0;
+        let failed = 0;
+        const failedKeys = [];
+
+        for (let i = 0; i < missingKeys.length; i++) {
+            const key = missingKeys[i];
+            try {
+                const translated = await translateText(key.default_text, 'en', langCode);
+                
+                if (!translated || translated.trim() === '') {
+                    throw new Error('Empty translation returned');
+                }
+                
+                await saveTranslationDirect(key.key, langCode, translated);
+                success++;
+                console.log(`✅ Translated: ${key.key} -> "${translated}"`);
+            } catch (e) {
+                console.error(`❌ Failed to translate ${key.key}:`, e.message);
+                failed++;
+                failedKeys.push(key.key);
+            }
+            
+            // Update progress
+            const percent = Math.round(((i + 1) / missingKeys.length) * 100);
+            document.getElementById('autoTranslateProgress').textContent = `${i + 1} / ${missingKeys.length} (${success} ✅, ${failed} ❌)`;
+            document.getElementById('autoTranslateBar').style.width = `${percent}%`;
+        }
+
+        document.body.removeChild(progressDiv);
+        
+        // Show results
+        let message = `Auto-translation complete!\n\n✅ ${success} translations added\n❌ ${failed} failed`;
+        if (failedKeys.length > 0 && failedKeys.length <= 5) {
+            message += `\n\nFailed keys:\n${failedKeys.join('\n')}`;
+        } else if (failedKeys.length > 5) {
+            message += `\n\nFailed keys:\n${failedKeys.slice(0, 5).join('\n')}\n... and ${failedKeys.length - 5} more`;
+        }
+        
+        // Reload translations BEFORE showing alert
+        console.log('Reloading translations...');
+        await loadTranslations();
+        
+        // Show result after refresh
+        alert(message);
+    }
+
+    async function autoTranslateAll() {
+        const nonEnglishLangs = allLanguages.filter(l => l.code !== 'en');
+        if (nonEnglishLangs.length === 0) {
+            alert('No other languages configured. Add languages first.');
+            return;
+        }
+
+        if (!confirm(`Auto-translate ALL missing translations for ALL languages?\n\nThis may take a few minutes.`)) {
+            return;
+        }
+
+        for (const lang of nonEnglishLangs) {
+            await autoTranslateColumn(lang.code);
+        }
+    }
+
+    async function translateText(text, fromLang, toLang) {
+        // Call backend proxy endpoint (avoids CORS issues with LibreTranslate)
+        try {
+            const response = await fetch('/api/admin/i18n/translate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({
+                    text: text,
+                    source_lang: fromLang,
+                    target_lang: toLang
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Translation API failed: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            return data.translated_text;
+        } catch (e) {
+            // Log error and return fallback
+            console.error('Translation failed:', e);
+            throw e; // Re-throw to let calling function handle it
+        }
+    }
+
+    async function cleanFailedTranslations(langCode) {
+        if (!confirm(`Delete all failed translations for ${langCode.toUpperCase()}?\\n\\nThis will remove all translations starting with [AUTO-TRANSLATE-FAILED].`)) {
+            return;
+        }
+
+        const failedKeys = allTranslationKeys.filter(key => {
+            const translation = key.translations?.[langCode];
+            return translation && translation.startsWith('[AUTO-TRANSLATE-FAILED]');
+        });
+
+        if (failedKeys.length === 0) {
+            alert('No failed translations found!');
+            return;
+        }
+
+        let deleted = 0;
+        for (const key of failedKeys) {
+            try {
+                await fetch(`/api/admin/i18n/translations/${langCode}/${encodeURIComponent(key.key)}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                deleted++;
+            } catch (e) {
+                console.error(`Failed to delete ${key.key}:`, e);
+            }
+        }
+
+        alert(`Deleted ${deleted} failed translations for ${langCode.toUpperCase()}`);
+        loadTranslations();
+    }
+
+    async function saveTranslationDirect(key, langCode, translatedText) {
+        const response = await fetch('/api/admin/i18n/translations', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                language_code: langCode,
+                translation_key: key,
+                translated_text: translatedText
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to save translation');
+        }
+    }
+
+    async function fetchLanguages() {
+        const response = await fetch('/api/admin/i18n/languages?include_inactive=false', {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (!response.ok) return [];
+        return await response.json();
+    }
+
+    function changeTranslationLanguageView(selectEl, keyName) {
+        const lang = selectEl.value;
+        // Update the filter dropdown and reload
+        document.getElementById('translationLanguageFilter').value = lang;
+        loadTranslations();
+    }
+
+    function debounceTranslationSearch() {
+        clearTimeout(translationSearchTimeout);
+        translationSearchTimeout = setTimeout(() => {
+            loadTranslations();
+        }, 500);
+    }
+
+    function openAddTranslationKeyModal() {
+        document.getElementById('addKeyName').value = '';
+        document.getElementById('addKeyCategory').value = '';
+        document.getElementById('addKeyDefaultText').value = '';
+        document.getElementById('addKeyContext').value = '';
+        document.getElementById('addTranslationKeyError').style.display = 'none';
+        document.getElementById('addTranslationKeyModal').classList.add('active');
+    }
+
+    async function handleAddTranslationKey(e) {
+        e.preventDefault();
+        const errorEl = document.getElementById('addTranslationKeyError');
+        errorEl.style.display = 'none';
+
+        try {
+            const key = document.getElementById('addKeyName').value.trim();
+            const category = document.getElementById('addKeyCategory').value || null;
+            const defaultText = document.getElementById('addKeyDefaultText').value.trim();
+            const context = document.getElementById('addKeyContext').value.trim() || null;
+
+            const response = await fetch('/api/admin/i18n/translation-keys', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({ key, category, default_text: defaultText, context })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to create translation key');
+            }
+
+            closeModal('addTranslationKeyModal');
+            await loadTranslations();
+            alert('Translation key created successfully!');
+        } catch (e) {
+            errorEl.textContent = e.message;
+            errorEl.style.display = 'block';
+        }
+    }
+
+    async function openEditTranslationModal(keyName, languageCode) {
+        const errorEl = document.getElementById('editTranslationError');
+        errorEl.style.display = 'none';
+
+        // Find the key details
+        const keyData = allTranslationKeys.find(k => k.key === keyName);
+        if (!keyData) {
+            alert('Translation key not found');
+            return;
+        }
+
+        // Populate form
+        document.getElementById('editTranslationKey').value = keyName;
+        document.getElementById('editTranslationKeyDisplay').value = keyName;
+        document.getElementById('editTranslationDefault').value = keyData.default_text;
+
+        // Show context if available
+        if (keyData.context) {
+            document.getElementById('editTranslationContextGroup').style.display = 'block';
+            document.getElementById('editTranslationContext').value = keyData.context;
+        } else {
+            document.getElementById('editTranslationContextGroup').style.display = 'none';
+        }
+
+        // Populate language dropdown
+        const languages = await fetchLanguages();
+        const langSelect = document.getElementById('editTranslationLanguage');
+        langSelect.innerHTML = languages.filter(l => l.code !== 'en').map(l => 
+            `<option value="${l.code}" ${l.code === languageCode ? 'selected' : ''}>${l.name}</option>`
+        ).join('');
+
+        // Set current translation if exists
+        const currentTranslation = keyData.translations[languageCode] || '';
+        document.getElementById('editTranslationText').value = currentTranslation;
+
+        document.getElementById('editTranslationModal').classList.add('active');
+    }
+
+    async function handleEditTranslation(e) {
+        e.preventDefault();
+        const errorEl = document.getElementById('editTranslationError');
+        errorEl.style.display = 'none';
+
+        try {
+            const key = document.getElementById('editTranslationKey').value;
+            const languageCode = document.getElementById('editTranslationLanguage').value;
+            const translatedText = document.getElementById('editTranslationText').value.trim();
+
+            const response = await fetch('/api/admin/i18n/translations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({
+                    translation_key: key,
+                    language_code: languageCode,
+                    translated_text: translatedText
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to save translation');
+            }
+
+            closeModal('editTranslationModal');
+            await loadTranslations();
+            alert('Translation saved successfully!');
+        } catch (e) {
+            errorEl.textContent = e.message;
+            errorEl.style.display = 'block';
+        }
+    }
+
+    async function exportTranslations() {
+        const languageFilter = document.getElementById('translationLanguageFilter').value;
+        if (!languageFilter) {
+            alert('Please select a language to export');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/admin/i18n/export/${languageFilter}?format=csv&missing_only=false`, {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+
+            if (!response.ok) throw new Error('Failed to export translations');
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `translations_${languageFilter}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (e) {
+            alert('Error exporting translations: ' + e.message);
+        }
+    }
+
+    async function openImportTranslationsModal() {
+        const languages = await fetchLanguages();
+        const select = document.getElementById('importTranslationLanguage');
+        select.innerHTML = languages.filter(l => l.code !== 'en').map(l => 
+            `<option value="${l.code}">${l.name}</option>`
+        ).join('');
+
+        document.getElementById('importTranslationFile').value = '';
+        document.getElementById('importTranslationsError').style.display = 'none';
+        document.getElementById('importTranslationsSuccess').style.display = 'none';
+        document.getElementById('importTranslationsModal').classList.add('active');
+    }
+
+    async function handleImportTranslations(e) {
+        e.preventDefault();
+        const errorEl = document.getElementById('importTranslationsError');
+        const successEl = document.getElementById('importTranslationsSuccess');
+        errorEl.style.display = 'none';
+        successEl.style.display = 'none';
+
+        try {
+            const languageCode = document.getElementById('importTranslationLanguage').value;
+            const fileInput = document.getElementById('importTranslationFile');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                throw new Error('Please select a file');
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await fetch(`/api/admin/i18n/import/${languageCode}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${authToken}` },
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to import translations');
+            }
+
+            const result = await response.json();
+            successEl.textContent = `Import successful! Created: ${result.created}, Updated: ${result.updated}, Skipped: ${result.skipped}`;
+            if (result.errors && result.errors.length > 0) {
+                successEl.textContent += `\nErrors: ${result.errors.slice(0, 3).join(', ')}`;
+            }
+            successEl.style.display = 'block';
+
+            await loadTranslations();
+            setTimeout(() => closeModal('importTranslationsModal'), 3000);
+        } catch (e) {
+            errorEl.textContent = e.message;
+            errorEl.style.display = 'block';
+        }
+    }
+
+    // ========================================================================
+    // LANGUAGES FUNCTIONS
+    // ========================================================================
+
+    async function loadLanguages() {
+        try {
+            const response = await fetch('/api/admin/i18n/languages?include_inactive=true', {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+
+            if (!response.ok) throw new Error('Failed to load languages');
+
+            const languages = await response.json();
+            const tbody = document.getElementById('languagesTableBody');
+            
+            // Safety check - element might not exist if tab isn't visible
+            if (!tbody) {
+                console.warn('languagesTableBody element not found - tab may not be visible');
+                return;
+            }
+
+            if (!languages || languages.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:2rem">No languages found</td></tr>';
+                return;
+            }
+
+            // Also populate the translation language filter (if it exists - only on Translations tab)
+            const langFilter = document.getElementById('translationLanguageFilter');
+            if (langFilter) {
+                langFilter.innerHTML = '<option value="">All Languages</option>' + 
+                    languages.filter(l => l.is_active).map(l => 
+                        `<option value="${l.code}">${l.name}</option>`
+                    ).join('');
+            }
+
+            tbody.innerHTML = languages.map(lang => {
+                const statusBadge = lang.is_active 
+                    ? '<span class="badge" style="background:var(--primary);color:white;">Active</span>'
+                    : '<span class="badge" style="background:var(--gray);color:white;">Inactive</span>';
+                
+                const completion = lang.completion_percentage || 0;
+                const completionColor = completion === 100 ? 'var(--primary)' : completion > 50 ? 'var(--warning)' : 'var(--danger)';
+                const completionBar = `
+                    <div style="background:var(--border);border-radius:4px;height:8px;overflow:hidden;">
+                        <div style="background:${completionColor};height:100%;width:${completion}%;transition:width 0.3s;"></div>
+                    </div>
+                    <small style="color:var(--gray);font-size:11px;">${completion}%</small>
+                `;
+
+                const canDelete = lang.code !== 'en';
+
+                return `
+                    <tr>
+                        <td><strong>${lang.code.toUpperCase()}</strong></td>
+                        <td>${escapeHtml(lang.name)}</td>
+                        <td>${statusBadge}</td>
+                        <td>${lang.translation_count || 0}</td>
+                        <td>${completionBar}</td>
+                        <td>
+                            ${canDelete ? `<button class="btn btn-small btn-danger" onclick="toggleLanguageStatus('${lang.code}', ${!lang.is_active})" style="font-size:11px;padding:4px 8px;">${lang.is_active ? 'Deactivate' : 'Activate'}</button>` : '<span style="color:var(--gray);font-size:11px;">System Default</span>'}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+        } catch (e) {
+            console.error('Error loading languages:', e);
+            alert('Error loading languages: ' + e.message);
+        }
+    }
+
+    function openAddLanguageModal() {
+        document.getElementById('addLanguageCode').value = '';
+        document.getElementById('addLanguageName').value = '';
+        document.getElementById('addLanguageActive').checked = true;
+        document.getElementById('addLanguageError').style.display = 'none';
+        document.getElementById('addLanguageModal').classList.add('active');
+    }
+
+    async function handleAddLanguage(e) {
+        e.preventDefault();
+        const errorEl = document.getElementById('addLanguageError');
+        errorEl.style.display = 'none';
+
+        try {
+            const code = document.getElementById('addLanguageCode').value.trim().toLowerCase();
+            const name = document.getElementById('addLanguageName').value.trim();
+            const isActive = document.getElementById('addLanguageActive').checked;
+
+            const response = await fetch('/api/admin/i18n/languages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({ code, name, is_active: isActive })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to create language');
+            }
+
+            closeModal('addLanguageModal');
+            await loadLanguages();
+            alert('Language added successfully!');
+        } catch (e) {
+            errorEl.textContent = e.message;
+            errorEl.style.display = 'block';
+        }
+    }
+
+    async function toggleLanguageStatus(code, activate) {
+        if (!confirm(`Are you sure you want to ${activate ? 'activate' : 'deactivate'} this language?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/admin/i18n/languages/${code}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to update language status');
+            }
+
+            await loadLanguages();
+            alert(`Language ${activate ? 'activated' : 'deactivated'} successfully!`);
+        } catch (e) {
+            alert('Error: ' + e.message);
+        }
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     </script>

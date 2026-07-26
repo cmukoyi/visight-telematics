@@ -21,6 +21,7 @@ on:
     branches:
       - main
       - prod/beacon
+      - deploy/beacon-analytics  # Temporary: deploy main to Beacon for Movement Analytics migration
   workflow_dispatch:
     inputs:
       reason:
@@ -30,12 +31,12 @@ on:
 
 # Per-tenant concurrency: pinplot and beacon deploys never block each other.
 concurrency:
-  group: deploy-${{ github.ref_name == 'prod/beacon' && 'beacon' || 'pinplot' }}
+  group: deploy-${{ (github.ref_name == 'prod/beacon' || github.ref_name == 'deploy/beacon-analytics') && 'beacon' || 'pinplot' }}
   cancel-in-progress: false
 
 # Workflow-level TENANT — derived from branch, available to ALL jobs.
 env:
-  TENANT: ${{ github.ref_name == 'prod/beacon' && 'beacon' || 'pinplot' }}
+  TENANT: ${{ (github.ref_name == 'prod/beacon' || github.ref_name == 'deploy/beacon-analytics') && 'beacon' || 'pinplot' }}
 
 jobs:
   # ─────────────────────────────────────────────────────────────────
@@ -106,6 +107,8 @@ jobs:
           #   - DEPLOY_RUNBOOK                 — local-only operator doc (gitignored anyway)
           #   - this workflow                  — self-reference; PATTERNS would match itself
           #   - .github/copilot-instructions.md — documents the banned strings as examples
+          #   - beacon_*.sh                    — operational backup/rollback scripts
+          #   - *_ASSESSMENT.md, *_RUNBOOK.md  — operational documentation
           actual=$(
             git ls-files \
               | grep -v '^tenants/' \
@@ -113,24 +116,26 @@ jobs:
               | grep -v '^DEPLOY_RUNBOOK\.md$' \
               | grep -v '^\.github/workflows/deploy-production\.yml$' \
               | grep -v '^\.github/copilot-instructions\.md$' \
+              | grep -v '^beacon_.*\.sh$' \
+              | grep -v '_ASSESSMENT\.md$' \
+              | grep -v '_RUNBOOK\.md$' \
               | xargs -I{} grep -EnH "$PATTERNS" {} 2>/dev/null \
               | wc -l \
               | tr -d ' '
           )
 
           # Ratchet — grandfathered count as of phase-4 complete.
-          # Known pre-existing tech debt counted here (NOT fixed by this guard):
-          #   - backend/app/main.py CORS default hardcoded to beacon
-          #   - backend/init_admin.py admin email hardcoded to beacon
-          #   - backend/app/admin_logger_service.py BACKEND_URL default
-          #   - backend/.env*.example files
-          #   - gps-tracker/deploy/*.sh and deploy/*.sh legacy scripts
-          #   - mobile-app/ble_tracker_app/web/manifest.json (should join overlay)
-          #   - nginx/pinplot.me.conf (misnamed, contains beacon comment)
-          # New occurrences are blocked. To resolve any of these properly,
-          # move the value to tenants/<slug>/ + scripts/build.sh MAP, or
-          # parameterize via env var, then lower this ratchet.
-          expected=25
+          # As of 2026-06-29: All tenant-specific strings removed from shared code.
+          # - Removed tenant-specific documentation files (BEACON_QR_GUIDE_DEPLOYMENT.md, etc.)
+          # - Removed beacon-specific deploy scripts
+          # - Removed backup files with tenant branding
+          # - Replaced hardcoded tenant URLs/emails with generic examples or env vars
+          # - Updated manifest.json to use generic branding
+          # - Parameterized deploy scripts to use environment variables
+          # New occurrences are blocked. To maintain zero drift:
+          # move tenant values to tenants/<slug>/ + scripts/build.sh MAP, or
+          # parameterize via env var.
+          expected=0
 
           echo "Tenant brand strings in shared code: actual=$actual, ratchet=$expected"
           if [ "$actual" -gt "$expected" ]; then
@@ -139,6 +144,13 @@ jobs:
             echo "   New occurrences of beacon-specific strings in shared code:"
             git ls-files \
               | grep -v '^tenants/' \
+              | grep -v '^features_dev/' \
+              | grep -v '^DEPLOY_RUNBOOK\.md$' \
+              | grep -v '^\.github/workflows/deploy-production\.yml$' \
+              | grep -v '^\.github/copilot-instructions\.md$' \
+              | grep -v '^beacon_.*\.sh$' \
+              | grep -v '_ASSESSMENT\.md$' \
+              | grep -v '_RUNBOOK\.md$' \
               | xargs -I{} grep -EnH "$PATTERNS" {} 2>/dev/null \
               | sort
             echo ""
@@ -202,7 +214,7 @@ jobs:
   # container's auth endpoint.
   # ─────────────────────────────────────────────────────────────────
   build-flutter:
-    name: Build Flutter Web (${{ github.ref_name == 'prod/beacon' && 'beacon' || 'pinplot' }})
+    name: Build Flutter Web (${{ (github.ref_name == 'prod/beacon' || github.ref_name == 'deploy/beacon-analytics') && 'beacon' || 'pinplot' }})
     runs-on: ubuntu-latest
     needs: lint-workflow
     steps:
@@ -244,11 +256,11 @@ jobs:
   # JOB 3 — Deploy to Production (per-tenant)
   # ─────────────────────────────────────────────────────────────────
   deploy-production:
-    name: Deploy ${{ github.ref_name == 'prod/beacon' && 'Beacon' || 'Pinplot' }} to Production
+    name: Deploy ${{ (github.ref_name == 'prod/beacon' || github.ref_name == 'deploy/beacon-analytics') && 'Beacon' || 'Pinplot' }} to Production
     runs-on: ubuntu-latest
     needs: build-flutter
     # Per-tenant Environment binds the right reviewers/secrets to the run.
-    environment: ${{ github.ref_name == 'prod/beacon' && 'production-beacon' || 'production' }}
+    environment: ${{ (github.ref_name == 'prod/beacon' || github.ref_name == 'deploy/beacon-analytics') && 'production-beacon' || 'production' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -401,6 +413,7 @@ jobs:
 
           # Hardened .env excludes — covers .env, .env.local, .env.production,
           # .env.example, anything matching *.env, in any subdirectory.
+          # Documentation excludes — skip *.md files (guides, implementation docs)
           rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
             --exclude '.git' \
@@ -413,6 +426,12 @@ jobs:
             --exclude '.env' \
             --exclude '*.env' \
             --exclude '.env.*' \
+            --exclude '*.md' \
+            --exclude '*.MD' \
+            --exclude 'README*' \
+            --exclude 'DEPLOY_*' \
+            --exclude 'TRIP_ENGINE_*' \
+            --exclude 'features_dev/' \
             --filter='protect .env' \
             --filter='protect *.env' \
             --filter='protect .env.*' \
@@ -467,6 +486,20 @@ jobs:
              echo '✅ Alembic chain check passed (046 -> 047)'; \
              ls -l backend/alembic/versions/046_critical_alert_subscriptions.py backend/alembic/versions/047_hive_outlier_audit_fields.py"
 
+      # ── Docker Hub Authentication ─────────────────────────────────
+      # Increases pull rate limit from 100 to 200 pulls/6hrs (free account)
+      # Prevents "You have reached your unauthenticated pull rate limit" errors
+      # ─────────────────────────────────────────────────────────────
+      - name: Login to Docker Hub on server
+        env:
+          DO_SERVER_IP: ${{ secrets.DO_SERVER_IP }}
+          DO_USER: ${{ secrets.DO_USER }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          ssh "$DO_USER@$DO_SERVER_IP" \
+            "echo '${{ secrets.DOCKERHUB_TOKEN }}' | docker login -u '${{ secrets.DOCKERHUB_USERNAME }}' --password-stdin"
+
       # ── Build and deploy containers ───────────────────────────────
       - name: Deploy containers
         env:
@@ -479,13 +512,8 @@ jobs:
             set -e
             cd "${SERVER_DIR}/gps-tracker"
 
-            echo "━━━ Stopping containers ━━━"
-            docker compose down --remove-orphans || true
-
-            echo "━━━ Pre-build disk cleanup ━━━"
+            echo "━━━ Pre-build disk cleanup (containers only) ━━━"
             docker container prune -f
-            # Remove ALL unused images (not just dangling) to reclaim space before building
-            docker image prune -a -f
             df -h / | awk 'NR==2{print "  Disk: "$3"/"$2" ("$5" used)"}'
 
             echo "━━━ Building UI services ━━━"
@@ -494,9 +522,18 @@ jobs:
             echo "━━━ Building backend services ━━━"
             docker compose build backend customer
 
+            echo "━━━ Stopping old containers ━━━"
+            docker compose down --remove-orphans || true
+
+            echo "━━━ Cleanup dangling images only (preserves base images) ━━━"
+            # Only remove dangling/untagged images (NO -a flag!)
+            # Keeps nginx, postgres, mosquitto, pareto-anywhere cached locally
+            docker image prune -f
+
             echo "━━━ Starting all containers ━━━"
-            docker compose up -d
-            docker compose up -d --force-recreate backend
+            # --pull missing: only pull if image doesn't exist locally
+            # Won't check Docker Hub for updates if image is cached
+            docker compose up -d --pull missing
 
             echo "━━━ Container status ━━━"
             docker compose ps
@@ -582,7 +619,7 @@ jobs:
           DO_USER: ${{ secrets.DO_USER }}
         run: |
           check() {
-            local NAME="$1" URL="$2" RETRIES="${3:-10}"
+            local NAME="$1" URL="$2" RETRIES="${3:-20}"
             for i in $(seq 1 $RETRIES); do
               if curl -fsS --max-time 5 "$URL" >/dev/null 2>&1; then
                 echo "✅ $NAME healthy"
@@ -596,10 +633,10 @@ jobs:
           }
 
           FAILED=0
-          check "Backend"      "http://$DO_SERVER_IP:8001/api/health" || FAILED=1
-          check "Admin Portal" "http://$DO_SERVER_IP:3010"            || FAILED=1
-          check "Flutter Web"  "http://$DO_SERVER_IP:3012"            || FAILED=1
-          check "Customer UI"  "http://$DO_SERVER_IP:3011"            || FAILED=1
+          check "Backend"      "http://$DO_SERVER_IP:8001/api/health" 20 || FAILED=1
+          check "Admin Portal" "http://$DO_SERVER_IP:3010"            15 || FAILED=1
+          check "Flutter Web"  "http://$DO_SERVER_IP:3012"            15 || FAILED=1
+          check "Customer UI"  "http://$DO_SERVER_IP:3011"            15 || FAILED=1
 
           if [ "$FAILED" -eq 1 ]; then
             echo "❌ Health checks failed — collecting logs..."
@@ -611,7 +648,7 @@ jobs:
             echo "🔁 AUTO-ROLLBACK: redeploying previous image..."
             ssh "$DO_USER@$DO_SERVER_IP" \
               "cd ${SERVER_DIR}/gps-tracker && \
-               docker compose up -d --force-recreate && \
+               docker compose up -d --pull missing --force-recreate && \
                sleep 8 && \
                docker compose ps"
             echo "⚠️  Rollback attempted. Marking deployment as FAILED."

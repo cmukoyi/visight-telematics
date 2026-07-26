@@ -18,7 +18,7 @@ import secrets
 import logging
 
 from app.database import get_db
-from app.models import UserGroup, UserGroupPackage, PortalUser, Building, Floor, IndoorGateway, Room, BLETag, User, TagCategory, GeofenceAlert, POI, POITrackerLink, GeofenceState, PortalAlert, TagIndoorPosition
+from app.models import UserGroup, UserGroupPackage, PortalUser, Building, Floor, IndoorGateway, Room, BLETag, User, TagCategory, GeofenceAlert, POI, POITrackerLink, GeofenceState, PortalAlert, TagIndoorPosition, DeviceState
 from app.models_admin import TagPackage
 from app.admin_auth import hash_password, verify_password
 from app.services.device_providers.provider_factory import DeviceProviderFactory
@@ -32,6 +32,8 @@ _TAG_TYPE_ALIAS = {
     "series2": "tracksolid",
     "series3": "series_3",
     "series_3": "series_3",
+    "series4": "ble",       # Series 4 (DX-Smart indoor BLE tags)
+    "series_4": "ble",
 }
 
 router = APIRouter(prefix="/api/portal", tags=["portal"])
@@ -108,7 +110,7 @@ def _login_record_success(ip: str) -> None:
 # ---------------------------------------------------------------------------
 
 SECTION_FEATURES: dict = {
-    "tracking":   ["livemap", "floorplan", "assets", "history", "hive"],
+    "tracking":   ["livemap", "floorplan", "assets", "history", "history-advanced", "hive"],
     "management": ["asset-mgmt", "users", "qr", "building", "locations", "settings"],
     "reports":    [
         "reports-subscriptions", "reports-activity", "reports-trips",
@@ -553,6 +555,7 @@ class RoomOut(BaseModel):
 class GatewayOut(BaseModel):
     id: UUID
     floor_id: UUID
+    room_id: Optional[UUID] = None  # Link to specific room
     receiver_id: str
     label: Optional[str]
     x: float
@@ -567,6 +570,8 @@ class FloorOut(BaseModel):
     floor_plan: Optional[str]
     map_w: int
     map_h: int
+    is_published: bool = False
+    published_at: Optional[datetime] = None
     gateways: List[GatewayOut] = []
     rooms: List[RoomOut] = []
     class Config: from_attributes = True
@@ -700,6 +705,9 @@ class FloorUpdate(BaseModel):
     map_w: Optional[int] = None
     map_h: Optional[int] = None
 
+class FloorPublish(BaseModel):
+    floor_plan_data: Optional[dict] = None  # JSON with elements array from sketch app
+
 
 @router.post("/buildings/{building_id}/floors", response_model=FloorOut, status_code=201)
 def create_floor(building_id: str, data: FloorCreate, request: Request, db: Session = Depends(get_db)):
@@ -772,6 +780,79 @@ def delete_floor(floor_id: str, request: Request, db: Session = Depends(get_db))
     db.commit()
 
 
+@router.post("/buildings/{building_id}/floors/{floor_id}/publish", response_model=FloorOut)
+def publish_floor_plan(
+    building_id: str, floor_id: str,
+    data: FloorPublish,
+    request: Request, db: Session = Depends(get_db)
+):
+    """Publish a floor plan - locks it and makes it available in Tracking > Floor Plan.
+    
+    Accepts floor_plan_data (JSON with elements array from sketch app).
+    Gateways are optional - they can be added later.
+    """
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Only group admins can publish floors")
+    
+    # Verify ownership
+    floor = db.query(Floor).join(Building).filter(
+        Floor.id == floor_id,
+        Building.id == building_id,
+        Building.usergroup_id == me.usergroup_id
+    ).first()
+    
+    if not floor:
+        raise HTTPException(status_code=404, detail="Floor not found")
+    
+    # Validation: Must have at least 1 gateway registered
+    gateways = db.query(IndoorGateway).filter(IndoorGateway.floor_id == floor.id).count()
+    if gateways == 0:
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot publish: At least 1 gateway required. Add gateway MAC addresses in the Properties panel."
+        )
+    
+    # TODO: Save floor_plan_data to database (needs migration to add column)
+    # For now, floor plan data lives in browser localStorage
+    
+    # Publish
+    floor.is_published = True
+    floor.published_at = func.now()
+    floor.published_by = me.id
+    db.commit()
+    db.refresh(floor)
+    
+    return FloorOut.model_validate(floor)
+
+
+@router.post("/buildings/{building_id}/floors/{floor_id}/unpublish", response_model=FloorOut)
+def unpublish_floor_plan(
+    building_id: str, floor_id: str,
+    request: Request, db: Session = Depends(get_db)
+):
+    """Unpublish a floor plan - reverts to draft mode for editing.
+    The floor plan will no longer appear in Tracking > Floor Plan."""
+    me = get_portal_user_from_request(request, db)
+    if not me.is_group_admin:
+        raise HTTPException(status_code=403, detail="Only group admins can unpublish floors")
+    
+    floor = db.query(Floor).join(Building).filter(
+        Floor.id == floor_id,
+        Building.id == building_id,
+        Building.usergroup_id == me.usergroup_id
+    ).first()
+    
+    if not floor:
+        raise HTTPException(status_code=404, detail="Floor not found")
+    
+    floor.is_published = False
+    db.commit()
+    db.refresh(floor)
+    
+    return FloorOut.model_validate(floor)
+
+
 # ---------------------------------------------------------------------------
 # Gateway Management (ESP32 BLE Gateways - Customer Self-Service)
 # ---------------------------------------------------------------------------
@@ -785,6 +866,7 @@ class GatewayCreate(BaseModel):
 class GatewayUpdate(BaseModel):
     receiver_id: Optional[str] = None
     label: Optional[str] = None
+    room_id: Optional[str] = None  # Link gateway to specific room
     x: Optional[float] = None
     y: Optional[float] = None
 
@@ -826,7 +908,7 @@ def create_gateway(floor_id: str, data: GatewayCreate, request: Request, db: Ses
 
 @router.put("/gateways/{gateway_id}", response_model=GatewayOut)
 def update_gateway(gateway_id: str, data: GatewayUpdate, request: Request, db: Session = Depends(get_db)):
-    """Update a gateway's position or label."""
+    """Update a gateway's position, label, or room assignment."""
     me = get_portal_user_from_request(request, db)
     if not me.is_group_admin:
         raise HTTPException(status_code=403, detail="Only group admins can modify gateways")
@@ -841,6 +923,7 @@ def update_gateway(gateway_id: str, data: GatewayUpdate, request: Request, db: S
     if data.receiver_id is not None:
         gw.receiver_id = data.receiver_id.lower().replace(":", "").replace("-", "").strip()
     if data.label is not None: gw.label = data.label
+    if data.room_id is not None: gw.room_id = data.room_id if data.room_id else None
     if data.x is not None: gw.x = data.x
     if data.y is not None: gw.y = data.y
     
@@ -1683,6 +1766,8 @@ class PortalTagOut(BaseModel):
     # Category (from attributes.category.value)
     category_id: Optional[str] = None
     category_name: Optional[str] = None
+    # Trip engine subscription
+    trip_subscribed: bool = False
     # Activity status derived from last_seen (real GPS-fix age):
     #   active  : reported within last 24 h
     #   idle    : reported within last 7 days but not within 24 h
@@ -1775,6 +1860,14 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
         .all()
     )
 
+    # Build DeviceState lookup for trip_subscribed field
+    device_state_map = {}
+    imeis = [tag.imei for tag in tags]
+    if imeis:
+        states = db.query(DeviceState).filter(DeviceState.device_imei.in_(imeis)).all()
+        for state in states:
+            device_state_map[state.device_imei] = state.trip_subscribed
+
     # Some group-scoped tags are included via attributes._created_usergroup_id
     # and may belong to users outside the current domain filter. Resolve those
     # owner emails as well so response model validation never sees None.
@@ -1850,6 +1943,7 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
             activation_date=tag.activation_date,
             category_id=cat_id,
             category_name=cat_name,
+            trip_subscribed=device_state_map.get(tag.imei, False),
             activity_status=_compute_activity_status(tag.last_seen),
         ))
 
@@ -1898,6 +1992,33 @@ def list_active_packages(request: Request, db: Session = Depends(get_db)):
         )
     # Fallback: no explicit assignments — return all active packages
     return db.query(TagPackage).filter(TagPackage.is_active == True).order_by(TagPackage.validity_days).all()
+
+
+@router.get("/tag-types")
+def list_supported_tag_types(request: Request, db: Session = Depends(get_db)):
+    """Return supported tag types for Asset Management dropdown.
+    
+    Respects usergroup allowed_tag_types if configured, otherwise returns all types.
+    """
+    me = get_portal_user_from_request(request, db)
+    
+    # All available tag types for portal
+    all_types = [
+        {"value": "series1", "label": "Series 1 (GPS)", "description": "Scope GPS tracker"},
+        {"value": "series2", "label": "Series 2 (GPS)", "description": "TrackSolid GPS tracker"},
+        {"value": "series_3", "label": "Series 3 (QR Code)", "description": "QR code asset tracking"},
+        {"value": "series_4", "label": "Series 4 (BLE Indoor)", "description": "DX-Smart BLE indoor tracking (CP27/CP28/CP29)"},
+    ]
+    
+    # Check if usergroup has restrictions
+    group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
+    if group and group.allowed_tag_types:
+        # Filter to only allowed types
+        allowed_set = set(group.allowed_tag_types)
+        filtered = [t for t in all_types if t["value"] in allowed_set or t["value"].replace("_", "") in allowed_set]
+        return {"types": filtered}
+    
+    return {"types": all_types}
 
 
 # ---------------------------------------------------------------------------
@@ -2062,6 +2183,7 @@ class PortalTagCreate(BaseModel):
     user_id: Optional[UUID] = None
     package_id: UUID  # mandatory — must select a package when adding a tag
     category: Optional[str] = None  # category name to store in attributes
+    trip_subscribed: Optional[bool] = False  # subscribe to Advanced Trip Analysis
 
 
 class PortalTagAssign(BaseModel):
@@ -2215,6 +2337,7 @@ class PortalTagUpdate(BaseModel):
     user_id: Optional[str] = None
     category: Optional[str] = None  # category name; empty string clears it
     package_id: Optional[str] = None  # UUID string; empty string clears package
+    trip_subscribed: Optional[bool] = None  # subscribe to Advanced Trip Analysis
 
 
 @router.put("/tags/{tag_id}", response_model=PortalTagOut)
@@ -2303,6 +2426,24 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
                     else:
                         tag.expiry_date = None  # pending first GPS fix
 
+    # Handle trip subscription (DeviceState management)
+    if data.trip_subscribed is not None:
+        device_state = db.query(DeviceState).filter(DeviceState.device_imei == tag.imei).first()
+        if data.trip_subscribed:
+            # Subscribe: create or update DeviceState
+            if not device_state:
+                device_state = DeviceState(
+                    device_imei=tag.imei,
+                    trip_subscribed=True,
+                )
+                db.add(device_state)
+            else:
+                device_state.trip_subscribed = True
+        else:
+            # Unsubscribe: update or delete DeviceState
+            if device_state:
+                device_state.trip_subscribed = False
+
     db.commit()
     db.refresh(tag)
     owner = db.query(User).filter(User.id == tag.user_id).first()
@@ -2354,10 +2495,8 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
         raise HTTPException(status_code=404, detail="Package not found or inactive")
 
     imei = data.imei.strip()
-    if db.query(BLETag).filter(BLETag.imei == imei).first():
-        raise HTTPException(status_code=409, detail=f"Tag with IMEI '{imei}' already exists")
-
-    # Validate IMEI against the vendor platform before persisting
+    
+    # Validate IMEI/MAC against the vendor platform before persisting
     canonical_type = _TAG_TYPE_ALIAS.get((data.tag_type or "scope").lower(), (data.tag_type or "scope").lower())
     try:
         provider = DeviceProviderFactory.get_provider(canonical_type)
@@ -2366,6 +2505,22 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
             raise HTTPException(status_code=422, detail=validation.message)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    
+    # For BLE indoor tags (series_4), normalize MAC address and store in both fields
+    mac_address = None
+    if canonical_type == "ble":
+        # Normalize: remove colons/dashes, lowercase
+        normalized_mac = imei.replace(":", "").replace("-", "").lower()
+        imei = normalized_mac  # Store normalized in imei field
+        mac_address = normalized_mac  # Also store in mac_address field for pareto_bridge compatibility
+        
+        # Check for duplicate using mac_address field (case-insensitive)
+        if db.query(BLETag).filter(BLETag.mac_address == normalized_mac).first():
+            raise HTTPException(status_code=409, detail=f"Tag with MAC address '{normalized_mac.upper()}' already exists")
+    else:
+        # For GPS tags, check duplicate using imei field
+        if db.query(BLETag).filter(BLETag.imei == imei).first():
+            raise HTTPException(status_code=409, detail=f"Tag with IMEI '{imei}' already exists")
 
     now = datetime.utcnow()
     # Build attributes — mark _user_named if a description was provided at creation
@@ -2378,6 +2533,7 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
     tag = BLETag(
         user_id=(str(data.user_id) if data.user_id else None),
         imei=imei,
+        mac_address=mac_address,  # Set for BLE tags, None for GPS tags
         description=data.description,
         tag_type=canonical_type,
         is_active=True,
@@ -2388,6 +2544,17 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
     db.add(tag)
     db.commit()
     db.refresh(tag)
+    
+    # Handle trip subscription (DeviceState management)
+    if data.trip_subscribed:
+        # Create DeviceState record for Trip Engine subscription
+        device_state = DeviceState(
+            device_imei=imei,
+            trip_subscribed=True,
+        )
+        db.add(device_state)
+        db.commit()
+    
     return _build_tag_out(tag, target_user.email if target_user else "unknown@unknown", db)
 
 
@@ -3543,3 +3710,733 @@ def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
     del _portal_reset_pins[email]
     return {"detail": "Password reset successfully"}
 
+
+
+# ==============================================================================
+# TRIP ENGINE CONFIGURATION (Phase 4.1)
+# ==============================================================================
+
+class TripConfigResponse(BaseModel):
+    """Trip engine configuration response model."""
+    tenant_id: Optional[str]
+    
+    # Ingestion
+    batch_sweep_interval_minutes: int
+    tracklist_delay_minutes: int
+    coalesce_floor_minutes: int
+    
+    # Engine
+    engine_anchor_radius_m: int
+    engine_min_leg_distance_m: int
+    engine_move_confirm_m: int
+    engine_max_speed_kmh: int
+    engine_gap_timeout_min: int
+    engine_air_speed_kmh: int
+    engine_air_min_distance_km: int
+    engine_journey_break_dwell_min: int
+    engine_smoothing_window: int
+
+
+class TripConfigUpdate(BaseModel):
+    """Trip engine configuration update model."""
+    # Ingestion (optional fields for partial updates)
+    batch_sweep_interval_minutes: Optional[int] = None
+    tracklist_delay_minutes: Optional[int] = None
+    coalesce_floor_minutes: Optional[int] = None
+    
+    # Engine
+    engine_anchor_radius_m: Optional[int] = None
+    engine_min_leg_distance_m: Optional[int] = None
+    engine_move_confirm_m: Optional[int] = None
+    engine_max_speed_kmh: Optional[int] = None
+    engine_gap_timeout_min: Optional[int] = None
+    engine_air_speed_kmh: Optional[int] = None
+    engine_air_min_distance_km: Optional[int] = None
+    engine_journey_break_dwell_min: Optional[int] = None
+    engine_smoothing_window: Optional[int] = None
+
+
+@router.get("/trip-config", response_model=TripConfigResponse)
+def get_trip_config(
+    tenant_id: Optional[str] = Query(None, description="Tenant ID for override config (None = global)"),
+    db: Session = Depends(get_db),
+):
+    """
+    Get trip engine configuration (global or per-tenant).
+    
+    Returns the effective configuration for the given tenant, applying overrides
+    over global defaults.
+    """
+    from app.models import TripConfig
+    
+    # Get global config
+    global_config = db.query(TripConfig).filter(TripConfig.tenant_id == None).first()
+    
+    if not global_config:
+        raise HTTPException(status_code=404, detail="Global trip config not found")
+    
+    # If tenant_id provided, try to get tenant-specific overrides
+    if tenant_id:
+        tenant_config = db.query(TripConfig).filter(TripConfig.tenant_id == tenant_id).first()
+        if tenant_config:
+            # Return tenant config (which inherits from global if fields are NULL)
+            return TripConfigResponse(
+                tenant_id=tenant_id,
+                batch_sweep_interval_minutes=tenant_config.batch_sweep_interval_minutes or global_config.batch_sweep_interval_minutes,
+                tracklist_delay_minutes=tenant_config.tracklist_delay_minutes or global_config.tracklist_delay_minutes,
+                coalesce_floor_minutes=tenant_config.coalesce_floor_minutes or global_config.coalesce_floor_minutes,
+                engine_anchor_radius_m=tenant_config.engine_anchor_radius_m or global_config.engine_anchor_radius_m,
+                engine_min_leg_distance_m=tenant_config.engine_min_leg_distance_m or global_config.engine_min_leg_distance_m,
+                engine_move_confirm_m=tenant_config.engine_move_confirm_m or global_config.engine_move_confirm_m,
+                engine_max_speed_kmh=tenant_config.engine_max_speed_kmh or global_config.engine_max_speed_kmh,
+                engine_gap_timeout_min=tenant_config.engine_gap_timeout_min or global_config.engine_gap_timeout_min,
+                engine_air_speed_kmh=tenant_config.engine_air_speed_kmh or global_config.engine_air_speed_kmh,
+                engine_air_min_distance_km=tenant_config.engine_air_min_distance_km or global_config.engine_air_min_distance_km,
+                engine_journey_break_dwell_min=tenant_config.engine_journey_break_dwell_min or global_config.engine_journey_break_dwell_min,
+                engine_smoothing_window=tenant_config.engine_smoothing_window or global_config.engine_smoothing_window,
+            )
+    
+    # Return global config
+    return TripConfigResponse(
+        tenant_id=None,
+        batch_sweep_interval_minutes=global_config.batch_sweep_interval_minutes,
+        tracklist_delay_minutes=global_config.tracklist_delay_minutes,
+        coalesce_floor_minutes=global_config.coalesce_floor_minutes,
+        engine_anchor_radius_m=global_config.engine_anchor_radius_m,
+        engine_min_leg_distance_m=global_config.engine_min_leg_distance_m,
+        engine_move_confirm_m=global_config.engine_move_confirm_m,
+        engine_max_speed_kmh=global_config.engine_max_speed_kmh,
+        engine_gap_timeout_min=global_config.engine_gap_timeout_min,
+        engine_air_speed_kmh=global_config.engine_air_speed_kmh,
+        engine_air_min_distance_km=global_config.engine_air_min_distance_km,
+        engine_journey_break_dwell_min=global_config.engine_journey_break_dwell_min,
+        engine_smoothing_window=global_config.engine_smoothing_window,
+    )
+
+
+@router.put("/trip-config", response_model=TripConfigResponse)
+def update_trip_config(
+    data: TripConfigUpdate,
+    tenant_id: Optional[str] = Query(None, description="Tenant ID for override config (None = global)"),
+    db: Session = Depends(get_db),
+):
+    """
+    Update trip engine configuration (global or per-tenant).
+    
+    For global config (tenant_id=None), updates the base configuration.
+    For tenant config, creates or updates per-tenant overrides (only non-null fields).
+    """
+    from app.models import TripConfig
+    from sqlalchemy.dialects.postgresql import insert
+    
+    # Validate at least one field provided
+    if all(v is None for v in data.dict().values()):
+        raise HTTPException(status_code=400, detail="At least one configuration field must be provided")
+    
+    # Get or create config record
+    config = db.query(TripConfig).filter(TripConfig.tenant_id == tenant_id).first()
+    
+    if not config:
+        # Create new config record
+        config = TripConfig(tenant_id=tenant_id)
+        db.add(config)
+    
+    # Update only provided fields
+    update_data = data.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        if value is not None:
+            setattr(config, key, value)
+    
+    config.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(config)
+    
+    logger.info(
+        "Trip config updated: tenant_id=%s, fields=%s",
+        tenant_id or "global",
+        list(update_data.keys())
+    )
+    
+    # Return effective config
+    return get_trip_config(tenant_id=tenant_id, db=db)
+
+
+# ==============================================================================
+# TRIP ENGINE API - JOURNEY ENDPOINTS (Phase 6.1)
+# ==============================================================================
+
+class JourneyResponse(BaseModel):
+    """Journey response model."""
+    id: str
+    device_imei: str
+    started_at: datetime
+    ended_at: datetime
+    leg_count: int
+    stationary_count: int
+    total_distance_m: float
+    total_duration_seconds: int
+    is_air_journey: bool
+    created_at: datetime
+
+
+class LegResponse(BaseModel):
+    """Leg response model."""
+    id: str
+    device_imei: str
+    journey_id: Optional[str]
+    started_at: datetime
+    ended_at: datetime
+    start_lat: Optional[float]
+    start_lng: Optional[float]
+    end_lat: Optional[float]
+    end_lng: Optional[float]
+    distance_m: float
+    duration_seconds: int
+    point_count: int
+    is_air_leg: bool
+    created_at: datetime
+
+
+class StationaryResponse(BaseModel):
+    """Stationary response model."""
+    id: str
+    device_imei: str
+    journey_id: Optional[str]
+    started_at: datetime
+    ended_at: datetime
+    anchor_lat: float
+    anchor_lng: float
+    point_count: int
+    duration_seconds: int
+    created_at: datetime
+
+
+class JourneyDetailResponse(BaseModel):
+    """Detailed journey with legs and stationaries."""
+    journey: JourneyResponse
+    legs: List[LegResponse]
+    stationaries: List[StationaryResponse]
+
+
+class JourneyListResponse(BaseModel):
+    """Paginated journey list."""
+    journeys: List[JourneyResponse]
+    total: int
+    page: int
+    page_size: int
+    has_more: bool
+
+
+@router.get("/journeys", response_model=JourneyListResponse)
+def list_journeys(
+    device_imei: str = Query(..., description="Device IMEI"),
+    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    page_size: int = Query(50, ge=1, le=500, description="Items per page"),
+    db: Session = Depends(get_db),
+):
+    """
+    List journeys for a device with optional date filtering.
+    
+    Returns paginated list of journeys ordered by started_at DESC.
+    """
+    from app.models import Journey
+    from sqlalchemy import and_
+    
+    # Build query
+    query = db.query(Journey).filter(Journey.device_imei == device_imei)
+    
+    # Date filtering
+    if start_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date).replace(hour=0, minute=0, second=0, microsecond=0)
+            query = query.filter(Journey.started_at >= start_dt)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid start_date format (use YYYY-MM-DD)")
+    
+    if end_date:
+        try:
+            end_dt = datetime.fromisoformat(end_date).replace(hour=23, minute=59, second=59, microsecond=999999)
+            query = query.filter(Journey.ended_at <= end_dt)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid end_date format (use YYYY-MM-DD)")
+    
+    # Count total
+    total = query.count()
+    
+    # Pagination
+    offset = (page - 1) * page_size
+    journeys = query.order_by(Journey.started_at.desc()).offset(offset).limit(page_size).all()
+    
+    # Convert to response models
+    journey_responses = [
+        JourneyResponse(
+            id=str(j.id),
+            device_imei=j.device_imei,
+            started_at=j.started_at,
+            ended_at=j.ended_at,
+            leg_count=j.leg_count,
+            stationary_count=j.stationary_count,
+            total_distance_m=j.total_distance_m,
+            total_duration_seconds=j.total_duration_seconds,
+            is_air_journey=j.is_air_journey,
+            created_at=j.created_at,
+        )
+        for j in journeys
+    ]
+    
+    return JourneyListResponse(
+        journeys=journey_responses,
+        total=total,
+        page=page,
+        page_size=page_size,
+        has_more=(offset + len(journeys)) < total,
+    )
+
+
+@router.get("/journeys/{journey_id}", response_model=JourneyDetailResponse)
+def get_journey(
+    journey_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Get a specific journey with all its legs and stationaries.
+    
+    Returns journey detail including ordered steps (legs + stationaries).
+    """
+    from app.models import Journey, Leg, Stationary
+    from uuid import UUID
+    
+    # Validate UUID
+    try:
+        journey_uuid = UUID(journey_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid journey_id format")
+    
+    # Get journey
+    journey = db.query(Journey).filter(Journey.id == journey_uuid).first()
+    if not journey:
+        raise HTTPException(status_code=404, detail="Journey not found")
+    
+    # Get legs
+    legs = db.query(Leg).filter(
+        Leg.journey_id == journey_uuid
+    ).order_by(Leg.started_at).all()
+    
+    # Get stationaries
+    stationaries = db.query(Stationary).filter(
+        Stationary.journey_id == journey_uuid
+    ).order_by(Stationary.started_at).all()
+    
+    # Convert to response models
+    journey_response = JourneyResponse(
+        id=str(journey.id),
+        device_imei=journey.device_imei,
+        started_at=journey.started_at,
+        ended_at=journey.ended_at,
+        leg_count=journey.leg_count,
+        stationary_count=journey.stationary_count,
+        total_distance_m=journey.total_distance_m,
+        total_duration_seconds=journey.total_duration_seconds,
+        is_air_journey=journey.is_air_journey,
+        created_at=journey.created_at,
+    )
+    
+    leg_responses = [
+        LegResponse(
+            id=str(leg.id),
+            device_imei=leg.device_imei,
+            journey_id=str(leg.journey_id) if leg.journey_id else None,
+            started_at=leg.started_at,
+            ended_at=leg.ended_at,
+            start_lat=leg.start_lat,
+            start_lng=leg.start_lng,
+            end_lat=leg.end_lat,
+            end_lng=leg.end_lng,
+            distance_m=leg.distance_m,
+            duration_seconds=leg.duration_seconds,
+            point_count=leg.point_count,
+            is_air_leg=leg.is_air_leg,
+            created_at=leg.created_at,
+        )
+        for leg in legs
+    ]
+    
+    stationary_responses = [
+        StationaryResponse(
+            id=str(st.id),
+            device_imei=st.device_imei,
+            journey_id=str(st.journey_id) if st.journey_id else None,
+            started_at=st.started_at,
+            ended_at=st.ended_at,
+            anchor_lat=st.anchor_lat,
+            anchor_lng=st.anchor_lng,
+            point_count=st.point_count,
+            duration_seconds=st.duration_seconds,
+            created_at=st.created_at,
+        )
+        for st in stationaries
+    ]
+    
+    return JourneyDetailResponse(
+        journey=journey_response,
+        legs=leg_responses,
+        stationaries=stationary_responses,
+    )
+
+
+@router.get("/journeys/{journey_id}/path")
+def get_journey_path(
+    journey_id: str,
+    simplified: bool = Query(False, description="Use simplified path (for zoomed-out maps)"),
+    db: Session = Depends(get_db),
+):
+    """
+    Get journey path as GeoJSON for map visualization.
+    
+    Returns GeoJSON FeatureCollection with legs as LineStrings and stationaries as Points.
+    Uses PostGIS geometry columns for optimal performance.
+    """
+    from app.models import Journey, Leg, Stationary
+    from uuid import UUID
+    from sqlalchemy import text
+    
+    # Validate UUID
+    try:
+        journey_uuid = UUID(journey_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid journey_id format")
+    
+    # Verify journey exists
+    journey = db.query(Journey).filter(Journey.id == journey_uuid).first()
+    if not journey:
+        raise HTTPException(status_code=404, detail="Journey not found")
+    
+    # Get leg paths (PostGIS geometry → GeoJSON)
+    path_column = "path_simplified" if simplified else "path"
+    leg_query = text(f"""
+        SELECT 
+            id,
+            started_at,
+            ended_at,
+            distance_m,
+            duration_seconds,
+            is_air_leg,
+            ST_AsGeoJSON({path_column})::json as geometry
+        FROM legs
+        WHERE journey_id = :journey_id
+        ORDER BY started_at
+    """)
+    
+    leg_results = db.execute(leg_query, {"journey_id": str(journey_uuid)}).fetchall()
+    
+    # Get stationary centroids (PostGIS geometry → GeoJSON)
+    stationary_query = text("""
+        SELECT 
+            id,
+            started_at,
+            ended_at,
+            duration_seconds,
+            anchor_lat,
+            anchor_lng,
+            ST_AsGeoJSON(centroid)::json as geometry
+        FROM stationaries
+        WHERE journey_id = :journey_id
+        ORDER BY started_at
+    """)
+    
+    stationary_results = db.execute(stationary_query, {"journey_id": str(journey_uuid)}).fetchall()
+    
+    # Build GeoJSON FeatureCollection
+    features = []
+    
+    # Add legs as LineString features
+    for leg in leg_results:
+        features.append({
+            "type": "Feature",
+            "geometry": leg.geometry if leg.geometry else {
+                "type": "LineString",
+                "coordinates": []
+            },
+            "properties": {
+                "id": str(leg.id),
+                "type": "leg",
+                "started_at": leg.started_at.isoformat(),
+                "ended_at": leg.ended_at.isoformat(),
+                "distance_m": float(leg.distance_m),
+                "duration_seconds": leg.duration_seconds,
+                "is_air_leg": leg.is_air_leg,
+            }
+        })
+    
+    # Add stationaries as Point features
+    for st in stationary_results:
+        # Use PostGIS centroid if available, else fallback to anchor lat/lng
+        geometry = st.geometry if st.geometry else {
+            "type": "Point",
+            "coordinates": [st.anchor_lng, st.anchor_lat]
+        }
+        features.append({
+            "type": "Feature",
+            "geometry": geometry,
+            "properties": {
+                "id": str(st.id),
+                "type": "stationary",
+                "started_at": st.started_at.isoformat(),
+                "ended_at": st.ended_at.isoformat(),
+                "duration_seconds": st.duration_seconds,
+            }
+        })
+    
+    return {
+        "type": "FeatureCollection",
+        "features": features,
+        "metadata": {
+            "journey_id": str(journey_id),
+            "device_imei": journey.device_imei,
+            "simplified": simplified,
+            "feature_count": len(features),
+        }
+    }
+
+
+# ==============================================================================
+# TRIP ENGINE API - POSITION ENDPOINTS (Phase 6.2)
+# ==============================================================================
+
+class PositionResponse(BaseModel):
+    """Position response model."""
+    id: int
+    device_imei: str
+    observed_at: datetime
+    latitude: float
+    longitude: float
+    speed_kmh: Optional[float]
+    heading: Optional[float]
+    ignition: Optional[bool]
+    source: str
+    created_at: datetime
+    # Trip engine linkage (Section 3.4)
+    leg_id: Optional[str] = None
+    stationary_id: Optional[str] = None
+    # Reverse geocoding (Section 3.6)
+    address: Optional[str] = None
+
+
+class PositionListResponse(BaseModel):
+    """Paginated position list."""
+    positions: List[PositionResponse]
+    total: int
+    page: int
+    page_size: int
+    has_more: bool
+
+
+@router.get("/positions", response_model=PositionListResponse)
+def list_positions(
+    device_imei: str = Query(..., description="Device IMEI"),
+    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    page_size: int = Query(200, ge=1, le=1000, description="Items per page"),
+    db: Session = Depends(get_db),
+):
+    """
+    List raw GPS positions for a device with optional date filtering.
+    
+    Returns paginated list of positions ordered by observed_at DESC.
+    Used for timeline view and raw data inspection.
+    """
+    from app.models import DevicePosition
+    
+    # Build query
+    query = db.query(DevicePosition).filter(DevicePosition.device_imei == device_imei)
+    
+    # Date filtering
+    if start_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date).replace(hour=0, minute=0, second=0, microsecond=0)
+            query = query.filter(DevicePosition.observed_at >= start_dt)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid start_date format (use YYYY-MM-DD)")
+    
+    if end_date:
+        try:
+            end_dt = datetime.fromisoformat(end_date).replace(hour=23, minute=59, second=59, microsecond=999999)
+            query = query.filter(DevicePosition.observed_at <= end_dt)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid end_date format (use YYYY-MM-DD)")
+    
+    # Count total
+    total = query.count()
+    
+    # Pagination
+    offset = (page - 1) * page_size
+    positions = query.order_by(DevicePosition.observed_at.desc()).offset(offset).limit(page_size).all()
+    
+    # Convert to response models
+    position_responses = [
+        PositionResponse(
+            id=p.id,
+            device_imei=p.device_imei,
+            observed_at=p.observed_at,
+            latitude=p.lat,
+            longitude=p.lng,
+            speed_kmh=p.gps_speed,
+            heading=p.direction,
+            ignition=(p.ignition == "ON") if p.ignition else None,
+            source=p.source,
+            created_at=p.created_at,
+            leg_id=str(p.leg_id) if p.leg_id else None,
+            stationary_id=str(p.stationary_id) if p.stationary_id else None,
+            address=p.address,
+        )
+        for p in positions
+    ]
+    
+    return PositionListResponse(
+        positions=position_responses,
+        total=total,
+        page=page,
+        page_size=page_size,
+        has_more=(offset + len(positions)) < total,
+    )
+
+
+# ==============================================================================
+# TRIP ENGINE API - DEVICE ENDPOINTS (Phase 6.3)
+# ==============================================================================
+
+class DeviceSubscriptionResponse(BaseModel):
+    """Device trip subscription response."""
+    device_imei: str
+    trip_subscribed: bool
+    updated_at: Optional[datetime]
+
+
+class DeviceSubscriptionUpdate(BaseModel):
+    """Device trip subscription update."""
+    trip_subscribed: bool
+
+
+@router.get("/devices/{device_imei}/subscription", response_model=DeviceSubscriptionResponse)
+def get_device_subscription(
+    device_imei: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Get trip subscription status for a device.
+    
+    Returns whether the device is enrolled in trip processing.
+    """
+    from app.models import DeviceState
+    
+    state = db.query(DeviceState).filter(DeviceState.device_imei == device_imei).first()
+    
+    if not state:
+        # Return default: not subscribed
+        return DeviceSubscriptionResponse(
+            device_imei=device_imei,
+            trip_subscribed=False,
+            updated_at=None,
+        )
+    
+    return DeviceSubscriptionResponse(
+        device_imei=device_imei,
+        trip_subscribed=state.trip_subscribed,
+        updated_at=state.updated_at,
+    )
+
+
+@router.put("/devices/{device_imei}/subscription", response_model=DeviceSubscriptionResponse)
+def update_device_subscription(
+    device_imei: str,
+    data: DeviceSubscriptionUpdate,
+    db: Session = Depends(get_db),
+):
+    """
+    Update trip subscription status for a device.
+    
+    Enables or disables trip processing for this device. When enabled:
+    - Device included in batch sweep (Tier 1)
+    - Selective track.list pulls triggered (Tier 2)
+    - Positions flow through trip engine
+    """
+    from app.models import DeviceState
+    
+    # Get or create device state
+    state = db.query(DeviceState).filter(DeviceState.device_imei == device_imei).first()
+    
+    if not state:
+        # Create new device state
+        state = DeviceState(
+            device_imei=device_imei,
+            trip_subscribed=data.trip_subscribed,
+            updated_at=datetime.utcnow(),
+        )
+        db.add(state)
+    else:
+        # Update existing state
+        state.trip_subscribed = data.trip_subscribed
+        state.updated_at = datetime.utcnow()
+    
+    db.commit()
+    db.refresh(state)
+    
+    logger.info(
+        "Device subscription updated: imei=%s, trip_subscribed=%s",
+        device_imei,
+        data.trip_subscribed
+    )
+    
+    return DeviceSubscriptionResponse(
+        device_imei=device_imei,
+        trip_subscribed=state.trip_subscribed,
+        updated_at=state.updated_at,
+    )
+
+
+@router.post("/admin/trip-engine/trigger")
+async def trigger_trip_engine_manual(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Manual trigger for trip engine (admin/testing only).
+    
+    Forces immediate processing of all subscribed devices.
+    Bypasses the 15-minute interval timer.
+    """
+    from app.services.trip_engine import process_all_subscribed_devices
+    
+    logger.info("🔧 Manual trip engine trigger requested")
+    
+    try:
+        result = await process_all_subscribed_devices(db)
+        
+        if result['success']:
+            return {
+                "success": True,
+                "message": f"Trip engine completed: {result['devices_processed']} devices processed",
+                "statistics": {
+                    "devices_processed": result['devices_processed'],
+                    "total_positions": result['total_positions'],
+                    "total_stationaries": result['total_stationaries'],
+                    "total_legs": result['total_legs'],
+                    "total_journeys": result['total_journeys'],
+                },
+                "device_results": result['device_results']
+            }
+        else:
+            return {
+                "success": False,
+                "error": result.get('error', 'Unknown error')
+            }
+    
+    except Exception as exc:
+        logger.error("❌ Manual trip engine trigger failed: %s", exc, exc_info=True)
+        return {
+            "success": False,
+            "error": str(exc)
+        }

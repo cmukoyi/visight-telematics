@@ -37,6 +37,13 @@ gps-tracker/**/.env
 # Local reference files — not for source control
 dB_schema.md
 
+# Local tracking files — project management, never commit
+*_TRACKER.md
+*_IMPLEMENTATION_TRACKER.md
+
+# Generated extraction output — local only
+extracted_translation_keys.json
+
 # Feature dev sandbox/instructions — keep fully local
 features_dev/
 
@@ -65,3 +72,95 @@ MULTI_TENANT_MIGRATION.md
 HIVE_Architecture_Specification.md
 DEPLOY_RUNBOOK.md
 gps-tracker/.tenant
+
+# Strategic documentation — keep local only (public repo)
+ADD_GITHUB_SECRETS.md
+API_DOCUMENTATION.md
+ASSET_TRACKING_IMPLEMENTATION.md
+BUTTONS_*.md
+DOCKER_HUB_AUTH_SETUP.md
+FLOOR_PLAN_*.md
+I18N_*.md
+IMEI_MAC_QR_UPDATES.md
+JOURNEY_PATH_TEST_PLAN.md
+MHA_*.md
+PHASE_*.md
+PROMOTION_TRACKER.md
+QR_NFC_COLOR_THEMING_FIX.md
+TRACKSOLID_*.md
+TRIP_ENGINE_*.md
+TROUBLESHOOT_*.md
+scripts/*_DEPLOYMENT.md
+scripts/*_CANARY.md
+DEPLOY_*.md
+*_IMPLEMENTATION*.md
+*_COMPLETE.md
+*_FIX*.md
+*_STATUS.md
+*_GUIDE.md
+*_RUNBOOK.md
+*_TRACKER.md
+HIVE_*.md
+PROJECT_STRUCTURE.md
+QUICK_REFERENCE.md
+SENDGRID_SETUP.md
+TAGS_NOT_SHOWING_FIX.md
+PRODUCTION_SECRETS_AUDIT.md
+POST_DEPLOYMENT_STEPS.md
+GITHUB_SECRETS.md
+GEOFENCE_STATE_TRACKING.md
+DEPLOYMENT_SAFETY.md
+DEPLOYMENT.md
+
+# Keep only essential root-level documentation
+!README.MD
+!README.md
+
+# Test and debug shell scripts — keep local only
+test_*.sh
+debug_*.sh
+diagnose_*.sh
+**/test_*.sh
+**/debug_*.sh
+**/diagnose_*.sh
+check_*.sh
+**/check_*.sh
+compare_*.sh
+**/compare_*.sh
+
+# Test/debug Python scripts with hardcoded credentials — NEVER commit
+list_tracksolid_*.py
+test_tracksolid_*.py
+check_*.py
+test_*.py
+**/test_*.py
+**/check_*.py
+
+# Test/debug HTML/JS files — keep local only
+test_*.html
+debug_*.html
+button_test.html
+location-manager.html
+**/test_*.html
+**/debug_*.html
+diagnose_*.js
+diagnostic_*.js
+debug_*.js
+check_*.js
+fix_*.js
+quick_fix.js
+ultimate_*.js
+test_*.js
+extract_*.py
+
+# API response dumps — may contain real customer data
+*_response.json
+*_response.txt
+tracksolid_*.json
+tracksolid_*.txt
+
+# Deployment/operations docs with potential secrets
+GEOCODING_DEPLOYMENT.md
+*_DEPLOYMENT.md
+scripts/monitor-*.sh
+scripts/validate-*.sh

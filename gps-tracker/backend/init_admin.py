@@ -49,7 +49,7 @@ def init_admin_user():
         # Create default admin
         default_admin = AdminUser(
             username="Admin",
-            email="admin@beacontelematics.co.uk",
+            email="admin@example.com",
             hashed_password=hash_password("123456789_Plus"),
             full_name="System Administrator",
             role="admin",
@@ -64,7 +64,7 @@ def init_admin_user():
         print("✓ Default admin user created successfully!")
         print(f"  Username: Admin")
         print(f"  Password: 123456789_Plus")
-        print(f"  Email: admin@beacontelematics.co.uk")
+        print(f"  Email: admin@example.com")
         print(f"  User ID: {default_admin.id}")
         print(f"  Role: {default_admin.role}")
         print()
@@ -75,7 +75,7 @@ def init_admin_user():
         if not system_user:
             system_user = AdminUser(
                 username="system",
-                email="system@beacontelematics.co.uk",
+                email="system@example.com",
                 hashed_password=hash_password(os.urandom(32).hex()),  # Random password
                 full_name="System Logger",
                 role="admin",

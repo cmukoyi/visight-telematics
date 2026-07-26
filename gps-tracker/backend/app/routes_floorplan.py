@@ -110,27 +110,34 @@ class AssetRename(BaseModel):
 
 @router.get("/floors")
 def list_floors(request: Request, db: Session = Depends(get_db)):
-    """Return the tenant's floors (one entry per Floor row across all of
-    their Buildings). `floor_key` is what the UI uses to switch tabs and
-    must match the hardcoded FLOORS keys in floorplan/app.js
-    ('G' / '1F' / '2F' / '3F'); admins set this via the Floor.label.
+    """Return the tenant's PUBLISHED floors only (one entry per Floor row 
+    across all of their Buildings). Draft floors are visible only in 
+    Management > Floor Plan Sketch.
+    
+    `floor_key` is what the UI uses to switch tabs and must match the 
+    hardcoded FLOORS keys in floorplan/app.js ('G' / '1F' / '2F' / '3F'); 
+    admins set this via the Floor.label.
     """
     me = get_portal_user_from_request(request, db)
     floors = (db.query(Floor, Building)
                 .join(Building, Building.id == Floor.building_id)
-                .filter(Building.usergroup_id == me.usergroup_id)
+                .filter(
+                    Building.usergroup_id == me.usergroup_id,
+                    Floor.is_published == True  # Only show published floor plans
+                )
                 .order_by(Building.name, Floor.floor_order)
                 .all())
     return {
         "floors": [{
-            "floor_id":    str(f.id),
-            "building_id": str(b.id),
-            "building":    b.name,
-            "floor_key":   f.label,   # convention: 'G' | '1F' | '2F' | '3F'
-            "label":       f.label,
-            "order":       f.floor_order,
-            "map_w":       f.map_w,
-            "map_h":       f.map_h,
+            "floor_id":     str(f.id),
+            "building_id":  str(b.id),
+            "building":     b.name,
+            "floor_key":    f.label,   # convention: 'G' | '1F' | '2F' | '3F'
+            "label":        f.label,
+            "order":        f.floor_order,
+            "map_w":        f.map_w,
+            "map_h":        f.map_h,
+            "published_at": f.published_at.isoformat() if f.published_at else None,
         } for f, b in floors]
     }
 

@@ -1,6 +1,7 @@
 from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, Float, Text, Enum, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from geoalchemy2 import Geometry
 import uuid
 from app.database import Base
 import os
@@ -49,6 +50,7 @@ class User(Base):
     is_admin = Column(Boolean, default=False)
     email_verified = Column(Boolean, default=False)
     email_alerts_enabled = Column(Boolean, default=True)  # Enable email alerts for geofence events
+    preferred_language = Column(String(5), nullable=True)  # User language preference (overrides usergroup default)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
@@ -101,7 +103,7 @@ class BLETag(Base):
     description = Column(String(255))  # Vehicle description from MZone API
     mzone_vehicle_id = Column(String(100), index=True)  # Cached MZone vehicle_Id for faster trips API
     mac_address = Column(String(17))  # Format: XX:XX:XX:XX:XX:XX
-    tag_type = Column(String(50), nullable=True, default='series1')  # 'series2' | 'series1'
+    tag_type = Column(String(50), nullable=True, default='series1')  # 'series1' | 'series2' | 'series_3' | 'series_4' (DX-Smart indoor BLE) | 'scope' | 'ble'
     is_active = Column(Boolean, default=True)
     last_seen = Column(DateTime(timezone=True))
     latitude = Column(String(50))
@@ -172,8 +174,8 @@ class APIToken(Base):
     
     id = Column(Integer, primary_key=True)
     provider = Column(String(50), nullable=False, unique=True)  # e.g. 'tracksolid_open_api'
-    access_token = Column(String(200), nullable=True)
-    refresh_token = Column(String(200), nullable=True)
+    access_token = Column(String(500), nullable=True)  # Increased for JWT tokens (~240 chars)
+    refresh_token = Column(String(500), nullable=True)
     expires_at = Column(DateTime(timezone=True), nullable=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -338,6 +340,7 @@ class UserGroup(Base):
     slug         = Column(String(100), nullable=False, unique=True)  # URL-safe identifier
     email_domain = Column(String(500), nullable=True, index=True)   # comma-separated list of domains e.g. "acme.com,acme.co.uk"
     default_package_id = Column(String(36), ForeignKey("tag_packages.id"), nullable=True)  # kept for bulk-import fallback
+    default_language = Column(String(5), nullable=False, server_default='en')  # Default language for usergroup
     is_active    = Column(Boolean, nullable=False, default=True)
     created_at   = Column(DateTime(timezone=True), server_default=func.now())
     updated_at   = Column(DateTime(timezone=True), onupdate=func.now())
@@ -358,6 +361,11 @@ class UserGroup(Base):
     # Tag type restrictions: list of allowed tag types ['series1', 'series2', 'series3']
     # NULL means all types allowed (default — backward-compatible).
     allowed_tag_types = Column(JSON, nullable=True)
+    
+    # v2.2 A1: Per-tenant trip engine config
+    # Coalesce floor: min interval between track.list pulls per device
+    # NULL = use global default (120 min)
+    coalesce_floor_minutes = Column(Integer, nullable=True)
 
     portal_users = relationship("PortalUser", back_populates="usergroup",
                                 cascade="all, delete-orphan")
@@ -466,15 +474,19 @@ class Floor(Base):
     """One floor / level of a building."""
     __tablename__ = "floors"
 
-    id          = get_uuid_column()
-    building_id = get_uuid_fk("buildings.id")
-    label       = Column(String(100), nullable=False, default="Ground Floor")
-    floor_order = Column(Integer, nullable=False, default=0)
-    floor_plan  = Column(Text, nullable=True)   # base64 data-URL PNG
-    map_w       = Column(Integer, nullable=False, default=800)
-    map_h       = Column(Integer, nullable=False, default=500)
-    created_at  = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at  = Column(DateTime(timezone=True), onupdate=func.now())
+    id           = get_uuid_column()
+    building_id  = get_uuid_fk("buildings.id")
+    label        = Column(String(100), nullable=False, default="Ground Floor")
+    floor_order  = Column(Integer, nullable=False, default=0)
+    floor_plan   = Column(Text, nullable=True)   # base64 data-URL PNG
+    map_w        = Column(Integer, nullable=False, default=800)
+    map_h        = Column(Integer, nullable=False, default=500)
+    # Publish workflow (draft vs live floor plans)
+    is_published = Column(Boolean, nullable=False, default=False)
+    published_at = Column(DateTime(timezone=True), nullable=True)
+    published_by = get_uuid_fk_nullable("portal_users.id")
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at   = Column(DateTime(timezone=True), onupdate=func.now())
 
     building = relationship("Building", back_populates="floors")
     gateways = relationship("IndoorGateway", back_populates="floor",
@@ -489,6 +501,7 @@ class IndoorGateway(Base):
 
     id          = get_uuid_column()
     floor_id    = get_uuid_fk("floors.id")
+    room_id     = get_uuid_fk_nullable("rooms.id")  # Link gateway to specific room
     receiver_id = Column(String(50), nullable=False, index=True)  # lowercase hex, no colons
     label       = Column(String(100), nullable=True)
     x           = Column(Float, nullable=False, default=0.0)
@@ -497,6 +510,7 @@ class IndoorGateway(Base):
     updated_at  = Column(DateTime(timezone=True), onupdate=func.now())
 
     floor = relationship("Floor", back_populates="gateways")
+    room  = relationship("Room", foreign_keys=[room_id])
 
 
 class Room(Base):
@@ -763,6 +777,7 @@ class HiveEvaluation(Base):
     coherent_pair_count   = Column(Integer, nullable=True)
     incoherent_pair_count = Column(Integer, nullable=True)
     breach_evidence       = Column(String(30), nullable=True)
+    tag_fix_history       = Column(Text, nullable=True)   # JSON map: tag_id -> array of recent fixes for trajectory analysis
 
     hive = relationship("Hive", back_populates="evaluations")
 
@@ -795,7 +810,7 @@ class HiveLiveState(Base):
     outlier_tag_id        = get_uuid_nullable()
     pending_breach_since  = Column(DateTime(timezone=True), nullable=True)
     pending_clear_since   = Column(DateTime(timezone=True), nullable=True)
-    consecutive_confirms  = Column(Integer, nullable=False, default=0)
+    consecutive_confirms  = Column(Integer, nullable=False, default=0)  # DEPRECATED — kept for compatibility
     # Most recent time a hive_breach alert was actually dispatched. Used to
     # re-notify if a hive stays in BREACHING for a long time without a state
     # change (e.g. when the original notification failed silently).
@@ -807,6 +822,13 @@ class HiveLiveState(Base):
     # Position fingerprint from the evaluation that opened BREACH_PENDING.
     # Used to detect fresh evidence vs stale re-evaluation.
     breach_persistence_first_fingerprint = Column(String(64), nullable=True)
+
+    # ─── Duration-based breach persistence (v1.2 confirmation fix) ────────
+    # Replaces "two consecutive fixes from separated tag" with duration-based
+    # persistence backed by fresh evidence from any tag.
+    persistence_eval_count              = Column(Integer, nullable=False, default=0)
+    persistence_snapshot_fp_at_start    = Column(String(500), nullable=True)
+    persistence_has_new_evidence        = Column(Boolean, nullable=False, default=False)
 
     # ─── Phase 3: motion awareness ────────────────────────────────────────
     # Four-state machine: STATIONARY ↔ PRE_TRANSIT ↔ IN_TRANSIT ↔ SETTLING.
@@ -826,3 +848,288 @@ class HiveLiveState(Base):
     centroid_anchor_at      = Column(DateTime(timezone=True), nullable=True)
 
     hive = relationship("Hive", back_populates="live_state")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TRIP ENGINE MODELS (Movement History Advanced)
+# ═══════════════════════════════════════════════════════════════════════════
+
+class DevicePosition(Base):
+    """
+    Single source of truth for GPS breadcrumbs from TrackSolid.
+    
+    Section 1 (Ingestion): Raw positions from batch sweep + track.list calls.
+    Unique constraint on (device_imei, observed_at) prevents duplicates.
+    """
+    __tablename__ = "device_positions"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    device_imei = Column(String(20), nullable=False, index=True)
+    
+    # Core position data
+    lat = Column(Float, nullable=False)
+    lng = Column(Float, nullable=False)
+    observed_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    
+    # v2.1.11 D1: Track arrival time (for late-arriving buffered positions)
+    received_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), index=True)
+    
+    # Movement metadata
+    direction = Column(Integer, nullable=True)           # 0-360 degrees
+    gps_speed = Column(Float, nullable=True)             # km/h
+    pos_type = Column(Integer, nullable=True)            # 1=GPS, 2=LBS, 3=WIFI, 5=unknown
+    satellite = Column(Integer, nullable=True)           # GPS satellite count
+    ignition = Column(String(10), nullable=True)         # ON/OFF
+    acc_status = Column(String(10), nullable=True)       # ON/OFF
+    gps_mode = Column(Integer, nullable=True)
+    confidence = Column(Integer, nullable=True)          # 1-3 (NEVER use for classification per spec)
+    
+    # Trip engine linkage (Section 3.4 - journey/leg/stationary linking)
+    leg_id = get_uuid_nullable()                         # Which leg this position belongs to
+    stationary_id = get_uuid_nullable()                  # Which stationary this position belongs to
+    
+    # Reverse geocoding (Section 3.6 - cached at ingest)
+    address = Column(Text, nullable=True)                # Human-readable location
+    
+    # Metadata
+    source = Column(String(20), nullable=False, default="batch")  # 'batch' or 'tracklist'
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class DeviceState(Base):
+    """
+    Per-device trigger tracking for smart API calling.
+    
+    Section 1 (Ingestion): Implements 3-condition trigger logic:
+    - last_batch_ts: Latest batch sweep timestamp (new data detection)
+    - last_position_ts: Latest GPS point (forward-only window boundary)
+    - last_tracklist_pull_at: Last track.list call (coalesce throttling)
+    """
+    __tablename__ = "device_state"
+    
+    device_imei = Column(String(20), primary_key=True)
+    
+    # Trigger detection timestamps
+    last_batch_ts = Column(DateTime(timezone=True), nullable=True)
+    last_position_ts = Column(DateTime(timezone=True), nullable=True)
+    last_tracklist_pull_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Subscription model (premium opt-in)
+    trip_subscribed = Column(Boolean, nullable=False, default=False, index=True)
+    
+    # Per-device config override (NULL = use global/tenant default)
+    coalesce_floor_minutes = Column(Integer, nullable=True)
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class TrackSolidSyncState(Base):
+    """
+    Global sync metadata (singleton row).
+    
+    Section 1 (Ingestion): Rate limiting counters and sweep timestamps.
+    """
+    __tablename__ = "tracksolid_sync_state"
+    
+    id = Column(Integer, primary_key=True, default=1)
+    
+    # Last sync timestamps
+    last_batch_sweep_at = Column(DateTime(timezone=True), nullable=True)
+    last_selective_sweep_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Rate limiting (TrackSolid limit: 86,400 calls/day)
+    api_calls_today = Column(Integer, nullable=False, default=0)
+    api_calls_reset_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Metadata
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class EngineState(Base):
+    """
+    Per-device state machine (STATIONARY ↔ MOVE).
+    
+    Section 2 (Engine): Maintains rolling anchor and current trip context.
+    """
+    __tablename__ = "engine_state"
+    
+    device_imei = Column(String(20), primary_key=True)
+    
+    # State machine
+    current_state = Column(String(20), nullable=False, default="STATIONARY")  # STATIONARY or MOVE
+    
+    # Rolling anchor (for STATIONARY state)
+    anchor_lat = Column(Float, nullable=True)
+    anchor_lng = Column(Float, nullable=True)
+    anchor_count = Column(Integer, nullable=False, default=0)
+    
+    # Current trip context (for MOVE state)
+    current_leg_id = get_uuid_nullable()
+    current_journey_id = get_uuid_nullable()
+    
+    # Processing watermark
+    last_processed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # v2.1.11 D1: Arrival-time checkpoint (captures late-arriving positions)
+    last_received_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class Stationary(Base):
+    """
+    Idle periods with anchor centroids.
+    
+    Section 2 (Engine): Created when device remains within R=100m radius.
+    """
+    __tablename__ = "stationaries"
+    
+    id = get_uuid_column()
+    device_imei = Column(String(20), nullable=False, index=True)
+    journey_id = get_uuid_nullable()  # NULL if ungrouped
+    
+    # Position references (nullable for reconstructed state)
+    start_position_id = Column(Integer, nullable=True)
+    end_position_id = Column(Integer, nullable=True)
+    
+    # Time window
+    started_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    ended_at = Column(DateTime(timezone=True), nullable=False)
+    
+    # Geometry
+    anchor_lat = Column(Float, nullable=False)
+    anchor_lng = Column(Float, nullable=False)
+    centroid = Column(Geometry('Point', srid=4326), nullable=True)  # PostGIS Point geometry (added in migration 056)
+    point_count = Column(Integer, nullable=False)
+    
+    # Metrics
+    duration_seconds = Column(Integer, nullable=False)
+    
+    # v2.2 R4c: Open stationary tracking
+    is_open = Column(Boolean, nullable=False, default=False, server_default='false')  # True if stationary still accumulating
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Leg(Base):
+    """
+    Movement segments between stationaries.
+    
+    Section 2 (Engine): Created when device moves >150m from anchor.
+    """
+    __tablename__ = "legs"
+    
+    id = get_uuid_column()
+    device_imei = Column(String(20), nullable=False, index=True)
+    journey_id = get_uuid_nullable()  # NULL if ungrouped
+    
+    # Position references
+    start_position_id = Column(Integer, nullable=False)
+    end_position_id = Column(Integer, nullable=False)
+    
+    # Time window
+    started_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    ended_at = Column(DateTime(timezone=True), nullable=False)
+    
+    # Start/End coordinates (for non-spatial queries)
+    start_lat = Column(Float, nullable=True)
+    start_lng = Column(Float, nullable=True)
+    end_lat = Column(Float, nullable=True)
+    end_lng = Column(Float, nullable=True)
+    
+    # Geometry (PostGIS) - Added in migration 056
+    path = Column(Geometry('LineString', srid=4326), nullable=True)  # Full resolution path
+    path_simplified = Column(Geometry('LineString', srid=4326), nullable=True)  # Simplified for rendering
+    
+    # Metrics
+    distance_m = Column(Float, nullable=False)
+    duration_seconds = Column(Integer, nullable=False)
+    point_count = Column(Integer, nullable=False)
+    
+    # Classification
+    is_air_leg = Column(Boolean, nullable=False, default=False, index=True)
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Journey(Base):
+    """
+    Grouped trips (legs + stationaries within 30-min dwell threshold).
+    
+    Section 2 (Engine): Journey grouping with aggregate metrics.
+    """
+    __tablename__ = "journeys"
+    
+    id = get_uuid_column()
+    device_imei = Column(String(20), nullable=False, index=True)
+    
+    # Time window
+    started_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    ended_at = Column(DateTime(timezone=True), nullable=False)
+    
+    # Journey structure references
+    first_leg_id = get_uuid_nullable()
+    last_leg_id = get_uuid_nullable()
+    
+    # Metrics
+    leg_count = Column(Integer, nullable=False, default=0)
+    stationary_count = Column(Integer, nullable=False, default=0)
+    total_distance_m = Column(Float, nullable=False, default=0)
+    total_duration_seconds = Column(Integer, nullable=False)
+    
+    # Classification
+    is_air_journey = Column(Boolean, nullable=False, default=False, index=True)
+    
+    # v2.2 A4: Engine versioning - track which engine version/params created this journey
+    engine_version = Column(String(20), nullable=True)  # e.g. 'v2.1', 'v2.2'
+    engine_params = Column(JSON, nullable=True)  # Snapshot of config at creation time
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class TripConfig(Base):
+    """
+    Admin configuration (global + per-tenant overrides).
+    
+    Configuration hierarchy: Global (tenant_id=NULL) → Tenant → Device
+    """
+    __tablename__ = "trip_config"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id = get_uuid_nullable()  # NULL = global default
+    
+    # Ingestion parameters
+    batch_sweep_interval_minutes = Column(Integer, nullable=False, default=10)
+    tracklist_delay_minutes = Column(Integer, nullable=False, default=5)
+    coalesce_floor_minutes = Column(Integer, nullable=False, default=120)
+    
+    # Engine geometry parameters
+    engine_anchor_radius_m = Column(Integer, nullable=False, default=100)
+    engine_min_leg_distance_m = Column(Integer, nullable=False, default=300)
+    engine_move_confirm_m = Column(Integer, nullable=False, default=150)
+    
+    # Engine thresholds
+    engine_max_speed_kmh = Column(Integer, nullable=False, default=200)
+    engine_gap_timeout_min = Column(Integer, nullable=False, default=30)
+    engine_smoothing_window = Column(Integer, nullable=False, default=3)
+    
+    # Air leg detection
+    engine_air_speed_kmh = Column(Integer, nullable=False, default=300)
+    engine_air_min_distance_km = Column(Integer, nullable=False, default=150)
+    
+    # Journey grouping
+    engine_journey_break_dwell_min = Column(Integer, nullable=False, default=30)
+    
+    # v2.1: Settle-dwell confirmation
+    engine_settle_min_dwell_min = Column(Integer, nullable=False, default=3)
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

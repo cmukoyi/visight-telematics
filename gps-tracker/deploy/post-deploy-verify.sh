@@ -6,7 +6,7 @@
 
 set -e
 
-APP_URL="https://beacontelematics.co.uk"
+APP_URL="${APP_URL:-https://pinplot.me}"
 
 echo "=========================================="
 echo "POST-DEPLOYMENT VERIFICATION"

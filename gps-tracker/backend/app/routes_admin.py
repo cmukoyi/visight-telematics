@@ -2,8 +2,9 @@
 Admin API endpoints: authentication, logging, billing, user management
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from typing import List, Optional, Dict
 from uuid import UUID
 from pydantic import BaseModel, EmailStr, field_validator
@@ -18,6 +19,7 @@ from app.models_admin import (
     BillingTransaction,
     CriticalServiceAlertSubscription,
     CriticalServiceCategory,
+    AsyncJob,
 )
 from app.models import (
     AppFeatures,
@@ -31,6 +33,7 @@ from app.models import (
     BLETag,
     PortalAlert,
     TagIndoorPosition,
+    DeviceState,
 )
 from app.admin_auth import (
     hash_password, verify_password, create_admin_access_token,
@@ -1088,6 +1091,649 @@ async def export_hive_logs(
             'Content-Disposition': f'attachment; filename="hive-logs-{timestamp}.tar.gz"'
         }
     )
+
+
+# ---------------------------------------------------------------------------
+# Trip Engine Logs Export
+# ---------------------------------------------------------------------------
+
+@router.get("/trip-logs/export")
+async def export_trip_logs(
+    request: Request,
+    db: Session = Depends(get_db),
+    days: int = Query(7, ge=1, le=90, description="Number of days of logs to export"),
+):
+    """
+    Export Trip Engine logs and database data as a downloadable tar.gz bundle.
+    Includes backend logs, journeys, legs, stationaries, and device states.
+    """
+    from fastapi.responses import StreamingResponse
+    import subprocess
+    import tempfile
+    import os
+    import tarfile
+    from io import BytesIO
+    
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires manager role")
+    
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    
+    # Create in-memory tar.gz
+    buffer = BytesIO()
+    
+    with tarfile.open(fileobj=buffer, mode='w:gz') as tar:
+        # 1. Backend Trip Engine logs (from docker logs)
+        try:
+            result = subprocess.run(
+                ['docker', 'logs', '--since', f'{days}d', 'pinplot_backend'],
+                capture_output=True, text=True, timeout=30
+            )
+            logs = result.stdout + result.stderr
+            # Filter for Trip Engine-related lines
+            trip_lines = [line for line in logs.split('\n') if any(x in line for x in [
+                'TripEngine', 'trip_engine', 'Journey', 'Leg', 'Stationary',
+                '🆕', '✅', '🔵', '🟠', '✈️', '🔚', '📅', 'IMEI'
+            ])]
+            trip_log_content = '\n'.join(trip_lines).encode('utf-8')
+            
+            info = tarfile.TarInfo(name='backend-trip-logs.log')
+            info.size = len(trip_log_content)
+            info.mtime = datetime.utcnow().timestamp()
+            tar.addfile(info, BytesIO(trip_log_content))
+        except Exception as e:
+            logger.error(f"Failed to extract backend trip logs: {e}")
+        
+        # 2. Journeys table
+        from app.models import Journey
+        journeys = db.query(Journey).filter(
+            Journey.started_at >= cutoff
+        ).order_by(Journey.started_at.desc()).limit(1000).all()
+        
+        journeys_data = f"Journeys (last {days} days): {len(journeys)}\n\n"
+        for j in journeys:
+            duration_min = j.total_duration_seconds / 60 if j.total_duration_seconds else 0
+            journeys_data += f"ID: {j.id}\n"
+            journeys_data += f"Device: {j.device_imei}\n"
+            journeys_data += f"Started: {j.started_at}\n"
+            journeys_data += f"Ended: {j.ended_at}\n"
+            journeys_data += f"Duration: {duration_min:.1f} min\n"
+            journeys_data += f"Distance: {j.total_distance_m/1000:.2f} km\n"
+            journeys_data += f"Legs: {j.leg_count}\n"
+            journeys_data += f"Stationaries: {j.stationary_count}\n"
+            journeys_data += f"Air Journey: {j.is_air_journey}\n"
+            journeys_data += f"Created: {j.created_at}\n\n"
+        
+        info = tarfile.TarInfo(name='journeys.txt')
+        info.size = len(journeys_data.encode('utf-8'))
+        info.mtime = datetime.utcnow().timestamp()
+        tar.addfile(info, BytesIO(journeys_data.encode('utf-8')))
+        
+        # 3. Legs table (sample from recent journeys)
+        from app.models import Leg
+        legs = db.query(Leg).filter(
+            Leg.started_at >= cutoff
+        ).order_by(Leg.started_at.desc()).limit(500).all()
+        
+        legs_data = f"Legs (last {days} days): {len(legs)}\n\n"
+        for leg in legs:
+            duration_min = leg.duration_seconds / 60 if leg.duration_seconds else 0
+            legs_data += f"ID: {leg.id}\n"
+            legs_data += f"Journey: {leg.journey_id}\n"
+            legs_data += f"Device: {leg.device_imei}\n"
+            legs_data += f"Started: {leg.started_at}\n"
+            legs_data += f"Ended: {leg.ended_at}\n"
+            legs_data += f"Duration: {duration_min:.1f} min\n"
+            legs_data += f"Distance: {leg.distance_m/1000:.3f} km\n"
+            legs_data += f"Points: {leg.point_count}\n"
+            legs_data += f"Air Leg: {leg.is_air_leg}\n"
+            legs_data += f"Start: ({leg.start_lat:.6f}, {leg.start_lng:.6f})\n"
+            legs_data += f"End: ({leg.end_lat:.6f}, {leg.end_lng:.6f})\n\n"
+        
+        info = tarfile.TarInfo(name='legs.txt')
+        info.size = len(legs_data.encode('utf-8'))
+        info.mtime = datetime.utcnow().timestamp()
+        tar.addfile(info, BytesIO(legs_data.encode('utf-8')))
+        
+        # 4. Stationaries table
+        from app.models import Stationary
+        stationaries = db.query(Stationary).filter(
+            Stationary.started_at >= cutoff
+        ).order_by(Stationary.started_at.desc()).limit(500).all()
+        
+        stats_data = f"Stationaries (last {days} days): {len(stationaries)}\n\n"
+        for stat in stationaries:
+            duration_min = stat.duration_seconds / 60 if stat.duration_seconds else 0
+            stats_data += f"ID: {stat.id}\n"
+            stats_data += f"Journey: {stat.journey_id or 'NULL (journey-breaking)'}\n"
+            stats_data += f"Device: {stat.device_imei}\n"
+            stats_data += f"Started: {stat.started_at}\n"
+            stats_data += f"Ended: {stat.ended_at}\n"
+            stats_data += f"Duration: {duration_min:.1f} min\n"
+            stats_data += f"Points: {stat.point_count}\n"
+            stats_data += f"Anchor: ({stat.anchor_lat:.6f}, {stat.anchor_lng:.6f})\n\n"
+        
+        info = tarfile.TarInfo(name='stationaries.txt')
+        info.size = len(stats_data.encode('utf-8'))
+        info.mtime = datetime.utcnow().timestamp()
+        tar.addfile(info, BytesIO(stats_data.encode('utf-8')))
+        
+        # 5. Device states (trip subscriptions)
+        device_states = db.query(DeviceState).all()
+        
+        states_data = f"Device States (total): {len(device_states)}\n\n"
+        for ds in device_states:
+            states_data += f"Device: {ds.device_imei}\n"
+            states_data += f"Trip Subscribed: {ds.trip_subscribed}\n"
+            states_data += f"Last Batch: {ds.last_batch_ts}\n"
+            states_data += f"Last Position: {ds.last_position_ts}\n"
+            states_data += f"Last Tracklist Pull: {ds.last_tracklist_pull_at}\n"
+            states_data += f"Updated: {ds.updated_at}\n\n"
+        
+        info = tarfile.TarInfo(name='device-states.txt')
+        info.size = len(states_data.encode('utf-8'))
+        info.mtime = datetime.utcnow().timestamp()
+        tar.addfile(info, BytesIO(states_data.encode('utf-8')))
+        
+        # 6. Engine states (trip processing state)
+        from app.models import EngineState
+        engine_states = db.query(EngineState).all()
+        
+        engine_data = f"Engine States (total): {len(engine_states)}\n\n"
+        for es in engine_states:
+            engine_data += f"Device: {es.device_imei}\n"
+            engine_data += f"Current State: {es.current_state}\n"
+            engine_data += f"Current Journey: {es.current_journey_id or 'None'}\n"
+            engine_data += f"Current Leg: {es.current_leg_id or 'None'}\n"
+            engine_data += f"Last Processed: {es.last_processed_at}\n"
+            
+            # Format anchor coordinates safely
+            anchor_str = f"({es.anchor_lat:.6f}, {es.anchor_lng:.6f})" if es.anchor_lat is not None and es.anchor_lng is not None else "N/A"
+            engine_data += f"Anchor: {anchor_str}\n"
+            engine_data += f"Anchor Count: {es.anchor_count}\n"
+            engine_data += f"Updated: {es.updated_at}\n\n"
+        
+        info = tarfile.TarInfo(name='engine-states.txt')
+        info.size = len(engine_data.encode('utf-8'))
+        info.mtime = datetime.utcnow().timestamp()
+        tar.addfile(info, BytesIO(engine_data.encode('utf-8')))
+    
+    buffer.seek(0)
+    
+    return StreamingResponse(
+        buffer,
+        media_type='application/gzip',
+        headers={
+            'Content-Disposition': f'attachment; filename="trip-logs-{timestamp}.tar.gz"'
+        }
+    )
+
+
+# ---------------------------------------------------------------------------
+# Trip Engine Reprocess (v2.2 A4)
+# ---------------------------------------------------------------------------
+
+class TripReprocessRequest(BaseModel):
+    """Request to reprocess trip data for a device."""
+    device_imei: str
+    start_date: Optional[date] = None  # Accepts "YYYY-MM-DD" format
+    end_date: Optional[date] = None    # Accepts "YYYY-MM-DD" format
+
+class TripReprocessResponse(BaseModel):
+    """Result of trip reprocess operation."""
+    device_imei: str
+    positions_processed: int
+    journeys_created: int
+    legs_created: int
+    stationaries_created: int
+    engine_version: str
+
+@router.post("/trips/reprocess", response_model=TripReprocessResponse)
+async def reprocess_device_trips(
+    data: TripReprocessRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Reprocess trip segmentation for a device from stored positions (A4).
+    
+    Deletes all derived trip data (journeys/legs/stationaries) and replays
+    positions through the current engine with current parameters. Use this
+    after engine updates to adopt new logic (e.g. v2.1 settle-dwell/merge/air-leg).
+    
+    **WARNING**: This is a DESTRUCTIVE operation. All existing trip data for
+    this device will be deleted and regenerated.
+    
+    Args:
+        data: Device IMEI and optional date window
+    
+    Returns:
+        Statistics about positions processed and trips created
+    
+    Note:
+        - Positions table is never modified (source of truth)
+        - Requires manager role
+        - Runs in a transaction (atomic)
+    """
+    from app.services.trip_reprocess_service import replay_device_trips, ENGINE_VERSION
+    
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires manager role")
+    
+    logger.info(
+        "🔄 Admin %s triggered reprocess for device %s (window: %s to %s)",
+        admin.email,
+        data.device_imei,
+        data.start_date,
+        data.end_date
+    )
+    
+    try:
+        # Run replay in a transaction
+        result = replay_device_trips(
+            db=db,
+            device_imei=data.device_imei,
+            start_date=data.start_date,
+            end_date=data.end_date,
+            tenant_id=None  # TODO: resolve from device's usergroup when available
+        )
+        
+        db.commit()
+        
+        logger.info(
+            "✅ Reprocess complete for %s: %d positions → %d journeys, %d legs, %d stationaries",
+            data.device_imei,
+            result["positions_processed"],
+            result["journeys_created"],
+            result["legs_created"],
+            result["stationaries_created"]
+        )
+        
+        return TripReprocessResponse(
+            device_imei=data.device_imei,
+            positions_processed=result["positions_processed"],
+            journeys_created=result["journeys_created"],
+            legs_created=result["legs_created"],
+            stationaries_created=result["stationaries_created"],
+            engine_version=ENGINE_VERSION
+        )
+        
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        db.rollback()
+        logger.error("❌ Reprocess failed for %s: %s", data.device_imei, e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Reprocess failed: {str(e)}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Trip Backfill (v2.2 A3)
+# ---------------------------------------------------------------------------
+
+class TripBackfillRequest(BaseModel):
+    """Request to backfill historical positions for a device."""
+    device_imei: str
+    preset: str  # today | yesterday | last_7_days | last_30_days
+
+class TripBackfillResponse(BaseModel):
+    """Result of trip backfill operation."""
+    device_imei: str
+    preset: str
+    window_start: datetime
+    window_end: datetime
+    clamped: bool
+    positions_fetched: int
+    positions_inserted: int
+    positions_processed: int
+    journeys_created: int
+    legs_created: int
+    stationaries_created: int
+    engine_version: str
+
+@router.post("/trips/backfill", response_model=TripBackfillResponse)
+async def backfill_device_trips(
+    data: TripBackfillRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Backfill historical positions from TrackSolid and reprocess trips (A3).
+    
+    Fetches historical GPS positions for a device using TrackSolid track.list API,
+    then reprocesses trips. The backfill window is clamped to the forward pipeline
+    high-water mark (last_position_ts) to prevent overlap with automated pulls.
+    
+    **Use cases:**
+    - Device wasn't subscribed when it moved (missing history)
+    - Gap in position data needs to be filled
+    - One-off historical analysis
+    
+    **Safe guarantees:**
+    - Never crosses forward pipeline boundary (last_position_ts)
+    - Idempotent position storage (duplicates ignored)
+    - Does NOT modify forward pipeline state
+    - Works for subscribed AND unsubscribed devices
+    
+    Args:
+        data: Device IMEI and time window preset
+    
+    Returns:
+        Statistics about positions fetched, inserted, and trips created
+    
+    Note:
+        - Requires manager role
+        - Runs async (may take several seconds for large windows)
+        - Positions are upserted (idempotent on device_imei, observed_at)
+    """
+    from app.services.trip_backfill_service import backfill_device_positions, BackfillPreset
+    
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires manager role")
+    
+    # Validate preset
+    try:
+        preset_enum = BackfillPreset(data.preset)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid preset: {data.preset}. Must be one of: today, yesterday, last_7_days, last_30_days"
+        )
+    
+    logger.info(
+        "📥 Admin %s triggered backfill for device %s (preset: %s)",
+        admin.email,
+        data.device_imei,
+        data.preset
+    )
+    
+    try:
+        # Run backfill (fetches + upserts + reprocesses)
+        result = await backfill_device_positions(
+            db=db,
+            device_imei=data.device_imei,
+            preset=preset_enum
+        )
+        
+        db.commit()
+        
+        logger.info(
+            "✅ Backfill complete for %s: %d fetched, %d inserted, %d journeys",
+            data.device_imei,
+            result["positions_fetched"],
+            result["positions_inserted"],
+            result["journeys_created"]
+        )
+        
+        return TripBackfillResponse(
+            device_imei=result["device_imei"],
+            preset=result["preset"],
+            window_start=result["window_start"],
+            window_end=result["window_end"],
+            clamped=result["clamped"],
+            positions_fetched=result["positions_fetched"],
+            positions_inserted=result["positions_inserted"],
+            positions_processed=result["positions_processed"],
+            journeys_created=result["journeys_created"],
+            legs_created=result["legs_created"],
+            stationaries_created=result["stationaries_created"],
+            engine_version=result["engine_version"]
+        )
+        
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        db.rollback()
+        logger.error("❌ Backfill failed for %s: %s", data.device_imei, e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Backfill failed: {str(e)}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Async Jobs - Batch Operations (v2.2 A5)
+# ---------------------------------------------------------------------------
+
+class BatchBackfillRequest(BaseModel):
+    """Request to backfill all subscribed devices in a tenant."""
+    tenant_id: UUID
+    preset: str  # today | yesterday | last_7_days | last_30_days
+
+class BatchReprocessRequest(BaseModel):
+    """Request to reprocess all subscribed devices in a tenant."""
+    tenant_id: UUID
+
+class AsyncJobResponse(BaseModel):
+    """Response for async job operations."""
+    id: UUID
+    job_type: str
+    status: str
+    created_by: str
+    created_at: datetime
+    started_at: Optional[datetime]
+    completed_at: Optional[datetime]
+    total_devices: Optional[int]
+    completed_devices: int
+    failed_devices: int
+    results: Optional[Dict]
+    error_message: Optional[str]
+    last_processed_imei: Optional[str]
+    
+    class Config:
+        from_attributes = True
+
+
+@router.post("/jobs/batch-backfill", response_model=AsyncJobResponse)
+async def create_batch_backfill_job(
+    data: BatchBackfillRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Create a batch backfill job for all subscribed devices in a tenant (A5).
+    
+    Queues an async background job to backfill historical positions from
+    TrackSolid for all subscribed devices in the specified tenant.
+    
+    The job runs asynchronously and can be monitored via GET /jobs/{job_id}.
+    
+    Args:
+        data: Tenant ID and time window preset
+    
+    Returns:
+        Created job with status "pending"
+    
+    Note:
+        - Requires manager role
+        - Job runs in background (non-blocking)
+        - Use GET /jobs/{job_id} to monitor progress
+        - Background worker processes jobs sequentially
+    """
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires manager role")
+    
+    # Validate tenant exists
+    tenant = db.query(UserGroup).filter(UserGroup.id == data.tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+    
+    # Validate preset
+    valid_presets = ["today", "yesterday", "last_7_days", "last_30_days"]
+    if data.preset not in valid_presets:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid preset. Must be one of: {', '.join(valid_presets)}"
+        )
+    
+    logger.info(
+        "📥 Admin %s creating batch backfill job: tenant=%s (%s), preset=%s",
+        admin.email,
+        tenant.name,
+        data.tenant_id,
+        data.preset
+    )
+    
+    # Create job
+    job = AsyncJob(
+        job_type="batch_backfill",
+        status="pending",
+        created_by=admin.email,
+        params={
+            "tenant_id": str(data.tenant_id),
+            "preset": data.preset
+        },
+        completed_devices=0,
+        failed_devices=0
+    )
+    
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    
+    logger.info("✅ Created batch backfill job %s", job.id)
+    
+    return job
+
+
+@router.post("/jobs/batch-reprocess", response_model=AsyncJobResponse)
+async def create_batch_reprocess_job(
+    data: BatchReprocessRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Create a batch reprocess job for all subscribed devices in a tenant (A5).
+    
+    Queues an async background job to reprocess trip segmentation for all
+    subscribed devices in the specified tenant.
+    
+    Use this after engine updates to adopt new logic across all tenant devices.
+    
+    Args:
+        data: Tenant ID
+    
+    Returns:
+        Created job with status "pending"
+    
+    Note:
+        - Requires manager role
+        - Job runs in background (non-blocking)
+        - Use GET /jobs/{job_id} to monitor progress
+        - Background worker processes jobs sequentially
+    """
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires manager role")
+    
+    # Validate tenant exists
+    tenant = db.query(UserGroup).filter(UserGroup.id == data.tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+    
+    logger.info(
+        "🔄 Admin %s creating batch reprocess job: tenant=%s (%s)",
+        admin.email,
+        tenant.name,
+        data.tenant_id
+    )
+    
+    # Create job
+    job = AsyncJob(
+        job_type="batch_reprocess",
+        status="pending",
+        created_by=admin.email,
+        params={
+            "tenant_id": str(data.tenant_id)
+        },
+        completed_devices=0,
+        failed_devices=0
+    )
+    
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    
+    logger.info("✅ Created batch reprocess job %s", job.id)
+    
+    return job
+
+
+@router.get("/jobs/{job_id}", response_model=AsyncJobResponse)
+async def get_job_status(
+    job_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Get status and progress of an async job.
+    
+    Args:
+        job_id: Job UUID
+    
+    Returns:
+        Job details including status, progress, and results
+    
+    Note:
+        - Requires viewer role
+        - Poll this endpoint to monitor job progress
+        - Check status field: pending | running | completed | failed | cancelled
+    """
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "viewer"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires viewer role")
+    
+    job = db.query(AsyncJob).filter(AsyncJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    
+    return job
+
+
+@router.get("/jobs", response_model=List[AsyncJobResponse])
+async def list_jobs(
+    request: Request,
+    status: Optional[str] = Query(None, description="Filter by status: pending|running|completed|failed"),
+    limit: int = Query(50, le=200, description="Max results to return"),
+    db: Session = Depends(get_db),
+):
+    """
+    List async jobs with optional filtering.
+    
+    Args:
+        status: Optional status filter
+        limit: Max results (default 50, max 200)
+    
+    Returns:
+        List of jobs ordered by created_at desc
+    
+    Note:
+        - Requires viewer role
+        - Returns most recent jobs first
+    """
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "viewer"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires viewer role")
+    
+    query = db.query(AsyncJob)
+    
+    if status:
+        if status not in ["pending", "running", "completed", "failed", "cancelled"]:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status")
+        query = query.filter(AsyncJob.status == status)
+    
+    jobs = query.order_by(AsyncJob.created_at.desc()).limit(limit).all()
+    
+    return jobs
 
 
 # ---------------------------------------------------------------------------
@@ -2996,3 +3642,169 @@ def discovered_ble_tags(
         if pos.tag_id not in registered_macs
     ]
     return discovered
+
+
+@router.get("/tags-with-subscriptions")
+def list_tags_with_subscriptions(
+    usergroup_id: str = Query(..., description="User group ID to filter tags"),
+    request: Request = None,
+    db: Session = Depends(get_db),
+):
+    """Return GPS tracker tags (with IMEIs) for a specific tenant/user group,
+    including their trip subscription status from device_state.
+    
+    Returns tags that:
+    - Belong to users in the specified user group (via domain OR portal_users)
+    - Have an IMEI (GPS trackers, not BLE-only tags)
+    - Include trip_subscribed status from DeviceState table
+    """
+    get_admin_from_request(request, db)
+    
+    from app.models import PortalUser, User, UserGroup
+    from uuid import UUID
+    
+    # Validate UUID
+    try:
+        group_uuid = UUID(usergroup_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid usergroup_id format")
+    
+    # Get the user group to check for email_domain
+    group = db.query(UserGroup).filter(UserGroup.id == usergroup_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="User group not found")
+    
+    # Build list of domains for this group
+    domains = []
+    if group.email_domain:
+        domains = [d.strip().lower() for d in group.email_domain.split(',') if d.strip()]
+    
+    user_ids = []
+    
+    # Source 1: Domain-matched users (auto-assigned via email domain)
+    if domains:
+        domain_filters = [User.email.ilike(f"%@{domain}") for domain in domains]
+        domain_users = db.query(User.id).filter(or_(*domain_filters)).all()
+        user_ids.extend([str(uid[0]) for uid in domain_users])
+    
+    # Source 2: Manually assigned users (via PortalUser table)
+    portal_users = (
+        db.query(User.id)
+        .join(PortalUser, User.email == PortalUser.email)
+        .filter(PortalUser.usergroup_id == usergroup_id)
+        .all()
+    )
+    user_ids.extend([str(uid[0]) for uid in portal_users])
+    
+    # Remove duplicates
+    user_ids = list(set(user_ids))
+    
+    if not user_ids:
+        return []
+    
+    # Get all tags owned by these users that have IMEIs (GPS trackers)
+    tags = (
+        db.query(BLETag)
+        .filter(
+            BLETag.user_id.in_(user_ids),
+            BLETag.imei.isnot(None),
+            BLETag.is_active == True
+        )
+        .order_by(BLETag.added_at.desc())
+        .all()
+    )
+    
+    # Build DeviceState lookup for trip_subscribed status
+    device_state_map = {}
+    imeis = [tag.imei for tag in tags if tag.imei]
+    if imeis:
+        states = db.query(DeviceState).filter(DeviceState.device_imei.in_(imeis)).all()
+        for state in states:
+            device_state_map[state.device_imei] = {
+                'trip_subscribed': state.trip_subscribed,
+                'last_position_ts': state.last_position_ts,
+                'last_tracklist_pull_at': state.last_tracklist_pull_at
+            }
+    
+    # Build response
+    result = []
+    for tag in tags:
+        device_state = device_state_map.get(tag.imei, {})
+        result.append({
+            'id': str(tag.id),
+            'imei': tag.imei,
+            'device_name': tag.device_name,
+            'description': tag.description,
+            'tag_type': tag.tag_type,
+            'is_active': tag.is_active,
+            'last_seen': tag.last_seen.isoformat() if tag.last_seen else None,
+            'battery_level': tag.battery_level,
+            'device_state': {
+                'trip_subscribed': device_state.get('trip_subscribed', False),
+                'last_position_ts': device_state.get('last_position_ts').isoformat() if device_state.get('last_position_ts') else None,
+                'last_tracklist_pull_at': device_state.get('last_tracklist_pull_at').isoformat() if device_state.get('last_tracklist_pull_at') else None
+            } if device_state else None
+        })
+    
+    return result
+
+
+class TripSubscriptionUpdate(BaseModel):
+    trip_subscribed: bool
+
+
+@router.put("/devices/{imei}/trip-subscription")
+def update_device_trip_subscription(
+    imei: str,
+    data: TripSubscriptionUpdate,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Update trip subscription status for a device (manager+).
+    
+    Creates DeviceState if it doesn't exist.
+    """
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=403, detail="Requires manager role")
+    
+    # Verify device exists
+    device = db.query(BLETag).filter(BLETag.imei == imei).first()
+    if not device:
+        raise HTTPException(status_code=404, detail=f"Device {imei} not found")
+    
+    # Get or create DeviceState
+    device_state = db.query(DeviceState).filter(DeviceState.device_imei == imei).first()
+    if not device_state:
+        device_state = DeviceState(
+            device_imei=imei,
+            trip_subscribed=data.trip_subscribed
+        )
+        db.add(device_state)
+        logger.info(f"Created DeviceState for {imei} with trip_subscribed={data.trip_subscribed}")
+    else:
+        old_value = device_state.trip_subscribed
+        device_state.trip_subscribed = data.trip_subscribed
+        logger.info(f"Updated {imei} trip_subscribed: {old_value} → {data.trip_subscribed}")
+    
+    db.commit()
+    
+    # Log audit
+    log_audit(
+        db,
+        str(admin.id),
+        "update_trip_subscription",
+        "DeviceState",
+        imei,
+        old_value={"trip_subscribed": not data.trip_subscribed} if device_state else None,
+        new_value={"trip_subscribed": data.trip_subscribed},
+        description=f"{'Subscribed' if data.trip_subscribed else 'Unsubscribed'} device {imei} for trip processing",
+        ip_address=request.client.host if request.client else None
+    )
+    
+    return {
+        "imei": imei,
+        "trip_subscribed": device_state.trip_subscribed,
+        "message": f"Device {'subscribed' if data.trip_subscribed else 'unsubscribed'} successfully"
+    }

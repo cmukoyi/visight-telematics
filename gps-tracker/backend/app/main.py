@@ -229,6 +229,12 @@ app.include_router(assets_router)
 from app.routes_scan import router as scan_router  # noqa: E402
 app.include_router(scan_router)
 
+from app.routes_i18n import router as i18n_router  # noqa: E402
+app.include_router(i18n_router)
+
+from app.routes_admin_i18n import router as admin_i18n_router  # noqa: E402
+app.include_router(admin_i18n_router)
+
 # Static files for asset tracking (baked into Docker image at build time)
 static_dir = "/app/static"
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
@@ -325,7 +331,7 @@ async def portal_request_timing_middleware(request, call_next):
     return response
 
 # CORS middleware - restrict to known origins only
-_cors_origins_env = os.getenv("CORS_ORIGINS", "https://beacontelematics.co.uk,https://www.beacontelematics.co.uk")
+_cors_origins_env = os.getenv("CORS_ORIGINS", "https://pinplot.me")
 _allowed_origins = [o.strip() for o in _cors_origins_env.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
@@ -393,6 +399,22 @@ async def startup_event():
     # Start critical-service error monitor (subscriptions drive whether emails send)
     asyncio.create_task(critical_service_alerts.start())
     print("🚨 Critical service alert monitor started (60-second cycle)")
+
+    # Start Trip Engine background tasks (lazy import to avoid slowing startup)
+    try:
+        from app.services import tracksolid_batch_service, tracksolid_track_service, trip_engine
+        
+        tracksolid_batch_service.start_batch_sweep()
+        print("🚗 Trip Engine: Batch sweep started (10-minute interval)")
+        
+        tracksolid_track_service.start_selective_sweep()
+        print("📍 Trip Engine: Selective sweep started (12-minute interval)")
+        
+        trip_engine.start_trip_engine()
+        print("🛣️  Trip Engine: Journey processor started (15-minute interval)")
+    except Exception as e:
+        logger.exception("⚠️  Trip Engine failed to start (continuing without it): %s", e)
+        print(f"⚠️  Trip Engine startup failed: {e} (app will run without trip tracking)")
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -602,6 +624,12 @@ def branding():
     frontend reads this at boot and overrides <title>, theme-color, header
     text, primary colour, etc. PinPlot defaults are kept for back-compat when
     no env vars are set."""
+    
+    # Parse disabled features from env (comma-separated)
+    disabled_features = [
+        f.strip() for f in os.getenv("TENANT_DISABLED_FEATURES", "").split(",") if f.strip()
+    ]
+    
     return {
         "name":         os.getenv("BRAND_NAME", "PinPlot"),
         "product":      os.getenv("BRAND_PRODUCT", "PinPlot Customer Portal"),
@@ -614,6 +642,9 @@ def branding():
         # Per-tenant MapTiler key. No default — each tenant MUST set
         # MAPTILER_KEY in backend/.env (free-tier keys are origin-restricted).
         "maptilerKey":  os.getenv("MAPTILER_KEY") or None,
+        # Feature gates: list of feature keys (tab names) that should be hidden
+        # from navigation and disabled at API level. Set via TENANT_DISABLED_FEATURES env.
+        "disabledFeatures": disabled_features,
     }
 
 

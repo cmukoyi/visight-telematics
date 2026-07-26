@@ -88,6 +88,9 @@ function resizeCanvases() {
 }
 window.addEventListener('resize', resizeCanvases);
 
+// Expose state for debugging and external integration
+window.state = state;
+
 // ─── Coordinate Helpers ───────────────────────────────────────────────────────
 function screenToWorld(sx, sy) {
   return {
@@ -695,6 +698,11 @@ function onMouseDown(e) {
     state.floors[state.currentFloor].elements.push(el);
     state.selected = el.id;
     showProperties(el);
+    // Auto-switch back to select mode after placing gateway
+    state.tool = 'select';
+    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('[data-tool="select"]').classList.add('active');
+    interactCanvas.style.cursor = 'default';
     render(); updateStats();
     return;
   }
@@ -1105,8 +1113,28 @@ document.addEventListener('keydown', e => {
   if ((e.ctrlKey||e.metaKey) && e.key === 'z' && !e.shiftKey) { undo(); e.preventDefault(); }
   if ((e.ctrlKey||e.metaKey) && (e.key === 'y' || (e.key==='z' && e.shiftKey))) { redo(); e.preventDefault(); }
   if (e.key === 'Escape') {
-    if (state.tool === 'polygon') { state.polygonPoints = []; state.drawing = false; render(); }
-    state.selected = null; showProperties(null); render();
+    // Cancel polygon drawing
+    if (state.tool === 'polygon') { 
+      state.polygonPoints = []; 
+      state.drawing = false; 
+    }
+    // Cancel any ongoing drawing
+    if (state.drawing) {
+      state.drawing = false;
+      state.drawStart = null;
+      state.drawCurrent = null;
+    }
+    // Switch back to select mode if in a drawing tool
+    if (state.tool !== 'select') {
+      state.tool = 'select';
+      document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+      document.querySelector('[data-tool="select"]').classList.add('active');
+      interactCanvas.style.cursor = 'default';
+    }
+    // Deselect current element
+    state.selected = null; 
+    showProperties(null); 
+    render();
   }
   if (e.key === 'Delete' || e.key === 'Backspace') {
     if (state.selected && document.activeElement === document.body) {
@@ -1116,9 +1144,20 @@ document.addEventListener('keydown', e => {
     }
   }
   if (e.key === 'v' || e.key === 'V') {
+    // Cancel any ongoing drawing
+    if (state.drawing) {
+      state.drawing = false;
+      state.drawStart = null;
+      state.drawCurrent = null;
+    }
+    if (state.tool === 'polygon') {
+      state.polygonPoints = [];
+    }
     document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
     document.querySelector('[data-tool="select"]').classList.add('active');
     state.tool = 'select';
+    interactCanvas.style.cursor = 'default';
+    render();
   }
 });
 
