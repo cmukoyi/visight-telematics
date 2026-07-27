@@ -419,7 +419,7 @@ class TenantFeature(Base):
     usergroup_id = get_uuid_fk("user_groups.id")
     feature_name = Column(String(50), nullable=False)
     enabled = Column(Boolean, nullable=False, server_default='true')
-    updated_by = Column(UUID(as_uuid=True), ForeignKey("admins.id", ondelete="SET NULL"), nullable=True)
+    updated_by = Column(UUID(as_uuid=True), ForeignKey("admin_users.id", ondelete="SET NULL"), nullable=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     

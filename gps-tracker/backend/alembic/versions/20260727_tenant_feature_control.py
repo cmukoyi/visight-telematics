@@ -47,7 +47,7 @@ def upgrade():
         sa.Column('usergroup_id', UUID(as_uuid=True), sa.ForeignKey('user_groups.id', ondelete='CASCADE'), nullable=False),
         sa.Column('feature_name', sa.String(50), nullable=False),
         sa.Column('enabled', sa.Boolean(), nullable=False, server_default='true'),
-        sa.Column('updated_by', UUID(as_uuid=True), sa.ForeignKey('admins.id', ondelete='SET NULL'), nullable=True),
+        sa.Column('updated_by', UUID(as_uuid=True), sa.ForeignKey('admin_users.id', ondelete='SET NULL'), nullable=True),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     )
