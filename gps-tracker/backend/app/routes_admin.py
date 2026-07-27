@@ -34,6 +34,7 @@ from app.models import (
     PortalAlert,
     TagIndoorPosition,
     DeviceState,
+    TenantFeature,
 )
 from app.admin_auth import (
     hash_password, verify_password, create_admin_access_token,
@@ -3807,4 +3808,140 @@ def update_device_trip_subscription(
         "imei": imei,
         "trip_subscribed": device_state.trip_subscribed,
         "message": f"Device {'subscribed' if data.trip_subscribed else 'unsubscribed'} successfully"
+    }
+
+
+# ---------------------------------------------------------------------------
+# Tenant Feature Management (Admin Portal → Customer Dashboard Feature Control)
+# ---------------------------------------------------------------------------
+
+class TenantFeatureOut(BaseModel):
+    """Response model for tenant feature"""
+    id: UUID
+    usergroup_id: UUID
+    feature_name: str
+    enabled: bool
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class TenantFeatureUpdate(BaseModel):
+    """Request model for updating tenant features"""
+    features: dict[str, bool]  # feature_name -> enabled mapping
+
+
+@router.get("/tenant-features/{usergroup_id}", response_model=List[TenantFeatureOut])
+def get_tenant_features(
+    usergroup_id: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Get all feature toggles for a tenant (usergroup).
+    
+    Returns list of feature records with enabled/disabled status.
+    If no records exist, returns empty list (all features enabled by default).
+    """
+    admin = get_admin_from_request(request, db)
+    
+    # Verify usergroup exists
+    usergroup = db.query(UserGroup).filter(UserGroup.id == usergroup_id).first()
+    if not usergroup:
+        raise HTTPException(status_code=404, detail="UserGroup not found")
+    
+    # Get all tenant features for this usergroup
+    features = db.query(TenantFeature).filter(
+        TenantFeature.usergroup_id == usergroup_id
+    ).all()
+    
+    return features
+
+
+@router.put("/tenant-features/{usergroup_id}")
+def update_tenant_features(
+    usergroup_id: str,
+    data: TenantFeatureUpdate,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Update tenant-wide feature toggles.
+    
+    Updates which features are available to ALL users in the tenant.
+    Creates/updates TenantFeature records with enabled/disabled status.
+    
+    Request body:
+    {
+        "features": {
+            "livemap": true,
+            "history": true,
+            "history-advanced": false,
+            ...
+        }
+    }
+    """
+    admin = get_admin_from_request(request, db)
+    
+    # Verify usergroup exists
+    usergroup = db.query(UserGroup).filter(UserGroup.id == usergroup_id).first()
+    if not usergroup:
+        raise HTTPException(status_code=404, detail="UserGroup not found")
+    
+    # Update or create feature records
+    updated_features = []
+    for feature_name, enabled in data.features.items():
+        # Check if feature record exists
+        feature = db.query(TenantFeature).filter(
+            TenantFeature.usergroup_id == usergroup_id,
+            TenantFeature.feature_name == feature_name
+        ).first()
+        
+        if feature:
+            # Update existing
+            old_enabled = feature.enabled
+            feature.enabled = enabled
+            feature.updated_by = admin.id
+            feature.updated_at = datetime.utcnow()
+            
+            log_audit(
+                db,
+                str(admin.id),
+                "update_tenant_feature",
+                "TenantFeature",
+                str(feature.id),
+                old_value={"enabled": old_enabled},
+                new_value={"enabled": enabled},
+                description=f"{'Enabled' if enabled else 'Disabled'} feature '{feature_name}' for tenant {usergroup.name}",
+                ip_address=request.client.host if request.client else None
+            )
+        else:
+            # Create new
+            feature = TenantFeature(
+                usergroup_id=usergroup_id,
+                feature_name=feature_name,
+                enabled=enabled,
+                updated_by=admin.id
+            )
+            db.add(feature)
+            
+            log_audit(
+                db,
+                str(admin.id),
+                "create_tenant_feature",
+                "TenantFeature",
+                None,
+                old_value=None,
+                new_value={"feature_name": feature_name, "enabled": enabled},
+                description=f"Created feature toggle '{feature_name}' ({'enabled' if enabled else 'disabled'}) for tenant {usergroup.name}",
+                ip_address=request.client.host if request.client else None
+            )
+        
+        updated_features.append(feature_name)
+    
+    db.commit()
+    
+    return {
+        "usergroup_id": usergroup_id,
+        "updated_features": updated_features,
+        "message": f"Updated {len(updated_features)} feature toggles for {usergroup.name}"
     }

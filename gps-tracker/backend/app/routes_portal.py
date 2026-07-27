@@ -119,6 +119,22 @@ SECTION_FEATURES: dict = {
 }
 ALL_SECTIONS = list(SECTION_FEATURES.keys())
 
+# Tenant feature → tab name mapping
+# Maps high-level tenant feature names to specific tab keys
+TENANT_FEATURE_TABS: dict = {
+    "livemap": ["livemap"],
+    "history": ["history"],
+    "history-advanced": ["history-advanced"],
+    "alerts": ["reports-alerts"],
+    "geofences": ["reports-geofence"],
+    "reports": ["reports-subscriptions", "reports-activity", "reports-trips", "reports-battery"],
+    "management": ["asset-mgmt", "users", "qr", "building", "locations", "settings"],
+    "floorplan": ["floorplan"],
+    "settings": ["settings"],
+    "hive": ["hive"],
+    "developers": ["api-tokens"],  # Developers section (API Tokens tab)
+}
+
 
 # Tenant-level feature kill-switch (env-driven). Comma-separated list of
 # feature keys that should be hidden from the portal *and* refused at the API
@@ -145,8 +161,11 @@ def require_feature_enabled(feature: str):
 
 def _compute_effective_features(user: "PortalUser", group: "UserGroup") -> list:
     """Return the list of tab keys the user can access, given their role and
-    the usergroup's allowed sections. Tenant-disabled features are stripped
-    last so the kill-switch always wins."""
+    the usergroup's allowed sections. Tenant features are applied as master
+    switch - user sees feature only if BOTH tenant enables it AND user role allows it."""
+    from app.models import TenantFeature
+    from sqlalchemy.orm import Session
+    
     allowed_sections = group.allowed_sections or ALL_SECTIONS
     group_features = [f for s in allowed_sections for f in SECTION_FEATURES.get(s, [])]
 
@@ -163,7 +182,36 @@ def _compute_effective_features(user: "PortalUser", group: "UserGroup") -> list:
         result = [f for f in custom if f in group_features]
     else:
         result = group_features
-    # Apply the tenant kill-switch *last* so it overrides every other layer.
+    
+    # Apply tenant-wide feature toggles (master switch)
+    # Query enabled features for this tenant
+    try:
+        from sqlalchemy import inspect
+        session = inspect(user).session
+        if session:
+            tenant_features = session.query(TenantFeature).filter(
+                TenantFeature.usergroup_id == user.usergroup_id,
+                TenantFeature.enabled == True
+            ).all()
+            tenant_enabled_features = {f.feature_name for f in tenant_features}
+            
+            # If tenant has feature records, expand feature names to tab names
+            # and intersect with user features
+            if tenant_enabled_features:
+                # Expand tenant features to actual tab names using TENANT_FEATURE_TABS mapping
+                tenant_enabled_tabs = set()
+                for feature_name in tenant_enabled_features:
+                    tabs = TENANT_FEATURE_TABS.get(feature_name, [])
+                    tenant_enabled_tabs.update(tabs)
+                
+                # User sees tab only if BOTH tenant enables it AND user role allows it
+                result = [f for f in result if f in tenant_enabled_tabs]
+    except Exception:
+        # If tenant features table doesn't exist yet or query fails,
+        # fall back to user features only (backward compatible)
+        pass
+    
+    # Apply the legacy kill-switch *last* so it overrides every other layer.
     return [f for f in result if f not in _DISABLED_FEATURES]
 
 

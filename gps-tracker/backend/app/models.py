@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, Float, Text, Enum, JSON
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, Float, Text, Enum, JSON, UniqueConstraint, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from geoalchemy2 import Geometry
@@ -399,6 +399,35 @@ class TagCategory(Base):
     usergroup = relationship("UserGroup", back_populates="tag_categories")
 
 
+class TenantFeature(Base):
+    """Tenant-wide feature toggles for customer dashboard.
+    
+    Controls which features are available to ALL users in a tenant.
+    Managed via Admin Portal → Tenant Features page.
+    
+    Logic:
+    - Tenant features = master switch (all users in tenant)
+    - User custom_features = per-user refinement  
+    - effective_features = intersection(tenant_features, user_features)
+    
+    Feature names: livemap, history, history-advanced, alerts, geofences,
+    reports, management, floorplan, settings, hive
+    """
+    __tablename__ = "tenant_features"
+    
+    id = get_uuid_column()
+    usergroup_id = get_uuid_fk("user_groups.id")
+    feature_name = Column(String(50), nullable=False)
+    enabled = Column(Boolean, nullable=False, server_default='true')
+    updated_by = Column(UUID(as_uuid=True), ForeignKey("admin_users.id", ondelete="SET NULL"), nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    
+    __table_args__ = (
+        UniqueConstraint('usergroup_id', 'feature_name', name='uq_tenant_feature'),
+        Index('ix_tenant_features_usergroup_id', 'usergroup_id'),
+        Index('ix_tenant_features_enabled', 'enabled'),
+    )
 
 
 class PortalUser(Base):
