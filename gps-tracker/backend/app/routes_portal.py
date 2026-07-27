@@ -145,8 +145,11 @@ def require_feature_enabled(feature: str):
 
 def _compute_effective_features(user: "PortalUser", group: "UserGroup") -> list:
     """Return the list of tab keys the user can access, given their role and
-    the usergroup's allowed sections. Tenant-disabled features are stripped
-    last so the kill-switch always wins."""
+    the usergroup's allowed sections. Tenant features are applied as master
+    switch - user sees feature only if BOTH tenant enables it AND user role allows it."""
+    from app.models import TenantFeature
+    from sqlalchemy.orm import Session
+    
     allowed_sections = group.allowed_sections or ALL_SECTIONS
     group_features = [f for s in allowed_sections for f in SECTION_FEATURES.get(s, [])]
 
@@ -163,7 +166,29 @@ def _compute_effective_features(user: "PortalUser", group: "UserGroup") -> list:
         result = [f for f in custom if f in group_features]
     else:
         result = group_features
-    # Apply the tenant kill-switch *last* so it overrides every other layer.
+    
+    # Apply tenant-wide feature toggles (master switch)
+    # Query enabled features for this tenant
+    try:
+        from sqlalchemy import inspect
+        session = inspect(user).session
+        if session:
+            tenant_features = session.query(TenantFeature).filter(
+                TenantFeature.usergroup_id == user.usergroup_id,
+                TenantFeature.enabled == True
+            ).all()
+            tenant_enabled = {f.feature_name for f in tenant_features}
+            
+            # If tenant has feature records, intersect with user features
+            # (user sees feature only if tenant enables it)
+            if tenant_enabled:
+                result = [f for f in result if f in tenant_enabled]
+    except Exception:
+        # If tenant features table doesn't exist yet or query fails,
+        # fall back to user features only (backward compatible)
+        pass
+    
+    # Apply the legacy kill-switch *last* so it overrides every other layer.
     return [f for f in result if f not in _DISABLED_FEATURES]
 
 
