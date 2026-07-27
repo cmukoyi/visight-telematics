@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, Float, Text, Enum, JSON
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, Float, Text, Enum, JSON, UniqueConstraint, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from geoalchemy2 import Geometry
@@ -424,9 +424,9 @@ class TenantFeature(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     
     __table_args__ = (
-        sa.UniqueConstraint('usergroup_id', 'feature_name', name='uq_tenant_feature'),
-        sa.Index('ix_tenant_features_usergroup_id', 'usergroup_id'),
-        sa.Index('ix_tenant_features_enabled', 'enabled'),
+        UniqueConstraint('usergroup_id', 'feature_name', name='uq_tenant_feature'),
+        Index('ix_tenant_features_usergroup_id', 'usergroup_id'),
+        Index('ix_tenant_features_enabled', 'enabled'),
     )
 
 
