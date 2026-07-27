@@ -119,6 +119,22 @@ SECTION_FEATURES: dict = {
 }
 ALL_SECTIONS = list(SECTION_FEATURES.keys())
 
+# Tenant feature → tab name mapping
+# Maps high-level tenant feature names to specific tab keys
+TENANT_FEATURE_TABS: dict = {
+    "livemap": ["livemap"],
+    "history": ["history"],
+    "history-advanced": ["history-advanced"],
+    "alerts": ["reports-alerts"],
+    "geofences": ["reports-geofence"],
+    "reports": ["reports-subscriptions", "reports-activity", "reports-trips", "reports-battery"],
+    "management": ["asset-mgmt", "users", "qr", "building", "locations", "settings"],
+    "floorplan": ["floorplan"],
+    "settings": ["settings"],
+    "hive": ["hive"],
+    "developers": ["api-tokens"],  # Developers section (API Tokens tab)
+}
+
 
 # Tenant-level feature kill-switch (env-driven). Comma-separated list of
 # feature keys that should be hidden from the portal *and* refused at the API
@@ -177,12 +193,19 @@ def _compute_effective_features(user: "PortalUser", group: "UserGroup") -> list:
                 TenantFeature.usergroup_id == user.usergroup_id,
                 TenantFeature.enabled == True
             ).all()
-            tenant_enabled = {f.feature_name for f in tenant_features}
+            tenant_enabled_features = {f.feature_name for f in tenant_features}
             
-            # If tenant has feature records, intersect with user features
-            # (user sees feature only if tenant enables it)
-            if tenant_enabled:
-                result = [f for f in result if f in tenant_enabled]
+            # If tenant has feature records, expand feature names to tab names
+            # and intersect with user features
+            if tenant_enabled_features:
+                # Expand tenant features to actual tab names using TENANT_FEATURE_TABS mapping
+                tenant_enabled_tabs = set()
+                for feature_name in tenant_enabled_features:
+                    tabs = TENANT_FEATURE_TABS.get(feature_name, [])
+                    tenant_enabled_tabs.update(tabs)
+                
+                # User sees tab only if BOTH tenant enables it AND user role allows it
+                result = [f for f in result if f in tenant_enabled_tabs]
     except Exception:
         # If tenant features table doesn't exist yet or query fails,
         # fall back to user features only (backward compatible)

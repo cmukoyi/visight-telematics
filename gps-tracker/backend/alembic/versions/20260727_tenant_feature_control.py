@@ -80,7 +80,8 @@ def upgrade():
                 ('management'),
                 ('floorplan'),
                 ('settings'),
-                ('hive')
+                ('hive'),
+                ('developers')
         ) AS features(feature)
         WHERE ug.is_active = true
         ON CONFLICT (usergroup_id, feature_name) DO NOTHING

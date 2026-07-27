@@ -1771,6 +1771,14 @@
                                         <div class="feature-desc">HIVE tracking UI for asset monitoring</div>
                                     </div>
                                 </label>
+
+                                <label class="feature-checkbox-item">
+                                    <input type="checkbox" id="tf_developers" data-feature="developers">
+                                    <div>
+                                        <div class="feature-name">👨‍💻 Developers</div>
+                                        <div class="feature-desc">API tokens and developer tools</div>
+                                    </div>
+                                </label>
                             </div>
 
                             <div style="margin-top:20px;padding:14px;background:var(--bg-secondary);border-radius:8px;border-left:4px solid var(--primary-color)">
@@ -7453,7 +7461,7 @@ dashboard.welcome,Bienvenue</pre>
             });
 
             // Update checkboxes
-            ['livemap', 'history', 'history-advanced', 'alerts', 'geofences', 'reports', 'management', 'floorplan', 'settings', 'hive'].forEach(feature => {
+            ['livemap', 'history', 'history-advanced', 'alerts', 'geofences', 'reports', 'management', 'floorplan', 'settings', 'hive', 'developers'].forEach(feature => {
                 const checkbox = document.getElementById(`tf_${feature}`);
                 if (checkbox) {
                     checkbox.checked = enabledMap[feature] !== false; // Default to true if missing
@@ -7480,7 +7488,7 @@ dashboard.welcome,Bienvenue</pre>
 
         try {
             const features = {};
-            ['livemap', 'history', 'history-advanced', 'alerts', 'geofences', 'reports', 'management', 'floorplan', 'settings', 'hive'].forEach(feature => {
+            ['livemap', 'history', 'history-advanced', 'alerts', 'geofences', 'reports', 'management', 'floorplan', 'settings', 'hive', 'developers'].forEach(feature => {
                 const checkbox = document.getElementById(`tf_${feature}`);
                 if (checkbox) {
                     features[feature] = checkbox.checked;
