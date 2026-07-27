@@ -3542,11 +3542,16 @@ input.hive-range::-moz-range-track {
                         </button>
                         
                         <div class="mha-map-head">
-                            <div class="t">
-                                <i class="fa-solid fa-map"></i>
-                                <span>Journey Map</span>
+                            <div style="display:flex;align-items:center;gap:12px;flex:1">
+                                <div class="t">
+                                    <i class="fa-solid fa-map"></i>
+                                    <span>Journey Map</span>
+                                </div>
+                                <div class="meta" id="mha-map-meta">Select an asset to view journeys</div>
                             </div>
-                            <div class="meta" id="mha-map-meta">Select an asset to view journeys</div>
+                            <button class="btn btn-secondary btn-small" onclick="mhaOpenHelp()" title="Open the Movement Analytics user manual in a new tab">
+                                <i class="fa-solid fa-circle-question"></i> How To
+                            </button>
                         </div>
                         <div class="mha-map-container">
                             <div id="mha-map"></div>
@@ -12811,6 +12816,17 @@ function qrOpenHelp() {
     const isBeacon = brandName.toLowerCase().includes('beacon');
     const guidePath = isBeacon ? 'QR_NFC_Guide_Beacon.html' : 'QR_NFC_Guide_Pinplot.html';
     window.open('/customer/help/' + guidePath + '?theme=' + encodeURIComponent(theme),
+                '_blank', 'noopener,noreferrer');
+}
+
+// Open the Movement Analytics user manual in a new tab
+function mhaOpenHelp() {
+    const theme = document.documentElement.getAttribute('data-theme') || 'light';
+    // Detect tenant from branding - use Beacon version if tenant name contains 'beacon'
+    const brandName = (window.APP_BRANDING && window.APP_BRANDING.name) || 'PinPlot';
+    const isBeacon = brandName.toLowerCase().includes('beacon');
+    const manualPath = isBeacon ? 'Movement_Analytics_User_Manual_v2_1_Beacon.html' : 'Movement_Analytics_User_Manual_v2_1_Pinplot.html';
+    window.open('/customer/help/' + manualPath + '?theme=' + encodeURIComponent(theme),
                 '_blank', 'noopener,noreferrer');
 }
 </script>
