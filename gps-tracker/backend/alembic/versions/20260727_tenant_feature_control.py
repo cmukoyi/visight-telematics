@@ -1,7 +1,7 @@
 """Tenant feature control - Admin portal manages customer dashboard features
 
 Revision ID: tenant_feature_control
-Revises: v2112_e1_journey_unique
+Revises: v2114_c2a_c3
 Create Date: 2026-07-27
 
 Add tenant-wide feature control to replace .env feature gates.
@@ -34,7 +34,7 @@ from sqlalchemy.dialects.postgresql import UUID
 
 # revision identifiers, used by Alembic.
 revision = 'tenant_feature_control'
-down_revision = 'v2112_e1_journey_unique'
+down_revision = 'v2114_c2a_c3'
 branch_labels = None
 depends_on = None
 
