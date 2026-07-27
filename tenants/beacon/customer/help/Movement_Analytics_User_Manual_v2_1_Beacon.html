@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Movement Analytics — User Manual v2.1</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep:        #0a0f14;
+    --bg-sidebar:     #0c1218;
+    --bg-content:     #0a0f14;
+    --bg-elevated:    #131a22;
+    --bg-card:        #161e28;
+    --border:         #1d2730;
+    --border-bright:  #2a3a48;
+
+    --text-primary:   #e8ecef;
+    --text-secondary: #a0adb8;
+    --text-tertiary:  #6b7785;
+    --text-muted:     #4a5663;
+
+    --green:          #3565d3;
+    --green-dim:      #2850a8;
+    --green-bg:       rgba(53, 101, 211, 0.1);
+    --green-glow:     rgba(53, 101, 211, 0.3);
+
+    --red:            #ff4757;
+    --red-bg:         rgba(255, 71, 87, 0.1);
+    --amber:          #ffb648;
+    --amber-bg:       rgba(255, 182, 72, 0.1);
+    --blue:           #4a9eff;
+    --blue-bg:        rgba(74, 158, 255, 0.1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+    scroll-behavior: smooth;
+  }
+
+  .docs {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    min-height: 100vh;
+  }
+
+  /* ===== Sidebar ===== */
+  .sidebar {
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border);
+    padding: 32px 28px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  .sidebar::-webkit-scrollbar { width: 6px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .docs-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--green);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    margin-bottom: 6px;
+  }
+  .docs-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+    letter-spacing: -0.01em;
+  }
+  .docs-version {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 22px;
+  }
+  .docs-version .new-badge {
+    display: inline-block;
+    background: var(--green-bg);
+    color: var(--green);
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 6px;
+    letter-spacing: 0.06em;
+  }
+
+  .nav-section {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    margin: 22px 0 10px;
+  }
+  .nav-section:first-of-type { margin-top: 0; }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 0 7px 14px;
+    color: var(--text-tertiary);
+    text-decoration: none;
+    font-size: 14px;
+    border-left: 2px solid transparent;
+    margin-left: -16px;
+    padding-left: 14px;
+    transition: all 0.12s;
+    cursor: pointer;
+  }
+  .nav-item::before {
+    content: '•';
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+  .nav-item:hover { color: var(--text-primary); }
+  .nav-item.active {
+    color: var(--green);
+    background: rgba(0, 217, 107, 0.06);
+    border-left-color: var(--green);
+    font-weight: 500;
+  }
+  .nav-item.active::before { color: var(--green); }
+  .nav-item .new-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    background: var(--green);
+    color: var(--bg-deep);
+    padding: 1px 5px;
+    border-radius: 2px;
+    font-weight: 700;
+    margin-left: auto;
+    letter-spacing: 0.04em;
+  }
+
+  /* ===== Content ===== */
+  .content {
+    background: var(--bg-content);
+    background-image:
+      radial-gradient(circle at 20% 0%, rgba(0, 217, 107, 0.04), transparent 50%),
+      radial-gradient(circle at 80% 100%, rgba(0, 217, 107, 0.02), transparent 50%);
+    padding: 60px 80px 120px;
+    max-width: 100%;
+  }
+  .content-inner {
+    max-width: 760px;
+  }
+
+  .kicker {
+    display: flex; align-items: center; gap: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    margin-bottom: 24px;
+  }
+  .kicker::before {
+    content: '';
+    width: 28px; height: 2px;
+    background: var(--green);
+  }
+
+  .hero-title {
+    font-size: 84px;
+    font-weight: 800;
+    line-height: 0.96;
+    letter-spacing: -0.04em;
+    margin-bottom: 32px;
+    color: var(--text-primary);
+  }
+  .hero-title .accent { color: var(--green); display: block; }
+
+  .hero-lede {
+    font-size: 18px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    max-width: 600px;
+    margin-bottom: 32px;
+  }
+
+  .pill-row {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 80px;
+  }
+  .pill {
+    display: inline-flex; align-items: center;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-bright);
+    color: var(--text-secondary);
+    padding: 7px 14px;
+    border-radius: 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+  }
+  .pill.new {
+    background: var(--green-bg);
+    border-color: var(--green-dim);
+    color: var(--green);
+  }
+
+  .section {
+    margin-bottom: 80px;
+    scroll-margin-top: 40px;
+  }
+  .section-head {
+    display: flex; align-items: center; gap: 18px;
+    margin-bottom: 32px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--green);
+    background: rgba(0, 217, 107, 0.08);
+    border: 1px solid var(--green-dim);
+    padding: 6px 10px;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+  }
+  .section-title {
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    flex: 1;
+  }
+  .section-title-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    background: var(--green);
+    color: var(--bg-deep);
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .section h3 {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 36px 0 14px;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+  }
+  .section h4 {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 26px 0 10px;
+    color: var(--text-primary);
+  }
+  .section p {
+    color: var(--text-secondary);
+    margin-bottom: 18px;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+  .section p b, .section p strong {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+  .section a {
+    color: var(--green);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(53, 101, 211, 0.3);
+    transition: border-color 0.15s;
+  }
+  .section a:hover { border-bottom-color: var(--green); }
+
+  .section ul, .section ol {
+    margin: 0 0 18px 4px;
+    padding-left: 24px;
+    color: var(--text-secondary);
+  }
+  .section li {
+    margin-bottom: 8px;
+    line-height: 1.65;
+  }
+  .section li b { color: var(--text-primary); font-weight: 600; }
+  .section li::marker { color: var(--green); }
+
+  .callout {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--green);
+    padding: 18px 22px;
+    margin: 24px 0;
+    border-radius: 4px;
+  }
+  .callout.info { border-left-color: var(--blue); }
+  .callout.warn { border-left-color: var(--amber); }
+  .callout.danger { border-left-color: var(--red); }
+  .callout-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--green);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    margin-bottom: 8px;
+  }
+  .callout.info .callout-title { color: var(--blue); }
+  .callout.warn .callout-title { color: var(--amber); }
+  .callout.danger .callout-title { color: var(--red); }
+  .callout p { margin-bottom: 0; font-size: 14px; }
+
+  .doc-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 18px 0;
+    font-size: 13px;
+  }
+  .doc-table th {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-bright);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .doc-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-secondary);
+  }
+  .doc-table td:first-child {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  .doc-table tr:last-child td { border-bottom: none; }
+  .doc-table .center { text-align: center; }
+
+  code, .kbd {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.88em;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    color: var(--green);
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 12px;
+    letter-spacing: 0.04em;
+  }
+  .status-pill.green { background: var(--green-bg); color: var(--green); }
+  .status-pill.red { background: var(--red-bg); color: var(--red); }
+  .status-pill.amber { background: var(--amber-bg); color: var(--amber); }
+  .status-pill.blue { background: var(--blue-bg); color: var(--blue); }
+  .status-pill.muted { background: var(--bg-elevated); color: var(--text-tertiary); border: 1px solid var(--border-bright); }
+  .status-pill .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .figure {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 24px;
+    margin: 24px 0;
+  }
+  .figure-caption {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--border);
+  }
+  .figure-caption b { color: var(--green); font-weight: 600; }
+
+  .state-diagram {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .state-node {
+    flex: 1;
+    min-width: 110px;
+    text-align: center;
+    padding: 14px 10px;
+    border-radius: 6px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-bright);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+  .state-node.ok { border-color: var(--green-dim); color: var(--green); }
+  .state-node.pending { border-color: var(--amber); color: var(--amber); }
+  .state-node.alert { border-color: var(--red); color: var(--red); }
+  .state-node.resolving { border-color: var(--blue); color: var(--blue); }
+  .state-node.starting { border-color: var(--amber); color: var(--amber); }
+  .state-node.transit { border-color: var(--blue); color: var(--blue); }
+  .state-node.settling { border-color: var(--amber); color: var(--amber); }
+  .state-arrow {
+    color: var(--text-tertiary);
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .pip-row {
+    display: flex; gap: 6px; align-items: center;
+    margin: 12px 0;
+  }
+  .pip {
+    width: 28px; height: 28px;
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+  .pip.fresh { background: var(--green-bg); color: var(--green); border-color: var(--green-dim); }
+  .pip.recent { background: var(--blue-bg); color: var(--blue); border-color: rgba(74, 158, 255, 0.4); }
+  .pip.stale { background: var(--amber-bg); color: var(--amber); border-color: rgba(255, 182, 72, 0.4); }
+  .pip.lost { background: var(--red-bg); color: var(--red); border-color: rgba(255, 71, 87, 0.4); }
+
+  .lifecycle-vis {
+    display: grid;
+    grid-template-columns: 1fr 24px 1fr 24px 1fr;
+    align-items: stretch;
+    gap: 0;
+  }
+  .lifecycle-stage {
+    background: var(--bg-card);
+    border: 1px solid var(--border-bright);
+    border-radius: 6px;
+    padding: 16px 18px;
+    text-align: center;
+  }
+  .lifecycle-stage.active { border-color: var(--green-dim); }
+  .lifecycle-stage.archived { border-color: var(--text-muted); opacity: 0.85; }
+  .lifecycle-stage.purged { border-color: var(--red); opacity: 0.65; }
+  .lifecycle-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    margin-bottom: 6px;
+  }
+  .lifecycle-stage.active .lifecycle-label { color: var(--green); }
+  .lifecycle-stage.archived .lifecycle-label { color: var(--text-secondary); }
+  .lifecycle-stage.purged .lifecycle-label { color: var(--red); }
+  .lifecycle-stage-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+  .lifecycle-duration {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+  .lifecycle-arrow {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+  }
+
+  /* (legacy motion-state visual styles — retained, unused) */
+  .motion-states {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 12px;
+    margin: 24px 0;
+  }
+  .motion-state-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border-bright);
+    border-radius: 6px;
+    padding: 18px 20px;
+  }
+  .motion-state-box.stationary { border-left: 3px solid var(--green); }
+  .motion-state-box.starting { border-left: 3px solid var(--amber); }
+  .motion-state-box.transit { border-left: 3px solid var(--blue); }
+  .motion-state-box.settling { border-left: 3px solid var(--amber); }
+  .motion-state-icon {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+  .motion-state-box.stationary .motion-state-icon { color: var(--green); }
+  .motion-state-box.starting .motion-state-icon { color: var(--amber); }
+  .motion-state-box.transit .motion-state-icon { color: var(--blue); }
+  .motion-state-box.settling .motion-state-icon { color: var(--amber); }
+  .motion-state-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+  .motion-state-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .quick-toc {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 22px 26px;
+    margin-bottom: 60px;
+  }
+  .quick-toc-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    margin-bottom: 12px;
+  }
+  .quick-toc-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px 24px;
+  }
+  .quick-toc-list a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 13px;
+    padding: 4px 0;
+    border-bottom: none !important;
+    transition: color 0.12s;
+    display: flex; align-items: center;
+  }
+  .quick-toc-list a:hover { color: var(--green); }
+  .quick-toc-list a .num {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-muted);
+    margin-right: 10px;
+    font-size: 11px;
+  }
+  .quick-toc-list a .new-mini {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    background: var(--green);
+    color: var(--bg-deep);
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-weight: 700;
+    margin-left: auto;
+    letter-spacing: 0.04em;
+  }
+
+  .doc-footer {
+    margin-top: 100px;
+    padding-top: 30px;
+    border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+
+  /* Whats new banner */
+  .whats-new {
+    background: linear-gradient(135deg, rgba(0, 217, 107, 0.08), rgba(0, 217, 107, 0.02));
+    border: 1px solid var(--green-dim);
+    border-radius: 8px;
+    padding: 24px 28px;
+    margin-bottom: 50px;
+    position: relative;
+  }
+  .whats-new-tag {
+    position: absolute;
+    top: -10px; right: 24px;
+    background: var(--green);
+    color: var(--bg-deep);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 4px 10px;
+    border-radius: 3px;
+  }
+  .whats-new-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+  .whats-new-list {
+    margin: 12px 0 0 4px;
+    padding-left: 24px;
+    color: var(--text-secondary);
+    font-size: 14px;
+  }
+  .whats-new-list li {
+    margin-bottom: 6px;
+  }
+  .whats-new-list li::marker { color: var(--green); }
+
+  @media (max-width: 1100px) {
+    .docs { grid-template-columns: 240px 1fr; }
+    .content { padding: 40px 50px 80px; }
+    .hero-title { font-size: 64px; }
+    .motion-states { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 800px) {
+    .docs { grid-template-columns: 1fr; }
+    .sidebar { position: relative; height: auto; }
+    .content { padding: 30px 24px 60px; }
+    .hero-title { font-size: 44px; }
+    .quick-toc-list { grid-template-columns: 1fr; }
+    .lifecycle-vis { grid-template-columns: 1fr; }
+    .lifecycle-arrow { padding: 6px 0; transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+
+<div class="docs">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar">
+    <div class="docs-label">Documentation</div>
+    <div class="docs-title">Movement Analytics</div>
+    <div class="docs-version">v2.1 — Beacon Telematics Platform <span class="new-badge">NEW</span></div>
+
+    <div class="nav-section">Getting Started</div>
+    <a class="nav-item active" href="#overview">Overview</a>
+    <a class="nav-item" href="#how-it-works">How It Works</a>
+    <a class="nav-item" href="#quick-start">Quick Start</a>
+    <a class="nav-item" href="#concepts">Key Concepts</a>
+
+    <div class="nav-section">Setup</div>
+    <a class="nav-item" href="#subscription">Advanced Trip Analysis <span class="new-tag">ADMIN</span></a>
+    <a class="nav-item" href="#filters">Date Range &amp; Filters</a>
+
+    <div class="nav-section">Using Movement Analytics</div>
+    <a class="nav-item" href="#screen">The Journeys Screen</a>
+    <a class="nav-item" href="#reading">Reading a Journey</a>
+    <a class="nav-item" href="#legs">Legs</a>
+    <a class="nav-item" href="#stops">Stationary Stops</a>
+    <a class="nav-item" href="#map">Map Controls</a>
+    <a class="nav-item" href="#positions">Positions Tab</a>
+
+    <div class="nav-section">Reference</div>
+    <a class="nav-item" href="#quality">Data Quality</a>
+    <a class="nav-item" href="#settings">Settings Reference</a>
+    <a class="nav-item" href="#troubleshooting">Troubleshooting</a>
+    <a class="nav-item" href="#faq">FAQ</a>
+  </aside>
+
+  <!-- ===== CONTENT ===== -->
+  <main class="content">
+    <div class="content-inner">
+
+      <!-- ===== HERO ===== -->
+      <div class="kicker">User Manual · v2.1</div>
+      <h1 class="hero-title">
+        Movement
+        <span class="accent">Analytics</span>
+      </h1>
+      <p class="hero-lede">
+        Turn a stream of position reports into journeys you can actually read — where an asset went, where it stopped, for how long, and how far it travelled. Built for vehicles, plant, parcels and any tracked asset that moves.
+      </p>
+      <div class="pill-row">
+        <span class="pill">Journeys &amp; Legs</span>
+        <span class="pill">Stop Detection</span>
+        <span class="pill">Map Playback</span>
+        <span class="pill">Distance Totals</span>
+        <span class="pill">Per-Asset Subscription</span>
+      </div>
+
+      <div class="whats-new">
+        <div class="whats-new-tag">Before You Start</div>
+        <div class="whats-new-title">Movement Analytics is opt-in per asset</div>
+        <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 0;">
+          Only assets with <b>Advanced Trip Analysis</b> enabled are processed. It's switched on by a system administrator in the Edit Tag dialog, and it takes effect going forward — enabling it today will not reconstruct last week's journeys.
+        </p>
+        <ul class="whats-new-list">
+          <li><b>Admin-controlled</b> — the checkbox is interactive for system administrators and read-only for everyone else</li>
+          <li><b>Forward-only</b> — journeys are built from the next position pull onward, never retroactively; to reprocess historical data, request it from your administrator</li>
+          <li><b>Filtered list</b> — the Movement Analytics asset list shows only enabled assets</li>
+        </ul>
+      </div>
+
+      <div class="quick-toc">
+        <div class="quick-toc-title">In This Manual</div>
+        <div class="quick-toc-list">
+          <a href="#overview"><span class="num">01</span>Overview</a>
+          <a href="#how-it-works"><span class="num">02</span>How It Works</a>
+          <a href="#quick-start"><span class="num">03</span>Quick Start</a>
+          <a href="#concepts"><span class="num">04</span>Key Concepts</a>
+          <a href="#subscription"><span class="num">05</span>Advanced Trip Analysis</a>
+          <a href="#filters"><span class="num">06</span>Date Range &amp; Filters</a>
+          <a href="#screen"><span class="num">07</span>The Journeys Screen</a>
+          <a href="#reading"><span class="num">08</span>Reading a Journey</a>
+          <a href="#legs"><span class="num">09</span>Legs</a>
+          <a href="#stops"><span class="num">10</span>Stationary Stops</a>
+          <a href="#map"><span class="num">11</span>Map Controls</a>
+          <a href="#positions"><span class="num">12</span>Positions Tab</a>
+          <a href="#quality"><span class="num">13</span>Data Quality</a>
+          <a href="#settings"><span class="num">14</span>Settings Reference</a>
+          <a href="#troubleshooting"><span class="num">15</span>Troubleshooting</a>
+          <a href="#faq"><span class="num">16</span>FAQ</a>
+        </div>
+      </div>
+
+      <!-- ===== 01 OVERVIEW ===== -->
+      <section class="section" id="overview">
+        <div class="section-head">
+          <div class="section-num">01</div>
+          <h2 class="section-title">Overview</h2>
+        </div>
+
+        <p>
+          Your tags report positions continuously — often every minute or two. On their own, those reports are a cloud of dots. Movement Analytics reads them in order and works out the story behind them: the asset sat here for three hours, then drove 10.5 km, then stopped for twenty minutes, then drove 4 km more.
+        </p>
+
+        <p>
+          The result is a <b>journey</b>: a start, one or more <b>legs</b> of travel, the <b>stops</b> in between, and an end. Each journey carries a total distance and duration, and every leg is drawn on the map so you can see the route taken.
+        </p>
+
+        <p>
+          Movement Analytics works with the position data your assets already report in <b>Beacon Telematics</b>. No extra hardware, no separate device configuration — you enable a trip subscription on the asset and journeys begin building from that point on.
+        </p>
+
+        <div class="callout">
+          <div class="callout-title">→ At a Glance</div>
+          <p>
+            Journeys built automatically from position reports · Legs and stops classified separately · Distance and duration per journey and per leg · Full route drawn on the map · Raw positions available alongside · <b>Per-asset subscription, admin-controlled</b>.
+          </p>
+        </div>
+      </section>
+
+      <!-- ===== 02 HOW IT WORKS ===== -->
+      <section class="section" id="how-it-works">
+        <div class="section-head">
+          <div class="section-num">02</div>
+          <h2 class="section-title">How It Works</h2>
+        </div>
+
+        <p>
+          Movement Analytics processes each asset's positions in time order and keeps track of one thing: is this asset currently <b>stopped</b> or <b>moving</b>?
+        </p>
+
+        <div class="state-diagram">
+          <div class="state-node stationary">Stopped</div>
+          <div class="state-arrow">→</div>
+          <div class="state-node transit">Moving</div>
+          <div class="state-arrow">→</div>
+          <div class="state-node settling">Settling</div>
+          <div class="state-arrow">→</div>
+          <div class="state-node stationary">Stopped</div>
+        </div>
+
+        <p>
+          While an asset is <b>stopped</b>, its reports cluster around one place. Movement Analytics holds an average position for that cluster — the <b>anchor</b> — and keeps refining it with each new report. Small wobble in the position data doesn't move the anchor much, which is what stops a parked vehicle from looking like it's drifting around the car park.
+        </p>
+
+        <p>
+          When a report lands clearly outside that cluster, the asset has departed and a <b>leg</b> opens. Every subsequent report is added to the leg, building up the route.
+        </p>
+
+        <p>
+          When reports start clustering again in a new place and stay there, Movement Analytics treats it as an arrival, closes the leg at that point, and starts a new stop. It waits a short settling period before committing — this is what prevents a pause at traffic lights from being recorded as a stop.
+        </p>
+
+        <p>
+          Finally, stops are used to divide the timeline into journeys. A short stop is a waypoint <em>within</em> a journey. A long one ends the journey — the next departure starts a fresh one.
+        </p>
+
+        <div class="callout info">
+          <div class="callout-title">→ Why some short movements aren't recorded</div>
+          <p>
+            A leg has to represent real travel, not position noise. Movement that doesn't get far enough from where it started is discarded rather than recorded as a trip. This is deliberate: without it, a stationary asset with noisy reports would generate dozens of meaningless one-minute "trips" every day.
+          </p>
+        </div>
+      </section>
+
+      <!-- ===== 03 QUICK START ===== -->
+      <section class="section" id="quick-start">
+        <div class="section-head">
+          <div class="section-num">03</div>
+          <h2 class="section-title">Quick Start</h2>
+        </div>
+
+        <p>Getting an asset producing journeys takes about thirty seconds, assuming you have administrator rights.</p>
+
+        <ol>
+          <li>Open <b>Assets</b> and edit the asset you want to track. The <b>Edit Tag</b> dialog opens.</li>
+          <li>Tick <b>Enable Advanced Trip Analysis</b>. If the checkbox is greyed out, you don't have administrator rights — ask a system administrator to enable it.</li>
+          <li>Click <code>Save Changes</code>. From the next position pull onward, journeys will start building.</li>
+          <li>Go to <b>Movement Analytics</b>. Your asset now appears in the asset list on the left.</li>
+          <li>Select it, choose a date range, and the journeys appear in the right-hand panel with the route drawn on the map.</li>
+        </ol>
+
+        <p>
+          There's nothing to configure per asset beyond the checkbox itself. Detection settings are platform-wide and tuned centrally.
+        </p>
+
+        <div class="callout warn">
+          <div class="callout-title">→ Don't expect yesterday's trips</div>
+          <p>
+            Advanced Trip Analysis is forward-only. Enabling it now will not go back and build journeys from positions already collected. If you need history for an asset, enable it before the period you care about.
+          </p>
+          <p style="margin-bottom: 0;">
+            If you need historical data reprocessed for a period that has already passed, <b>send a request to your administrator for further direction</b>.
+          </p>
+        </div>
+      </section>
+
+      <!-- ===== 04 KEY CONCEPTS ===== -->
+      <section class="section" id="concepts">
+        <div class="section-head">
+          <div class="section-num">04</div>
+          <h2 class="section-title">Key Concepts</h2>
+        </div>
+
+        <h3>Position</h3>
+        <p>
+          A single location report from a tag, with a timestamp. Positions are the raw input — everything else is derived from them. You can view them directly in the <a href="#positions">Positions tab</a>.
+        </p>
+
+        <h3>Leg</h3>
+        <p>
+          One continuous stretch of travel between two stops. A leg has a start time, an end time, a distance, and a route drawn from the positions collected along the way. Legs are shown in blue on the map.
+        </p>
+
+        <h3>Stationary Stop</h3>
+        <p>
+          A period where the asset stayed in one place. Each stop records when it started, when it ended, how long it lasted (<b>dwell</b>), and how many positions contributed to it. Stops appear as amber markers.
+        </p>
+
+        <h3>Anchor</h3>
+        <p>
+          The averaged position of a stop, refined as more reports arrive. The anchor is what the map marker shows, and it's what new reports are measured against to decide whether the asset has left.
+        </p>
+
+        <h3>Dwell</h3>
+        <p>
+          How long a stop lasted. Dwell is what decides whether a stop is a waypoint inside a journey or the end of one.
+        </p>
+
+        <h3>Journey</h3>
+        <p>
+          A start, a sequence of legs and short stops, and an end. A journey's distance is the sum of its legs. Journeys are numbered in the panel and can be expanded to show their internal structure.
+        </p>
+
+        <h3>Idle</h3>
+        <p>
+          The gap between two journeys, shown as a chip in the timeline — for example <span class="status-pill amber"><span class="dot"></span>9h 26m idle</span>. This is the long stop that separated them.
+        </p>
+      </section>
+
+      <!-- ===== 05 SUBSCRIPTION ===== -->
+      <section class="section" id="subscription">
+        <div class="section-head">
+          <div class="section-num">05</div>
+          <h2 class="section-title">Advanced Trip Analysis</h2>
+          <span class="section-title-tag">Admin</span>
+        </div>
+
+        <p>
+          Movement Analytics is enabled per asset via the <b>Enable Advanced Trip Analysis</b> checkbox. Processing every asset on the platform would be wasteful — most assets don't need journey reconstruction — so it's opt-in.
+        </p>
+
+        <h3>Where to find it</h3>
+        <p>
+          The <b>Enable Advanced Trip Analysis</b> checkbox lives in the <b>Edit Tag</b> dialog, on the asset itself — reached by editing an asset from <b>Assets</b>. It is not a bulk action and not a separate management screen.
+        </p>
+
+        <h3>Who can change it</h3>
+        <table class="doc-table">
+          <thead>
+            <tr><th>Role</th><th>Sees the control</th><th>Can change it</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>System administrator</td><td>Yes</td><td><span class="status-pill green"><span class="dot"></span>YES</span></td></tr>
+            <tr><td>All other user types</td><td>Yes — greyed out</td><td><span class="status-pill red"><span class="dot"></span>NO</span></td></tr>
+          </tbody>
+        </table>
+
+        <p>
+          Non-administrators see the control in a read-only state rather than having it hidden. This is deliberate — it means anyone can tell at a glance whether an asset is subscribed, without having to ask.
+        </p>
+
+        <h3>What happens when you enable it</h3>
+        <p>
+          Journey building starts at the next position pull. Positions already stored are not reprocessed. If you clear the checkbox, existing journeys remain visible but no new ones are built.
+        </p>
+
+        <h3>If you need historical data</h3>
+        <p>
+          Reprocessing positions that were collected before Advanced Trip Analysis was enabled is not something you can trigger from the asset. If you need journeys rebuilt for a period that has already passed, <b>send a request to your administrator for further direction</b>.
+        </p>
+
+        <div class="callout info">
+          <div class="callout-title">→ The asset list is filtered</div>
+          <p>
+            The Movement Analytics screen only lists assets with Advanced Trip Analysis enabled. If an asset you expect isn't there, the checkbox is off — that's the first thing to check.
+          </p>
+        </div>
+      </section>
+
+      <!-- ===== 06 FILTERS ===== -->
+      <section class="section" id="filters">
+        <div class="section-head">
+          <div class="section-num">06</div>
+          <h2 class="section-title">Date Range &amp; Filters</h2>
+        </div>
+
+        <p>The left-hand panel controls which asset you're looking at and over what period.</p>
+
+        <h3>Date range</h3>
+        <p>
+          Choose from <code>Today</code>, <code>Yesterday</code>, <code>Last 7 days</code>, <code>Last 30 days</code>, or <code>Custom</code> for an arbitrary window. The journeys panel header tells you how many journeys fall in the selected range.
+        </p>
+
+        <h3>Status</h3>
+        <p>
+          Counters across the top show how many assets are <b>Total</b>, <b>Active</b>, <b>Idle</b> and <b>Offline</b>. Click one to filter the list.
+        </p>
+
+        <h3>Asset type</h3>
+        <p>
+          Additional chips filter by category — for example <code>New Tags</code>, <code>Parcels</code>, <code>QR Code</code>. Which chips appear depends on what's registered in your account.
+        </p>
+
+        <h3>Sorting</h3>
+        <p>
+          The asset list is sorted by <b>last reported</b> by default, so the most recently active assets are at the top. Each row shows how long ago the asset last reported and, where available, battery level.
+        </p>
+      </section>
+
+      <!-- ===== 07 SCREEN ===== -->
+      <section class="section" id="screen">
+        <div class="section-head">
+          <div class="section-num">07</div>
+          <h2 class="section-title">The Journeys Screen</h2>
+        </div>
+
+        <p>Three panels, left to right:</p>
+
+        <div class="motion-states">
+          <div class="motion-state-box">
+            <div class="motion-state-icon">1</div>
+            <div class="motion-state-name">Assets</div>
+            <div class="motion-state-desc">Subscribed assets, date range, and status filters. Select an asset to load its history.</div>
+          </div>
+          <div class="motion-state-box">
+            <div class="motion-state-icon">2</div>
+            <div class="motion-state-name">Journey Map</div>
+            <div class="motion-state-desc">Routes, stop markers, and start/end pins. Switch between street and satellite views.</div>
+          </div>
+          <div class="motion-state-box">
+            <div class="motion-state-icon">3</div>
+            <div class="motion-state-name">Journeys / Positions</div>
+            <div class="motion-state-desc">Journeys grouped by day, or the raw position list behind them.</div>
+          </div>
+        </div>
+
+        <p>
+          Selecting a journey in the right-hand panel highlights it on the map and expands it to show its legs and stops. A summary bar at the foot of the map reports what's currently plotted — for example <em>Journey · 12.5 km · 2 legs · 3 stationaries · 41 positions</em>.
+        </p>
+
+        <div class="figure">
+          <div class="figure-caption">Panel layout: Assets (left) · Journey Map (centre) · Journeys and Positions tabs (right)</div>
+        </div>
+      </section>
+
+      <!-- ===== 08 READING ===== -->
+      <section class="section" id="reading">
+        <div class="section-head">
+          <div class="section-num">08</div>
+          <h2 class="section-title">Reading a Journey</h2>
+        </div>
+
+        <p>
+          Journeys are grouped by day, newest first, and numbered within the selected range. The collapsed row shows the essentials: time span, total distance, and how many legs and stops it contains.
+        </p>
+
+        <p>Expanding a journey lists its structure in order:</p>
+
+        <table class="doc-table">
+          <thead>
+            <tr><th>Entry</th><th>Means</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="status-pill green"><span class="dot"></span>START</span></td><td>Time the journey began — the moment the asset departed</td></tr>
+            <tr><td><span class="status-pill blue"><span class="dot"></span>LEG</span></td><td>A stretch of travel, with its distance and duration</td></tr>
+            <tr><td><span class="status-pill amber"><span class="dot"></span>STATIONARY</span></td><td>A stop within the journey, with its dwell time</td></tr>
+            <tr><td><span class="status-pill red"><span class="dot"></span>END</span></td><td>Time the journey finished</td></tr>
+          </tbody>
+        </table>
+
+        <p>
+          Between journeys you'll see an <b>idle</b> chip showing the gap — the long stop that separated them. A day that starts with a long idle chip simply means the asset was parked overnight.
+        </p>
+
+        <h3>Distances and times</h3>
+        <p>
+          A journey's distance is the sum of its legs; stops contribute nothing. Times are shown in your local timezone. Distance units follow your account setting — kilometres or miles.
+        </p>
+      </section>
+
+      <!-- ===== 09 LEGS ===== -->
+      <section class="section" id="legs">
+        <div class="section-head">
+          <div class="section-num">09</div>
+          <h2 class="section-title">Legs</h2>
+        </div>
+
+        <p>
+          A leg is drawn from the positions reported while the asset was moving. Its shape is therefore only as detailed as the reporting was frequent.
+        </p>
+
+        <h3>Why some legs look like straight lines</h3>
+        <p>
+          If an asset reported ten times during a drive, the leg follows the road closely. If it reported three times, you get a triangle. Both are accurate representations of what was actually recorded — Movement Analytics draws what it has and does not invent intermediate points or snap routes to roads.
+        </p>
+
+        <p>
+          Reporting frequency varies with the positioning method and the surrounding environment, so two assets travelling in the same vehicle can produce differently detailed routes.
+        </p>
+
+        <h3>Round trips</h3>
+        <p>
+          A trip that goes out and comes back to where it started is still a leg, even though its start and end points are close together. Movement Analytics judges legs on how far they actually travelled, not just on the gap between the endpoints.
+        </p>
+
+        <div class="callout info">
+          <div class="callout-title">→ Legs end at the stop they arrive at</div>
+          <p>
+            A leg's final point is the stop it arrives at, so the route line terminates exactly on the stop marker rather than short of it.
+          </p>
+        </div>
+      </section>
+
+      <!-- ===== 10 STOPS ===== -->
+      <section class="section" id="stops">
+        <div class="section-head">
+          <div class="section-num">10</div>
+          <h2 class="section-title">Stationary Stops</h2>
+        </div>
+
+        <p>
+          Stops are shown as amber markers. Where several stops fall close together, the map clusters them into a single numbered marker — the number tells you how many are stacked there.
+        </p>
+
+        <h3>Short stops versus journey breaks</h3>
+        <p>
+          A stop shorter than the journey-break threshold is a waypoint: the journey continues after it. A longer stop ends the journey, and the next departure begins a new one.
+        </p>
+
+        <p>
+          This is why the same delivery round can appear as one journey with several stops on a quiet day and as several journeys on a busy one — it depends on how long the asset waited at each call.
+        </p>
+
+        <h3>Dwell and position count</h3>
+        <p>
+          Each stop reports how long it lasted and how many positions built it. A stop lasting hours will typically have accumulated dozens of positions.
+        </p>
+
+        <h3>Open stops</h3>
+        <p>
+          A stop that's still in progress appears while it's happening, with its dwell increasing as new reports arrive. You don't have to wait for the asset to move again before its current stop is visible.
+        </p>
+      </section>
+
+      <!-- ===== 11 MAP ===== -->
+      <section class="section" id="map">
+        <div class="section-head">
+          <div class="section-num">11</div>
+          <h2 class="section-title">Map Controls</h2>
+        </div>
+
+        <h3>Legend</h3>
+        <table class="doc-table">
+          <thead>
+            <tr><th>Marker</th><th>Meaning</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="status-pill green"><span class="dot"></span>START</span></td><td>Where the journey began</td></tr>
+            <tr><td><span class="status-pill blue"><span class="dot"></span>LEG</span></td><td>The route travelled</td></tr>
+            <tr><td><span class="status-pill blue"><span class="dot"></span>POSITION</span></td><td>An individual position report</td></tr>
+            <tr><td><span class="status-pill amber"><span class="dot"></span>STATIONARY</span></td><td>A stop — numbered when several are clustered</td></tr>
+            <tr><td><span class="status-pill red"><span class="dot"></span>END</span></td><td>Where the journey finished</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Controls</h3>
+        <ul>
+          <li><code>Streets</code> / <code>Satellite</code> — switch base map</li>
+          <li><code>Show geofences</code> — overlay your configured geofences, useful for checking whether a stop fell inside a site boundary</li>
+          <li><code>Clear markers</code> — remove plotted markers without changing your selection</li>
+          <li><code>Plot all</code> — draw every journey in the selected range at once</li>
+          <li><b>+ / −</b> — zoom; the map auto-fits when you select a journey</li>
+        </ul>
+
+        <div class="callout info">
+          <div class="callout-title">→ Plotting everything at once</div>
+          <p>
+            <code>Plot all</code> over a long date range can produce a dense map. If it's hard to read, narrow the date range rather than zooming — the panel header tells you how many journeys are in scope.
+          </p>
+        </div>
+      </section>
+
+      <!-- ===== 12 POSITIONS ===== -->
+      <section class="section" id="positions">
+        <div class="section-head">
+          <div class="section-num">12</div>
+          <h2 class="section-title">Positions Tab</h2>
+        </div>
+
+        <p>
+          The Positions tab shows the raw reports behind the journeys — every position in the selected range, newest first, with its time and resolved address.
+        </p>
+
+        <p>
+          Each row has a locate button that drops a pin on the map. <code>Remove all</code> clears plotted pins.
+        </p>
+
+        <h3>When to use it</h3>
+        <ul>
+          <li>Checking exactly when an asset was somewhere, to the minute</li>
+          <li>Understanding why a leg is drawn sparsely — the position list shows how often the asset actually reported</li>
+          <li>Confirming presence at a location that didn't produce a stop</li>
+        </ul>
+
+        <div class="callout warn">
+          <div class="callout-title">→ Positions and journeys are different views</div>
+          <p>
+            The Positions tab lists <em>all</em> positions in the range, including those recorded outside any journey. If you see dense clusters of dots on the map that no leg passes through, they're almost always from a different time of day — check their timestamps before concluding a journey is missing.
+          </p>
+        </div>
+      </section>
+
+      <!-- ===== 13 QUALITY ===== -->
+      <section class="section" id="quality">
+        <div class="section-head">
+          <div class="section-num">13</div>
+          <h2 class="section-title">Data Quality</h2>
+        </div>
+
+        <p>
+          Movement Analytics is only ever as good as the positions it's given. Understanding what affects them explains most of what you'll see.
+        </p>
+
+        <h3>Reporting frequency</h3>
+        <p>
+          Assets that report every minute produce detailed routes and precise stop timings. Assets that report every fifteen minutes produce coarse routes, and short stops may be missed entirely because there weren't enough reports to establish them.
+        </p>
+
+        <h3>Position accuracy</h3>
+        <p>
+          Some positioning methods have inherent scatter of tens of metres. A parked asset can appear to wander within that radius. The anchor averaging described above is designed to absorb this, but very noisy data can still produce extra stops.
+        </p>
+
+        <h3>Gaps in coverage</h3>
+        <p>
+          If an asset goes unreported for a long period mid-journey — out of coverage, for example — Movement Analytics closes the leg at the last known position. When reporting resumes elsewhere, a new stop and journey begin. The route across the gap is not guessed.
+        </p>
+
+        <h3>Two tags on one vehicle</h3>
+        <p>
+          Assets travelling together should produce closely matching journeys. Small differences in leg count or distance are normal and come from differing report timing — particularly when a stop sits right on the journey-break threshold, where one tag may split a journey that the other keeps whole.
+        </p>
+      </section>
+
+      <!-- ===== 14 SETTINGS ===== -->
+      <section class="section" id="settings">
+        <div class="section-head">
+          <div class="section-num">14</div>
+          <h2 class="section-title">Settings Reference</h2>
+        </div>
+
+        <p>
+          Detection behaviour is governed by platform-wide settings, tuned centrally rather than per asset. They're listed here so you can interpret what you see, not because you need to change them.
+        </p>
+
+        <table class="doc-table">
+          <thead>
+            <tr><th>Setting</th><th>Default</th><th>What it controls</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Anchor radius</td><td>100 m</td><td>How far a report can fall from a stop's anchor and still count as part of that stop</td></tr>
+            <tr><td>Minimum leg distance</td><td>300 m</td><td>How far a movement must get from its start before it's recorded as a leg</td></tr>
+            <tr><td>Minimum leg excursion</td><td>500 m</td><td>Allows out-and-back trips to qualify on how far they went, not where they finished</td></tr>
+            <tr><td>Settle time</td><td>3 min</td><td>How long an asset must remain in one place before an arrival is committed</td></tr>
+            <tr><td>Journey break dwell</td><td>30 min</td><td>Stops longer than this end the journey; shorter ones are waypoints within it</td></tr>
+            <tr><td>Reporting gap timeout</td><td>30 min</td><td>Silence longer than this closes the current leg</td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout warn">
+          <div class="callout-title">→ Changes apply going forward</div>
+          <p>
+            Adjusting these settings affects future processing only. Journeys already built are not recalculated, so your history stays consistent with how it was originally interpreted.
+          </p>
+        </div>
+      </section>
+
+      <!-- ===== 15 TROUBLESHOOTING ===== -->
+      <section class="section" id="troubleshooting">
+        <div class="section-head">
+          <div class="section-num">15</div>
+          <h2 class="section-title">Troubleshooting</h2>
+        </div>
+
+        <h3>My asset isn't in the Movement Analytics list</h3>
+        <p>
+          The list only shows assets with Advanced Trip Analysis enabled. Edit the asset from <b>Assets</b> and check the <b>Enable Advanced Trip Analysis</b> checkbox in the Edit Tag dialog. If it's greyed out, you'll need a system administrator to enable it.
+        </p>
+
+        <h3>I ticked the checkbox but there's no history</h3>
+        <p>
+          Advanced Trip Analysis is forward-only. Journeys build from the next position pull onward — there's nothing to show for the period before you enabled it. Give it a journey or two and check again.
+        </p>
+        <p>
+          If it's the earlier period you actually need, send a request to your administrator for further direction on reprocessing historical data.
+        </p>
+
+        <h3>A journey shows as a straight line instead of following the road</h3>
+        <p>
+          The asset reported only a handful of times during that leg. The line is drawn through the positions that exist, so a leg with three reports renders as two straight segments. Check the Positions tab to see the actual reporting frequency for that window.
+        </p>
+
+        <h3>A trip I made isn't showing</h3>
+        <p>
+          Most often the movement didn't travel far enough to qualify as a leg — very short hops are filtered out deliberately. Failing that, check the date range, and check the Positions tab to confirm the asset was reporting during that period at all.
+        </p>
+
+        <h3>One stop is showing as two</h3>
+        <p>
+          Position scatter can occasionally push reports far enough apart that a single stop is recorded in parts. This is most likely with noisy position data or a large parking area. The Positions tab will show whether the reports were genuinely spread out.
+        </p>
+
+        <h3>Two tags in the same vehicle show different journeys</h3>
+        <p>
+          Compare total distance and leg count rather than journey count. Journey boundaries depend on stop duration, so a stop sitting close to the 30-minute threshold can legitimately split one tag's day and not the other's. Large differences in distance, however, are worth reporting.
+        </p>
+
+        <h3>The map is cluttered after using Plot all</h3>
+        <p>
+          Narrow the date range, or use <code>Clear markers</code> and select a single journey. The journeys panel header shows how many journeys are currently in scope.
+        </p>
+      </section>
+
+      <!-- ===== 16 FAQ ===== -->
+      <section class="section" id="faq">
+        <div class="section-head">
+          <div class="section-num">16</div>
+          <h2 class="section-title">FAQ</h2>
+        </div>
+
+        <h4>Do I need special hardware?</h4>
+        <p>No. Movement Analytics uses the position reports your assets already send.</p>
+
+        <h4>Can I enable Movement Analytics myself?</h4>
+        <p>Only if you're a system administrator. Other users can see whether Advanced Trip Analysis is on for an asset, but can't change it.</p>
+
+        <h4>Will enabling Advanced Trip Analysis rebuild past journeys?</h4>
+        <p>No. Processing starts from the next position pull. Anything before that is not reconstructed.</p>
+
+        <h4>Can historical data be reprocessed?</h4>
+        <p>Not from the asset itself. If you need journeys built for a period before Advanced Trip Analysis was enabled, send a request to your administrator for further direction.</p>
+
+        <h4>What happens if I turn it off again?</h4>
+        <p>Existing journeys stay visible. No new ones are built until you turn it back on.</p>
+
+        <h4>Why is a journey's distance lower than my odometer?</h4>
+        <p>Distance is measured between reported positions, so any curve between two reports is measured as a straight line. Assets reporting infrequently will read lower than actual road distance.</p>
+
+        <h4>Why do stops sometimes appear before the asset has left?</h4>
+        <p>Stops are shown while they're still in progress, with dwell increasing as reports arrive. You don't have to wait for departure to see the current stop.</p>
+
+        <h4>Can I export journeys?</h4>
+        <p>Position data can be exported from the tracking platform. Journey-level export is on the roadmap.</p>
+
+        <h4>Are flights detected?</h4>
+        <p>Automatic detection of air travel is on the roadmap. Until it ships, a flight is recorded as an ordinary journey with a single very long leg.</p>
+
+        <h4>How far back does history go?</h4>
+        <p>As far back as the asset has had Advanced Trip Analysis enabled and positions have been retained. Use <code>Custom</code> in the date range to look at any specific window.</p>
+
+        <h4>Does Movement Analytics work with every tag type?</h4>
+        <p>Any asset in <b>Beacon Telematics</b> that reports positions can have Advanced Trip Analysis enabled. Route detail will vary with how frequently the tag reports.</p>
+      </section>
+
+      <!-- footer -->
+      <div class="doc-footer">
+        <div>Movement Analytics · v2.1</div>
+        <div>Beacon Telematics Platform Documentation</div>
+      </div>
+
+    </div>
+  </main>
+
+</div>
+
+</body>
+</html>
