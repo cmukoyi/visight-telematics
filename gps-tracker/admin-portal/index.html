@@ -761,6 +761,45 @@
                 padding: 12px;
             }
         }
+
+        /* Tenant Features - Feature Checkbox Items */
+        .feature-checkbox-item {
+            display: flex;
+            gap: 12px;
+            padding: 14px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .feature-checkbox-item:hover {
+            border-color: var(--primary-color);
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+        }
+
+        .feature-checkbox-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: var(--primary-color);
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .feature-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .feature-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
     </style>
 </head>
 <body>
@@ -851,6 +890,12 @@
                         <button class="sidebar-link" onclick="switchTab('usergroups')">
                             <span>🏢</span>
                             <span>User Groups</span>
+                        </button>
+                    </li>
+                    <li class="sidebar-item">
+                        <button class="sidebar-link" onclick="switchTab('tenant-features')">
+                            <span>🎛️</span>
+                            <span>Tenant Features</span>
                         </button>
                     </li>
                     <li class="sidebar-item">
@@ -1617,6 +1662,126 @@
                                 </div>
                             </div>
                         </div>
+
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <!-- TENANT FEATURES TAB                                 -->
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <div id="tenant-features" class="tab-content">
+                        <div class="page-header">
+                            <h2 class="page-title">Tenant Features</h2>
+                            <p class="page-subtitle">Control which customer dashboard features are available to all users in each tenant. Features disabled here are hidden for everyone regardless of their role.</p>
+                        </div>
+
+                        <div id="tfAlertBanner" class="alert" style="display:none"><span id="tfAlertText"></span></div>
+
+                        <div class="card">
+                            <h3 class="card-title">Select Tenant</h3>
+                            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">Choose a tenant (user group) to manage their customer dashboard features:</p>
+                            <select id="tfTenantSelect" class="form-input" onchange="loadTenantFeatures()" style="max-width:400px">
+                                <option value="">— Select a tenant —</option>
+                            </select>
+                        </div>
+
+                        <div id="tfFeaturesCard" class="card" style="display:none">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                                <h3 class="card-title" style="margin:0">Customer Dashboard Features</h3>
+                                <button class="btn btn-primary" onclick="saveTenantFeatures()" id="tfSaveBtn">Save Changes</button>
+                            </div>
+                            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:18px">
+                                Enable or disable features for <strong id="tfTenantName"></strong>. Disabled features are hidden from all users in this tenant.
+                            </p>
+
+                            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">
+                                <label class="feature-checkbox-item">
+                                    <input type="checkbox" id="tf_livemap" data-feature="livemap">
+                                    <div>
+                                        <div class="feature-name">🗺️ Live Map</div>
+                                        <div class="feature-desc">Real-time GPS tracking map with tag positions</div>
+                                    </div>
+                                </label>
+
+                                <label class="feature-checkbox-item">
+                                    <input type="checkbox" id="tf_history" data-feature="history">
+                                    <div>
+                                        <div class="feature-name">📅 History</div>
+                                        <div class="feature-desc">Journey history with playback and filtering</div>
+                                    </div>
+                                </label>
+
+                                <label class="feature-checkbox-item">
+                                    <input type="checkbox" id="tf_history-advanced" data-feature="history-advanced">
+                                    <div>
+                                        <div class="feature-name">✈️ Movement Analytics</div>
+                                        <div class="feature-desc">Advanced analytics with great-circle arcs, air legs, trip engine data</div>
+                                    </div>
+                                </label>
+
+                                <label class="feature-checkbox-item">
+                                    <input type="checkbox" id="tf_alerts" data-feature="alerts">
+                                    <div>
+                                        <div class="feature-name">🔔 Alerts</div>
+                                        <div class="feature-desc">Alert configuration and notifications</div>
+                                    </div>
+                                </label>
+
+                                <label class="feature-checkbox-item">
+                                    <input type="checkbox" id="tf_geofences" data-feature="geofences">
+                                    <div>
+                                        <div class="feature-name">📍 Geofences</div>
+                                        <div class="feature-desc">Geofence management and boundary alerts</div>
+                                    </div>
+                                </label>
+
+                                <label class="feature-checkbox-item">
+                                    <input type="checkbox" id="tf_reports" data-feature="reports">
+                                    <div>
+                                        <div class="feature-name">📊 Reports</div>
+                                        <div class="feature-desc">Reports and analytics dashboards</div>
+                                    </div>
+                                </label>
+
+                                <label class="feature-checkbox-item">
+                                    <input type="checkbox" id="tf_management" data-feature="management">
+                                    <div>
+                                        <div class="feature-name">⚙️ Management</div>
+                                        <div class="feature-desc">Tag management and configuration</div>
+                                    </div>
+                                </label>
+
+                                <label class="feature-checkbox-item">
+                                    <input type="checkbox" id="tf_floorplan" data-feature="floorplan">
+                                    <div>
+                                        <div class="feature-name">🏗️ Floor Plan</div>
+                                        <div class="feature-desc">Indoor floor plan tracking and BLE positioning</div>
+                                    </div>
+                                </label>
+
+                                <label class="feature-checkbox-item">
+                                    <input type="checkbox" id="tf_settings" data-feature="settings">
+                                    <div>
+                                        <div class="feature-name">⚙️ Settings</div>
+                                        <div class="feature-desc">User settings and preferences</div>
+                                    </div>
+                                </label>
+
+                                <label class="feature-checkbox-item">
+                                    <input type="checkbox" id="tf_hive" data-feature="hive">
+                                    <div>
+                                        <div class="feature-name">🛡️ HIVE</div>
+                                        <div class="feature-desc">HIVE tracking UI for asset monitoring</div>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <div style="margin-top:20px;padding:14px;background:var(--bg-secondary);border-radius:8px;border-left:4px solid var(--primary-color)">
+                                <p style="margin:0;font-size:13px;color:var(--text-secondary)">
+                                    <strong>ℹ️ How it works:</strong> Features enabled here are the <strong>master switch</strong> for all users in this tenant. 
+                                    Individual users can be further restricted via their Role in the customer portal (Admin, Manager, Reporter, Custom), 
+                                    but they cannot access features disabled at the tenant level.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
 
                     <!-- ═══════════════════════════════════════════════════ -->
                     <!-- PACKAGES TAB                                        -->
@@ -3229,6 +3394,7 @@ dashboard.welcome,Bienvenue</pre>
                 'audit': 'Audit Logs',
                 'features': 'App Features',
                 'usergroups': 'User Groups',
+                'tenant-features': 'Tenant Features',
                 'packages': 'Tag Packages',
                 'buildings': 'Buildings & Floor Plans',
                 'ble-tags': 'BLE Tag Registration',
@@ -3253,6 +3419,7 @@ dashboard.welcome,Bienvenue</pre>
             if (tabName === 'audit') loadAuditLogs();
             if (tabName === 'features') loadFeatures();
             if (tabName === 'usergroups') loadUsergroups();
+            if (tabName === 'tenant-features') loadTenantFeaturesTab();
             if (tabName === 'packages') loadPackages();
             if (tabName === 'buildings') { loadBuildings(); }
             if (tabName === 'ble-tags') { loadBLETags(); }
@@ -7232,6 +7399,115 @@ dashboard.welcome,Bienvenue</pre>
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    // === Tenant Features ===
+
+    async function loadTenantFeaturesTab() {
+        // Populate tenant selector
+        const selectEl = document.getElementById('tfTenantSelect');
+        selectEl.innerHTML = '<option value="">— Select a tenant —</option>';
+
+        try {
+            const response = await fetch('/api/admin/usergroups', {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+
+            if (!response.ok) throw new Error('Failed to load tenants');
+
+            const data = await response.json();
+            data.forEach(ug => {
+                const opt = document.createElement('option');
+                opt.value = ug.usergroup_id;
+                opt.textContent = ug.group_name;
+                selectEl.appendChild(opt);
+            });
+        } catch (e) {
+            alert('Error loading tenants: ' + e.message);
+        }
+    }
+
+    async function loadTenantFeatures() {
+        const usergroupId = document.getElementById('tfTenantSelect').value;
+        const featuresCard = document.getElementById('tfFeaturesCard');
+        const saveBtn = document.getElementById('tfSaveBtn');
+
+        if (!usergroupId) {
+            featuresCard.style.display = 'none';
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/admin/tenant-features/${usergroupId}`, {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+
+            if (!response.ok) throw new Error('Failed to load features');
+
+            const features = await response.json();
+
+            // Build a map of enabled features
+            const enabledMap = {};
+            features.forEach(f => {
+                enabledMap[f.feature_name] = f.enabled;
+            });
+
+            // Update checkboxes
+            ['livemap', 'history', 'history-advanced', 'alerts', 'geofences', 'reports', 'management', 'floorplan', 'settings', 'hive'].forEach(feature => {
+                const checkbox = document.getElementById(`tf_${feature.replace('-', '_')}`);
+                if (checkbox) {
+                    checkbox.checked = enabledMap[feature] !== false; // Default to true if missing
+                }
+            });
+
+            featuresCard.style.display = 'block';
+        } catch (e) {
+            alert('Error loading features: ' + e.message);
+            featuresCard.style.display = 'none';
+        }
+    }
+
+    async function saveTenantFeatures() {
+        const usergroupId = document.getElementById('tfTenantSelect').value;
+        if (!usergroupId) {
+            alert('Please select a tenant first');
+            return;
+        }
+
+        const saveBtn = document.getElementById('tfSaveBtn');
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+
+        try {
+            const features = {};
+            ['livemap', 'history', 'history-advanced', 'alerts', 'geofences', 'reports', 'management', 'floorplan', 'settings', 'hive'].forEach(feature => {
+                const checkbox = document.getElementById(`tf_${feature.replace('-', '_')}`);
+                if (checkbox) {
+                    features[feature] = checkbox.checked;
+                }
+            });
+
+            const response = await fetch(`/api/admin/tenant-features/${usergroupId}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ features })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to save features');
+            }
+
+            alert('Tenant features updated successfully! Users will see changes on next login.');
+        } catch (e) {
+            alert('Error saving features: ' + e.message);
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save Changes';
+        }
     }
 
     </script>
