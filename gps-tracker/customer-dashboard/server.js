@@ -49,6 +49,60 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Pretty help routes - tenant-aware
+// Maps /help/movement-analytics to tenant-specific manual based on branding
+app.get('/help/movement-analytics', (req, res) => {
+  const brandName = process.env.BRAND_NAME || 'PinPlot';
+  const isBeacon = brandName.toLowerCase().includes('beacon');
+  const filename = isBeacon 
+    ? 'Movement_Analytics_User_Manual_v2_1_Beacon.html'
+    : 'Movement_Analytics_User_Manual_v2_1_Pinplot.html';
+  
+  const filePath = path.join(publicDir, 'help', filename);
+  
+  if (fs.existsSync(filePath)) {
+    res.sendFile(filePath);
+  } else {
+    res.status(404).json({ 
+      error: 'Manual not found',
+      tenant: brandName,
+      expectedFile: filename 
+    });
+  }
+});
+
+// Pretty route for QR/NFC guide
+app.get('/help/qr-nfc', (req, res) => {
+  const brandName = process.env.BRAND_NAME || 'PinPlot';
+  const isBeacon = brandName.toLowerCase().includes('beacon');
+  const filename = isBeacon 
+    ? 'QR_NFC_Guide_Beacon.html'
+    : 'QR_NFC_Guide_Pinplot.html';
+  
+  const filePath = path.join(publicDir, 'help', filename);
+  
+  if (fs.existsSync(filePath)) {
+    res.sendFile(filePath);
+  } else {
+    res.status(404).json({ 
+      error: 'Guide not found',
+      tenant: brandName,
+      expectedFile: filename 
+    });
+  }
+});
+
+// Pretty route for HIVE manual
+app.get('/help/hive', (req, res) => {
+  const filePath = path.join(publicDir, 'help', 'HIVE_User_Manual.html');
+  
+  if (fs.existsSync(filePath)) {
+    res.sendFile(filePath);
+  } else {
+    res.status(404).json({ error: 'HIVE manual not found' });
+  }
+});
+
 // Manifest endpoint
 app.get('/api/manifest', (req, res) => {
   const files = fs.existsSync(publicDir) ? fs.readdirSync(publicDir) : [];
