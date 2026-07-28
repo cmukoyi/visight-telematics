@@ -96,7 +96,7 @@ from app.models import (
 logger = logging.getLogger(__name__)
 
 # ── Engine Version (v2.2.0 - Fix Register) ────────────────────────────────
-ENGINE_VERSION = "2.1.15"  # v2.1.15: C2b journey break on departure checks dwell
+ENGINE_VERSION = "2.1.16"  # v2.1.16: D1 state rebuild for late arrivals (incremental path)
 
 # ── Configuration (defaults from spec validation) ─────────────────────────
 DEFAULT_ANCHOR_RADIUS_M = 100
@@ -1506,6 +1506,68 @@ class TripEngine:
         
         return leg
     
+    def _reset_state_to_rebuild_point(self, rebuild_from: datetime) -> None:
+        """
+        Reset engine state to a rebuild point for late-arrival reprocessing.
+        
+        Finds the last confirmed stationary before rebuild_from and restores
+        state to that point. Positions from rebuild_from onward will be reprocessed.
+        
+        Args:
+            rebuild_from: Timestamp to rebuild from
+        """
+        logger.info(
+            "🔄 D1: Resetting state to rebuild from %s",
+            rebuild_from.isoformat()
+        )
+        
+        # Find last confirmed stationary before rebuild point
+        anchor_query = select(Stationary).where(
+            and_(
+                Stationary.device_imei == self.device_imei,
+                Stationary.started_at < rebuild_from
+            )
+        ).order_by(Stationary.started_at.desc()).limit(1)
+        
+        anchor_stat = self.db.execute(anchor_query).scalar_one_or_none()
+        
+        if anchor_stat:
+            # Reset to STATIONARY state at anchor
+            self.context.current_state = "STATIONARY"
+            self.context.anchor_lat = anchor_stat.anchor_lat
+            self.context.anchor_lng = anchor_stat.anchor_lng
+            self.context.anchor_points = [(anchor_stat.anchor_lat, anchor_stat.anchor_lng, anchor_stat.ended_at, None)]
+            self.context.last_processed_at = anchor_stat.ended_at
+            self.context.current_journey_id = anchor_stat.journey_id
+            self.context.last_stationary_ended_at = anchor_stat.ended_at
+            self.context.last_stationary_flush = anchor_stat.ended_at
+            
+            # Clear MOVE state
+            self.context.leg_buffer = []
+            self.context.stop_candidate_since = None
+            self.context.stop_candidate_points = []
+            
+            logger.info(
+                "🔄 D1: State reset to anchor stationary at (%.4f, %.4f) ending %s",
+                anchor_stat.anchor_lat, anchor_stat.anchor_lng,
+                anchor_stat.ended_at.isoformat()
+            )
+        else:
+            # No anchor found - reset to initial STATIONARY
+            self.context.current_state = "STATIONARY"
+            self.context.anchor_lat = None
+            self.context.anchor_lng = None
+            self.context.anchor_points = []
+            self.context.last_processed_at = None
+            self.context.current_journey_id = None
+            self.context.last_stationary_ended_at = None
+            self.context.last_stationary_flush = None
+            self.context.leg_buffer = []
+            self.context.stop_candidate_since = None
+            self.context.stop_candidate_points = []
+            
+            logger.info("🔄 D1: State reset to initial (no anchor found before rebuild point)")
+    
     def process_positions(self, limit: Optional[int] = None) -> Dict:
         """
         Process unprocessed positions for this device.
@@ -1563,22 +1625,60 @@ class TripEngine:
             logger.info("✅ IMEI %s: All positions were duplicates", self.device_imei)
             return stats
         
-        # v2.1.11 D1: Detect late-arriving positions (out-of-order timestamps)
-        # If any position has observed_at < last_processed_at, we must rebuild state
+        # v2.1.16 D1: State rebuild for late-arriving positions
+        # If any position has observed_at < last_processed_at, rebuild state from that point
+        rebuild_from = None
         if self.context.last_processed_at:
             min_observed = min(p.observed_at for p in positions)
             if min_observed < self.context.last_processed_at:
                 logger.warning(
-                    "⚠️  D1 late arrivals detected: min(observed_at)=%s < last_processed_at=%s",
+                    "⚠️  D1 late arrivals: min(observed_at)=%s < last_processed_at=%s",
                     min_observed.isoformat(),
                     self.context.last_processed_at.isoformat()
                 )
+                
+                # Find rebuild anchor point: earlier of (min observed_at, last stationary start)
+                rebuild_from = min_observed
+                
+                # If we have a last stationary, use its start time if earlier
+                last_stat_query = select(Stationary).where(
+                    Stationary.device_imei == self.device_imei
+                ).order_by(Stationary.started_at.desc()).limit(1)
+                last_stat = self.db.execute(last_stat_query).scalar_one_or_none()
+                
+                if last_stat and last_stat.started_at < rebuild_from:
+                    rebuild_from = last_stat.started_at
+                    logger.info(
+                        "🔄 D1 rebuild anchor: last stationary start (%s)",
+                        rebuild_from.isoformat()
+                    )
+                else:
+                    logger.info(
+                        "🔄 D1 rebuild anchor: earliest late position (%s)",
+                        rebuild_from.isoformat()
+                    )
+                
+                # Fetch ALL positions from rebuild point (not just late ones)
+                rebuild_query = select(DevicePosition).where(
+                    and_(
+                        DevicePosition.device_imei == self.device_imei,
+                        DevicePosition.observed_at >= rebuild_from
+                    )
+                ).order_by(DevicePosition.observed_at)
+                
+                if limit:
+                    rebuild_query = rebuild_query.limit(limit)
+                
+                positions = list(self.db.execute(rebuild_query).scalars().all())
+                
                 logger.warning(
-                    "⚠️  State rebuild required - use reprocess or wait for next scheduled reprocess"
+                    "⚠️  D1 state rebuild: reprocessing %d positions from %s",
+                    len(positions),
+                    rebuild_from.isoformat()
                 )
-                # NOTE: Full state rebuild requires reprocessing from earliest position
-                # For incremental runs, we log the issue but continue processing
-                # Reprocess jobs will handle full state reconstruction
+                
+                # Reset state to rebuild point
+                self._reset_state_to_rebuild_point(rebuild_from)
         
         # Apply median smoothing
         smoothed = median_smooth_positions(positions, self.config.smoothing_window)
