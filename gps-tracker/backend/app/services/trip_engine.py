@@ -551,7 +551,29 @@ class TripEngine:
             }
         ).returning(Journey.id)
         
-        result_id = self.db.execute(stmt).scalar_one()
+        try:
+            result_id = self.db.execute(stmt).scalar_one()
+            self.db.flush()  # Ensure the upsert is persisted before continuing
+        except Exception as exc:
+            # If upsert fails, try to find existing journey as fallback
+            logger.warning("⚠️  IMEI %s: Journey upsert failed (%s), querying existing...", 
+                          self.device_imei, exc)
+            self.db.rollback()
+            existing = self.db.execute(
+                select(Journey).where(
+                    Journey.device_imei == self.device_imei,
+                    Journey.started_at == timestamp
+                )
+            ).scalar_one_or_none()
+            
+            if existing:
+                result_id = existing.id
+                logger.info("♻️  IMEI %s: Found existing journey %s", self.device_imei, result_id)
+            else:
+                # Re-raise if we can't find the journey
+                logger.error("❌ IMEI %s: Journey upsert failed and no existing journey found", 
+                           self.device_imei)
+                raise
         
         self.context.current_journey_id = str(result_id)
         self.context.journey_just_created = (result_id == journey_id)  # True only if inserted new
@@ -2311,6 +2333,9 @@ async def process_all_subscribed_devices(db: Session) -> Dict:
             total_stats['device_results'].append(stats)
         except Exception as exc:
             logger.error("❌ IMEI %s: Processing failed: %s", device_state.device_imei, exc, exc_info=True)
+            # Roll back the poisoned transaction so remaining devices can process
+            db.rollback()
+            logger.info("🔄 Session rolled back, continuing with next device...")
     
     logger.info(
         "✅ Processed %d devices: %d positions → %d stationaries, %d legs, %d journeys",
