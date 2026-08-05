@@ -249,7 +249,7 @@
 
     <!-- ── HEADER ── -->
     <header id="app-header">
-        <button id="sidebar-toggle" title="Toggle sidebar" onclick="toggleSidebarResponsive()">
+        <button id="sidebar-toggle" data-i18n-title="nav.toggle_sidebar" title="Toggle sidebar" onclick="toggleSidebarResponsive()">
             <i class="fa-solid fa-bars"></i>
         </button>
 
@@ -257,7 +257,7 @@
             <div class="logo-icon"><i class="fa-solid fa-location-dot"></i></div>
             <div>
                 <span data-brand="name">PinPlot</span>
-                <span class="logo-sub">Customer Portal</span>
+                <span class="logo-sub" data-i18n="nav.customer_portal">Customer Portal</span>
             </div>
         </div>
 
@@ -282,7 +282,7 @@
                     </div>
                 </div>
             </div>
-            <button id="theme-toggle" data-i18n-title="settings.toggle_theme" title="Toggle light / dark mode" onclick="toggleTheme()">
+            <button id="theme-toggle" data-i18n-title="nav.toggle_theme" title="Toggle light / dark mode" onclick="toggleTheme()">
                 <i id="themeIcon" class="fa-solid fa-sun"></i>
             </button>
             <div style="font-size:13px;color:var(--text-3);text-align:right">
@@ -290,19 +290,19 @@
                 <small id="sidebarCompany">—</small>
             </div>
             <div class="avatar-menu-wrap" id="avatarMenuWrap">
-                <div class="header-avatar" id="headerAvatar" data-i18n-title="settings.account_menu" title="Account menu" onclick="toggleAvatarMenu(event)" style="cursor:pointer">—</div>
+                <div class="header-avatar" id="headerAvatar" data-i18n-title="nav.account_menu" title="Account menu" onclick="toggleAvatarMenu(event)" style="cursor:pointer">—</div>
                 <div class="avatar-dropdown" id="avatarDropdown" style="display:none">
                     <div class="avatar-dropdown-header" id="avatarDropdownEmail">—</div>
                     <button class="avatar-menu-item" onclick="closeAvatarMenu(); switchTab('settings')">
                         <i class="fa-solid fa-gear"></i> <span data-i18n="settings.title">Settings</span>
                     </button>
-                    <label class="avatar-menu-item" style="display:flex;align-items:center;gap:8px;cursor:pointer" title="Always show maps with the light style, even in dark mode">
+                    <label class="avatar-menu-item" style="display:flex;align-items:center;gap:8px;cursor:pointer" data-i18n-title="nav.light_maps_tooltip" title="Always show maps with the light style, even in dark mode">
                         <i class="fa-solid fa-map-location-dot" style="width:16px"></i>
-                        <span style="flex:1">Light maps</span>
+                        <span style="flex:1" data-i18n="nav.light_maps">Light maps</span>
                         <input type="checkbox" id="lightMapsToggle" onchange="_ppToggleLightMaps(this.checked)" style="margin:0">
                     </label>
                     <button class="avatar-menu-item avatar-menu-item-danger" onclick="closeAvatarMenu(); handleLogout()">
-                        <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+                        <i class="fa-solid fa-right-from-bracket"></i> <span data-i18n="nav.sign_out">Sign Out</span>
                     </button>
                 </div>
             </div>
@@ -313,16 +313,16 @@
     <nav id="sidebar">
 
         <div class="nav-section">
-            <div class="nav-section-label">Tracking</div>
+            <div class="nav-section-label" data-i18n="nav.tracking">Tracking</div>
 
             <button class="nav-item active" data-tab="livemap" onclick="switchTab('livemap')">
                 <span class="nav-icon"><i class="fa-solid fa-map"></i></span>
-                <span class="nav-label">Live Map</span>
+                <span class="nav-label" data-i18n="nav.live_map">Live Map</span>
             </button>
 
             <button class="nav-item" data-tab="floorplan" onclick="switchTab('floorplan')">
                 <span class="nav-icon"><i class="fa-solid fa-layer-group"></i></span>
-                <span class="nav-label" data-i18n="general.floor_plan">Floor Plan <span class="beta-badge">Beta</span></span>
+                <span class="nav-label" data-i18n="general.floor_plan">Floor Plan <span class="beta-badge" data-i18n="common.beta">Beta</span></span>
             </button>
 
             <button class="nav-item" data-tab="assets" onclick="switchTab('assets')">
@@ -371,7 +371,7 @@
 
             <button class="nav-item" data-tab="building" onclick="switchTab('building')">
                 <span class="nav-icon"><i class="fa-solid fa-pencil-ruler"></i></span>
-                <span class="nav-label" data-i18n="general.floor_plan_sketch">Floor Plan Sketch <span class="beta-badge">Beta</span></span>
+                <span class="nav-label" data-i18n="general.floor_plan_sketch">Floor Plan Sketch <span class="beta-badge" data-i18n="common.beta">Beta</span></span>
             </button>
 
             <button class="nav-item" data-tab="settings" onclick="switchTab('settings')">
@@ -415,9 +415,9 @@
         </div>
 
         <div class="nav-section" id="nav-section-developers" style="display:none">
-            <div class="nav-section-label" data-i18n="general.developers">Developers</div>
+            <div class="nav-section-label" data-i18n="nav.developers">Developers</div>
 
-            <a class="nav-item" href="/docs" target="_blank" rel="noopener noreferrer" title="Open API Documentation in new tab">
+            <a class="nav-item" href="/docs" target="_blank" rel="noopener noreferrer" data-i18n-title="nav.api_docs_tooltip" title="Open API Documentation in new tab">
                 <span class="nav-icon"><i class="fa-solid fa-code"></i></span>
                 <span class="nav-label" data-i18n="general.api_docs">API Docs</span>
                 <span class="nav-icon" style="margin-left:auto;font-size:11px"><i class="fa-solid fa-arrow-up-right-from-square"></i></span>
@@ -449,19 +449,19 @@
 
                     <!-- Stats -->
                     <div class="stat-chips" id="lm-stat-chips">
-                        <div class="stat-chip" style="cursor:pointer" onclick="lmFilterStatus('all', this)" title="Show all">
+                        <div class="stat-chip" style="cursor:pointer" onclick="lmFilterStatus('all', this)" data-i18n-title="map.filter_show_all" title="Show all">
                             <span class="stat-num" id="lm-stat-total">—</span>
                             <span data-i18n="common.total">Total</span>
                         </div>
-                        <div class="stat-chip online" style="cursor:pointer" onclick="lmFilterStatus('active', this)" title="Reported within last 24 h">
+                        <div class="stat-chip online" style="cursor:pointer" onclick="lmFilterStatus('active', this)" data-i18n-title="map.filter_active_24h" title="Reported within last 24 h">
                             <span class="stat-num" id="lm-stat-online">—</span>
                             <span data-i18n="common.active">Active</span>
                         </div>
-                        <div class="stat-chip idle" style="cursor:pointer" onclick="lmFilterStatus('idle', this)" title="Reported in last 7 days but not within 24 h">
+                        <div class="stat-chip idle" style="cursor:pointer" onclick="lmFilterStatus('idle', this)" data-i18n-title="map.filter_idle_7d" title="Reported in last 7 days but not within 24 h">
                             <span class="stat-num" id="lm-stat-idle">—</span>
                             <span data-i18n="common.idle">Idle</span>
                         </div>
-                        <div class="stat-chip offline" style="cursor:pointer" onclick="lmFilterStatus('offline', this)" title="No position in over 7 days">
+                        <div class="stat-chip offline" style="cursor:pointer" onclick="lmFilterStatus('offline', this)" data-i18n-title="map.filter_offline_7d" title="No position in over 7 days">
                             <span class="stat-num" id="lm-stat-offline">—</span>
                             <span data-i18n="common.offline">Offline</span>
                         </div>
@@ -481,7 +481,7 @@
 
                 <div class="map-area">
                     <!-- Mobile: toggle asset list panel -->
-                    <button id="lm-sidebar-btn" class="map-panel-toggle" onclick="toggleMapSidebar()" title="Toggle asset list">
+                    <button id="lm-sidebar-btn" class="map-panel-toggle" onclick="toggleMapSidebar()" data-i18n-title="map.toggle_asset_list" title="Toggle asset list">
                         <i class="fa-solid fa-list"></i>
                     </button>
                     <!-- POI overlay toggle (floating top-right of map) -->
@@ -502,10 +502,10 @@
                     </button>
                     <!-- Map Style Switcher for Live Map -->
                     <div class="map-style-switcher" id="live-style-switcher">
-                        <button class="map-style-btn active" data-style="streets" onclick="liveSwitchMapStyle('streets')">
+                        <button class="map-style-btn active" data-style="streets" onclick="liveSwitchMapStyle('streets')" data-i18n="map.streets">
                             Streets
                         </button>
-                        <button class="map-style-btn" data-style="satellite" onclick="liveSwitchMapStyle('satellite')">
+                        <button class="map-style-btn" data-style="satellite" onclick="liveSwitchMapStyle('satellite')" data-i18n="map.satellite">
                             Satellite
                         </button>
                     </div>
@@ -516,7 +516,7 @@
             <!-- ═══ ASSET LIST TAB ═══ -->
             <div id="tab-assets" class="tab-content">
                 <div class="view-header">
-                    <h2><i class="fa-solid fa-list" style="color:var(--primary);margin-right:8px"></i>Asset List</h2>
+                    <h2><i class="fa-solid fa-list" style="color:var(--primary);margin-right:8px"></i><span data-i18n="assets.asset_list">Asset List</span></h2>
                     <div class="search-input-wrap" style="flex:1;max-width:300px">
                         <i class="fa-solid fa-magnifying-glass"></i>
                         <input id="al-search" class="search-input" type="text" data-i18n-placeholder="general.search_name_imei" placeholder="Search name, IMEI…" oninput="_alRenderTableD()">
@@ -543,7 +543,7 @@
                                 </tr>
                             </thead>
                             <tbody id="al-tbody">
-                                <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-3)">Loading…</td></tr>
+                                <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-3)" data-i18n="common.loading">Loading…</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -554,18 +554,18 @@
             <div id="tab-history" class="tab-content">
                 <div class="hist-controls">
                     <div class="hist-asset-name-wrap">
-                        <label for="hist-asset-select"><i class="fa-solid fa-tag"></i> Asset / Tag</label>
+                        <label for="hist-asset-select"><i class="fa-solid fa-tag"></i> <span data-i18n="assets.asset_tag">Asset / Tag</span></label>
                         <select id="hist-asset-select" onchange="histChangeAsset(this.value); histLoadTrips()" style="min-width:220px"></select>
                     </div>
                     <div class="hist-field">
-                        <label>From</label>
+                        <label data-i18n="common.from">From</label>
                         <div style="display:flex;gap:4px">
                             <input type="date" id="hist-from">
                             <input type="time" id="hist-from-t" value="07:00">
                         </div>
                     </div>
                     <div class="hist-field">
-                        <label>To</label>
+                        <label data-i18n="common.to">To</label>
                         <div style="display:flex;gap:4px">
                             <input type="date" id="hist-to">
                             <input type="time" id="hist-to-t" value="18:00">
@@ -575,14 +575,14 @@
                         <span class="hist-field-spacer"></span>
                         <div style="display:flex;gap:6px">
                             <button class="btn btn-primary btn-sm" onclick="histLoadTrips()">
-                                <i class="fa-solid fa-magnifying-glass"></i> Load Journeys
+                                <i class="fa-solid fa-magnifying-glass"></i> <span data-i18n="trips.load_journeys">Load Journeys</span>
                             </button>
                             <div id="hist-export-btn" style="display:none;gap:4px" class="rpt-export-group">
                                 <button class="btn btn-ghost btn-sm" onclick="histExport()">
-                                    <i class="fa-solid fa-file-csv"></i> CSV
+                                    <i class="fa-solid fa-file-csv"></i> <span data-i18n="common.csv">CSV</span>
                                 </button>
                                 <button class="btn btn-ghost btn-sm" onclick="histExportXLSX()">
-                                    <i class="fa-solid fa-file-excel"></i> Excel
+                                    <i class="fa-solid fa-file-excel"></i> <span data-i18n="common.excel">Excel</span>
                                 </button>
                             </div>
                         </div>
@@ -592,7 +592,7 @@
                 <div class="hist-body">
                     <div id="hist-map" style="position:relative">
                         <!-- Mobile: toggle journey panel -->
-                        <button id="hist-panel-btn" class="map-panel-toggle" onclick="toggleHistPanel()" title="Toggle journeys panel" style="display:none">
+                        <button id="hist-panel-btn" class="map-panel-toggle" onclick="toggleHistPanel()" data-i18n-title="trips.toggle_journeys_panel" title="Toggle journeys panel" style="display:none">
                             <i class="fa-solid fa-route"></i>
                         </button>
                         
@@ -2299,31 +2299,31 @@ input.hive-range::-moz-range-track {
                         <div class="settings-section-header">
                             <i class="fa-solid fa-lock" style="color:var(--primary)"></i>
                             <div>
-                                <h3>Account &amp; Security</h3>
-                                <p>Change your login password.</p>
+                                <h3 data-i18n="settings.account_security">Account &amp; Security</h3>
+                                <p data-i18n="settings.account_security_hint">Change your login password.</p>
                             </div>
                         </div>
                         <div class="settings-row">
                             <div>
-                                <div class="settings-row-label">Password</div>
-                                <div class="settings-row-hint">Keep your account secure with a strong password.</div>
+                                <div class="settings-row-label" data-i18n="settings.password">Password</div>
+                                <div class="settings-row-hint" data-i18n="settings.password_hint">Keep your account secure with a strong password.</div>
                             </div>
                             <button class="btn btn-secondary btn-small" onclick="settingsToggleForm('pwForm')">
-                                <i class="fa-solid fa-key"></i> Change Password
+                                <i class="fa-solid fa-key"></i> <span data-i18n="settings.change_password">Change Password</span>
                             </button>
                         </div>
                         <div class="settings-inline-edit" id="pwForm" style="display:none">
                             <div>
-                                <label style="font-size:12px;font-weight:600;color:var(--text-3);display:block;margin-bottom:4px">Current password</label>
-                                <input type="password" id="pw-current" placeholder="••••••••" autocomplete="current-password">
+                                <label style="font-size:12px;font-weight:600;color:var(--text-3);display:block;margin-bottom:4px" data-i18n="settings.current_password">Current password</label>
+                                <input type="password" id="pw-current" data-i18n-placeholder="settings.password_placeholder" placeholder="••••••••" autocomplete="current-password">
                             </div>
                             <div>
-                                <label style="font-size:12px;font-weight:600;color:var(--text-3);display:block;margin-bottom:4px">New password <span style="color:var(--text-3)">(min 8 characters)</span></label>
-                                <input type="password" id="pw-new" placeholder="••••••••" autocomplete="new-password">
+                                <label style="font-size:12px;font-weight:600;color:var(--text-3);display:block;margin-bottom:4px"><span data-i18n="settings.new_password">New password</span> <span style="color:var(--text-3)" data-i18n="settings.min_8_chars">(min 8 characters)</span></label>
+                                <input type="password" id="pw-new" data-i18n-placeholder="settings.password_placeholder" placeholder="••••••••" autocomplete="new-password">
                             </div>
                             <div>
-                                <label style="font-size:12px;font-weight:600;color:var(--text-3);display:block;margin-bottom:4px">Confirm new password</label>
-                                <input type="password" id="pw-confirm" placeholder="••••••••" autocomplete="new-password">
+                                <label style="font-size:12px;font-weight:600;color:var(--text-3);display:block;margin-bottom:4px" data-i18n="settings.confirm_password">Confirm new password</label>
+                                <input type="password" id="pw-confirm" data-i18n-placeholder="settings.password_placeholder" placeholder="••••••••" autocomplete="new-password">
                             </div>
                             <div class="actions">
                                 <button class="btn btn-primary btn-small" id="pw-save-btn" onclick="settingsSavePassword()" data-i18n="settings.save_password">Save Password</button>
@@ -2397,15 +2397,15 @@ input.hive-range::-moz-range-track {
                                 <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
                                     <div class="logo-preview-box" id="logo-preview-box">
                                         <img id="logo-preview-img" src="" alt="" style="display:none;max-height:48px;max-width:140px">
-                                        <span id="logo-preview-none" style="font-size:12px;color:var(--text-3)">No logo</span>
+                                        <span id="logo-preview-none" style="font-size:12px;color:var(--text-3)" data-i18n="settings.no_logo">No logo</span>
                                     </div>
                                     <div id="appearance-logo-controls" style="display:none;flex-direction:column;gap:6px">
                                         <label class="btn btn-secondary btn-small" style="cursor:pointer">
-                                            <i class="fa-solid fa-upload"></i> Upload
+                                            <i class="fa-solid fa-upload"></i> <span data-i18n="common.upload">Upload</span>
                                             <input type="file" id="logo-file-input" accept="image/*" style="display:none" onchange="settingsLogoFileChange(event)">
                                         </label>
                                         <button class="btn btn-secondary btn-small" id="logo-remove-btn" style="display:none" onclick="settingsLogoRemove()">
-                                            <i class="fa-solid fa-trash"></i> Remove
+                                            <i class="fa-solid fa-trash"></i> <span data-i18n="common.remove">Remove</span>
                                         </button>
                                     </div>
                                 </div>
@@ -2413,21 +2413,21 @@ input.hive-range::-moz-range-track {
                             <!-- Logo (Dark Mode) -->
                             <div class="settings-row" style="align-items:flex-start;gap:20px;flex-wrap:wrap">
                                 <div>
-                                    <div class="settings-row-label">Company Logo <span style="font-size:11px;color:var(--text-3);font-weight:400">(Dark Mode)</span></div>
-                                    <div class="settings-row-hint">Optional alternative logo for dark mode. Falls back to the light logo if not set.</div>
+                                    <div class="settings-row-label"><span data-i18n="settings.company_logo">Company Logo</span> <span style="font-size:11px;color:var(--text-3);font-weight:400">(<span data-i18n="settings.dark_mode">Dark Mode</span>)</span></div>
+                                    <div class="settings-row-hint" data-i18n="settings.logo_dark_hint">Optional alternative logo for dark mode. Falls back to the light logo if not set.</div>
                                 </div>
                                 <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
                                     <div class="logo-preview-box" id="logo-dark-preview-box" style="background:var(--bg-2,#1e1e2e)">
                                         <img id="logo-dark-preview-img" src="" alt="" style="display:none;max-height:48px;max-width:140px">
-                                        <span id="logo-dark-preview-none" style="font-size:12px;color:var(--text-3)">No logo</span>
+                                        <span id="logo-dark-preview-none" style="font-size:12px;color:var(--text-3)" data-i18n="settings.no_logo">No logo</span>
                                     </div>
                                     <div id="appearance-logo-dark-controls" style="display:none;flex-direction:column;gap:6px">
                                         <label class="btn btn-secondary btn-small" style="cursor:pointer">
-                                            <i class="fa-solid fa-upload"></i> Upload
+                                            <i class="fa-solid fa-upload"></i> <span data-i18n="common.upload">Upload</span>
                                             <input type="file" id="logo-dark-file-input" accept="image/*" style="display:none" onchange="settingsLogoDarkFileChange(event)">
                                         </label>
                                         <button class="btn btn-secondary btn-small" id="logo-dark-remove-btn" style="display:none" onclick="settingsLogoDarkRemove()">
-                                            <i class="fa-solid fa-trash"></i> Remove
+                                            <i class="fa-solid fa-trash"></i> <span data-i18n="common.remove">Remove</span>
                                         </button>
                                     </div>
                                 </div>
@@ -2435,14 +2435,14 @@ input.hive-range::-moz-range-track {
                             <!-- Colors -->
                             <div class="settings-row">
                                 <div>
-                                    <div class="settings-row-label">Primary Colour</div>
-                                    <div class="settings-row-hint">Buttons, links, active states.</div>
+                                    <div class="settings-row-label" data-i18n="settings.primary_colour">Primary Colour</div>
+                                    <div class="settings-row-hint" data-i18n="settings.primary_colour_hint">Buttons, links, active states.</div>
                                 </div>
                                 <div class="settings-row-control" id="color-primary-control" style="display:none">
                                     <input type="color" id="color-primary" value="#3b82f6" class="color-swatch-input"
                                            oninput="settingsColorPreview()">
-                                    <button class="btn btn-secondary btn-small" onclick="settingsResetColor('primary')" title="Restore to default (#3b82f6)">
-                                        <i class="fa-solid fa-rotate-left"></i> Restore default
+                                    <button class="btn btn-secondary btn-small" onclick="settingsResetColor('primary')" data-i18n-title="settings.restore_default_tooltip" title="Restore to default (#3b82f6)">
+                                        <i class="fa-solid fa-rotate-left"></i> <span data-i18n="settings.restore_default">Restore default</span>
                                     </button>
                                 </div>
                                 <span id="color-primary-view" class="settings-row-value" style="display:flex;align-items:center;gap:8px">
@@ -2452,14 +2452,14 @@ input.hive-range::-moz-range-track {
                             </div>
                             <div class="settings-row">
                                 <div>
-                                    <div class="settings-row-label">Accent Colour</div>
-                                    <div class="settings-row-hint">Secondary highlights.</div>
+                                    <div class="settings-row-label" data-i18n="settings.accent_colour">Accent Colour</div>
+                                    <div class="settings-row-hint" data-i18n="settings.accent_colour_hint">Secondary highlights.</div>
                                 </div>
                                 <div class="settings-row-control" id="color-accent-control" style="display:none">
                                     <input type="color" id="color-accent" value="#10b981" class="color-swatch-input"
                                            oninput="settingsColorPreview()">
-                                    <button class="btn btn-secondary btn-small" onclick="settingsResetColor('accent')" title="Restore to default (#10b981)">
-                                        <i class="fa-solid fa-rotate-left"></i> Restore default
+                                    <button class="btn btn-secondary btn-small" onclick="settingsResetColor('accent')" data-i18n-title="settings.restore_default_tooltip" title="Restore to default (#10b981)">
+                                        <i class="fa-solid fa-rotate-left"></i> <span data-i18n="settings.restore_default">Restore default</span>
                                     </button>
                                 </div>
                                 <span id="color-accent-view" class="settings-row-value" style="display:flex;align-items:center;gap:8px">
@@ -2470,9 +2470,9 @@ input.hive-range::-moz-range-track {
                             <!-- Admin save row -->
                             <div id="appearance-save-row" style="display:none;margin-top:16px;display:flex;gap:8px">
                                 <button class="btn btn-primary btn-small" id="appearance-save-btn" onclick="settingsSaveAppearance()">
-                                    <i class="fa-solid fa-floppy-disk"></i> Save Appearance
+                                    <i class="fa-solid fa-floppy-disk"></i> <span data-i18n="settings.save_appearance">Save Appearance</span>
                                 </button>
-                                <button class="btn btn-secondary btn-small" onclick="settingsCancelAppearance()">Discard</button>
+                                <button class="btn btn-secondary btn-small" onclick="settingsCancelAppearance()" data-i18n="common.discard">Discard</button>
                             </div>
                             <div class="alert" id="appearance-alert" style="display:none"><span id="appearance-alert-text"></span></div>
                         </div>
@@ -2483,40 +2483,40 @@ input.hive-range::-moz-range-track {
                         <div class="settings-section-header">
                             <i class="fa-solid fa-clock-rotate-left" style="color:var(--primary)"></i>
                             <div>
-                                <h3>Data Retention</h3>
-                                <p>How long movement history is stored for your assets. Older data is automatically purged.</p>
+                                <h3 data-i18n="settings.data_retention">Data Retention</h3>
+                                <p data-i18n="settings.data_retention_hint">How long movement history is stored for your assets. Older data is automatically purged.</p>
                             </div>
                         </div>
                         <div id="retention-loading" style="padding:24px;text-align:center;color:var(--text-3)">
-                            <i class="fa-solid fa-spinner fa-spin"></i> Loading…
+                            <i class="fa-solid fa-spinner fa-spin"></i> <span data-i18n="common.loading">Loading…</span>
                         </div>
                         <div id="retention-body" style="display:none">
                             <div class="settings-row">
                                 <div>
-                                    <div class="settings-row-label">History Retention</div>
-                                    <div class="settings-row-hint">Tag location history older than this will be removed.</div>
+                                    <div class="settings-row-label" data-i18n="settings.history_retention">History Retention</div>
+                                    <div class="settings-row-hint" data-i18n="settings.history_retention_hint">Tag location history older than this will be removed.</div>
                                 </div>
                                 <div class="settings-row-control">
                                     <span id="retention-view" class="settings-row-value">365 days</span>
                                     <button class="btn btn-secondary btn-small" id="retention-edit-btn" style="display:none"
                                             onclick="settingsToggleForm('retentionForm')">
-                                        <i class="fa-solid fa-pen"></i> Edit
+                                        <i class="fa-solid fa-pen"></i> <span data-i18n="common.edit">Edit</span>
                                     </button>
                                 </div>
                             </div>
                             <div class="settings-inline-edit" id="retentionForm" style="display:none">
                                 <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
                                     <select id="retention-days-select" style="width:auto">
-                                        <option value="30">30 days</option>
-                                        <option value="60">60 days</option>
-                                        <option value="90">90 days</option>
-                                        <option value="180">6 months</option>
-                                        <option value="365" selected>1 year</option>
-                                        <option value="730">2 years</option>
-                                        <option value="1095">3 years</option>
+                                        <option value="30" data-i18n="settings.retention_30_days">30 days</option>
+                                        <option value="60" data-i18n="settings.retention_60_days">60 days</option>
+                                        <option value="90" data-i18n="settings.retention_90_days">90 days</option>
+                                        <option value="180" data-i18n="settings.retention_6_months">6 months</option>
+                                        <option value="365" selected data-i18n="settings.retention_1_year">1 year</option>
+                                        <option value="730" data-i18n="settings.retention_2_years">2 years</option>
+                                        <option value="1095" data-i18n="settings.retention_3_years">3 years</option>
                                     </select>
                                 </div>
-                                <p class="hint">Data beyond this period is automatically deleted to save storage.</p>
+                                <p class="hint" data-i18n="settings.retention_delete_hint">Data beyond this period is automatically deleted to save storage.</p>
                                 <div class="actions">
                                     <button class="btn btn-primary btn-small" id="retention-save-btn" onclick="settingsSaveRetention()" data-i18n="common.save">Save</button>
                                     <button class="btn btn-secondary btn-small" onclick="settingsToggleForm('retentionForm')" data-i18n="common.cancel">Cancel</button>
@@ -2531,19 +2531,19 @@ input.hive-range::-moz-range-track {
                         <div class="settings-section-header">
                             <i class="fa-solid fa-bell" style="color:var(--primary)"></i>
                             <div>
-                                <h3>Alerts &amp; Notifications</h3>
-                                <p>Control when you are notified about your assets.</p>
+                                <h3 data-i18n="settings.alerts_notifications">Alerts &amp; Notifications</h3>
+                                <p data-i18n="settings.alerts_notifications_hint">Control when you are notified about your assets.</p>
                             </div>
                         </div>
                         <div id="notif-loading" style="padding:24px;text-align:center;color:var(--text-3)">
-                            <i class="fa-solid fa-spinner fa-spin"></i> Loading…
+                            <i class="fa-solid fa-spinner fa-spin"></i> <span data-i18n="common.loading">Loading…</span>
                         </div>
                         <div id="notif-body" style="display:none">
                             <!-- Master toggle -->
                             <div class="settings-row">
                                 <div>
-                                    <div class="settings-row-label">Enable Alerts</div>
-                                    <div class="settings-row-hint">Master switch — turns all notifications on or off.</div>
+                                    <div class="settings-row-label" data-i18n="settings.enable_alerts">Enable Alerts</div>
+                                    <div class="settings-row-hint" data-i18n="settings.enable_alerts_hint">Master switch — turns all notifications on or off.</div>
                                 </div>
                                 <label class="toggle-switch">
                                     <input type="checkbox" id="notif-enabled" onchange="settingsSaveNotifications()">
@@ -2552,13 +2552,13 @@ input.hive-range::-moz-range-track {
                             </div>
                             <!-- Trigger types -->
                             <div id="notif-triggers" style="transition:opacity .2s">
-                                <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-3);padding:14px 0 8px">
+                                <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-3);padding:14px 0 8px" data-i18n="settings.notify_when_tag">
                                     Notify me when a tag…
                                 </p>
                                 <div class="settings-row">
                                     <div>
-                                        <div class="settings-row-label"><i class="fa-solid fa-draw-polygon" style="margin-right:6px;color:var(--warning)"></i>Geofence entry / exit</div>
-                                        <div class="settings-row-hint">Alert when an asset enters or exits a defined geofence area.</div>
+                                        <div class="settings-row-label"><i class="fa-solid fa-draw-polygon" style="margin-right:6px;color:var(--warning)"></i><span data-i18n="settings.geofence_entry_exit">Geofence entry / exit</span></div>
+                                        <div class="settings-row-hint" data-i18n="settings.geofence_alert_hint">Alert when an asset enters or exits a defined geofence area.</div>
                                     </div>
                                     <label class="toggle-switch">
                                         <input type="checkbox" id="notif-geofence" onchange="settingsSaveNotifications()">
@@ -2567,8 +2567,8 @@ input.hive-range::-moz-range-track {
                                 </div>
                                 <div class="settings-row">
                                     <div>
-                                        <div class="settings-row-label"><i class="fa-solid fa-battery-low" style="margin-right:6px;color:var(--danger)"></i>Battery is low</div>
-                                        <div class="settings-row-hint">Alert when a tag's battery drops below 20%.</div>
+                                        <div class="settings-row-label"><i class="fa-solid fa-battery-low" style="margin-right:6px;color:var(--danger)"></i><span data-i18n="settings.battery_low">Battery is low</span></div>
+                                        <div class="settings-row-hint" data-i18n="settings.battery_alert_hint">Alert when a tag's battery drops below 20%.</div>
                                     </div>
                                     <label class="toggle-switch">
                                         <input type="checkbox" id="notif-battery" onchange="settingsSaveNotifications()">
@@ -2577,8 +2577,8 @@ input.hive-range::-moz-range-track {
                                 </div>
                                 <div class="settings-row">
                                     <div>
-                                        <div class="settings-row-label"><i class="fa-solid fa-signal-slash" style="margin-right:6px;color:var(--text-3)"></i>Alert when a tag hasn't been reported a location in last 7 days</div>
-                                        <div class="settings-row-hint">Alert when a tag hasn't been detected for an extended period.</div>
+                                        <div class="settings-row-label"><i class="fa-solid fa-signal-slash" style="margin-right:6px;color:var(--text-3)"></i><span data-i18n="settings.no_report_7_days">Alert when a tag hasn't been reported a location in last 7 days</span></div>
+                                        <div class="settings-row-hint" data-i18n="settings.no_report_alert_hint">Alert when a tag hasn't been detected for an extended period.</div>
                                     </div>
                                     <label class="toggle-switch">
                                         <input type="checkbox" id="notif-offline" onchange="settingsSaveNotifications()">
@@ -2587,8 +2587,8 @@ input.hive-range::-moz-range-track {
                                 </div>
                                 <div class="settings-row">
                                     <div>
-                                        <div class="settings-row-label"><i class="fa-solid fa-shield-halved" style="margin-right:6px;color:var(--primary)"></i>Hive breach detected</div>
-                                        <div class="settings-row-hint">Alert when a tag separates from its HIVE group beyond the configured threshold.</div>
+                                        <div class="settings-row-label"><i class="fa-solid fa-shield-halved" style="margin-right:6px;color:var(--primary)"></i><span data-i18n="settings.hive_breach">Hive breach detected</span></div>
+                                        <div class="settings-row-hint" data-i18n="settings.hive_breach_hint">Alert when a tag separates from its HIVE group beyond the configured threshold.</div>
                                     </div>
                                     <label class="toggle-switch">
                                         <input type="checkbox" id="notif-hive" onchange="settingsSaveNotifications()">
@@ -2596,13 +2596,13 @@ input.hive-range::-moz-range-track {
                                     </label>
                                 </div>
                                 <!-- Delivery method -->
-                                <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-3);padding:14px 0 8px">
+                                <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-3);padding:14px 0 8px" data-i18n="settings.how_to_notify">
                                     How to notify me
                                 </p>
                                 <div class="settings-row">
                                     <div>
-                                        <div class="settings-row-label"><i class="fa-solid fa-envelope" style="margin-right:6px;color:var(--info)"></i>Email notifications</div>
-                                        <div class="settings-row-hint">Send alert emails to the addresses listed below.</div>
+                                        <div class="settings-row-label"><i class="fa-solid fa-envelope" style="margin-right:6px;color:var(--info)"></i><span data-i18n="settings.email_notifications">Email notifications</span></div>
+                                        <div class="settings-row-hint" data-i18n="settings.email_notifications_hint">Send alert emails to the addresses listed below.</div>
                                     </div>
                                     <label class="toggle-switch">
                                         <input type="checkbox" id="notif-email" onchange="settingsSaveNotifications()">
