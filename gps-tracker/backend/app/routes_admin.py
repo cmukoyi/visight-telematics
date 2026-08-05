@@ -1905,6 +1905,7 @@ class UserGroupOut(BaseModel):
             default_package_name=default_pkg_name,
             allowed_sections=g.allowed_sections,
             allowed_tag_types=g.allowed_tag_types,
+            default_language=g.default_language,
             packages=packages_out,
             created_at=g.created_at,
             portal_users=g.portal_users,

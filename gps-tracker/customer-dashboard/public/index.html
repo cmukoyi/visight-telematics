@@ -4366,7 +4366,11 @@ class TranslationService {
             return TranslationService.#instance;
         }
         TranslationService.#instance = this;
-        this.#currentLang = localStorage.getItem(LANG_KEY) || 'en';
+        // Language priority: 1) User preference (localStorage), 2) Usergroup default, 3) English fallback
+        const userLang = localStorage.getItem(LANG_KEY);
+        const usergroupData = localStorage.getItem(GROUP_KEY);
+        const usergroupLang = usergroupData ? JSON.parse(usergroupData).default_language : null;
+        this.#currentLang = userLang || usergroupLang || 'en';
     }
 
     static getInstance() {
