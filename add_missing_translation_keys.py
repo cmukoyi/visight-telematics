@@ -1,24 +1,31 @@
 #!/usr/bin/env python3
 """
-Add missing i18n translation keys and auto-translate to French
-Usage: 
-  Local: python3 add_missing_translation_keys.py
-  Server: docker exec -i pinplot_backend python3 /app/add_missing_translation_keys.py
+Extract all i18n translation keys from customer-dashboard/public/index.html
+and add missing keys to the database.
+
+This script:
+1. Parses index.html for data-i18n, data-i18n-title, data-i18n-placeholder attributes
+2. Groups keys by category (prefix before the dot)
+3. Adds missing keys to translation_keys table
+4. Reports what was added
+
+Usage:
+  Local:  python3 add_missing_translation_keys.py
+  Server: docker exec -i pinplot_backend python3 /tmp/add_missing_translation_keys.py
 """
 
+import re
 import psycopg2
-import requests
-import time
 import os
-from urllib.parse import quote
+from collections import defaultdict
 
 # Database connection - try environment variable first, then defaults
 DATABASE_URL = os.getenv('DATABASE_URL')
 
 if DATABASE_URL:
     # Parse postgresql://user:pass@host:port/dbname
-    import re
-    match = re.match(r'postgresql://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)', DATABASE_URL)
+    import re as regex_module
+    match = regex_module.match(r'postgresql://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)', DATABASE_URL)
     if match:
         DB_CONFIG = {
             'user': match.group(1),
@@ -40,152 +47,175 @@ else:
         'password': 'pinplot_db_password'
     }
 
-# MyMemory API for translations
-MYMEMORY_API = "https://api.mymemory.translated.net/get"
-
-# New translation keys to add
-NEW_KEYS = [
-    # Assets
-    ('assets.asset_tag', 'assets', 'Asset / Tag'),
-    ('assets.description', 'assets', 'Description'),
-    ('assets.type', 'assets', 'Type'),
-    ('assets.category', 'assets', 'Category'),
-    ('assets.status', 'assets', 'Status'),
-    ('assets.package', 'assets', 'Package'),
-    ('assets.battery', 'assets', 'Battery'),
-    ('assets.last_location', 'assets', 'Last Location'),
-    ('assets.last_update', 'assets', 'Last Update'),
-    ('assets.expires', 'assets', 'Expires'),
-    
-    # Geofences
-    ('geofences.name_required', 'geofences', 'Name *'),
-    ('geofences.address_latlng', 'geofences', 'Address / Lat,Lng'),
-    ('geofences.radius', 'geofences', 'Radius'),
-    ('geofences.save_location', 'geofences', 'Save location'),
-    
-    # Common
-    ('common.id', 'common', 'ID'),
-    ('common.tag', 'common', 'Tag'),
-    ('common.last_seen', 'common', 'Last Seen'),
-    ('common.distance', 'common', 'Distance'),
-    ('common.role', 'common', 'Role'),
-    
-    # Floor Plan
-    ('floor_plan.room_name', 'floor_plan', 'Room name…'),
-    ('floor_plan.mac_address', 'floor_plan', 'A4:CF:12:45:AB:CD'),
-    
-    # Settings/Auth
-    ('settings.save_password', 'settings', 'Save Password'),
-    ('auth.save_role', 'auth', 'Save Role'),
-    
-    # Trips (from earlier code additions)
-    ('trips.start', 'trips', 'Start'),
-    ('trips.end', 'trips', 'End'),
-    ('trips.duration', 'trips', 'Duration'),
-    ('trips.distance_mi', 'trips', 'Distance (mi)'),
-    ('trips.from', 'trips', 'From'),
-    ('trips.to', 'trips', 'To'),
-    
-    # Alerts (from earlier code additions)
-    ('alerts.type', 'alerts', 'Type'),
-    ('alerts.detail', 'alerts', 'Detail'),
-    ('alerts.time', 'alerts', 'Time'),
-]
-
-
-def translate_text(text, source_lang='en', target_lang='fr'):
-    """Translate text using MyMemory API"""
+def extract_keys_from_html(html_file_path):
+    """Extract all unique translation keys from HTML file."""
     try:
-        url = f"{MYMEMORY_API}?q={quote(text)}&langpair={source_lang}|{target_lang}"
-        response = requests.get(url, timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            if data.get('responseStatus') == 200:
-                return data['responseData']['translatedText']
-        
-        print(f"  ⚠️  Translation failed for '{text}', using original")
-        return text
-    except Exception as e:
-        print(f"  ⚠️  Translation error for '{text}': {e}")
-        return text
-
-
-def main():
-    print("🌍 Adding Missing Translation Keys\n")
+        with open(html_file_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+    except FileNotFoundError:
+        print(f"❌ File not found: {html_file_path}")
+        return []
     
-    # Connect to database
+    # Regex patterns to match data-i18n attributes
+    patterns = [
+        r'data-i18n="([^"]+)"',           # data-i18n="key"
+        r'data-i18n-title="([^"]+)"',     # data-i18n-title="key"
+        r'data-i18n-placeholder="([^"]+)"' # data-i18n-placeholder="key"
+    ]
+    
+    keys = set()
+    for pattern in patterns:
+        matches = re.findall(pattern, html_content)
+        keys.update(matches)
+    
+    return sorted(keys)
+
+def categorize_keys(keys):
+    """Group keys by category (prefix before first dot)."""
+    categorized = defaultdict(list)
+    
+    for key in keys:
+        if '.' in key:
+            category = key.split('.', 1)[0]
+            categorized[category].append(key)
+        else:
+            categorized['general'].append(key)
+    
+    return dict(categorized)
+
+def generate_default_text(key):
+    """Generate human-readable default text from key."""
+    # Take the last part after final dot
+    if '.' in key:
+        text = key.split('.')[-1]
+    else:
+        text = key
+    
+    # Replace underscores with spaces
+    text = text.replace('_', ' ')
+    
+    # Capitalize first letter of each word
+    text = ' '.join(word.capitalize() for word in text.split())
+    
+    return text
+
+def add_keys_to_database(keys):
+    """Add missing translation keys to the database."""
+    conn = None
+    added_count = 0
+    skipped_count = 0
+    
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         cur = conn.cursor()
-        print("✅ Connected to database\n")
-    except Exception as e:
-        print(f"❌ Database connection failed: {e}")
-        return
-    
-    added_count = 0
-    skipped_count = 0
-    translated_count = 0
-    
-    try:
-        for key, category, default_text in NEW_KEYS:
+        
+        for key in keys:
+            # Determine category
+            if '.' in key:
+                category = key.split('.', 1)[0]
+            else:
+                category = 'general'
+            
+            # Generate default text
+            default_text = generate_default_text(key)
+            
             # Check if key already exists
             cur.execute("SELECT id FROM translation_keys WHERE key = %s", (key,))
-            if cur.fetchone():
-                print(f"⏭️  Skipped {key} (already exists)")
+            existing = cur.fetchone()
+            
+            if existing:
+                print(f"  ⏭️  {key} (already exists)")
                 skipped_count += 1
                 continue
             
-            # Insert translation key
-            cur.execute(
-                """
-                INSERT INTO translation_keys (key, category, default_text, created_at)
-                VALUES (%s, %s, %s, NOW())
-                RETURNING id
-                """,
-                (key, category, default_text)
-            )
-            key_id = cur.fetchone()[0]
-            conn.commit()
+            # Insert new key
+            cur.execute("""
+                INSERT INTO translation_keys (key, category, default_text, context)
+                VALUES (%s, %s, %s, %s)
+            """, (key, category, default_text, None))
             
-            print(f"✅ Added key: {key}")
+            print(f"  ✅ {key} → {default_text}")
             added_count += 1
-            
-            # Auto-translate to French
-            french_text = translate_text(default_text, 'en', 'fr')
-            time.sleep(0.5)  # Rate limit: 2 requests/second
-            
-            # Insert French translation
-            try:
-                cur.execute(
-                    """
-                    INSERT INTO translations (language_code, key, translated_text, last_updated)
-                    VALUES ('fr', %s, %s, NOW())
-                    ON CONFLICT (language_code, key) DO UPDATE
-                    SET translated_text = EXCLUDED.translated_text, last_updated = NOW()
-                    """,
-                    (key, french_text)
-                )
-                conn.commit()
-                print(f"   🇫🇷 '{default_text}' → '{french_text}'")
-                translated_count += 1
-            except Exception as e:
-                print(f"   ⚠️  French translation insert failed: {e}")
-                conn.rollback()
         
-        print(f"\n📊 Summary:")
-        print(f"   ✅ Added: {added_count} keys")
-        print(f"   ⏭️  Skipped: {skipped_count} keys (already existed)")
-        print(f"   🇫🇷 Translated: {translated_count} to French")
+        conn.commit()
+        cur.close()
+        
+        return added_count, skipped_count
         
     except Exception as e:
-        print(f"❌ Error: {e}")
-        conn.rollback()
+        print(f"❌ Database error: {e}")
+        if conn:
+            conn.rollback()
+        return 0, 0
     finally:
-        cur.close()
-        conn.close()
-        print("\n✅ Done!")
+        if conn:
+            conn.close()
 
+def main():
+    print("=" * 80)
+    print("Translation Keys Extraction & Database Import")
+    print("=" * 80)
+    print()
+    
+    # Try multiple possible paths for the HTML file
+    possible_paths = [
+        '/tmp/index.html',  # Temporary location when copied into container
+        '/root/pinplot/gps-tracker/customer-dashboard/public/index.html',  # Pinplot host
+        '/root/beacon-telematics/gps-tracker/customer-dashboard/public/index.html',  # Beacon host
+        '/app/customer-dashboard/public/index.html',  # Inside backend container
+        'gps-tracker/customer-dashboard/public/index.html',  # Relative path
+        'customer-dashboard/public/index.html'  # Relative path fallback
+    ]
+    
+    html_file = None
+    for path in possible_paths:
+        if os.path.exists(path):
+            html_file = path
+            break
+    
+    if not html_file:
+        print(f"❌ Could not find index.html in any of these locations:")
+        for path in possible_paths:
+            print(f"   • {path}")
+        return
+    
+    print(f"📄 Parsing HTML file: {html_file}")
+    keys = extract_keys_from_html(html_file)
+    print(f"   Found {len(keys)} unique translation keys\n")
+    
+    # Categorize keys
+    categorized = categorize_keys(keys)
+    
+    print("📊 Keys by category:")
+    for category, cat_keys in sorted(categorized.items()):
+        print(f"   {category:20s} {len(cat_keys):3d} keys")
+    print()
+    
+    # Show sample keys from each category
+    print("📋 Sample keys from each category:")
+    for category, cat_keys in sorted(categorized.items()):
+        print(f"\n   {category.upper()}:")
+        for key in sorted(cat_keys)[:5]:
+            print(f"      • {key}")
+        if len(cat_keys) > 5:
+            print(f"      ... and {len(cat_keys) - 5} more")
+    print()
+    
+    # Add to database
+    print("💾 Adding missing keys to database...")
+    added, skipped = add_keys_to_database(keys)
+    
+    print()
+    print("=" * 80)
+    print(f"✅ Complete! Added {added} new keys, skipped {skipped} existing keys")
+    print("=" * 80)
+    print()
+    print("🌐 Next steps:")
+    print("   1. Go to https://pinplot.me/admin/index.html#translations")
+    print("   2. Click the refresh icon to see new keys")
+    print("   3. Use 'Auto-translate All' to translate missing French keys")
+    print("   4. Or manually translate keys one by one")
+    print()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
