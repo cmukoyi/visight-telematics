@@ -530,16 +530,16 @@
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Asset / Tag</th>
-                                    <th>Description</th>
-                                    <th>Type</th>
-                                    <th>Category</th>
-                                    <th>Status</th>
-                                    <th>Package</th>
-                                    <th>Battery</th>
-                                    <th>Last Location</th>
-                                    <th>Last Update</th>
-                                    <th>Expires</th>
+                                    <th data-i18n="assets.asset_tag">Asset / Tag</th>
+                                    <th data-i18n="assets.description">Description</th>
+                                    <th data-i18n="assets.type">Type</th>
+                                    <th data-i18n="assets.category">Category</th>
+                                    <th data-i18n="assets.status">Status</th>
+                                    <th data-i18n="assets.package">Package</th>
+                                    <th data-i18n="assets.battery">Battery</th>
+                                    <th data-i18n="assets.last_location">Last Location</th>
+                                    <th data-i18n="assets.last_update">Last Update</th>
+                                    <th data-i18n="assets.expires">Expires</th>
                                 </tr>
                             </thead>
                             <tbody id="al-tbody">
@@ -1577,7 +1577,7 @@ input.hive-range::-moz-range-track {
                     </div>
                     <div class="loc-editor-body">
                       <div class="form-row">
-                        <label class="form-label">Name *</label>
+                        <label class="form-label" data-i18n="geofences.name_required">Name *</label>
                         <input class="form-input" id="locGfName" data-i18n-placeholder="geofences.name_placeholder" placeholder="e.g. Worsley Depot" maxlength="200"/>
                       </div>
                       <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -1626,7 +1626,7 @@ input.hive-range::-moz-range-track {
                     </div>
                     <div class="loc-editor-footer">
                       <button class="btn btn-ghost btn-sm" id="locBtnCancelEditor" data-i18n="common.cancel">Cancel</button>
-                      <button class="btn btn-primary btn-sm" id="locBtnSave">Save location</button>
+                      <button class="btn btn-primary btn-sm" id="locBtnSave" data-i18n="geofences.save_location">Save location</button>
                     </div>
                   </aside>
                 </div><!-- /map-area -->
@@ -1669,7 +1669,7 @@ input.hive-range::-moz-range-track {
                         <div class="loc-preview-wrap" id="loc-preview-wrap">
                             <table class="loc-preview-table">
                                 <thead>
-                                    <tr><th>#</th><th>Name</th><th>Type</th><th>Address / Lat,Lng</th><th>Radius</th><th>Status</th></tr>
+                                    <tr><th>#</th><th data-i18n="common.name">Name</th><th data-i18n="common.type">Type</th><th data-i18n="geofences.address_latlng">Address / Lat,Lng</th><th data-i18n="geofences.radius">Radius</th><th data-i18n="common.status">Status</th></tr>
                                 </thead>
                                 <tbody id="loc-preview-body"></tbody>
                             </table>
@@ -1962,11 +1962,11 @@ input.hive-range::-moz-range-track {
                       </div>
                       <div class="prop-group">
                         <div class="prop-label">Label</div>
-                        <input type="text" class="prop-input" id="propLabel" placeholder="Room name…">
+                        <input type="text" class="prop-input" id="propLabel" data-i18n-placeholder="floor_plan.room_name" placeholder="Room name…">
                       </div>
                       <div class="prop-group" id="propMacGroup" style="display:none">
                         <div class="prop-label">MAC Address</div>
-                        <input type="text" class="prop-input mono" id="propMac" placeholder="A4:CF:12:45:AB:CD">
+                        <input type="text" class="prop-input mono" id="propMac" data-i18n-placeholder="floor_plan.mac_address" placeholder="A4:CF:12:45:AB:CD">
                         <div style="margin-top:4px;font-size:11px;color:var(--text-muted)">ESP32S3 gateway MAC address</div>
                       </div>
                       <div class="prop-group" id="propGatewayIdGroup" style="display:none">
@@ -2326,7 +2326,7 @@ input.hive-range::-moz-range-track {
                                 <input type="password" id="pw-confirm" placeholder="••••••••" autocomplete="new-password">
                             </div>
                             <div class="actions">
-                                <button class="btn btn-primary btn-small" id="pw-save-btn" onclick="settingsSavePassword()">Save Password</button>
+                                <button class="btn btn-primary btn-small" id="pw-save-btn" onclick="settingsSavePassword()" data-i18n="settings.save_password">Save Password</button>
                                 <button class="btn btn-secondary btn-small" onclick="settingsToggleForm('pwForm')" data-i18n="common.cancel">Cancel</button>
                             </div>
                             <div class="alert" id="pw-alert" style="display:none"><span id="pw-alert-text"></span></div>
@@ -2862,7 +2862,7 @@ input.hive-range::-moz-range-track {
                                 <th class="sortable" onclick="rptSubSort('added_at')">Date Added <span class="sort-arrow" data-col="added_at"></span></th>
                                 <th class="sortable" onclick="rptSubSort('expiry_date')">Expiry Date <span class="sort-arrow" data-col="expiry_date"></span></th>
                                 <th class="sortable" onclick="rptSubSort('days_remaining')">Days Left <span class="sort-arrow" data-col="days_remaining"></span></th>
-                                <th>Status</th>
+                                <th data-i18n="common.status">Status</th>
                             </tr>
                         </thead>
                         <tbody id="rpt-sub-tbody">
@@ -2922,8 +2922,8 @@ input.hive-range::-moz-range-track {
                                 <th class="sortable" onclick="rptActSort('last_seen')">Last Seen <span class="sort-arrow" data-col="last_seen"></span></th>
                                 <th class="sortable" onclick="rptActSort('hours_silent')">Hrs Silent <span class="sort-arrow" data-col="hours_silent"></span></th>
                                 <th class="sortable" onclick="rptActSort('battery_level')">Battery <span class="sort-arrow" data-col="battery_level"></span></th>
-                                <th>Location</th>
-                                <th>Status</th>
+                                <th data-i18n="common.location">Location</th>
+                                <th data-i18n="common.status">Status</th>
                             </tr>
                         </thead>
                         <tbody id="rpt-act-tbody">
@@ -2972,12 +2972,12 @@ input.hive-range::-moz-range-track {
                         <thead>
                             <tr>
                                 <th style="width:40px">#</th>
-                                <th>Start</th>
-                                <th>End</th>
-                                <th>Duration</th>
-                                <th style="text-align:center">Distance (mi)</th>
-                                <th>From</th>
-                                <th>To</th>
+                                <th data-i18n="trips.start">Start</th>
+                                <th data-i18n="trips.end">End</th>
+                                <th data-i18n="trips.duration">Duration</th>
+                                <th style="text-align:center" data-i18n="trips.distance_mi">Distance (mi)</th>
+                                <th data-i18n="trips.from">From</th>
+                                <th data-i18n="trips.to">To</th>
                             </tr>
                         </thead>
                         <tbody id="rpt-trips-tbody">
@@ -3096,7 +3096,7 @@ input.hive-range::-moz-range-track {
                                 <th class="sortable" onclick="rptBatSort('battery_level')">Battery <span class="sort-arrow" data-col="battery_level"></span></th>
                                 <th class="sortable" onclick="rptBatSort('last_seen')">Last Seen <span class="sort-arrow" data-col="last_seen"></span></th>
                                 <th class="sortable" onclick="rptBatSort('hours_silent')">Hrs Silent <span class="sort-arrow" data-col="hours_silent"></span></th>
-                                <th>Status</th>
+                                <th data-i18n="common.status">Status</th>
                             </tr>
                         </thead>
                         <tbody id="rpt-bat-tbody">
@@ -3173,10 +3173,10 @@ input.hive-range::-moz-range-track {
                         <thead>
                             <tr>
                                 <th style="width:16px"></th>
-                                <th>Type</th>
-                                <th>Asset / Tag</th>
-                                <th>Detail</th>
-                                <th>Time</th>
+                                <th data-i18n="alerts.type">Type</th>
+                                <th data-i18n="assets.asset_tag">Asset / Tag</th>
+                                <th data-i18n="alerts.detail">Detail</th>
+                                <th data-i18n="alerts.time">Time</th>
                                 <th style="width:40px"></th>
                             </tr>
                         </thead>
@@ -3740,11 +3740,11 @@ input.hive-range::-moz-range-track {
                       <table class="hive-tag-table">
                         <thead>
                           <tr>
-                            <th>ID</th>
-                            <th>Tag</th>
-                            <th class="hive-text-right">Last Seen</th>
-                            <th class="hive-text-right">Distance</th>
-                            <th class="hive-text-right">Role</th>
+                            <th data-i18n="common.id">ID</th>
+                            <th data-i18n="common.tag">Tag</th>
+                            <th class="hive-text-right" data-i18n="common.last_seen">Last Seen</th>
+                            <th class="hive-text-right" data-i18n="common.distance">Distance</th>
+                            <th class="hive-text-right" data-i18n="common.role">Role</th>
                           </tr>
                         </thead>
                         <tbody id="hive-tag-tbody">
@@ -4294,7 +4294,7 @@ input.hive-range::-moz-range-track {
         </div>
         <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
             <button type="button" class="btn btn-secondary" onclick="closeModal('editRoleModal')" data-i18n="common.cancel">Cancel</button>
-            <button type="button" class="btn btn-primary" id="erSaveBtn" onclick="submitEditRole()">Save Role</button>
+            <button type="button" class="btn btn-primary" id="erSaveBtn" onclick="submitEditRole()" data-i18n="auth.save_role">Save Role</button>
         </div>
     </div>
 </div>
