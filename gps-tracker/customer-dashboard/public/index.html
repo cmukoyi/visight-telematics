@@ -249,7 +249,7 @@
 
     <!-- ── HEADER ── -->
     <header id="app-header">
-        <button id="sidebar-toggle" title="Toggle sidebar" onclick="toggleSidebarResponsive()">
+        <button id="sidebar-toggle" data-i18n-title="nav.toggle_sidebar" title="Toggle sidebar" onclick="toggleSidebarResponsive()">
             <i class="fa-solid fa-bars"></i>
         </button>
 
@@ -257,7 +257,7 @@
             <div class="logo-icon"><i class="fa-solid fa-location-dot"></i></div>
             <div>
                 <span data-brand="name">PinPlot</span>
-                <span class="logo-sub">Customer Portal</span>
+                <span class="logo-sub" data-i18n="nav.customer_portal">Customer Portal</span>
             </div>
         </div>
 
@@ -282,7 +282,7 @@
                     </div>
                 </div>
             </div>
-            <button id="theme-toggle" data-i18n-title="settings.toggle_theme" title="Toggle light / dark mode" onclick="toggleTheme()">
+            <button id="theme-toggle" data-i18n-title="nav.toggle_theme" title="Toggle light / dark mode" onclick="toggleTheme()">
                 <i id="themeIcon" class="fa-solid fa-sun"></i>
             </button>
             <div style="font-size:13px;color:var(--text-3);text-align:right">
@@ -290,19 +290,19 @@
                 <small id="sidebarCompany">—</small>
             </div>
             <div class="avatar-menu-wrap" id="avatarMenuWrap">
-                <div class="header-avatar" id="headerAvatar" data-i18n-title="settings.account_menu" title="Account menu" onclick="toggleAvatarMenu(event)" style="cursor:pointer">—</div>
+                <div class="header-avatar" id="headerAvatar" data-i18n-title="nav.account_menu" title="Account menu" onclick="toggleAvatarMenu(event)" style="cursor:pointer">—</div>
                 <div class="avatar-dropdown" id="avatarDropdown" style="display:none">
                     <div class="avatar-dropdown-header" id="avatarDropdownEmail">—</div>
                     <button class="avatar-menu-item" onclick="closeAvatarMenu(); switchTab('settings')">
                         <i class="fa-solid fa-gear"></i> <span data-i18n="settings.title">Settings</span>
                     </button>
-                    <label class="avatar-menu-item" style="display:flex;align-items:center;gap:8px;cursor:pointer" title="Always show maps with the light style, even in dark mode">
+                    <label class="avatar-menu-item" style="display:flex;align-items:center;gap:8px;cursor:pointer" data-i18n-title="nav.light_maps_tooltip" title="Always show maps with the light style, even in dark mode">
                         <i class="fa-solid fa-map-location-dot" style="width:16px"></i>
-                        <span style="flex:1">Light maps</span>
+                        <span style="flex:1" data-i18n="nav.light_maps">Light maps</span>
                         <input type="checkbox" id="lightMapsToggle" onchange="_ppToggleLightMaps(this.checked)" style="margin:0">
                     </label>
                     <button class="avatar-menu-item avatar-menu-item-danger" onclick="closeAvatarMenu(); handleLogout()">
-                        <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+                        <i class="fa-solid fa-right-from-bracket"></i> <span data-i18n="nav.sign_out">Sign Out</span>
                     </button>
                 </div>
             </div>
@@ -313,16 +313,16 @@
     <nav id="sidebar">
 
         <div class="nav-section">
-            <div class="nav-section-label">Tracking</div>
+            <div class="nav-section-label" data-i18n="nav.tracking">Tracking</div>
 
             <button class="nav-item active" data-tab="livemap" onclick="switchTab('livemap')">
                 <span class="nav-icon"><i class="fa-solid fa-map"></i></span>
-                <span class="nav-label">Live Map</span>
+                <span class="nav-label" data-i18n="nav.live_map">Live Map</span>
             </button>
 
             <button class="nav-item" data-tab="floorplan" onclick="switchTab('floorplan')">
                 <span class="nav-icon"><i class="fa-solid fa-layer-group"></i></span>
-                <span class="nav-label" data-i18n="general.floor_plan">Floor Plan <span class="beta-badge">Beta</span></span>
+                <span class="nav-label" data-i18n="general.floor_plan">Floor Plan <span class="beta-badge" data-i18n="common.beta">Beta</span></span>
             </button>
 
             <button class="nav-item" data-tab="assets" onclick="switchTab('assets')">
@@ -371,7 +371,7 @@
 
             <button class="nav-item" data-tab="building" onclick="switchTab('building')">
                 <span class="nav-icon"><i class="fa-solid fa-pencil-ruler"></i></span>
-                <span class="nav-label" data-i18n="general.floor_plan_sketch">Floor Plan Sketch <span class="beta-badge">Beta</span></span>
+                <span class="nav-label" data-i18n="general.floor_plan_sketch">Floor Plan Sketch <span class="beta-badge" data-i18n="common.beta">Beta</span></span>
             </button>
 
             <button class="nav-item" data-tab="settings" onclick="switchTab('settings')">
@@ -415,9 +415,9 @@
         </div>
 
         <div class="nav-section" id="nav-section-developers" style="display:none">
-            <div class="nav-section-label" data-i18n="general.developers">Developers</div>
+            <div class="nav-section-label" data-i18n="nav.developers">Developers</div>
 
-            <a class="nav-item" href="/docs" target="_blank" rel="noopener noreferrer" title="Open API Documentation in new tab">
+            <a class="nav-item" href="/docs" target="_blank" rel="noopener noreferrer" data-i18n-title="nav.api_docs_tooltip" title="Open API Documentation in new tab">
                 <span class="nav-icon"><i class="fa-solid fa-code"></i></span>
                 <span class="nav-label" data-i18n="general.api_docs">API Docs</span>
                 <span class="nav-icon" style="margin-left:auto;font-size:11px"><i class="fa-solid fa-arrow-up-right-from-square"></i></span>
@@ -449,19 +449,19 @@
 
                     <!-- Stats -->
                     <div class="stat-chips" id="lm-stat-chips">
-                        <div class="stat-chip" style="cursor:pointer" onclick="lmFilterStatus('all', this)" title="Show all">
+                        <div class="stat-chip" style="cursor:pointer" onclick="lmFilterStatus('all', this)" data-i18n-title="map.filter_show_all" title="Show all">
                             <span class="stat-num" id="lm-stat-total">—</span>
                             <span data-i18n="common.total">Total</span>
                         </div>
-                        <div class="stat-chip online" style="cursor:pointer" onclick="lmFilterStatus('active', this)" title="Reported within last 24 h">
+                        <div class="stat-chip online" style="cursor:pointer" onclick="lmFilterStatus('active', this)" data-i18n-title="map.filter_active_24h" title="Reported within last 24 h">
                             <span class="stat-num" id="lm-stat-online">—</span>
                             <span data-i18n="common.active">Active</span>
                         </div>
-                        <div class="stat-chip idle" style="cursor:pointer" onclick="lmFilterStatus('idle', this)" title="Reported in last 7 days but not within 24 h">
+                        <div class="stat-chip idle" style="cursor:pointer" onclick="lmFilterStatus('idle', this)" data-i18n-title="map.filter_idle_7d" title="Reported in last 7 days but not within 24 h">
                             <span class="stat-num" id="lm-stat-idle">—</span>
                             <span data-i18n="common.idle">Idle</span>
                         </div>
-                        <div class="stat-chip offline" style="cursor:pointer" onclick="lmFilterStatus('offline', this)" title="No position in over 7 days">
+                        <div class="stat-chip offline" style="cursor:pointer" onclick="lmFilterStatus('offline', this)" data-i18n-title="map.filter_offline_7d" title="No position in over 7 days">
                             <span class="stat-num" id="lm-stat-offline">—</span>
                             <span data-i18n="common.offline">Offline</span>
                         </div>
@@ -481,7 +481,7 @@
 
                 <div class="map-area">
                     <!-- Mobile: toggle asset list panel -->
-                    <button id="lm-sidebar-btn" class="map-panel-toggle" onclick="toggleMapSidebar()" title="Toggle asset list">
+                    <button id="lm-sidebar-btn" class="map-panel-toggle" onclick="toggleMapSidebar()" data-i18n-title="map.toggle_asset_list" title="Toggle asset list">
                         <i class="fa-solid fa-list"></i>
                     </button>
                     <!-- POI overlay toggle (floating top-right of map) -->
@@ -502,10 +502,10 @@
                     </button>
                     <!-- Map Style Switcher for Live Map -->
                     <div class="map-style-switcher" id="live-style-switcher">
-                        <button class="map-style-btn active" data-style="streets" onclick="liveSwitchMapStyle('streets')">
+                        <button class="map-style-btn active" data-style="streets" onclick="liveSwitchMapStyle('streets')" data-i18n="map.streets">
                             Streets
                         </button>
-                        <button class="map-style-btn" data-style="satellite" onclick="liveSwitchMapStyle('satellite')">
+                        <button class="map-style-btn" data-style="satellite" onclick="liveSwitchMapStyle('satellite')" data-i18n="map.satellite">
                             Satellite
                         </button>
                     </div>
@@ -516,7 +516,7 @@
             <!-- ═══ ASSET LIST TAB ═══ -->
             <div id="tab-assets" class="tab-content">
                 <div class="view-header">
-                    <h2><i class="fa-solid fa-list" style="color:var(--primary);margin-right:8px"></i>Asset List</h2>
+                    <h2><i class="fa-solid fa-list" style="color:var(--primary);margin-right:8px"></i><span data-i18n="assets.asset_list">Asset List</span></h2>
                     <div class="search-input-wrap" style="flex:1;max-width:300px">
                         <i class="fa-solid fa-magnifying-glass"></i>
                         <input id="al-search" class="search-input" type="text" data-i18n-placeholder="general.search_name_imei" placeholder="Search name, IMEI…" oninput="_alRenderTableD()">
@@ -543,7 +543,7 @@
                                 </tr>
                             </thead>
                             <tbody id="al-tbody">
-                                <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-3)">Loading…</td></tr>
+                                <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-3)" data-i18n="common.loading">Loading…</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -554,18 +554,18 @@
             <div id="tab-history" class="tab-content">
                 <div class="hist-controls">
                     <div class="hist-asset-name-wrap">
-                        <label for="hist-asset-select"><i class="fa-solid fa-tag"></i> Asset / Tag</label>
+                        <label for="hist-asset-select"><i class="fa-solid fa-tag"></i> <span data-i18n="assets.asset_tag">Asset / Tag</span></label>
                         <select id="hist-asset-select" onchange="histChangeAsset(this.value); histLoadTrips()" style="min-width:220px"></select>
                     </div>
                     <div class="hist-field">
-                        <label>From</label>
+                        <label data-i18n="common.from">From</label>
                         <div style="display:flex;gap:4px">
                             <input type="date" id="hist-from">
                             <input type="time" id="hist-from-t" value="07:00">
                         </div>
                     </div>
                     <div class="hist-field">
-                        <label>To</label>
+                        <label data-i18n="common.to">To</label>
                         <div style="display:flex;gap:4px">
                             <input type="date" id="hist-to">
                             <input type="time" id="hist-to-t" value="18:00">
@@ -575,14 +575,14 @@
                         <span class="hist-field-spacer"></span>
                         <div style="display:flex;gap:6px">
                             <button class="btn btn-primary btn-sm" onclick="histLoadTrips()">
-                                <i class="fa-solid fa-magnifying-glass"></i> Load Journeys
+                                <i class="fa-solid fa-magnifying-glass"></i> <span data-i18n="trips.load_journeys">Load Journeys</span>
                             </button>
                             <div id="hist-export-btn" style="display:none;gap:4px" class="rpt-export-group">
                                 <button class="btn btn-ghost btn-sm" onclick="histExport()">
-                                    <i class="fa-solid fa-file-csv"></i> CSV
+                                    <i class="fa-solid fa-file-csv"></i> <span data-i18n="common.csv">CSV</span>
                                 </button>
                                 <button class="btn btn-ghost btn-sm" onclick="histExportXLSX()">
-                                    <i class="fa-solid fa-file-excel"></i> Excel
+                                    <i class="fa-solid fa-file-excel"></i> <span data-i18n="common.excel">Excel</span>
                                 </button>
                             </div>
                         </div>
@@ -592,7 +592,7 @@
                 <div class="hist-body">
                     <div id="hist-map" style="position:relative">
                         <!-- Mobile: toggle journey panel -->
-                        <button id="hist-panel-btn" class="map-panel-toggle" onclick="toggleHistPanel()" title="Toggle journeys panel" style="display:none">
+                        <button id="hist-panel-btn" class="map-panel-toggle" onclick="toggleHistPanel()" data-i18n-title="trips.toggle_journeys_panel" title="Toggle journeys panel" style="display:none">
                             <i class="fa-solid fa-route"></i>
                         </button>
                         
@@ -1463,7 +1463,7 @@ input.hive-range::-moz-range-track {
                 <aside class="loc-sidebar">
                   <div class="loc-sidebar-hd">
                     <div class="loc-sidebar-title">
-                      <span class="loc-pulse"></span> Geofences
+                      <span class="loc-pulse"></span> <span data-i18n="geofences.title">Geofences</span>
                     </div>
                     <div class="loc-search-wrap" id="locAddrWrap">
                       <svg class="loc-search-ico" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -1474,8 +1474,8 @@ input.hive-range::-moz-range-track {
                   </div>
 
                   <div class="loc-stats" id="locStats">
-                    <div class="loc-stat loc-stat-total lsf-active" data-lsf="all"><div class="loc-stat-num" id="locStatTotal">0</div><div class="loc-stat-lbl">Total</div></div>
-                    <div class="loc-stat loc-stat-armed" data-lsf="armed"><div class="loc-stat-num" id="locStatArmed">0</div><div class="loc-stat-lbl">Armed</div></div>
+                    <div class="loc-stat loc-stat-total lsf-active" data-lsf="all"><div class="loc-stat-num" id="locStatTotal">0</div><div class="loc-stat-lbl" data-i18n="common.total">Total</div></div>
+                    <div class="loc-stat loc-stat-armed" data-lsf="armed"><div class="loc-stat-num" id="locStatArmed">0</div><div class="loc-stat-lbl" data-i18n="geofences.armed">Armed</div></div>
                   </div>
 
                   <div id="loc-alert" class="alert" style="display:none;margin:6px 10px 0"><span id="loc-alert-text"></span></div>
@@ -1518,7 +1518,7 @@ input.hive-range::-moz-range-track {
                           <div class="loc-detail-id" id="locDetailId">—</div>
                         </div>
                       </div>
-                      <button class="btn-icon-sm" id="locDetailClose" title="Close"><i class="fa-solid fa-xmark"></i></button>
+                      <button class="btn-icon-sm" id="locDetailClose" data-i18n-title="common.close" title="Close"><i class="fa-solid fa-xmark"></i></button>
                     </div>
                     <div class="loc-detail-grid">
                       <div><div class="loc-detail-lbl" data-i18n="common.status">Status</div><div class="loc-detail-val loc-detail-val-accent" id="locDetailStatus">—</div></div>
@@ -1565,12 +1565,12 @@ input.hive-range::-moz-range-track {
                   <aside class="loc-editor-panel" id="locEditorPanel">
                     <div class="loc-editor-hd">
                       <div style="display:flex;align-items:center;gap:10px;min-width:0">
-                        <span class="loc-editor-badge" id="locEditorBadge">New</span>
+                        <span class="loc-editor-badge" id="locEditorBadge" data-i18n="geofences.new">New</span>
                         <div>
                           <div class="loc-editor-title" id="locEditorTitle">
-                            <span id="locEditorTitleText">New geofence</span>
+                            <span id="locEditorTitleText" data-i18n="geofences.new_geofence">New geofence</span>
                           </div>
-                          <div class="loc-editor-sub" id="locEditorSub">Adjust shape on the map</div>
+                          <div class="loc-editor-sub" id="locEditorSub" data-i18n="geofences.adjust_shape_hint">Adjust shape on the map</div>
                         </div>
                       </div>
                       <button class="btn-icon-sm" id="locEditorClose"><i class="fa-solid fa-xmark"></i></button>
@@ -1582,45 +1582,45 @@ input.hive-range::-moz-range-track {
                       </div>
                       <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                         <div>
-                          <label class="form-label">Shape</label>
+                          <label class="form-label" data-i18n="geofences.shape">Shape</label>
                           <select class="form-input" id="locGfType">
-                            <option value="circle">Circle</option>
-                            <option value="polygon">Polygon</option>
-                            <option value="rectangle">Rectangle</option>
+                            <option value="circle" data-i18n="geofences.circle">Circle</option>
+                            <option value="polygon" data-i18n="geofences.polygon">Polygon</option>
+                            <option value="rectangle" data-i18n="geofences.rectangle">Rectangle</option>
                           </select>
                         </div>
                         <div>
-                          <label class="form-label">Status</label>
+                          <label class="form-label" data-i18n="common.status">Status</label>
                           <select class="form-input" id="locGfStatus">
-                            <option value="active">Active</option>
-                            <option value="draft">Draft</option>
+                            <option value="active" data-i18n="common.active">Active</option>
+                            <option value="draft" data-i18n="geofences.draft">Draft</option>
                           </select>
                         </div>
                       </div>
                       <div class="form-row" id="locRadiusRow">
-                        <label class="form-label">Radius</label>
+                        <label class="form-label" data-i18n="geofences.radius">Radius</label>
                         <div style="display:flex;align-items:center;gap:10px">
                           <input type="range" id="locGfRadius" min="50" max="2000" step="25" value="300" style="flex:1;accent-color:var(--primary)"/>
                           <span id="locRadiusDisp" style="min-width:58px;text-align:right;font-weight:600;color:var(--primary);font-size:13px">300 m</span>
                         </div>
-                        <div style="font-size:11px;color:var(--text-3);margin-top:4px">Drag the marker on the map to reposition.</div>
+                        <div style="font-size:11px;color:var(--text-3);margin-top:4px" data-i18n="geofences.drag_marker_hint">Drag the marker on the map to reposition.</div>
                       </div>
                       <input type="hidden" id="locGfAddress" value=""/>
                       <div class="form-row">
-                        <label class="form-label">Notes</label>
+                        <label class="form-label" data-i18n="geofences.notes">Notes</label>
                         <input class="form-input" id="locGfNotes" data-i18n-placeholder="geofences.notes_placeholder" placeholder="Optional notes about this location…" maxlength="500"/>
                       </div>
                       <div class="form-row">
-                        <label class="form-label">Coordinates</label>
+                        <label class="form-label" data-i18n="geofences.coordinates">Coordinates</label>
                         <div id="locCoordDisp" style="padding:8px 12px;background:var(--bg-3,var(--bg));border:1px solid var(--border);border-radius:8px;font-family:monospace;font-size:11px;color:var(--text-2)">—</div>
                       </div>
                       <div class="loc-help-card">
-                        <strong><i class="fa-solid fa-circle-info"></i> Creating a Geofence</strong>
+                        <strong><i class="fa-solid fa-circle-info"></i> <span data-i18n="geofences.creating_geofence">Creating a Geofence</span></strong>
                         <ol>
-                          <li>Position the geofence by clicking and dragging the center marker to your desired location.</li>
-                          <li>Set the coverage area using the radius slider.</li>
-                          <li>(Optional) Choose an alternative shape from the shape selector at the top of the map.</li>
-                          <li>Enter a name for your geofence and click Save.</li>
+                          <li data-i18n="geofences.instruction_position">Position the geofence by clicking and dragging the center marker to your desired location.</li>
+                          <li data-i18n="geofences.instruction_radius">Set the coverage area using the radius slider.</li>
+                          <li data-i18n="geofences.instruction_shape">(Optional) Choose an alternative shape from the shape selector at the top of the map.</li>
+                          <li data-i18n="geofences.instruction_save">Enter a name for your geofence and click Save.</li>
                         </ol>
                       </div>
                     </div>
@@ -1647,8 +1647,8 @@ input.hive-range::-moz-range-track {
                         <!-- dropzone -->
                         <div class="loc-dropzone" id="loc-dropzone">
                             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                            <div class="loc-dropzone-title">Drag &amp; drop CSV or Excel file</div>
-                            <div class="loc-dropzone-sub">.csv, .xlsx, .xls — addresses, UK postcodes, or lat/lng all accepted</div>
+                            <div class="loc-dropzone-title" data-i18n="geofences.drag_drop_csv">Drag &amp; drop CSV or Excel file</div>
+                            <div class="loc-dropzone-sub" data-i18n="geofences.csv_formats_accepted">.csv, .xlsx, .xls — addresses, UK postcodes, or lat/lng all accepted</div>
                             <input type="file" id="loc-bulk-file" accept=".csv,.xlsx,.xls" style="display:none" />
                         </div>
                         <!-- template banner -->
@@ -1657,12 +1657,12 @@ input.hive-range::-moz-range-track {
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                             </div>
                             <div class="loc-template-banner-text">
-                                <div class="loc-template-banner-title">Need a template?</div>
-                                <div class="loc-template-banner-sub">Download our CSV template with example rows and required headers.</div>
+                                <div class="loc-template-banner-title" data-i18n="geofences.need_template">Need a template?</div>
+                                <div class="loc-template-banner-sub" data-i18n="geofences.template_description">Download our CSV template with example rows and required headers.</div>
                             </div>
                             <button class="btn btn-secondary" id="loc-bulk-template-btn" style="flex:0 0 auto">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                Template
+                                <span data-i18n="common.template">Template</span>
                             </button>
                         </div>
                         <!-- preview table -->
@@ -1678,7 +1678,7 @@ input.hive-range::-moz-range-track {
                         <div class="loc-progress-row" id="loc-bulk-progress">
                             <div class="loc-progress-bar"><div class="loc-progress-fill" id="loc-progress-fill"></div></div>
                             <div class="loc-progress-text">
-                                <span id="loc-progress-label">Preparing…</span>
+                                <span id="loc-progress-label" data-i18n="geofences.preparing">Preparing…</span>
                                 <span id="loc-progress-count"></span>
                             </div>
                         </div>
@@ -1687,7 +1687,7 @@ input.hive-range::-moz-range-track {
                     </div>
                     <div class="modal-footer">
                         <button class="btn btn-ghost" onclick="locCloseBulk()" data-i18n="common.close">Close</button>
-                        <button class="btn btn-primary" id="loc-bulk-upload-btn" disabled>Import 0 locations</button>
+                        <button class="btn btn-primary" id="loc-bulk-upload-btn" disabled><span data-i18n="geofences.import_locations">Import 0 locations</span></button>
                     </div>
                 </div>
             </div>
@@ -1700,14 +1700,14 @@ input.hive-range::-moz-range-track {
                         <button class="modal-close" onclick="locCloseTagsModal()"><i class="fa-solid fa-xmark"></i></button>
                     </div>
                     <div class="modal-body" style="padding:0">
-                        <p style="padding:12px 20px 8px;margin:0;font-size:.83rem;color:var(--text-3)">
+                        <p style="padding:12px 20px 8px;margin:0;font-size:.83rem;color:var(--text-3)" data-i18n="geofences.toggle_arm_disarm_hint">
                             Toggle the switch on each tag to arm or disarm geofence alerts for this location.
                             When armed, entry and exit events generate alerts in the inbox.
                         </p>
                         <div id="loc-tags-list" style="max-height:400px;overflow-y:auto;padding:0 20px 16px"></div>
                     </div>
                     <div class="modal-footer">
-                        <button class="btn btn-ghost" onclick="locCloseTagsModal()">Done</button>
+                        <button class="btn btn-ghost" onclick="locCloseTagsModal()" data-i18n="common.done">Done</button>
                     </div>
                 </div>
             </div>
@@ -1731,47 +1731,47 @@ input.hive-range::-moz-range-track {
                       </svg>
                     </div>
                     <div>
-                      <div class="brand-name">PinPlot Sketch</div>
-                      <div class="brand-sub">Floor Plan Builder</div>
+                      <div class="brand-name" data-brand="name">PinPlot Sketch</div>
+                      <div class="brand-sub" data-i18n="floor_plan.floor_plan_builder">Floor Plan Builder</div>
                     </div>
                   </div>
                   <div class="header-actions">
-                    <button class="btn-icon" id="undoBtn" title="Undo (Ctrl+Z)">
+                    <button class="btn-icon" id="undoBtn" data-i18n-title="floor_plan.undo" title="Undo (Ctrl+Z)">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>
                     </button>
-                    <button class="btn-icon" id="redoBtn" title="Redo (Ctrl+Y)">
+                    <button class="btn-icon" id="redoBtn" data-i18n-title="floor_plan.redo" title="Redo (Ctrl+Y)">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/></svg>
                     </button>
                     <div class="divider-v"></div>
-                    <button class="btn-icon" id="importBtn" title="Import floor plan image">
+                    <button class="btn-icon" id="importBtn" data-i18n-title="floor_plan.import_image" title="Import floor plan image">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                      Import
+                      <span data-i18n="common.import">Import</span>
                     </button>
-                    <button class="btn-icon btn-save" id="saveBtn" title="Save to browser (Ctrl+S)">
+                    <button class="btn-icon btn-save" id="saveBtn" data-i18n-title="floor_plan.save_browser" title="Save to browser (Ctrl+S)">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                      Save
+                      <span data-i18n="common.save">Save</span>
                     </button>
                     <span class="save-status" id="saveStatus"></span>
-                    <button class="btn-icon" id="exportJsonBtn" title="Export floor plan as JSON">
+                    <button class="btn-icon" id="exportJsonBtn" data-i18n-title="floor_plan.export_json" title="Export floor plan as JSON">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                      Export JSON
+                      <span data-i18n="floor_plan.export_json">Export JSON</span>
                     </button>
-                    <button class="btn-icon" id="exportSvgBtn" title="Export as SVG">
+                    <button class="btn-icon" id="exportSvgBtn" data-i18n-title="floor_plan.export_svg" title="Export as SVG">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 12h8M12 8v8"/></svg>
-                      Export SVG
+                      <span data-i18n="floor_plan.export_svg">Export SVG</span>
                     </button>
-                    <button class="btn-icon" id="previewBtn" title="Preview Leaflet map">
+                    <button class="btn-icon" id="previewBtn" data-i18n-title="floor_plan.preview" title="Preview Leaflet map">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><circle cx="11" cy="11" r="3"/></svg>
-                      Preview
+                      <span data-i18n="floor_plan.preview">Preview</span>
                     </button>
                     <div class="divider-v"></div>
-                    <button class="btn-icon" id="setupFloorBtn" title="Setup Building & Floor" style="background:var(--primary-dim);color:var(--primary);display:none">
+                    <button class="btn-icon" id="setupFloorBtn" data-i18n-title="floor_plan.setup_building_floor" title="Setup Building & Floor" style="background:var(--primary-dim);color:var(--primary);display:none">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
-                      Setup
+                      <span data-i18n="floor_plan.setup">Setup</span>
                     </button>
-                    <button class="btn-icon" id="publishFloorBtn" title="Publish Floor Plan to Database" style="background:#10b981;color:white">
+                    <button class="btn-icon" id="publishFloorBtn" data-i18n-title="floor_plan.publish_to_database" title="Publish Floor Plan to Database" style="background:#10b981;color:white">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg>
-                      Publish
+                      <span data-i18n="floor_plan.publish">Publish</span>
                     </button>
                   </div>
                 </header>
@@ -1780,108 +1780,108 @@ input.hive-range::-moz-range-track {
                   <!-- Left Toolbar -->
                   <aside class="toolbar">
                     <div class="tool-section">
-                      <div class="tool-label">SELECT</div>
-                      <button class="tool-btn active" data-tool="select" title="Select / Move (V)">
+                      <div class="tool-label" data-i18n="floor_plan.select">SELECT</div>
+                      <button class="tool-btn active" data-tool="select" data-i18n-title="floor_plan.select_move" title="Select / Move (V)">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-7 1-3 7z"/></svg>
-                        <span>Select</span>
+                        <span data-i18n="floor_plan.select">Select</span>
                       </button>
                     </div>
 
                     <div class="tool-section">
-                      <div class="tool-label">WALLS</div>
-                      <button class="tool-btn" data-tool="wall-concrete" title="Concrete Wall">
+                      <div class="tool-label" data-i18n="floor_plan.walls">WALLS</div>
+                      <button class="tool-btn" data-tool="wall-concrete" data-i18n-title="floor_plan.concrete_wall" title="Concrete Wall">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="10" width="20" height="4"/></svg>
-                        <span>Concrete</span>
+                        <span data-i18n="floor_plan.concrete">Concrete</span>
                       </button>
-                      <button class="tool-btn" data-tool="wall-drywall" title="Drywall / Partition">
+                      <button class="tool-btn" data-tool="wall-drywall" data-i18n-title="floor_plan.drywall" title="Drywall / Partition">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 2"><line x1="2" y1="12" x2="22" y2="12"/></svg>
-                        <span>Drywall</span>
+                        <span data-i18n="floor_plan.drywall">Drywall</span>
                       </button>
-                      <button class="tool-btn" data-tool="wall-glass" title="Glass Wall / Curtain">
+                      <button class="tool-btn" data-tool="wall-glass" data-i18n-title="floor_plan.glass_wall" title="Glass Wall / Curtain">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 1"><line x1="2" y1="12" x2="22" y2="12"/></svg>
-                        <span>Glass</span>
+                        <span data-i18n="floor_plan.glass">Glass</span>
                       </button>
-                      <button class="tool-btn" data-tool="wall-exterior" title="Exterior Wall">
+                      <button class="tool-btn" data-tool="wall-exterior" data-i18n-title="floor_plan.exterior_wall" title="Exterior Wall">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="9" width="20" height="6"/></svg>
-                        <span>Exterior</span>
+                        <span data-i18n="floor_plan.exterior">Exterior</span>
                       </button>
                     </div>
 
                     <div class="tool-section">
-                      <div class="tool-label">OPENINGS</div>
-                      <button class="tool-btn" data-tool="door-single" title="Single Door">
+                      <div class="tool-label" data-i18n="floor_plan.openings">OPENINGS</div>
+                      <button class="tool-btn" data-tool="door-single" data-i18n-title="floor_plan.single_door" title="Single Door">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="18"/><path d="M11 6 A9 9 0 0 1 20 15" stroke-dasharray="2 1"/><line x1="3" y1="21" x2="22" y2="21"/></svg>
-                        <span>Door</span>
+                        <span data-i18n="floor_plan.door">Door</span>
                       </button>
-                      <button class="tool-btn" data-tool="door-double" title="Double Door">
+                      <button class="tool-btn" data-tool="door-double" data-i18n-title="floor_plan.double_door" title="Double Door">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="10" height="16"/><rect x="13" y="4" width="10" height="16"/><line x1="1" y1="20" x2="23" y2="20"/></svg>
-                        <span>Dbl Door</span>
+                        <span data-i18n="floor_plan.dbl_door">Dbl Door</span>
                       </button>
-                      <button class="tool-btn" data-tool="window" title="Window">
+                      <button class="tool-btn" data-tool="window" data-i18n-title="floor_plan.window" title="Window">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="9" width="20" height="6"/><line x1="12" y1="9" x2="12" y2="15"/></svg>
-                        <span>Window</span>
+                        <span data-i18n="floor_plan.window">Window</span>
                       </button>
                     </div>
 
                     <div class="tool-section">
-                      <div class="tool-label">AREAS</div>
-                      <button class="tool-btn" data-tool="room" title="Room / Space (Rectangle)">
+                      <div class="tool-label" data-i18n="floor_plan.areas">AREAS</div>
+                      <button class="tool-btn" data-tool="room" data-i18n-title="floor_plan.room_rectangle" title="Room / Space (Rectangle)">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="1"/></svg>
-                        <span>Room</span>
+                        <span data-i18n="floor_plan.room">Room</span>
                       </button>
-                      <button class="tool-btn" data-tool="polygon" title="Polygon Room">
+                      <button class="tool-btn" data-tool="polygon" data-i18n-title="floor_plan.polygon_room" title="Polygon Room">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,2 22,8 19,20 5,20 2,8"/></svg>
-                        <span>Polygon</span>
+                        <span data-i18n="floor_plan.polygon">Polygon</span>
                       </button>
                     </div>
 
                     <div class="tool-section">
-                      <div class="tool-label">FEATURES</div>
-                      <button class="tool-btn" data-tool="stairs" title="Staircase">
+                      <div class="tool-label" data-i18n="floor_plan.features">FEATURES</div>
+                      <button class="tool-btn" data-tool="stairs" data-i18n-title="floor_plan.staircase" title="Staircase">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="2,22 2,14 8,14 8,8 14,8 14,2 22,2"/></svg>
-                        <span>Stairs</span>
+                        <span data-i18n="floor_plan.stairs">Stairs</span>
                       </button>
-                      <button class="tool-btn" data-tool="lift" title="Lift / Elevator">
+                      <button class="tool-btn" data-tool="lift" data-i18n-title="floor_plan.lift_elevator" title="Lift / Elevator">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="1"/><line x1="12" y1="2" x2="12" y2="22"/><polyline points="8,8 12,4 16,8"/><polyline points="8,16 12,20 16,16"/></svg>
-                        <span>Lift</span>
+                        <span data-i18n="floor_plan.lift">Lift</span>
                       </button>
-                      <button class="tool-btn" data-tool="column" title="Structural Column">
+                      <button class="tool-btn" data-tool="column" data-i18n-title="floor_plan.structural_column" title="Structural Column">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="8" y="2" width="8" height="20"/></svg>
-                        <span>Column</span>
+                        <span data-i18n="floor_plan.column">Column</span>
                       </button>
-                      <button class="tool-btn" data-tool="text" title="Text Label">
+                      <button class="tool-btn" data-tool="text" data-i18n-title="floor_plan.text_label" title="Text Label">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
-                        <span>Label</span>
+                        <span data-i18n="floor_plan.label">Label</span>
                       </button>
-                      <button class="tool-btn" data-tool="gateway" title="BLE Gateway">
+                      <button class="tool-btn" data-tool="gateway" data-i18n-title="floor_plan.ble_gateway" title="BLE Gateway">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M6.3 6.3a8 8 0 000 11.4"/><path d="M17.7 6.3a8 8 0 010 11.4"/><path d="M9.5 9.5a4 4 0 000 5"/><path d="M14.5 9.5a4 4 0 010 5"/></svg>
-                        <span>Gateway</span>
+                        <span data-i18n="floor_plan.gateway">Gateway</span>
                       </button>
                     </div>
 
                     <div class="tool-section">
-                      <div class="tool-label">TRACE</div>
+                      <div class="tool-label" data-i18n="floor_plan.trace">TRACE</div>
                       <div class="trace-controls">
                         <label class="toggle-row">
-                          <span>Show overlay</span>
+                          <span data-i18n="floor_plan.show_overlay">Show overlay</span>
                           <label class="toggle">
                             <input type="checkbox" id="overlayToggle" checked>
                             <span class="slider"></span>
                           </label>
                         </label>
                         <label class="opacity-row">
-                          <span>Opacity</span>
+                          <span data-i18n="floor_plan.opacity">Opacity</span>
                           <input type="range" id="overlayOpacity" min="10" max="90" value="35" class="range-input">
                           <span id="opacityVal" class="mono">35%</span>
                         </label>
                         <button class="btn-upload" id="uploadOverlayBtn">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                          Upload Image
+                          <span data-i18n="floor_plan.upload_image">Upload Image</span>
                         </button>
                         <div class="upload-hint">PDF, PNG, JPG, SVG</div>
                         <button class="btn-upload btn-danger" id="clearOverlayBtn" style="display:none">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-                          Clear
+                          <span data-i18n="common.clear">Clear</span>
                         </button>
                       </div>
                     </div>
@@ -1898,7 +1898,7 @@ input.hive-range::-moz-range-track {
                         <button class="btn-icon sm" id="zoomIn">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
                         </button>
-                        <button class="btn-icon sm" id="zoomFit" title="Fit to view">
+                        <button class="btn-icon sm" id="zoomFit" data-i18n-title="floor_plan.fit_to_view" title="Fit to view">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
                         </button>
                       </div>
@@ -1906,14 +1906,14 @@ input.hive-range::-moz-range-track {
                         <span class="mono" id="cursorCoords">0, 0</span>
                         <span class="divider-v sm"></span>
                         <label class="toggle-row sm">
-                          <span>Grid</span>
+                          <span data-i18n="floor_plan.grid">Grid</span>
                           <label class="toggle sm">
                             <input type="checkbox" id="gridToggle" checked>
                             <span class="slider"></span>
                           </label>
                         </label>
                         <label class="toggle-row sm">
-                          <span>Snap</span>
+                          <span data-i18n="floor_plan.snap">Snap</span>
                           <label class="toggle sm">
                             <input type="checkbox" id="snapToggle" checked>
                             <span class="slider"></span>
@@ -1924,11 +1924,11 @@ input.hive-range::-moz-range-track {
                         <button class="btn-icon sm" id="prevFloor">
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
                         </button>
-                        <span class="floor-label" id="floorLabel">Floor 1</span>
+                        <span class="floor-label" id="floorLabel"><span data-i18n="floor_plan.floor">Floor</span> 1</span>
                         <button class="btn-icon sm" id="nextFloor">
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
                         </button>
-                        <button class="btn-icon sm" id="addFloor" title="Add floor">
+                        <button class="btn-icon sm" id="addFloor" data-i18n-title="floor_plan.add_floor" title="Add floor">
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                         </button>
                       </div>
@@ -1948,43 +1948,43 @@ input.hive-range::-moz-range-track {
 
                   <!-- Right Properties Panel -->
                   <aside class="properties-panel" id="propertiesPanel">
-                    <div class="panel-header">Properties</div>
+                    <div class="panel-header" data-i18n="floor_plan.properties">Properties</div>
 
                     <div id="noSelection" class="no-selection">
                       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5"><path d="M5 3l14 9-7 1-3 7z"/></svg>
-                      <div>Select an element<br/>to edit properties</div>
+                      <div data-i18n="floor_plan.select_element_hint">Select an element<br/>to edit properties</div>
                     </div>
 
                     <div id="selectionProps" class="selection-props" style="display:none">
                       <div class="prop-group">
-                        <div class="prop-label">Type</div>
+                        <div class="prop-label" data-i18n="common.type">Type</div>
                         <div class="prop-value mono" id="propType">—</div>
                       </div>
                       <div class="prop-group">
-                        <div class="prop-label">Label</div>
+                        <div class="prop-label" data-i18n="floor_plan.label">Label</div>
                         <input type="text" class="prop-input" id="propLabel" data-i18n-placeholder="floor_plan.room_name" placeholder="Room name…">
                       </div>
                       <div class="prop-group" id="propMacGroup" style="display:none">
-                        <div class="prop-label">MAC Address</div>
+                        <div class="prop-label" data-i18n="floor_plan.mac_address_label">MAC Address</div>
                         <input type="text" class="prop-input mono" id="propMac" data-i18n-placeholder="floor_plan.mac_address" placeholder="A4:CF:12:45:AB:CD">
-                        <div style="margin-top:4px;font-size:11px;color:var(--text-muted)">ESP32S3 gateway MAC address</div>
+                        <div style="margin-top:4px;font-size:11px;color:var(--text-muted)" data-i18n="floor_plan.esp32_gateway_hint">ESP32S3 gateway MAC address</div>
                       </div>
                       <div class="prop-group" id="propGatewayIdGroup" style="display:none">
-                        <div class="prop-label">Gateway Status</div>
-                        <div id="propGatewayStatus" style="font-size:12px;padding:6px 10px;border-radius:4px;background:var(--primary-dim);color:var(--text-muted)">
+                        <div class="prop-label" data-i18n="floor_plan.gateway_status">Gateway Status</div>
+                        <div id="propGatewayStatus" style="font-size:12px;padding:6px 10px;border-radius:4px;background:var(--primary-dim);color:var(--text-muted)" data-i18n="floor_plan.not_registered">
                           Not registered
                         </div>
                         <button class="btn-primary-sm" id="propRegisterGateway" style="margin-top:8px;width:100%">
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg>
-                          Register Gateway
+                          <span data-i18n="floor_plan.register_gateway">Register Gateway</span>
                         </button>
                       </div>
                       <div class="prop-group" id="propFontSizeGroup" style="display:none">
-                        <div class="prop-label">Font Size</div>
+                        <div class="prop-label" data-i18n="floor_plan.font_size">Font Size</div>
                         <div class="font-size-top-row">
-                          <button class="font-size-btn" id="propFontSizeDec" title="Decrease font size">−</button>
+                          <button class="font-size-btn" id="propFontSizeDec" data-i18n-title="floor_plan.decrease_font" title="Decrease font size">−</button>
                           <input type="number" id="propFontSizeNum" class="prop-input mono font-size-num" min="6" max="120" value="14">
-                          <button class="font-size-btn" id="propFontSizeInc" title="Increase font size">+</button>
+                          <button class="font-size-btn" id="propFontSizeInc" data-i18n-title="floor_plan.increase_font" title="Increase font size">+</button>
                           <span class="mono" id="propFontSizeVal" style="font-size:11px;color:var(--text-muted);min-width:32px;text-align:right">14px</span>
                         </div>
                         <div class="font-size-slider-row">
@@ -1992,7 +1992,7 @@ input.hive-range::-moz-range-track {
                         </div>
                       </div>
                       <div class="prop-group" id="propColorGroup">
-                        <div class="prop-label">Color</div>
+                        <div class="prop-label" data-i18n="common.color">Color</div>
                         <div class="color-row">
                           <input type="color" class="color-swatch" id="propColor" value="#006400">
                           <input type="text" class="prop-input mono" id="propColorHex" placeholder="#006400" maxlength="7">
@@ -2299,31 +2299,31 @@ input.hive-range::-moz-range-track {
                         <div class="settings-section-header">
                             <i class="fa-solid fa-lock" style="color:var(--primary)"></i>
                             <div>
-                                <h3>Account &amp; Security</h3>
-                                <p>Change your login password.</p>
+                                <h3 data-i18n="settings.account_security">Account &amp; Security</h3>
+                                <p data-i18n="settings.account_security_hint">Change your login password.</p>
                             </div>
                         </div>
                         <div class="settings-row">
                             <div>
-                                <div class="settings-row-label">Password</div>
-                                <div class="settings-row-hint">Keep your account secure with a strong password.</div>
+                                <div class="settings-row-label" data-i18n="settings.password">Password</div>
+                                <div class="settings-row-hint" data-i18n="settings.password_hint">Keep your account secure with a strong password.</div>
                             </div>
                             <button class="btn btn-secondary btn-small" onclick="settingsToggleForm('pwForm')">
-                                <i class="fa-solid fa-key"></i> Change Password
+                                <i class="fa-solid fa-key"></i> <span data-i18n="settings.change_password">Change Password</span>
                             </button>
                         </div>
                         <div class="settings-inline-edit" id="pwForm" style="display:none">
                             <div>
-                                <label style="font-size:12px;font-weight:600;color:var(--text-3);display:block;margin-bottom:4px">Current password</label>
-                                <input type="password" id="pw-current" placeholder="••••••••" autocomplete="current-password">
+                                <label style="font-size:12px;font-weight:600;color:var(--text-3);display:block;margin-bottom:4px" data-i18n="settings.current_password">Current password</label>
+                                <input type="password" id="pw-current" data-i18n-placeholder="settings.password_placeholder" placeholder="••••••••" autocomplete="current-password">
                             </div>
                             <div>
-                                <label style="font-size:12px;font-weight:600;color:var(--text-3);display:block;margin-bottom:4px">New password <span style="color:var(--text-3)">(min 8 characters)</span></label>
-                                <input type="password" id="pw-new" placeholder="••••••••" autocomplete="new-password">
+                                <label style="font-size:12px;font-weight:600;color:var(--text-3);display:block;margin-bottom:4px"><span data-i18n="settings.new_password">New password</span> <span style="color:var(--text-3)" data-i18n="settings.min_8_chars">(min 8 characters)</span></label>
+                                <input type="password" id="pw-new" data-i18n-placeholder="settings.password_placeholder" placeholder="••••••••" autocomplete="new-password">
                             </div>
                             <div>
-                                <label style="font-size:12px;font-weight:600;color:var(--text-3);display:block;margin-bottom:4px">Confirm new password</label>
-                                <input type="password" id="pw-confirm" placeholder="••••••••" autocomplete="new-password">
+                                <label style="font-size:12px;font-weight:600;color:var(--text-3);display:block;margin-bottom:4px" data-i18n="settings.confirm_password">Confirm new password</label>
+                                <input type="password" id="pw-confirm" data-i18n-placeholder="settings.password_placeholder" placeholder="••••••••" autocomplete="new-password">
                             </div>
                             <div class="actions">
                                 <button class="btn btn-primary btn-small" id="pw-save-btn" onclick="settingsSavePassword()" data-i18n="settings.save_password">Save Password</button>
@@ -2397,15 +2397,15 @@ input.hive-range::-moz-range-track {
                                 <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
                                     <div class="logo-preview-box" id="logo-preview-box">
                                         <img id="logo-preview-img" src="" alt="" style="display:none;max-height:48px;max-width:140px">
-                                        <span id="logo-preview-none" style="font-size:12px;color:var(--text-3)">No logo</span>
+                                        <span id="logo-preview-none" style="font-size:12px;color:var(--text-3)" data-i18n="settings.no_logo">No logo</span>
                                     </div>
                                     <div id="appearance-logo-controls" style="display:none;flex-direction:column;gap:6px">
                                         <label class="btn btn-secondary btn-small" style="cursor:pointer">
-                                            <i class="fa-solid fa-upload"></i> Upload
+                                            <i class="fa-solid fa-upload"></i> <span data-i18n="common.upload">Upload</span>
                                             <input type="file" id="logo-file-input" accept="image/*" style="display:none" onchange="settingsLogoFileChange(event)">
                                         </label>
                                         <button class="btn btn-secondary btn-small" id="logo-remove-btn" style="display:none" onclick="settingsLogoRemove()">
-                                            <i class="fa-solid fa-trash"></i> Remove
+                                            <i class="fa-solid fa-trash"></i> <span data-i18n="common.remove">Remove</span>
                                         </button>
                                     </div>
                                 </div>
@@ -2413,21 +2413,21 @@ input.hive-range::-moz-range-track {
                             <!-- Logo (Dark Mode) -->
                             <div class="settings-row" style="align-items:flex-start;gap:20px;flex-wrap:wrap">
                                 <div>
-                                    <div class="settings-row-label">Company Logo <span style="font-size:11px;color:var(--text-3);font-weight:400">(Dark Mode)</span></div>
-                                    <div class="settings-row-hint">Optional alternative logo for dark mode. Falls back to the light logo if not set.</div>
+                                    <div class="settings-row-label"><span data-i18n="settings.company_logo">Company Logo</span> <span style="font-size:11px;color:var(--text-3);font-weight:400">(<span data-i18n="settings.dark_mode">Dark Mode</span>)</span></div>
+                                    <div class="settings-row-hint" data-i18n="settings.logo_dark_hint">Optional alternative logo for dark mode. Falls back to the light logo if not set.</div>
                                 </div>
                                 <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
                                     <div class="logo-preview-box" id="logo-dark-preview-box" style="background:var(--bg-2,#1e1e2e)">
                                         <img id="logo-dark-preview-img" src="" alt="" style="display:none;max-height:48px;max-width:140px">
-                                        <span id="logo-dark-preview-none" style="font-size:12px;color:var(--text-3)">No logo</span>
+                                        <span id="logo-dark-preview-none" style="font-size:12px;color:var(--text-3)" data-i18n="settings.no_logo">No logo</span>
                                     </div>
                                     <div id="appearance-logo-dark-controls" style="display:none;flex-direction:column;gap:6px">
                                         <label class="btn btn-secondary btn-small" style="cursor:pointer">
-                                            <i class="fa-solid fa-upload"></i> Upload
+                                            <i class="fa-solid fa-upload"></i> <span data-i18n="common.upload">Upload</span>
                                             <input type="file" id="logo-dark-file-input" accept="image/*" style="display:none" onchange="settingsLogoDarkFileChange(event)">
                                         </label>
                                         <button class="btn btn-secondary btn-small" id="logo-dark-remove-btn" style="display:none" onclick="settingsLogoDarkRemove()">
-                                            <i class="fa-solid fa-trash"></i> Remove
+                                            <i class="fa-solid fa-trash"></i> <span data-i18n="common.remove">Remove</span>
                                         </button>
                                     </div>
                                 </div>
@@ -2435,14 +2435,14 @@ input.hive-range::-moz-range-track {
                             <!-- Colors -->
                             <div class="settings-row">
                                 <div>
-                                    <div class="settings-row-label">Primary Colour</div>
-                                    <div class="settings-row-hint">Buttons, links, active states.</div>
+                                    <div class="settings-row-label" data-i18n="settings.primary_colour">Primary Colour</div>
+                                    <div class="settings-row-hint" data-i18n="settings.primary_colour_hint">Buttons, links, active states.</div>
                                 </div>
                                 <div class="settings-row-control" id="color-primary-control" style="display:none">
                                     <input type="color" id="color-primary" value="#3b82f6" class="color-swatch-input"
                                            oninput="settingsColorPreview()">
-                                    <button class="btn btn-secondary btn-small" onclick="settingsResetColor('primary')" title="Restore to default (#3b82f6)">
-                                        <i class="fa-solid fa-rotate-left"></i> Restore default
+                                    <button class="btn btn-secondary btn-small" onclick="settingsResetColor('primary')" data-i18n-title="settings.restore_default_tooltip" title="Restore to default (#3b82f6)">
+                                        <i class="fa-solid fa-rotate-left"></i> <span data-i18n="settings.restore_default">Restore default</span>
                                     </button>
                                 </div>
                                 <span id="color-primary-view" class="settings-row-value" style="display:flex;align-items:center;gap:8px">
@@ -2452,14 +2452,14 @@ input.hive-range::-moz-range-track {
                             </div>
                             <div class="settings-row">
                                 <div>
-                                    <div class="settings-row-label">Accent Colour</div>
-                                    <div class="settings-row-hint">Secondary highlights.</div>
+                                    <div class="settings-row-label" data-i18n="settings.accent_colour">Accent Colour</div>
+                                    <div class="settings-row-hint" data-i18n="settings.accent_colour_hint">Secondary highlights.</div>
                                 </div>
                                 <div class="settings-row-control" id="color-accent-control" style="display:none">
                                     <input type="color" id="color-accent" value="#10b981" class="color-swatch-input"
                                            oninput="settingsColorPreview()">
-                                    <button class="btn btn-secondary btn-small" onclick="settingsResetColor('accent')" title="Restore to default (#10b981)">
-                                        <i class="fa-solid fa-rotate-left"></i> Restore default
+                                    <button class="btn btn-secondary btn-small" onclick="settingsResetColor('accent')" data-i18n-title="settings.restore_default_tooltip" title="Restore to default (#10b981)">
+                                        <i class="fa-solid fa-rotate-left"></i> <span data-i18n="settings.restore_default">Restore default</span>
                                     </button>
                                 </div>
                                 <span id="color-accent-view" class="settings-row-value" style="display:flex;align-items:center;gap:8px">
@@ -2470,9 +2470,9 @@ input.hive-range::-moz-range-track {
                             <!-- Admin save row -->
                             <div id="appearance-save-row" style="display:none;margin-top:16px;display:flex;gap:8px">
                                 <button class="btn btn-primary btn-small" id="appearance-save-btn" onclick="settingsSaveAppearance()">
-                                    <i class="fa-solid fa-floppy-disk"></i> Save Appearance
+                                    <i class="fa-solid fa-floppy-disk"></i> <span data-i18n="settings.save_appearance">Save Appearance</span>
                                 </button>
-                                <button class="btn btn-secondary btn-small" onclick="settingsCancelAppearance()">Discard</button>
+                                <button class="btn btn-secondary btn-small" onclick="settingsCancelAppearance()" data-i18n="common.discard">Discard</button>
                             </div>
                             <div class="alert" id="appearance-alert" style="display:none"><span id="appearance-alert-text"></span></div>
                         </div>
@@ -2483,40 +2483,40 @@ input.hive-range::-moz-range-track {
                         <div class="settings-section-header">
                             <i class="fa-solid fa-clock-rotate-left" style="color:var(--primary)"></i>
                             <div>
-                                <h3>Data Retention</h3>
-                                <p>How long movement history is stored for your assets. Older data is automatically purged.</p>
+                                <h3 data-i18n="settings.data_retention">Data Retention</h3>
+                                <p data-i18n="settings.data_retention_hint">How long movement history is stored for your assets. Older data is automatically purged.</p>
                             </div>
                         </div>
                         <div id="retention-loading" style="padding:24px;text-align:center;color:var(--text-3)">
-                            <i class="fa-solid fa-spinner fa-spin"></i> Loading…
+                            <i class="fa-solid fa-spinner fa-spin"></i> <span data-i18n="common.loading">Loading…</span>
                         </div>
                         <div id="retention-body" style="display:none">
                             <div class="settings-row">
                                 <div>
-                                    <div class="settings-row-label">History Retention</div>
-                                    <div class="settings-row-hint">Tag location history older than this will be removed.</div>
+                                    <div class="settings-row-label" data-i18n="settings.history_retention">History Retention</div>
+                                    <div class="settings-row-hint" data-i18n="settings.history_retention_hint">Tag location history older than this will be removed.</div>
                                 </div>
                                 <div class="settings-row-control">
                                     <span id="retention-view" class="settings-row-value">365 days</span>
                                     <button class="btn btn-secondary btn-small" id="retention-edit-btn" style="display:none"
                                             onclick="settingsToggleForm('retentionForm')">
-                                        <i class="fa-solid fa-pen"></i> Edit
+                                        <i class="fa-solid fa-pen"></i> <span data-i18n="common.edit">Edit</span>
                                     </button>
                                 </div>
                             </div>
                             <div class="settings-inline-edit" id="retentionForm" style="display:none">
                                 <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
                                     <select id="retention-days-select" style="width:auto">
-                                        <option value="30">30 days</option>
-                                        <option value="60">60 days</option>
-                                        <option value="90">90 days</option>
-                                        <option value="180">6 months</option>
-                                        <option value="365" selected>1 year</option>
-                                        <option value="730">2 years</option>
-                                        <option value="1095">3 years</option>
+                                        <option value="30" data-i18n="settings.retention_30_days">30 days</option>
+                                        <option value="60" data-i18n="settings.retention_60_days">60 days</option>
+                                        <option value="90" data-i18n="settings.retention_90_days">90 days</option>
+                                        <option value="180" data-i18n="settings.retention_6_months">6 months</option>
+                                        <option value="365" selected data-i18n="settings.retention_1_year">1 year</option>
+                                        <option value="730" data-i18n="settings.retention_2_years">2 years</option>
+                                        <option value="1095" data-i18n="settings.retention_3_years">3 years</option>
                                     </select>
                                 </div>
-                                <p class="hint">Data beyond this period is automatically deleted to save storage.</p>
+                                <p class="hint" data-i18n="settings.retention_delete_hint">Data beyond this period is automatically deleted to save storage.</p>
                                 <div class="actions">
                                     <button class="btn btn-primary btn-small" id="retention-save-btn" onclick="settingsSaveRetention()" data-i18n="common.save">Save</button>
                                     <button class="btn btn-secondary btn-small" onclick="settingsToggleForm('retentionForm')" data-i18n="common.cancel">Cancel</button>
@@ -2531,19 +2531,19 @@ input.hive-range::-moz-range-track {
                         <div class="settings-section-header">
                             <i class="fa-solid fa-bell" style="color:var(--primary)"></i>
                             <div>
-                                <h3>Alerts &amp; Notifications</h3>
-                                <p>Control when you are notified about your assets.</p>
+                                <h3 data-i18n="settings.alerts_notifications">Alerts &amp; Notifications</h3>
+                                <p data-i18n="settings.alerts_notifications_hint">Control when you are notified about your assets.</p>
                             </div>
                         </div>
                         <div id="notif-loading" style="padding:24px;text-align:center;color:var(--text-3)">
-                            <i class="fa-solid fa-spinner fa-spin"></i> Loading…
+                            <i class="fa-solid fa-spinner fa-spin"></i> <span data-i18n="common.loading">Loading…</span>
                         </div>
                         <div id="notif-body" style="display:none">
                             <!-- Master toggle -->
                             <div class="settings-row">
                                 <div>
-                                    <div class="settings-row-label">Enable Alerts</div>
-                                    <div class="settings-row-hint">Master switch — turns all notifications on or off.</div>
+                                    <div class="settings-row-label" data-i18n="settings.enable_alerts">Enable Alerts</div>
+                                    <div class="settings-row-hint" data-i18n="settings.enable_alerts_hint">Master switch — turns all notifications on or off.</div>
                                 </div>
                                 <label class="toggle-switch">
                                     <input type="checkbox" id="notif-enabled" onchange="settingsSaveNotifications()">
@@ -2552,13 +2552,13 @@ input.hive-range::-moz-range-track {
                             </div>
                             <!-- Trigger types -->
                             <div id="notif-triggers" style="transition:opacity .2s">
-                                <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-3);padding:14px 0 8px">
+                                <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-3);padding:14px 0 8px" data-i18n="settings.notify_when_tag">
                                     Notify me when a tag…
                                 </p>
                                 <div class="settings-row">
                                     <div>
-                                        <div class="settings-row-label"><i class="fa-solid fa-draw-polygon" style="margin-right:6px;color:var(--warning)"></i>Geofence entry / exit</div>
-                                        <div class="settings-row-hint">Alert when an asset enters or exits a defined geofence area.</div>
+                                        <div class="settings-row-label"><i class="fa-solid fa-draw-polygon" style="margin-right:6px;color:var(--warning)"></i><span data-i18n="settings.geofence_entry_exit">Geofence entry / exit</span></div>
+                                        <div class="settings-row-hint" data-i18n="settings.geofence_alert_hint">Alert when an asset enters or exits a defined geofence area.</div>
                                     </div>
                                     <label class="toggle-switch">
                                         <input type="checkbox" id="notif-geofence" onchange="settingsSaveNotifications()">
@@ -2567,8 +2567,8 @@ input.hive-range::-moz-range-track {
                                 </div>
                                 <div class="settings-row">
                                     <div>
-                                        <div class="settings-row-label"><i class="fa-solid fa-battery-low" style="margin-right:6px;color:var(--danger)"></i>Battery is low</div>
-                                        <div class="settings-row-hint">Alert when a tag's battery drops below 20%.</div>
+                                        <div class="settings-row-label"><i class="fa-solid fa-battery-low" style="margin-right:6px;color:var(--danger)"></i><span data-i18n="settings.battery_low">Battery is low</span></div>
+                                        <div class="settings-row-hint" data-i18n="settings.battery_alert_hint">Alert when a tag's battery drops below 20%.</div>
                                     </div>
                                     <label class="toggle-switch">
                                         <input type="checkbox" id="notif-battery" onchange="settingsSaveNotifications()">
@@ -2577,8 +2577,8 @@ input.hive-range::-moz-range-track {
                                 </div>
                                 <div class="settings-row">
                                     <div>
-                                        <div class="settings-row-label"><i class="fa-solid fa-signal-slash" style="margin-right:6px;color:var(--text-3)"></i>Alert when a tag hasn't been reported a location in last 7 days</div>
-                                        <div class="settings-row-hint">Alert when a tag hasn't been detected for an extended period.</div>
+                                        <div class="settings-row-label"><i class="fa-solid fa-signal-slash" style="margin-right:6px;color:var(--text-3)"></i><span data-i18n="settings.no_report_7_days">Alert when a tag hasn't been reported a location in last 7 days</span></div>
+                                        <div class="settings-row-hint" data-i18n="settings.no_report_alert_hint">Alert when a tag hasn't been detected for an extended period.</div>
                                     </div>
                                     <label class="toggle-switch">
                                         <input type="checkbox" id="notif-offline" onchange="settingsSaveNotifications()">
@@ -2587,8 +2587,8 @@ input.hive-range::-moz-range-track {
                                 </div>
                                 <div class="settings-row">
                                     <div>
-                                        <div class="settings-row-label"><i class="fa-solid fa-shield-halved" style="margin-right:6px;color:var(--primary)"></i>Hive breach detected</div>
-                                        <div class="settings-row-hint">Alert when a tag separates from its HIVE group beyond the configured threshold.</div>
+                                        <div class="settings-row-label"><i class="fa-solid fa-shield-halved" style="margin-right:6px;color:var(--primary)"></i><span data-i18n="settings.hive_breach">Hive breach detected</span></div>
+                                        <div class="settings-row-hint" data-i18n="settings.hive_breach_hint">Alert when a tag separates from its HIVE group beyond the configured threshold.</div>
                                     </div>
                                     <label class="toggle-switch">
                                         <input type="checkbox" id="notif-hive" onchange="settingsSaveNotifications()">
@@ -2596,13 +2596,13 @@ input.hive-range::-moz-range-track {
                                     </label>
                                 </div>
                                 <!-- Delivery method -->
-                                <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-3);padding:14px 0 8px">
+                                <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-3);padding:14px 0 8px" data-i18n="settings.how_to_notify">
                                     How to notify me
                                 </p>
                                 <div class="settings-row">
                                     <div>
-                                        <div class="settings-row-label"><i class="fa-solid fa-envelope" style="margin-right:6px;color:var(--info)"></i>Email notifications</div>
-                                        <div class="settings-row-hint">Send alert emails to the addresses listed below.</div>
+                                        <div class="settings-row-label"><i class="fa-solid fa-envelope" style="margin-right:6px;color:var(--info)"></i><span data-i18n="settings.email_notifications">Email notifications</span></div>
+                                        <div class="settings-row-hint" data-i18n="settings.email_notifications_hint">Send alert emails to the addresses listed below.</div>
                                     </div>
                                     <label class="toggle-switch">
                                         <input type="checkbox" id="notif-email" onchange="settingsSaveNotifications()">
@@ -2614,11 +2614,11 @@ input.hive-range::-moz-range-track {
                                     <div style="font-size:12px;color:var(--text-3);margin-bottom:8px">Notification addresses — your login email is always included.</div>
                                     <div id="notif-email-tags" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
                                     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                                        <input type="email" id="notif-email-add-input" placeholder="Add email address…"
+                                        <input type="email" id="notif-email-add-input" data-i18n-placeholder="settings.add_email_placeholder" placeholder="Add email address…"
                                                style="flex:1;min-width:200px;max-width:320px"
                                                onkeydown="if(event.key==='Enter'){event.preventDefault();notifAddEmail();}">
                                         <button class="btn btn-secondary btn-small" onclick="notifAddEmail()">
-                                            <i class="fa-solid fa-plus"></i> Add
+                                            <i class="fa-solid fa-plus"></i> <span data-i18n="common.add">Add</span>
                                         </button>
                                     </div>
                                     <div class="alert" id="notif-email-alert" style="display:none;margin-top:8px"><span id="notif-email-alert-text"></span></div>
@@ -2626,12 +2626,12 @@ input.hive-range::-moz-range-track {
                                 <!-- SMS section (only shown when group has sms_addon) -->
                                 <div id="notif-sms-section" style="display:none">
                                     <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-3);padding:14px 0 8px">
-                                        <i class="fa-solid fa-mobile-screen-button" style="margin-right:5px;color:var(--primary)"></i>SMS Alerts
+                                        <i class="fa-solid fa-mobile-screen-button" style="margin-right:5px;color:var(--primary)"></i><span data-i18n="settings.sms_alerts">SMS Alerts</span>
                                     </p>
                                     <div class="settings-row">
                                         <div>
-                                            <div class="settings-row-label">SMS Alerts</div>
-                                            <div class="settings-row-hint">Receive text messages for your alerts.</div>
+                                            <div class="settings-row-label" data-i18n="settings.sms_alerts">SMS Alerts</div>
+                                            <div class="settings-row-hint" data-i18n="settings.sms_alerts_hint">Receive text messages for your alerts.</div>
                                         </div>
                                         <label class="toggle-switch">
                                             <input type="checkbox" id="notif-sms-enabled" onchange="settingsSaveNotifications()">
@@ -2642,11 +2642,11 @@ input.hive-range::-moz-range-track {
                                         <!-- Phone number -->
                                         <div class="settings-row" style="gap:12px;flex-wrap:wrap">
                                             <div style="flex:1;min-width:180px">
-                                                <div class="settings-row-label">Mobile Number</div>
-                                                <div class="settings-row-hint">UK numbers: 07xxx will be converted to +44 automatically.</div>
+                                                <div class="settings-row-label" data-i18n="settings.mobile_number">Mobile Number</div>
+                                                <div class="settings-row-hint" data-i18n="settings.mobile_number_hint">UK numbers: 07xxx will be converted to +44 automatically.</div>
                                             </div>
                                             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                                                <input type="tel" id="notif-phone" placeholder="e.g. 07700900123 or +447700900123"
+                                                <input type="tel" id="notif-phone" data-i18n-placeholder="settings.mobile_placeholder" placeholder="e.g. 07700900123 or +447700900123"
                                                        style="min-width:220px;max-width:300px"
                                                        onkeydown="if(event.key==='Enter'){event.preventDefault();settingsSavePhone();}">
                                                 <button class="btn btn-secondary btn-small" onclick="settingsSavePhone()" data-i18n="common.save">Save</button>
@@ -2654,10 +2654,10 @@ input.hive-range::-moz-range-track {
                                         </div>
                                         <div class="alert" id="notif-phone-alert" style="display:none;margin:4px 0 8px"><span id="notif-phone-alert-text"></span></div>
                                         <!-- Per-type SMS toggles -->
-                                        <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-3);padding:10px 0 6px">SMS alert types</p>
+                                        <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-3);padding:10px 0 6px" data-i18n="settings.sms_alert_types">SMS alert types</p>
                                         <div class="settings-row">
                                             <div>
-                                                <div class="settings-row-label"><i class="fa-solid fa-draw-polygon" style="margin-right:6px;color:var(--warning)"></i>Geofence entry / exit alerts</div>
+                                                <div class="settings-row-label"><i class="fa-solid fa-draw-polygon" style="margin-right:6px;color:var(--warning)"></i><span data-i18n="settings.sms_geofence">Geofence entry / exit alerts</span></div>
                                             </div>
                                             <label class="toggle-switch">
                                                 <input type="checkbox" id="notif-sms-geofence" onchange="settingsSaveNotifications()">
@@ -2666,7 +2666,7 @@ input.hive-range::-moz-range-track {
                                         </div>
                                         <div class="settings-row">
                                             <div>
-                                                <div class="settings-row-label"><i class="fa-solid fa-battery-low" style="margin-right:6px;color:var(--danger)"></i>Battery low alerts</div>
+                                                <div class="settings-row-label"><i class="fa-solid fa-battery-low" style="margin-right:6px;color:var(--danger)"></i><span data-i18n="settings.sms_battery">Battery low alerts</span></div>
                                             </div>
                                             <label class="toggle-switch">
                                                 <input type="checkbox" id="notif-sms-battery" onchange="settingsSaveNotifications()">
@@ -2675,7 +2675,7 @@ input.hive-range::-moz-range-track {
                                         </div>
                                         <div class="settings-row">
                                             <div>
-                                                <div class="settings-row-label"><i class="fa-solid fa-signal-slash" style="margin-right:6px;color:var(--text-3)"></i>Tag offline alerts</div>
+                                                <div class="settings-row-label"><i class="fa-solid fa-signal-slash" style="margin-right:6px;color:var(--text-3)"></i><span data-i18n="settings.sms_offline">Tag offline alerts</span></div>
                                             </div>
                                             <label class="toggle-switch">
                                                 <input type="checkbox" id="notif-sms-offline" onchange="settingsSaveNotifications()">
@@ -2684,7 +2684,7 @@ input.hive-range::-moz-range-track {
                                         </div>
                                         <div class="settings-row">
                                             <div>
-                                                <div class="settings-row-label"><i class="fa-solid fa-shield-halved" style="margin-right:6px;color:var(--primary)"></i>Hive breach alerts</div>
+                                                <div class="settings-row-label"><i class="fa-solid fa-shield-halved" style="margin-right:6px;color:var(--primary)"></i><span data-i18n="settings.sms_hive">Hive breach alerts</span></div>
                                             </div>
                                             <label class="toggle-switch">
                                                 <input type="checkbox" id="notif-sms-hive" onchange="settingsSaveNotifications()">

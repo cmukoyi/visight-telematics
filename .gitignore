@@ -164,3 +164,4 @@ GEOCODING_DEPLOYMENT.md
 *_DEPLOYMENT.md
 scripts/monitor-*.sh
 scripts/validate-*.sh
+TRANSLATION_KEYS_DEPLOYMENT.md

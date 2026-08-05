@@ -48,6 +48,11 @@ build/
 .idea/
 *.swp
 *.swo
+
+# I18N Gap Analysis (internal documentation, not for git)
+I18N_GAP_ANALYSIS.md
+i18n_gap_report.txt
+scan_i18n_gaps.py
 *~
 
 # Docker

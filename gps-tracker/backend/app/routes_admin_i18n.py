@@ -89,6 +89,22 @@ class TranslationOut(BaseModel):
     
     class Config:
         from_attributes = True
+        # Map ORM 'key' column to Pydantic 'translation_key' field
+        populate_by_name = True
+    
+    @classmethod
+    def model_validate(cls, obj):
+        """Custom validation to handle ORM key -> translation_key mapping"""
+        if hasattr(obj, 'key'):
+            # Create dict from ORM object, using 'key' for 'translation_key'
+            return cls(
+                id=obj.id,
+                language_code=obj.language_code,
+                translation_key=obj.key,  # Use the string column, not the relationship
+                translated_text=obj.translated_text,
+                last_updated=obj.last_updated
+            )
+        return super().model_validate(obj)
 
 
 class BulkTranslationUpdate(BaseModel):
