@@ -6924,6 +6924,13 @@ dashboard.welcome,Bienvenue</pre>
             const percent = Math.round(((i + 1) / missingKeys.length) * 100);
             document.getElementById('autoTranslateProgress').textContent = `${i + 1} / ${missingKeys.length} (${success} ✅, ${failed} ❌)`;
             document.getElementById('autoTranslateBar').style.width = `${percent}%`;
+            
+            // Rate limit: 6 second delay between requests
+            // LibreTranslate: 10/min = 6s spacing avoids limit
+            // MyMemory fallback: handles overflow gracefully
+            if (i < missingKeys.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 6000));
+            }
         }
 
         document.body.removeChild(progressDiv);
