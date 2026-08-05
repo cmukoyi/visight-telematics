@@ -716,8 +716,15 @@ class TripEngine:
             leg_count, stationary_count, journey.total_duration_seconds / 60
         )
         
-        # Clear journey context
+        # FIX 1: Clean reset - return to neutral state after journey close
+        # Prevents a closed journey's ID from carrying into the next MOVE
         self.context.current_journey_id = None
+        self.context.current_leg = None
+        self.context.current_state = "STATIONARY"
+        logger.debug(
+            "🔄 IMEI %s: Journey closed → reset to neutral (STATIONARY, no journey, no leg)",
+            self.device_imei
+        )
         
         # v2.1.6 B5: Detach terminal stationaries (those after final leg)
         self._detach_terminal_stationaries(journey.id)
@@ -1603,6 +1610,37 @@ class TripEngine:
         # Load engine state
         self.context = self._load_state()
         
+        # FIX 2a: Invalid-state self-correct (recovers already-wedged devices)
+        # A device in MOVE with no leg, or with a current_journey that's ended, is invalid
+        invalid_state = False
+        invalid_reason = None
+        
+        if self.context.current_state == "MOVE" and not self.context.current_leg:
+            invalid_state = True
+            invalid_reason = "MOVE with no current_leg"
+        elif self.context.current_journey_id:
+            # Check if current journey is ended in the database
+            journey = self.db.execute(
+                select(Journey).where(Journey.id == self.context.current_journey_id)
+            ).scalar_one_or_none()
+            
+            if journey and journey.ended_at is not None:
+                invalid_state = True
+                invalid_reason = f"current_journey {journey.id} is ended in DB"
+            elif not journey:
+                invalid_state = True
+                invalid_reason = f"current_journey {self.context.current_journey_id} not found in DB"
+        
+        if invalid_state:
+            logger.warning(
+                "⚠️  IMEI %s: Invalid state detected: %s. Self-correcting → STATIONARY, no journey, no leg",
+                self.device_imei, invalid_reason
+            )
+            self.context.current_journey_id = None
+            self.context.current_leg = None
+            self.context.current_state = "STATIONARY"
+            self._save_state(self.context)
+        
         # Get unprocessed positions
         # v2.1.11 D1: Query by received_at (arrival time) to capture late positions
         query = select(DevicePosition).where(
@@ -1985,6 +2023,17 @@ class TripEngine:
                 
                 # Enter MOVE state
                 self.context.current_state = "MOVE"
+                
+                # FIX 2b: Start a new journey when movement resumes with no open journey
+                # This prevents accumulating against a stale or absent journey pointer
+                if not self.context.current_journey_id:
+                    logger.info(
+                        "🆕 IMEI %s: Movement detected with no open journey → opening new journey",
+                        self.device_imei
+                    )
+                    journey = self._open_journey(lat, lng, observed_at)
+                    if journey:
+                        result['journey_created'] = True
                 
                 # v2.1.14 C2a: Reset journey break flag when leaving stationary
                 self.context.journey_break_fired_this_stop = False
@@ -2440,14 +2489,146 @@ def validate_journey_invariants(db: Session, journey_id: str) -> Dict[str, any]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# TESTING / MANUAL TRIGGER
-# ═══════════════════════════════════════════════════════════════════════════
 # BACKGROUND TASK
 # ═══════════════════════════════════════════════════════════════════════════
 
 TRIP_ENGINE_INTERVAL_MINUTES = 15  # Run every 15 minutes
+STALL_WATCHDOG_INTERVAL_MINUTES = 30  # Run every 30 minutes (FIX 3)
 _trip_engine_task = None
+_stall_watchdog_task = None
 
+
+# ──────────────────────────────────────────────────────────────────────────
+# FIX 3: STALL WATCHDOG
+# ──────────────────────────────────────────────────────────────────────────
+
+async def stall_watchdog_sweep(db: Session) -> Dict:
+    """
+    Re-enqueue devices that have fallen behind (stalled processing).
+    
+    A device is stalled if:
+    1. has_backlog: device_state.last_position_ts > engine_state.last_processed_at
+    2. engine_stale: engine_state.updated_at older than WATCHDOG_STALE_MIN
+    
+    Both conditions are required to avoid re-enqueuing devices mid-cycle.
+    
+    Returns:
+        Dict with watchdog statistics
+    """
+    from app.models import DeviceState, EngineState
+    from datetime import timezone
+    
+    WATCHDOG_STALE_MIN = 30  # Must exceed trip engine cadence (15 min)
+    stale_threshold = datetime.now(timezone.utc) - timedelta(minutes=WATCHDOG_STALE_MIN)
+    
+    # Get all subscribed devices with their state
+    subscribed = db.execute(
+        select(DeviceState).where(DeviceState.trip_subscribed == True)
+    ).scalars().all()
+    
+    stats = {
+        'devices_checked': len(subscribed),
+        'devices_stalled': 0,
+        'devices_requeued': [],
+    }
+    
+    for device_state in subscribed:
+        # Get engine state
+        engine_state = db.execute(
+            select(EngineState).where(EngineState.device_imei == device_state.device_imei)
+        ).scalar_one_or_none()
+        
+        if not engine_state:
+            continue  # No engine state yet, device hasn't been processed
+        
+        # Check condition 1: has_backlog
+        has_backlog = False
+        if device_state.last_position_ts and engine_state.last_processed_at:
+            has_backlog = device_state.last_position_ts > engine_state.last_processed_at
+        elif device_state.last_position_ts and not engine_state.last_processed_at:
+            has_backlog = True  # Has positions but never processed
+        
+        # Check condition 2: engine_stale
+        engine_stale = False
+        if engine_state.updated_at:
+            engine_stale = engine_state.updated_at < stale_threshold
+        
+        # Both conditions must be met
+        if has_backlog and engine_stale:
+            backlog_seconds = 0
+            if device_state.last_position_ts and engine_state.last_processed_at:
+                backlog_seconds = (device_state.last_position_ts - engine_state.last_processed_at).total_seconds()
+            
+            logger.warning(
+                "⚠️  Watchdog: Device %s stalled - backlog %.1f hrs, engine updated %s ago → re-enqueuing",
+                device_state.device_imei,
+                backlog_seconds / 3600,
+                datetime.now(timezone.utc) - engine_state.updated_at
+            )
+            
+            stats['devices_stalled'] += 1
+            stats['devices_requeued'].append({
+                'device_imei': device_state.device_imei,
+                'backlog_seconds': backlog_seconds,
+                'last_position_ts': device_state.last_position_ts.isoformat() if device_state.last_position_ts else None,
+                'last_processed_at': engine_state.last_processed_at.isoformat() if engine_state.last_processed_at else None,
+                'engine_updated_at': engine_state.updated_at.isoformat() if engine_state.updated_at else None,
+            })
+            
+            # Re-enqueue for processing
+            try:
+                await process_device_trips(db, device_state.device_imei)
+            except Exception as exc:
+                logger.error(
+                    "❌ Watchdog: Failed to re-enqueue device %s: %s",
+                    device_state.device_imei, exc, exc_info=True
+                )
+                db.rollback()
+    
+    if stats['devices_stalled'] > 0:
+        logger.info(
+            "🔍 Watchdog: %d/%d devices stalled and re-enqueued",
+            stats['devices_stalled'], stats['devices_checked']
+        )
+    else:
+        logger.debug(
+            "✅ Watchdog: All %d subscribed devices current",
+            stats['devices_checked']
+        )
+    
+    return stats
+
+
+async def _stall_watchdog_loop():
+    """Background task that monitors for stalled devices."""
+    from app.database import SessionLocal
+    
+    logger.info("🔍 Stall watchdog started (interval: %d minutes)", STALL_WATCHDOG_INTERVAL_MINUTES)
+    
+    # Wait 10 minutes for initial processing to complete
+    await asyncio.sleep(600)
+    
+    while True:
+        try:
+            db = SessionLocal()
+            try:
+                result = await stall_watchdog_sweep(db)
+                logger.debug(
+                    "✅ Stall watchdog: checked %d devices, %d stalled",
+                    result['devices_checked'], result['devices_stalled']
+                )
+            finally:
+                db.close()
+        except Exception as exc:
+            logger.error("❌ Stall watchdog loop error: %s", exc, exc_info=True)
+        
+        # Wait for next cycle
+        await asyncio.sleep(STALL_WATCHDOG_INTERVAL_MINUTES * 60)
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# ENGINE + WATCHDOG STARTUP
+# ──────────────────────────────────────────────────────────────────────────
 
 async def _trip_engine_loop():
     """Background task that processes trips for all subscribed devices."""
@@ -2485,6 +2666,16 @@ def start_trip_engine():
         logger.info("✅ Trip engine task scheduled")
     else:
         logger.warning("⚠️  Trip engine task already running")
+
+
+def start_stall_watchdog():
+    """Start the stall watchdog background task (FIX 3)."""
+    global _stall_watchdog_task
+    if _stall_watchdog_task is None:
+        _stall_watchdog_task = asyncio.create_task(_stall_watchdog_loop())
+        logger.info("✅ Stall watchdog task scheduled")
+    else:
+        logger.warning("⚠️  Stall watchdog task already running")
 
 
 # ═══════════════════════════════════════════════════════════════════════════

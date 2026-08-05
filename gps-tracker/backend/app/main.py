@@ -447,6 +447,9 @@ async def startup_event():
         
         trip_engine.start_trip_engine()
         print("🛣️  Trip Engine: Journey processor started (15-minute interval)")
+        
+        trip_engine.start_stall_watchdog()
+        print("🔍 Trip Engine: Stall watchdog started (30-minute interval)")
     except Exception as e:
         logger.exception("⚠️  Trip Engine failed to start (continuing without it): %s", e)
         print(f"⚠️  Trip Engine startup failed: {e} (app will run without trip tracking)")
