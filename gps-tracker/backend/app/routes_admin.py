@@ -36,6 +36,7 @@ from app.models import (
     DeviceState,
     TenantFeature,
 )
+from app.models_i18n import Language
 from app.admin_auth import (
     hash_password, verify_password, create_admin_access_token,
     decode_admin_token, check_role_permission
@@ -1857,6 +1858,7 @@ class UserGroupOut(BaseModel):
     default_package_name: Optional[str] = None
     allowed_sections: Optional[list] = None
     allowed_tag_types: Optional[list] = None
+    default_language: Optional[str] = None
     packages: List[GroupPackageOut] = []
     created_at: Optional[datetime] = None
     portal_users: List[PortalUserOut] = []
@@ -2096,6 +2098,7 @@ class UserGroupUpdate(BaseModel):
     email_domain: Optional[str] = None   # empty string clears it; comma-separated for multiple domains
     allowed_sections: Optional[list] = None  # e.g. ["tracking","management","reports"] — None means no change
     allowed_tag_types: Optional[list] = None  # e.g. ["series1","series2"] — None means no change
+    default_language: Optional[str] = None  # e.g. "en", "fr" — None means no change
 
 
 @router.put("/usergroups/{group_id}")
@@ -2154,8 +2157,23 @@ def update_usergroup(
             tag_types = tag_types or None   # empty list → store null (= all allowed)
         group.allowed_tag_types = tag_types
 
+    # default_language: validate against available languages
+    if data.default_language is not None:
+        # Validate language code exists in languages table
+        lang = db.query(Language).filter(Language.code == data.default_language, Language.is_active == True).first()
+        if not lang:
+            raise HTTPException(status_code=400, detail=f"Invalid or inactive language code: {data.default_language}")
+        group.default_language = data.default_language
+
     db.commit()
-    return {"id": str(group.id), "name": group.name, "email_domain": group.email_domain, "allowed_sections": group.allowed_sections, "allowed_tag_types": group.allowed_tag_types}
+    return {
+        "id": str(group.id),
+        "name": group.name,
+        "email_domain": group.email_domain,
+        "allowed_sections": group.allowed_sections,
+        "allowed_tag_types": group.allowed_tag_types,
+        "default_language": group.default_language
+    }
 
 
 # ---------------------------------------------------------------------------
