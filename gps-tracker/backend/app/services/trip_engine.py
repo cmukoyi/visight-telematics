@@ -2031,8 +2031,8 @@ class TripEngine:
                         "🆕 IMEI %s: Movement detected with no open journey → opening new journey",
                         self.device_imei
                     )
-                    journey = self._open_journey(lat, lng, observed_at)
-                    if journey:
+                    journey_id = self._ensure_journey_open(observed_at)
+                    if journey_id:
                         result['journey_created'] = True
                 
                 # v2.1.14 C2a: Reset journey break flag when leaving stationary
