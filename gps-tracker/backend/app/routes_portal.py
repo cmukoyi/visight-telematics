@@ -2565,6 +2565,14 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
         validation = await provider.validate_tag(imei)
         if not validation.is_valid:
             raise HTTPException(status_code=422, detail=validation.message)
+        
+        # For Hubble (Series 5), use device_id from registration as imei
+        if canonical_type == "hubble" and validation.device_id:
+            imei = validation.device_id
+            # Store device_key in description for now (TODO: add dedicated hubble_device_key column)
+            if validation.device_key and not data.description:
+                data.description = f"Hubble Key: {validation.device_key}"
+                
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     
@@ -2579,6 +2587,10 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
         # Check for duplicate using mac_address field (case-insensitive)
         if db.query(BLETag).filter(BLETag.mac_address == normalized_mac).first():
             raise HTTPException(status_code=409, detail=f"Tag with MAC address '{normalized_mac.upper()}' already exists")
+    elif canonical_type == "hubble":
+        # For Hubble tags, check duplicate using device_id (stored in imei field)
+        if db.query(BLETag).filter(BLETag.imei == imei).first():
+            raise HTTPException(status_code=409, detail=f"Hubble device '{imei}' already registered in PinPlot")
     else:
         # For GPS tags, check duplicate using imei field
         if db.query(BLETag).filter(BLETag.imei == imei).first():

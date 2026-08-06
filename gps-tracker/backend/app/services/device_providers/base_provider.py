@@ -14,6 +14,8 @@ class TagValidationResult:
     is_valid: bool
     message: str
     battery_level: Optional[int] = field(default=None)  # Battery % as integer, e.g. 98
+    device_id: Optional[str] = field(default=None)  # For Hubble: generated device ID to store as imei
+    device_key: Optional[str] = field(default=None)  # For Hubble: base64-encoded encryption key
 
 
 class DeviceTagProvider(ABC):

@@ -5523,6 +5523,9 @@ function _updateImeiLabelForTagType() {
     if (tagType === 'series_4' || tagType === 'series4') {
         label.textContent = 'MAC Address *';
         input.placeholder = 'e.g. 48872D9DBC66 or AA:BB:CC:DD:EE:FF';
+    } else if (tagType === 'series_5' || tagType === 'series5' || tagType === 'hubble') {
+        label.textContent = 'Device Name *';
+        input.placeholder = 'e.g. warehouse-scanner-01';
     } else if (tagType === 'series3' || tagType === 'series_3') {
         label.textContent = 'QR / NFC ID *';
         input.placeholder = 'e.g. 4a8b2c3d-1e2f-3g4h-5i6j-7k8l9m0n1o2p';
@@ -5770,8 +5773,8 @@ async function _tagImeiValidateOnBlur() {
     const imei = imeiInput.value.trim();
     if (!imei) return;
     
-    // Only validate Series 1/2 (GPS) and Series 4 (BLE) - Series 3 (QR) doesn't need external validation
-    if (tagType === 'series1' || tagType === 'scope' || tagType === 'series2' || tagType === 'tracksolid' || tagType === 'series_4' || tagType === 'series4') {
+    // Only validate Series 1/2 (GPS), Series 4 (BLE), and Series 5 (Hubble) - Series 3 (QR) doesn't need external validation
+    if (tagType === 'series1' || tagType === 'scope' || tagType === 'series2' || tagType === 'tracksolid' || tagType === 'series_4' || tagType === 'series4' || tagType === 'series_5' || tagType === 'series5' || tagType === 'hubble') {
         await _tagImeiValidate(imei, tagType);
     }
 }
