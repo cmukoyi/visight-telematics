@@ -100,6 +100,20 @@ class HubbleTagProvider(DeviceTagProvider):
                 message="Hubble API not configured. Please contact administrator to set up Series 5 integration.",
             )
 
+        # Check if device with this name already exists in Hubble
+        # This prevents duplicate device names and provides better error messages
+        try:
+            existing_device = await self.get_device_by_name(device_name)
+            if existing_device:
+                logger.info(f"Device name '{device_name}' already exists in Hubble: {existing_device.get('device_id')}")
+                return TagValidationResult(
+                    is_valid=False,
+                    message=f"A device named '{device_name}' already exists in Hubble. Please use a unique name.",
+                )
+        except Exception as e:
+            # Don't fail registration if we can't check - just log and continue
+            logger.warning(f"Failed to check for existing device '{device_name}': {e}")
+
         # Register device with Hubble API
         try:
             registration_result = await self._register_device_with_hubble(device_name)
@@ -241,3 +255,170 @@ class HubbleTagProvider(DeviceTagProvider):
                 "success": False,
                 "error": f"Unexpected error: {str(e)}",
             }
+
+    async def list_devices(
+        self, 
+        filter_created_ts: Optional[str] = None,
+        filter_most_recent_packet_ts: Optional[str] = None,
+        continuation_token: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        List all devices registered in Hubble Platform.
+        
+        GET /v1/org/{org_id}/devices
+        
+        Use cases:
+          - Sync device inventory between Hubble and PinPlot
+          - Check if device exists before registration
+          - Audit device lifecycle and activity
+        
+        Args:
+            filter_created_ts: Filter by creation timestamp
+                               Format: "between:{after}:{before}" (after inclusive, before exclusive)
+                               Example: "between:1722960000:1723046400" (last 24h)
+            filter_most_recent_packet_ts: Filter by last packet timestamp
+                               Example: "between:0:1" (never sent packet)
+            continuation_token: Pagination token from previous response
+        
+        Returns:
+            Dict with keys:
+              - success: bool
+              - devices: List[Dict] (if success)
+                - device_id: str
+                - name: str
+                - created_ts: int (Unix timestamp)
+                - most_recent_packet: Dict (may be None)
+              - continuation_token: str (if more pages available)
+              - error: str (if failure)
+        
+        Example queries:
+          - Unused devices: filter_most_recent_packet_ts="between:0:1"
+          - Recently active (24h): filter_most_recent_packet_ts="between:{timestamp_1day_ago}:{now}"
+          - Recently registered (24h): filter_created_ts="between:{timestamp_1day_ago}:{now}"
+        """
+        if not self.api_key or not self.org_id:
+            return {
+                "success": False,
+                "error": "Hubble API credentials not configured",
+            }
+        
+        url = f"{self.api_base}/v1/org/{self.org_id}/devices"
+        
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Accept": "application/json",
+            "X-Request-ID": f"pinplot-list-devices",
+        }
+        
+        # Build query parameters
+        params = {}
+        if filter_created_ts:
+            params["filter_created_ts"] = filter_created_ts
+        if filter_most_recent_packet_ts:
+            params["filter_most_recent_packet_ts"] = filter_most_recent_packet_ts
+        if continuation_token:
+            params["continuation_token"] = continuation_token
+        
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.get(url, headers=headers, params=params)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    # Expected response structure:
+                    # {
+                    #   "devices": [
+                    #     {
+                    #       "device_id": "abc123",
+                    #       "name": "my-device",
+                    #       "created_ts": 1722960000,
+                    #       "most_recent_packet": {...} or null
+                    #     }
+                    #   ],
+                    #   "continuation_token": "token" (optional)
+                    # }
+                    
+                    result = {
+                        "success": True,
+                        "devices": data.get("devices", []),
+                    }
+                    
+                    # Add continuation token if present (more pages available)
+                    if "continuation_token" in data:
+                        result["continuation_token"] = data["continuation_token"]
+                    
+                    return result
+                
+                elif response.status_code == 400:
+                    error_data = response.json() if response.text else {}
+                    return {
+                        "success": False,
+                        "error": f"Invalid request: {error_data.get('message', response.text)}",
+                    }
+                
+                elif response.status_code == 500:
+                    return {
+                        "success": False,
+                        "error": "Hubble API server error (500)",
+                    }
+                
+                else:
+                    return {
+                        "success": False,
+                        "error": f"HTTP {response.status_code}: {response.text[:100]}",
+                    }
+                    
+        except httpx.TimeoutException:
+            return {
+                "success": False,
+                "error": "Request timed out - Hubble API not responding",
+            }
+        except httpx.RequestError as e:
+            return {
+                "success": False,
+                "error": f"Network error: {str(e)}",
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Unexpected error: {str(e)}",
+            }
+
+    async def get_device_by_name(self, device_name: str) -> Optional[Dict[str, Any]]:
+        """
+        Find a device by name in Hubble Platform.
+        
+        Useful for checking if a device with a given name already exists
+        before attempting registration.
+        
+        Args:
+            device_name: Device name to search for
+        
+        Returns:
+            Device dict if found, None otherwise
+            Device dict contains: device_id, name, created_ts, most_recent_packet
+        """
+        result = await self.list_devices()
+        
+        if not result["success"]:
+            logger.error(f"Failed to list Hubble devices: {result.get('error')}")
+            return None
+        
+        # Search through devices for matching name
+        for device in result.get("devices", []):
+            if device.get("name") == device_name:
+                return device
+        
+        # Handle pagination if continuation_token exists
+        while "continuation_token" in result:
+            result = await self.list_devices(continuation_token=result["continuation_token"])
+            
+            if not result["success"]:
+                break
+            
+            for device in result.get("devices", []):
+                if device.get("name") == device_name:
+                    return device
+        
+        return None

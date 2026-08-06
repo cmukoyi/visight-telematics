@@ -42,6 +42,7 @@ from app.admin_auth import (
     decode_admin_token, check_role_permission
 )
 from app.services.critical_service_alert_service import CATEGORY_DEFS
+from app.services.device_providers.provider_factory import DeviceProviderFactory
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 logger = logging.getLogger(__name__)
@@ -3964,3 +3965,73 @@ def update_tenant_features(
         "updated_features": updated_features,
         "message": f"Updated {len(updated_features)} feature toggles for {usergroup.name}"
     }
+
+
+@router.get("/hubble/devices")
+async def list_hubble_devices(
+    filter_created_ts: Optional[str] = Query(None, description="Filter by creation timestamp (format: between:{after}:{before})"),
+    filter_most_recent_packet_ts: Optional[str] = Query(None, description="Filter by last packet timestamp (format: between:{after}:{before})"),
+    continuation_token: Optional[str] = Query(None, description="Pagination token from previous response"),
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    """
+    List all devices registered in Hubble Platform (Series 5).
+    
+    Useful for:
+      - Syncing device inventory between Hubble and PinPlot
+      - Auditing device lifecycle and activity
+      - Identifying unused or inactive devices
+    
+    Query parameters:
+      - filter_created_ts: Filter by creation timestamp
+        Example: "between:1722960000:1723046400" (devices registered in last 24h)
+      
+      - filter_most_recent_packet_ts: Filter by last packet timestamp
+        Examples:
+          - "between:0:1" - Devices that have never sent a packet (unused)
+          - "between:1:{timestamp_7days_ago}" - Inactive devices (no packet in 7 days)
+          - "between:{timestamp_1day_ago}:{timestamp_now}" - Recently active devices
+      
+      - continuation_token: Token for pagination (returned in previous response)
+    
+    Response includes:
+      - devices: List of device objects with device_id, name, created_ts, most_recent_packet
+      - continuation_token: Present if more pages available
+    
+    Requires HUBBLE_API_KEY and HUBBLE_ORG_ID in environment variables.
+    """
+    admin = get_admin_from_request(request, db)
+    
+    try:
+        # Get Hubble provider
+        provider = DeviceProviderFactory.get_provider("hubble")
+        
+        # Call list_devices method
+        result = await provider.list_devices(
+            filter_created_ts=filter_created_ts,
+            filter_most_recent_packet_ts=filter_most_recent_packet_ts,
+            continuation_token=continuation_token
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Hubble API error: {result.get('error', 'Unknown error')}"
+            )
+        
+        return {
+            "success": True,
+            "devices": result["devices"],
+            "continuation_token": result.get("continuation_token"),
+            "device_count": len(result["devices"]),
+        }
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error listing Hubble devices: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list Hubble devices: {str(e)}"
+        )
