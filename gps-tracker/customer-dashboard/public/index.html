@@ -264,6 +264,11 @@
         <span id="pageTitle" style="font-size:1rem;font-weight:600;color:var(--text);flex:1;padding-left:16px"></span>
 
         <div class="header-right">
+            <!-- Language Selector -->
+            <select id="header-language-selector" class="form-input" style="max-width:90px;padding:4px 8px;font-size:0.85rem;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--text);cursor:pointer" onchange="settingsSaveLanguage(this.value)" data-i18n-title="settings.interface_language" title="Interface language">
+                <!-- Options populated by JS -->
+            </select>
+            
             <div class="notif-wrap" id="notifWrap">
                 <button id="notif-btn" data-i18n-title="alerts.alerts_inbox" title="Alerts inbox" onclick="toggleNotifPanel(event)">
                     <i class="fa-solid fa-bell"></i>
@@ -2350,26 +2355,6 @@ input.hive-range::-moz-range-track {
                             <select id="pref-units" class="form-input" style="max-width:180px" onchange="settingsSaveUnits(this.value)">
                                 <option value="metric" data-i18n="settings.metric">Metric (km, km/h)</option>
                                 <option value="imperial" data-i18n="settings.imperial">Imperial (mi, mph)</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- ─── Language ─── -->
-                    <div class="card">
-                        <div class="settings-section-header">
-                            <i class="fa-solid fa-language" style="color:var(--primary)"></i>
-                            <div>
-                                <h3 data-i18n="settings.language">Language</h3>
-                                <p data-i18n="settings.language_hint">Choose your preferred language for the portal interface.</p>
-                            </div>
-                        </div>
-                        <div class="settings-row">
-                            <div>
-                                <div class="settings-row-label" data-i18n="settings.interface_language">Interface language</div>
-                                <div class="settings-row-hint" data-i18n="settings.language_stored_locally">Saved locally in this browser.</div>
-                            </div>
-                            <select id="pref-language" class="form-input" style="max-width:180px" onchange="settingsSaveLanguage(this.value)">
-                                <!-- Options populated by JS -->
                             </select>
                         </div>
                     </div>
@@ -5945,7 +5930,7 @@ async function settingsSaveLanguage(lang) {
 
 async function populateLanguageSelector() {
     const ts = TranslationService.getInstance();
-    const langSel = document.getElementById('pref-language');
+    const langSel = document.getElementById('header-language-selector');
     if (!langSel) return;
     
     const languages = ts.getAvailableLanguages();
