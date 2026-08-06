@@ -34,6 +34,8 @@ _TAG_TYPE_ALIAS = {
     "series_3": "series_3",
     "series4": "ble",       # Series 4 (DX-Smart indoor BLE tags)
     "series_4": "ble",
+    "series5": "hubble",    # Series 5 (Hubble Platform BLE tags)
+    "series_5": "hubble",
 }
 
 router = APIRouter(prefix="/api/portal", tags=["portal"])
@@ -2067,6 +2069,7 @@ def list_supported_tag_types(request: Request, db: Session = Depends(get_db)):
         {"value": "series2", "label": "Series 2 (GPS)", "description": "TrackSolid GPS tracker"},
         {"value": "series_3", "label": "Series 3 (QR Code)", "description": "QR code asset tracking"},
         {"value": "series_4", "label": "Series 4 (BLE Indoor)", "description": "DX-Smart BLE indoor tracking (CP27/CP28/CP29)"},
+        {"value": "series_5", "label": "Series 5 (Hubble)", "description": "Hubble Platform BLE tracking"},
     ]
     
     # Check if usergroup has restrictions

@@ -4037,6 +4037,7 @@ input.hive-range::-moz-range-track {
                     <option value="series2">Series 2 (GPS)</option>
                     <option value="series3">Series 3 (QR Code)</option>
                     <option value="series_4">Series 4 (BLE Indoor)</option>
+                    <option value="series_5">Series 5 (Hubble)</option>
                 </select>
             </div>
             <div id="tagMgmtCategoryGroup" class="form-group">
@@ -5306,6 +5307,9 @@ function _ppTagTypeLabel(tt) {
         series_4: 'Series 4',
         series4: 'Series 4',
         ble: 'Series 4',
+        series_5: 'Series 5',
+        series5: 'Series 5',
+        hubble: 'Series 5',
     };
     const key = (tt || '').toLowerCase();
     return map[key] || (tt || '—');
@@ -5548,7 +5552,7 @@ async function openAddTagModal() {
     // Filter tag type options based on usergroup permissions
     const _typeSelAdd = document.getElementById('tagMgmtType');
     const session = getSession();
-    const allowedTypes = session.group?.allowed_tag_types || ['series1', 'series2', 'series3', 'series_4'];
+    const allowedTypes = session.group?.allowed_tag_types || ['series1', 'series2', 'series3', 'series_4', 'series_5'];
     // Show/hide options based on allowed types
     Array.from(_typeSelAdd.options).forEach(opt => {
         opt.style.display = allowedTypes.includes(opt.value) ? '' : 'none';
@@ -5622,7 +5626,7 @@ async function openTagMgmtModal(mode, imei) {
     document.getElementById('tagMgmtDesc').value = tag.description || tag.device_name || '';
     document.getElementById('tagMgmtDescGroup').style.display = '';
 
-    // Tag type — normalise canonical DB values (scope/tracksolid/series3/ble) to select option values (series1/series2/series3/series_4)
+    // Tag type — normalise canonical DB values (scope/tracksolid/series3/ble/hubble) to select option values (series1/series2/series3/series_4/series_5)
     const _typeAliasToSelect = {
         scope: 'series1',
         tracksolid: 'series2',
@@ -5632,13 +5636,16 @@ async function openTagMgmtModal(mode, imei) {
         series2: 'series2',
         series_4: 'series_4',
         series4: 'series_4',
-        ble: 'series_4'
+        ble: 'series_4',
+        series_5: 'series_5',
+        series5: 'series_5',
+        hubble: 'series_5'
     };
     const _typeSelect = document.getElementById('tagMgmtType');
     
     // Filter tag type options based on usergroup permissions
     const session = getSession();
-    const allowedTypes = session.group?.allowed_tag_types || ['series1', 'series2', 'series3', 'series_4'];
+    const allowedTypes = session.group?.allowed_tag_types || ['series1', 'series2', 'series3', 'series_4', 'series_5'];
     Array.from(_typeSelect.options).forEach(opt => {
         opt.style.display = allowedTypes.includes(opt.value) ? '' : 'none';
     });

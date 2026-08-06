@@ -1484,6 +1484,14 @@
                                                 <input type="checkbox" id="cgTypeSeries3" value="series3">
                                                 <span>Series 3 (QR/NFC)</span>
                                             </label>
+                                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                                                <input type="checkbox" id="cgTypeSeries4" value="series_4">
+                                                <span>Series 4 (BLE Indoor)</span>
+                                            </label>
+                                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                                                <input type="checkbox" id="cgTypeSeries5" value="series_5">
+                                                <span>Series 5 (Hubble)</span>
+                                            </label>
                                         </div>
                                     </div>
                                     <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:8px">
@@ -1577,6 +1585,14 @@
                                             <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
                                                 <input type="checkbox" id="egTypeSeries3" value="series3" checked>
                                                 <span>Series 3 (QR/NFC)</span>
+                                            </label>
+                                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                                                <input type="checkbox" id="egTypeSeries4" value="series_4" checked>
+                                                <span>Series 4 (BLE Indoor)</span>
+                                            </label>
+                                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                                                <input type="checkbox" id="egTypeSeries5" value="series_5" checked>
+                                                <span>Series 5 (Hubble)</span>
                                             </label>
                                         </div>
                                     </div>
@@ -4396,6 +4412,8 @@ dashboard.welcome,Bienvenue</pre>
             if (document.getElementById('cgTypeSeries1').checked) allowedTypes.push('series1');
             if (document.getElementById('cgTypeSeries2').checked) allowedTypes.push('series2');
             if (document.getElementById('cgTypeSeries3').checked) allowedTypes.push('series3');
+            if (document.getElementById('cgTypeSeries4').checked) allowedTypes.push('series_4');
+            if (document.getElementById('cgTypeSeries5').checked) allowedTypes.push('series_5');
             
             // Parse coalesce_floor_minutes (optional Trip Engine config v2.2)
             const coalesceFloorRaw = document.getElementById('cgCoalesceFloor').value.trim();
@@ -4601,10 +4619,12 @@ dashboard.welcome,Bienvenue</pre>
             document.getElementById('egFeatManagement').checked = secs.includes('management');
             document.getElementById('egFeatReports').checked    = secs.includes('reports');
             // Populate tag type checkboxes — null means all allowed
-            const types = allowedTagTypes || ['series1', 'series2', 'series3'];
+            const types = allowedTagTypes || ['series1', 'series2', 'series3', 'series_4', 'series_5'];
             document.getElementById('egTypeSeries1').checked = types.includes('series1');
             document.getElementById('egTypeSeries2').checked = types.includes('series2');
             document.getElementById('egTypeSeries3').checked = types.includes('series3');
+            document.getElementById('egTypeSeries4').checked = types.includes('series_4');
+            document.getElementById('egTypeSeries5').checked = types.includes('series_5');
             // Populate language dropdown
             const langSel = document.getElementById('egLanguage');
             langSel.innerHTML = '<option value="en">Loading...</option>';
@@ -4737,6 +4757,8 @@ dashboard.welcome,Bienvenue</pre>
             if (document.getElementById('egTypeSeries1').checked) allowedTagTypes.push('series1');
             if (document.getElementById('egTypeSeries2').checked) allowedTagTypes.push('series2');
             if (document.getElementById('egTypeSeries3').checked) allowedTagTypes.push('series3');
+            if (document.getElementById('egTypeSeries4').checked) allowedTagTypes.push('series_4');
+            if (document.getElementById('egTypeSeries5').checked) allowedTagTypes.push('series_5');
             try {
                 const res = await fetch(`${API_URL}/api/admin/usergroups/${groupId}`, {
                     method: 'PUT',
