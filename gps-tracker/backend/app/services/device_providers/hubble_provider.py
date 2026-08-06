@@ -521,3 +521,161 @@ class HubbleTagProvider(DeviceTagProvider):
                 "success": False,
                 "error": f"Unexpected error: {str(e)}",
             }
+
+    async def update_device(
+        self,
+        device_id: str,
+        set_name: Optional[str] = None,
+        set_tags: Optional[Dict[str, Any]] = None,
+        set_install_location: Optional[Dict[str, Any]] = None,
+        set_destination_org_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Update a registered device in Hubble Platform.
+        
+        PATCH /v1/org/{org_id}/devices/{device_id}
+        
+        Use cases:
+          - Rename device
+          - Add custom tags for filtering/organization
+          - Set physical installation location
+          - Transfer device to another organization
+        
+        Args:
+            device_id: Hubble device identifier
+            set_name: New device name (optional)
+            set_tags: Custom tags dict (optional)
+                     Example: {"_env": "production", "building": "warehouse-A"}
+            set_install_location: Installation location (optional)
+                                 Must include: lat, long, location_name
+                                 Example: {
+                                     "lat": 37.7749,
+                                     "long": -122.4194,
+                                     "location_name": "San Francisco Office"
+                                 }
+            set_destination_org_id: Target organization UUID for transfer (optional)
+        
+        Returns:
+            Dict with keys:
+              - success: bool
+              - device: Dict (if success) - Updated device object
+              - error: str (if failure)
+        
+        Notes:
+          - All parameters are optional, but at least one must be provided
+          - set_install_location requires all three fields (lat, long, location_name)
+          - set_destination_org_id transfers ownership (requires appropriate permissions)
+        """
+        if not self.api_key or not self.org_id:
+            return {
+                "success": False,
+                "error": "Hubble API credentials not configured",
+            }
+        
+        # Build request body (only include provided fields)
+        body = {}
+        
+        if set_name is not None:
+            body["set_name"] = set_name
+        
+        if set_tags is not None:
+            body["set_tags"] = set_tags
+        
+        if set_install_location is not None:
+            # Validate required fields
+            required = ["lat", "long", "location_name"]
+            missing = [f for f in required if f not in set_install_location]
+            if missing:
+                return {
+                    "success": False,
+                    "error": f"set_install_location missing required fields: {missing}",
+                }
+            body["set_install_location"] = set_install_location
+        
+        if set_destination_org_id is not None:
+            body["set_destination_org_id"] = set_destination_org_id
+        
+        # Must provide at least one update field
+        if not body:
+            return {
+                "success": False,
+                "error": "At least one update field must be provided",
+            }
+        
+        url = f"{self.api_base}/v1/org/{self.org_id}/devices/{device_id}"
+        
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "X-Request-ID": f"pinplot-update-device-{device_id}",
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.patch(url, headers=headers, json=body)
+                
+                if response.status_code == 200:
+                    device = response.json()
+                    
+                    # Expected response: Updated device object
+                    # {
+                    #   "device_id": "abc123",
+                    #   "name": "updated-name",
+                    #   "created_ts": 1722960000,
+                    #   "tags": {...},
+                    #   "install_location": {...},
+                    #   ...
+                    # }
+                    
+                    return {
+                        "success": True,
+                        "device": device,
+                    }
+                
+                elif response.status_code == 404:
+                    return {
+                        "success": False,
+                        "error": f"Device '{device_id}' not found in Hubble platform",
+                    }
+                
+                elif response.status_code == 400:
+                    error_data = response.json() if response.text else {}
+                    return {
+                        "success": False,
+                        "error": f"Invalid request: {error_data.get('message', response.text)}",
+                    }
+                
+                elif response.status_code == 413:
+                    return {
+                        "success": False,
+                        "error": "Payload too large - reduce size of tags or location data",
+                    }
+                
+                elif response.status_code == 500:
+                    return {
+                        "success": False,
+                        "error": "Hubble API server error (500)",
+                    }
+                
+                else:
+                    return {
+                        "success": False,
+                        "error": f"HTTP {response.status_code}: {response.text[:100]}",
+                    }
+                    
+        except httpx.TimeoutException:
+            return {
+                "success": False,
+                "error": "Request timed out - Hubble API not responding",
+            }
+        except httpx.RequestError as e:
+            return {
+                "success": False,
+                "error": f"Network error: {str(e)}",
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Unexpected error: {str(e)}",
+            }

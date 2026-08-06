@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, date
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from uuid import UUID
 from pydantic import BaseModel, EmailStr, field_validator
 import logging
@@ -4098,4 +4098,92 @@ async def get_hubble_device(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get Hubble device: {str(e)}"
+        )
+
+
+@router.patch("/hubble/devices/{device_id}")
+async def update_hubble_device(
+    device_id: str,
+    request: Request = None,
+    db: Session = Depends(get_db),
+    set_name: Optional[str] = None,
+    set_tags: Optional[Dict[str, Any]] = None,
+    set_install_location: Optional[Dict[str, Any]] = None,
+    set_destination_org_id: Optional[str] = None,
+):
+    """
+    Update a registered device in Hubble Platform (Series 5).
+    
+    Useful for:
+      - Renaming device after registration
+      - Adding custom tags for filtering/organization
+      - Setting physical installation location
+      - Transferring device to another organization
+    
+    Path parameters:
+      - device_id: Hubble device identifier
+    
+    Body parameters (all optional, but at least one required):
+      - set_name: New device name
+      - set_tags: Custom tags dict (e.g., {"_env": "production", "building": "A"})
+      - set_install_location: Physical location with lat, long, location_name
+      - set_destination_org_id: Target organization UUID for transfer
+    
+    Example:
+      PATCH /api/admin/hubble/devices/abc123def456
+      Body: {
+        "set_name": "warehouse-scanner-updated",
+        "set_tags": {"_env": "production", "floor": "3"}
+      }
+    
+    Returns updated device object or error.
+    Requires HUBBLE_API_KEY and HUBBLE_ORG_ID in environment variables.
+    """
+    admin = get_admin_from_request(request, db)
+    
+    try:
+        # Get Hubble provider
+        provider = DeviceProviderFactory.get_provider("hubble")
+        
+        # Call update_device method
+        result = await provider.update_device(
+            device_id=device_id,
+            set_name=set_name,
+            set_tags=set_tags,
+            set_install_location=set_install_location,
+            set_destination_org_id=set_destination_org_id,
+        )
+        
+        if not result["success"]:
+            error_msg = result.get('error', 'Unknown error')
+            
+            # Return 404 for device not found
+            if "not found" in error_msg.lower():
+                raise HTTPException(status_code=404, detail=error_msg)
+            
+            # Return 400 for validation errors
+            if "at least one" in error_msg.lower() or "missing required" in error_msg.lower():
+                raise HTTPException(status_code=400, detail=error_msg)
+            
+            # Return 413 for payload too large
+            if "too large" in error_msg.lower():
+                raise HTTPException(status_code=413, detail=error_msg)
+            
+            # Otherwise return 500
+            raise HTTPException(status_code=500, detail=f"Hubble API error: {error_msg}")
+        
+        return {
+            "success": True,
+            "device": result["device"],
+        }
+        
+    except HTTPException:
+        raise  # Re-raise HTTPExceptions
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error updating Hubble device {device_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update Hubble device: {str(e)}"
         )
