@@ -679,3 +679,101 @@ class HubbleTagProvider(DeviceTagProvider):
                 "success": False,
                 "error": f"Unexpected error: {str(e)}",
             }
+
+    async def delete_device(self, device_id: str) -> Dict[str, Any]:
+        """
+        Delete a registered device from Hubble Platform.
+        
+        DELETE /v1/org/{org_id}/devices/{device_id}
+        
+        Permanently removes a device from your organization. This action cannot
+        be undone. All historical data for the device may be lost.
+        
+        Use cases:
+          - Remove decommissioned devices
+          - Clean up test devices after development
+          - Remove incorrectly registered devices
+          - Revoke device access from organization
+        
+        Args:
+            device_id: Hubble device identifier
+        
+        Returns:
+            Dict with keys:
+              - success: bool
+              - message: str (if success) - Confirmation message
+              - error: str (if failure)
+        
+        Warnings:
+          - This operation is permanent and cannot be undone
+          - Historical packet data may be lost
+          - Device must be re-registered if needed again
+          - Consider updating device status/tags instead of deleting
+        """
+        if not self.api_key or not self.org_id:
+            return {
+                "success": False,
+                "error": "Hubble API credentials not configured",
+            }
+        
+        url = f"{self.api_base}/v1/org/{self.org_id}/devices/{device_id}"
+        
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Accept": "application/json",
+            "X-Request-ID": f"pinplot-delete-device-{device_id}",
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.delete(url, headers=headers)
+                
+                if response.status_code == 200:
+                    # Expected response: Success confirmation
+                    # Response body may be empty or contain confirmation message
+                    
+                    return {
+                        "success": True,
+                        "message": f"Device '{device_id}' successfully deleted from Hubble platform",
+                    }
+                
+                elif response.status_code == 404:
+                    return {
+                        "success": False,
+                        "error": f"Device '{device_id}' not found in Hubble platform",
+                    }
+                
+                elif response.status_code == 400:
+                    error_data = response.json() if response.text else {}
+                    return {
+                        "success": False,
+                        "error": f"Invalid request: {error_data.get('message', response.text)}",
+                    }
+                
+                elif response.status_code == 500:
+                    return {
+                        "success": False,
+                        "error": "Hubble API server error (500)",
+                    }
+                
+                else:
+                    return {
+                        "success": False,
+                        "error": f"HTTP {response.status_code}: {response.text[:100]}",
+                    }
+                    
+        except httpx.TimeoutException:
+            return {
+                "success": False,
+                "error": "Request timed out - Hubble API not responding",
+            }
+        except httpx.RequestError as e:
+            return {
+                "success": False,
+                "error": f"Network error: {str(e)}",
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Unexpected error: {str(e)}",
+            }

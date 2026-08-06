@@ -4187,3 +4187,72 @@ async def update_hubble_device(
             status_code=500,
             detail=f"Failed to update Hubble device: {str(e)}"
         )
+
+
+@router.delete("/hubble/devices/{device_id}")
+async def delete_hubble_device(
+    device_id: str,
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a registered device from Hubble Platform (Series 5).
+    
+    WARNING: This operation is PERMANENT and cannot be undone.
+    All historical packet data for this device may be lost.
+    
+    Useful for:
+      - Removing decommissioned devices
+      - Cleaning up test devices after development
+      - Removing incorrectly registered devices
+      - Revoking device access from organization
+    
+    Path parameters:
+      - device_id: Hubble device identifier
+    
+    Alternative approaches to consider before deleting:
+      - Update device tags to mark as "inactive" or "decommissioned"
+      - Transfer device to a different organization (if applicable)
+      - Keep device registered but stop monitoring it in PinPlot
+    
+    Example:
+      DELETE /api/admin/hubble/devices/abc123def456
+    
+    Returns 200 with success message if deleted.
+    Returns 404 if device not found.
+    Requires HUBBLE_API_KEY and HUBBLE_ORG_ID in environment variables.
+    """
+    admin = get_admin_from_request(request, db)
+    
+    try:
+        # Get Hubble provider
+        provider = DeviceProviderFactory.get_provider("hubble")
+        
+        # Call delete_device method
+        result = await provider.delete_device(device_id)
+        
+        if not result["success"]:
+            error_msg = result.get('error', 'Unknown error')
+            
+            # Return 404 for device not found
+            if "not found" in error_msg.lower():
+                raise HTTPException(status_code=404, detail=error_msg)
+            
+            # Otherwise return 500
+            raise HTTPException(status_code=500, detail=f"Hubble API error: {error_msg}")
+        
+        return {
+            "success": True,
+            "message": result["message"],
+        }
+        
+    except HTTPException:
+        raise  # Re-raise HTTPExceptions
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error deleting Hubble device {device_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete Hubble device: {str(e)}"
+        )
