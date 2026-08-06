@@ -422,3 +422,102 @@ class HubbleTagProvider(DeviceTagProvider):
                     return device
         
         return None
+
+    async def get_device(self, device_id: str) -> Dict[str, Any]:
+        """
+        Get a specific device by device_id from Hubble Platform.
+        
+        GET /v1/org/{org_id}/devices/{device_id}
+        
+        Use cases:
+          - Verify device exists and is registered
+          - Get device details and last activity
+          - Check device configuration
+        
+        Args:
+            device_id: Hubble device identifier
+        
+        Returns:
+            Dict with keys:
+              - success: bool
+              - device: Dict (if success)
+                - device_id: str
+                - name: str
+                - created_ts: int (Unix timestamp)
+                - most_recent_packet: Dict (may be None)
+              - error: str (if failure)
+        """
+        if not self.api_key or not self.org_id:
+            return {
+                "success": False,
+                "error": "Hubble API credentials not configured",
+            }
+        
+        url = f"{self.api_base}/v1/org/{self.org_id}/devices/{device_id}"
+        
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Accept": "application/json",
+            "X-Request-ID": f"pinplot-get-device-{device_id}",
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(url, headers=headers)
+                
+                if response.status_code == 200:
+                    device = response.json()
+                    
+                    # Expected response structure:
+                    # {
+                    #   "device_id": "abc123",
+                    #   "name": "my-device",
+                    #   "created_ts": 1722960000,
+                    #   "most_recent_packet": {...} or null
+                    # }
+                    
+                    return {
+                        "success": True,
+                        "device": device,
+                    }
+                
+                elif response.status_code == 404:
+                    return {
+                        "success": False,
+                        "error": f"Device '{device_id}' not found in Hubble platform",
+                    }
+                
+                elif response.status_code == 400:
+                    error_data = response.json() if response.text else {}
+                    return {
+                        "success": False,
+                        "error": f"Invalid request: {error_data.get('message', response.text)}",
+                    }
+                
+                elif response.status_code == 500:
+                    return {
+                        "success": False,
+                        "error": "Hubble API server error (500)",
+                    }
+                
+                else:
+                    return {
+                        "success": False,
+                        "error": f"HTTP {response.status_code}: {response.text[:100]}",
+                    }
+                    
+        except httpx.TimeoutException:
+            return {
+                "success": False,
+                "error": "Request timed out - Hubble API not responding",
+            }
+        except httpx.RequestError as e:
+            return {
+                "success": False,
+                "error": f"Network error: {str(e)}",
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Unexpected error: {str(e)}",
+            }

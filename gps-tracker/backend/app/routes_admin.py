@@ -4035,3 +4035,67 @@ async def list_hubble_devices(
             status_code=500,
             detail=f"Failed to list Hubble devices: {str(e)}"
         )
+
+
+@router.get("/hubble/devices/{device_id}")
+async def get_hubble_device(
+    device_id: str,
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Get a specific device by device_id from Hubble Platform (Series 5).
+    
+    Useful for:
+      - Verifying device exists and is registered
+      - Getting device details and last activity
+      - Checking device configuration before adding to PinPlot
+      - Troubleshooting device issues
+    
+    Path parameters:
+      - device_id: Hubble device identifier (returned from registration)
+    
+    Response includes:
+      - device: Device object with device_id, name, created_ts, most_recent_packet
+      - most_recent_packet: May be null if device has never sent a packet
+    
+    Example:
+      GET /api/admin/hubble/devices/abc123def456
+    
+    Returns 404 if device not found in Hubble platform.
+    Requires HUBBLE_API_KEY and HUBBLE_ORG_ID in environment variables.
+    """
+    admin = get_admin_from_request(request, db)
+    
+    try:
+        # Get Hubble provider
+        provider = DeviceProviderFactory.get_provider("hubble")
+        
+        # Call get_device method
+        result = await provider.get_device(device_id)
+        
+        if not result["success"]:
+            error_msg = result.get('error', 'Unknown error')
+            
+            # Return 404 for device not found
+            if "not found" in error_msg.lower():
+                raise HTTPException(status_code=404, detail=error_msg)
+            
+            # Otherwise return 500
+            raise HTTPException(status_code=500, detail=f"Hubble API error: {error_msg}")
+        
+        return {
+            "success": True,
+            "device": result["device"],
+        }
+        
+    except HTTPException:
+        raise  # Re-raise HTTPExceptions
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error getting Hubble device {device_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get Hubble device: {str(e)}"
+        )
