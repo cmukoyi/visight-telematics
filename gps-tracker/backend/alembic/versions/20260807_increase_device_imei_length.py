@@ -8,17 +8,14 @@ all tables to support Hubble UUIDs and future device ID formats.
 
 Affected tables:
 - device_state (PRIMARY KEY)
-- position_history (PRIMARY KEY)
-- location_history_row
-- tracksolid_track_query
-- tracksolid_track_history
+- device_positions (PRIMARY KEY)
 - engine_state (PRIMARY KEY)
 - stationaries
 - legs
 - journeys
 
 Revision ID: v2113_series5_imei_length
-Revises: v2112_e1_journey_unique
+Revises: add_developers_feature
 Create Date: 2026-08-07
 """
 from alembic import op
@@ -40,22 +37,7 @@ def upgrade():
                     type_=sa.String(100),
                     existing_nullable=False)
     
-    op.alter_column('position_history', 'device_imei',
-                    existing_type=sa.String(20),
-                    type_=sa.String(100),
-                    existing_nullable=False)
-    
-    op.alter_column('location_history_row', 'device_imei',
-                    existing_type=sa.String(20),
-                    type_=sa.String(100),
-                    existing_nullable=False)
-    
-    op.alter_column('tracksolid_track_query', 'device_imei',
-                    existing_type=sa.String(20),
-                    type_=sa.String(100),
-                    existing_nullable=False)
-    
-    op.alter_column('tracksolid_track_history', 'device_imei',
+    op.alter_column('device_positions', 'device_imei',
                     existing_type=sa.String(20),
                     type_=sa.String(100),
                     existing_nullable=False)
@@ -105,22 +87,7 @@ def downgrade():
                     type_=sa.String(20),
                     existing_nullable=False)
     
-    op.alter_column('tracksolid_track_history', 'device_imei',
-                    existing_type=sa.String(100),
-                    type_=sa.String(20),
-                    existing_nullable=False)
-    
-    op.alter_column('tracksolid_track_query', 'device_imei',
-                    existing_type=sa.String(100),
-                    type_=sa.String(20),
-                    existing_nullable=False)
-    
-    op.alter_column('location_history_row', 'device_imei',
-                    existing_type=sa.String(100),
-                    type_=sa.String(20),
-                    existing_nullable=False)
-    
-    op.alter_column('position_history', 'device_imei',
+    op.alter_column('device_positions', 'device_imei',
                     existing_type=sa.String(100),
                     type_=sa.String(20),
                     existing_nullable=False)
