@@ -10523,6 +10523,7 @@ function _lmPlaceMarkers() {
         const statusLabels = { active: 'Active', idle: 'Idle', offline: 'Offline' };
         
         // Build sensor data snippet for popup (only key fields)
+        console.log('[POPUP] Building sensor snippet for tag:', t.imei, 'attributes:', t.attributes);
         let sensorSnippet = '';
         if (t.attributes) {
             const attrs = t.attributes;
@@ -10530,9 +10531,15 @@ function _lmPlaceMarkers() {
             if (attrs.Temperature?.value) snippets.push(`🌡️ ${esc(attrs.Temperature.value)}`);
             if (attrs.Humidity?.value) snippets.push(`💧 ${esc(attrs.Humidity.value)}`);
             if (attrs.Altitude?.value) snippets.push(`⛰️ ${esc(attrs.Altitude.value)}`);
+            console.log('[POPUP] Sensor snippets:', snippets);
             if (snippets.length > 0) {
                 sensorSnippet = `<div style="font-size:.75rem;color:var(--text-3);margin-top:4px;padding-top:4px;border-top:1px solid var(--border)">${snippets.join(' • ')}</div>`;
+                console.log('[POPUP] Sensor snippet HTML:', sensorSnippet);
+            } else {
+                console.log('[POPUP] No sensor data to display in popup');
             }
+        } else {
+            console.log('[POPUP] No attributes found for popup');
         }
         
         m.bindPopup(`
@@ -10951,10 +10958,17 @@ function _lmSelectTag(imei) {
 function _lmRenderSensorData(t) {
     // Render sensor data for Series 5 (Hubble) tags
     // Data comes from attributes field: { Temperature: {value, show_on_map}, Humidity: {value, show_on_map}, ... }
-    if (!t.attributes) return '';
+    console.log('[SENSOR] _lmRenderSensorData called for tag:', t.imei);
+    console.log('[SENSOR] Tag attributes:', t.attributes);
+    
+    if (!t.attributes) {
+        console.log('[SENSOR] No attributes found, returning empty');
+        return '';
+    }
     
     const attrs = t.attributes;
     const sensorFields = [];
+    console.log('[SENSOR] Processing attributes:', Object.keys(attrs));
     
     // Priority sensor fields to display
     const priorityFields = [
@@ -10978,9 +10992,14 @@ function _lmRenderSensorData(t) {
     });
     
     // If no sensor data, return empty
-    if (sensorFields.length === 0) return '';
+    console.log('[SENSOR] Found', sensorFields.length, 'sensor fields:', sensorFields.map(f => f.label));
+    if (sensorFields.length === 0) {
+        console.log('[SENSOR] No sensor fields to display, returning empty');
+        return '';
+    }
     
     // Build sensor data section
+    console.log('[SENSOR] Building sensor HTML section');
     const sensorHtml = sensorFields.map(f => `
         <div class="detail-item">
             <label><i class="fa-solid ${f.icon}" style="color:${f.color};margin-right:4px"></i>${f.label}</label>
@@ -11041,7 +11060,11 @@ function _lmRenderDetail(t) {
             <div class="detail-item"><label>Last Seen</label><span>${lastSeen}</span></div>
             <div class="detail-item detail-full"><label>Type</label><span>${tagTypeDisplay}</span></div>
         </div>
-        ${_lmRenderSensorData(t)}
+        ${(() => {
+            const sensorHtml = _lmRenderSensorData(t);
+            console.log('[DETAIL] Sensor HTML output length:', sensorHtml.length, 'chars');
+            return sensorHtml;
+        })()}
         ${_lmMarkers[t.imei] ? `<div class="detail-actions">
             <button class="btn btn-primary btn-sm" onclick="lmSelectFromList('${esc(t.imei)}')">
                 <i class="fa-solid fa-crosshairs"></i> Centre on Map
