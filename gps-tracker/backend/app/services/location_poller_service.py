@@ -356,6 +356,12 @@ class LocationPollerService:
                         
                         tracker.attributes = attrs
                         
+                        # Force SQLAlchemy to detect JSON column change
+                        from sqlalchemy.orm.attributes import flag_modified
+                        flag_modified(tracker, "attributes")
+                        
+                        logger.info(f"✅ Series 5 device {device_id[:8]}: updated with temp={temperature}°C, rssi={rssi}dBm")
+                        
                         # Reverse geocode for address
                         try:
                             geo_result = self.geocode_service.reverse_geocode(
