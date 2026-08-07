@@ -1836,6 +1836,8 @@ class PortalTagOut(BaseModel):
     #   idle    : reported within last 7 days but not within 24 h
     #   offline : older than 7 days, or never reported
     activity_status: Optional[str] = None
+    # Sensor data and metadata (Series 5: Temperature, Humidity, RSSI, etc.)
+    attributes: Optional[dict] = None
 
     class Config:
         from_attributes = True
@@ -2008,6 +2010,7 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
             category_name=cat_name,
             trip_subscribed=device_state_map.get(tag.imei, False),
             activity_status=_compute_activity_status(tag.last_seen),
+            attributes=tag.attributes,
         ))
 
     elapsed_ms = (perf_counter() - started_at) * 1000.0
