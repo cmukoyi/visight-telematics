@@ -761,8 +761,8 @@ class HubbleTagProvider(DeviceTagProvider):
         """
         Fetch the most recent location for a Hubble device.
         
-        Uses GET /v1/org/{org_id}/devices/{device_id} and extracts
-        location from the most_recent_packet field.
+        Uses GET /v1/org/{org_id}/packets with device_id filter to get
+        the latest packet from Hubble's gateway network.
         
         Args:
             device_id: Hubble device identifier (UUID)
@@ -770,10 +770,10 @@ class HubbleTagProvider(DeviceTagProvider):
         Returns:
             {
                 "success": True,
-                "latitude": float,
-                "longitude": float,
-                "timestamp": datetime,  # When location was observed
-                "battery_level": int or None,  # 0-100
+                "latitude": float,        # Gateway location
+                "longitude": float,       # Gateway location
+                "timestamp": datetime,    # When packet was detected
+                "rssi": int or None,      # Signal strength
             }
             or
             {
@@ -781,52 +781,107 @@ class HubbleTagProvider(DeviceTagProvider):
                 "error": "error message",
             }
         """
-        result = await self.get_device(device_id)
-        
-        if not result.get("success"):
-            return result  # Pass through error
-        
-        device = result.get("device", {})
-        packet = device.get("most_recent_packet")
-        
-        if not packet:
+        if not self.api_key or not self.org_id:
             return {
                 "success": False,
-                "error": "No location data available - device has not reported yet",
+                "error": "Hubble API credentials not configured",
             }
         
-        # Hubble BLE packet structure (from Minew tags):
-        # {
-        #   "received_ts": 1722960123,
-        #   "latitude": 51.5074,
-        #   "longitude": -0.1278,
-        #   "battery_level": 85,  # 0-100
-        #   "rssi": -65,
-        #   "gateway_id": "gw-123",
-        # }
+        # Query packets API for this specific device
+        # We want the most recent packet, so we query from recent past
+        url = f"{self.api_base}/v1/org/{self.org_id}/packets"
         
-        lat = packet.get("latitude")
-        lng = packet.get("longitude")
-        
-        if lat is None or lng is None:
-            return {
-                "success": False,
-                "error": "Location data missing from packet",
-            }
-        
-        # Convert received_ts (Unix timestamp) to datetime
-        received_ts = packet.get("received_ts")
-        if received_ts:
-            from datetime import datetime, timezone
-            timestamp = datetime.fromtimestamp(received_ts, tz=timezone.utc)
-        else:
-            from datetime import datetime, timezone
-            timestamp = datetime.now(timezone.utc)
-        
-        return {
-            "success": True,
-            "latitude": float(lat),
-            "longitude": float(lng),
-            "timestamp": timestamp,
-            "battery_level": packet.get("battery_level"),  # May be None
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Accept": "application/json",
+            "X-Request-ID": f"pinplot-packets-{device_id}",
         }
+        
+        # Filter to only this device's packets
+        params = {
+            "device_id": device_id,
+            # Query last 24 hours (don't need Continuation-Token for single poll)
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(url, headers=headers, params=params)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    packets = data.get("packets", [])
+                    
+                    if not packets:
+                        return {
+                            "success": False,
+                            "error": "No packets received from device yet - tag not detected by any gateway",
+                        }
+                    
+                    # Get the most recent packet (packets are in ascending order)
+                    latest_packet = packets[-1]
+                    
+                    # Extract location from the packet
+                    # For TERRESTRIAL packets, location is from the scanning gateway's GPS
+                    location = latest_packet.get("location", {})
+                    device_info = latest_packet.get("device", {})
+                    
+                    lat = location.get("latitude")
+                    lng = location.get("longitude")
+                    
+                    if lat is None or lng is None:
+                        return {
+                            "success": False,
+                            "error": "Packet received but location data is missing",
+                        }
+                    
+                    # device.timestamp = when gateway detected the packet
+                    device_ts = device_info.get("timestamp")
+                    if device_ts:
+                        from datetime import datetime, timezone
+                        timestamp = datetime.fromtimestamp(device_ts, tz=timezone.utc)
+                    else:
+                        from datetime import datetime, timezone
+                        timestamp = datetime.now(timezone.utc)
+                    
+                    return {
+                        "success": True,
+                        "latitude": float(lat),
+                        "longitude": float(lng),
+                        "timestamp": timestamp,
+                        "rssi": device_info.get("rssi"),  # Signal strength
+                    }
+                
+                elif response.status_code == 404:
+                    return {
+                        "success": False,
+                        "error": f"Device '{device_id}' not found or no packets available",
+                    }
+                
+                elif response.status_code == 400:
+                    error_data = response.json() if response.text else {}
+                    return {
+                        "success": False,
+                        "error": f"Invalid request: {error_data.get('message', response.text)}",
+                    }
+                
+                else:
+                    return {
+                        "success": False,
+                        "error": f"HTTP {response.status_code}: {response.text[:100]}",
+                    }
+                    
+        except httpx.TimeoutException:
+            return {
+                "success": False,
+                "error": "Request timed out - Hubble API not responding",
+            }
+        except httpx.RequestError as e:
+            return {
+                "success": False,
+                "error": f"Network error: {str(e)}",
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Unexpected error: {str(e)}",
+            }

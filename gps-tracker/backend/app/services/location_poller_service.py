@@ -287,13 +287,12 @@ class LocationPollerService:
                                     tracker.expiry_date = tracker.activation_date + timedelta(days=pkg.validity_days)
                                     logger.info("📅 Tag %s activated — expiry set to %s", tracker.imei, tracker.expiry_date)
                         
-                        # Update battery level if available
-                        battery = loc_result.get("battery_level")
-                        if battery is not None:
-                            tracker.battery_level = battery
+                        # Store RSSI (signal strength) as attribute if available
+                        rssi = loc_result.get("rssi")
+                        if rssi is not None:
                             attrs = tracker.attributes or {}
-                            attrs["Battery"] = {
-                                "value": f"{battery}%",
+                            attrs["RSSI"] = {
+                                "value": f"{rssi} dBm",
                                 "show_on_map": True,
                             }
                             tracker.attributes = attrs
