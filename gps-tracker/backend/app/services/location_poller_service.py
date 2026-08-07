@@ -267,6 +267,18 @@ class LocationPollerService:
                     device_id = tracker.imei
                     
                     try:
+                        # Fetch device model from Hubble if not set (for sensor decoding)
+                        if not tracker.device_model:
+                            try:
+                                device_info = await hubble_provider.get_device(device_id)
+                                if device_info.get("success"):
+                                    hubble_name = device_info.get("name", "").strip()
+                                    if hubble_name:
+                                        tracker.device_model = hubble_name
+                                        logger.info(f"📝 Series 5 device {device_id[:8]}: synced model name '{hubble_name}'")
+                            except Exception as exc:
+                                logger.warning(f"⚠️  Series 5 device {device_id[:8]}: failed to fetch device model: {exc}")
+                        
                         loc_result = await hubble_provider.get_location(device_id)
                         
                         if not loc_result.get("success"):
