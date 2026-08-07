@@ -2529,13 +2529,21 @@ async def validate_tag_portal(
     if not _user_can_manage(me, "asset-mgmt"):
         raise HTTPException(status_code=403, detail="You don't have permission to validate tags")
 
-    tag_type = _TAG_TYPE_ALIAS.get(data.tag_type.lower(), data.tag_type.lower())
+    # Map user-facing series names to canonical provider keys
+    tag_type_raw = data.tag_type.lower()
+    tag_type = _TAG_TYPE_ALIAS.get(tag_type_raw, tag_type_raw)
+    
+    logger.info(f"Tag validation request: tag_type_raw='{tag_type_raw}' → canonical='{tag_type}', imei='{data.imei}'")
+    
     try:
         provider = DeviceProviderFactory.get_provider(tag_type)
+        logger.info(f"Using provider: {provider.provider_name} for tag_type '{tag_type}'")
     except ValueError as exc:
+        logger.error(f"Unknown tag type '{tag_type}' (raw: '{tag_type_raw}'): {exc}")
         raise HTTPException(status_code=400, detail=str(exc))
 
     result = await provider.validate_tag(data.imei)
+    logger.info(f"Validation result for {tag_type}/{data.imei}: is_valid={result.is_valid}, message='{result.message}'")
     return {"is_valid": result.is_valid, "message": result.message}
 
 
