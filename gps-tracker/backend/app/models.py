@@ -887,7 +887,7 @@ class DevicePosition(Base):
     __tablename__ = "device_positions"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    device_imei = Column(String(20), nullable=False, index=True)
+    device_imei = Column(String(100), nullable=False, index=True)
     
     # Core position data
     lat = Column(Float, nullable=False)
@@ -930,7 +930,7 @@ class DeviceState(Base):
     """
     __tablename__ = "device_state"
     
-    device_imei = Column(String(20), primary_key=True)
+    device_imei = Column(String(100), primary_key=True)
     
     # Trigger detection timestamps
     last_batch_ts = Column(DateTime(timezone=True), nullable=True)
@@ -978,7 +978,7 @@ class EngineState(Base):
     """
     __tablename__ = "engine_state"
     
-    device_imei = Column(String(20), primary_key=True)
+    device_imei = Column(String(100), primary_key=True)
     
     # State machine
     current_state = Column(String(20), nullable=False, default="STATIONARY")  # STATIONARY or MOVE
@@ -1012,7 +1012,7 @@ class Stationary(Base):
     __tablename__ = "stationaries"
     
     id = get_uuid_column()
-    device_imei = Column(String(20), nullable=False, index=True)
+    device_imei = Column(String(100), nullable=False, index=True)
     journey_id = get_uuid_nullable()  # NULL if ungrouped
     
     # Position references (nullable for reconstructed state)
@@ -1048,7 +1048,7 @@ class Leg(Base):
     __tablename__ = "legs"
     
     id = get_uuid_column()
-    device_imei = Column(String(20), nullable=False, index=True)
+    device_imei = Column(String(100), nullable=False, index=True)
     journey_id = get_uuid_nullable()  # NULL if ungrouped
     
     # Position references
@@ -1090,7 +1090,7 @@ class Journey(Base):
     __tablename__ = "journeys"
     
     id = get_uuid_column()
-    device_imei = Column(String(20), nullable=False, index=True)
+    device_imei = Column(String(100), nullable=False, index=True)
     
     # Time window
     started_at = Column(DateTime(timezone=True), nullable=False, index=True)
