@@ -26,7 +26,7 @@ import sqlalchemy as sa
 
 
 revision = 'v2113_series5_imei_length'
-down_revision = 'v2112_e1_journey_unique'
+down_revision = 'add_developers_feature'
 branch_labels = None
 depends_on = None
 
