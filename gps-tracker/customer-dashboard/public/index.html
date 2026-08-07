@@ -10933,6 +10933,58 @@ function _lmSelectTag(imei) {
     if (tag) _lmRenderDetail(tag);
 }
 
+function _lmRenderSensorData(t) {
+    // Render sensor data for Series 5 (Hubble) tags
+    // Data comes from attributes field: { Temperature: {value, show_on_map}, Humidity: {value, show_on_map}, ... }
+    if (!t.attributes) return '';
+    
+    const attrs = t.attributes;
+    const sensorFields = [];
+    
+    // Priority sensor fields to display
+    const priorityFields = [
+        { key: 'Temperature', icon: 'fa-temperature-half', color: 'var(--primary)' },
+        { key: 'Humidity', icon: 'fa-droplet', color: 'var(--info)' },
+        { key: 'Altitude', icon: 'fa-mountain', color: 'var(--success)' },
+        { key: 'RSSI', icon: 'fa-signal', color: 'var(--warning)' },
+        { key: 'GPS_Accuracy', icon: 'fa-bullseye', color: 'var(--text-3)' },
+        { key: 'Battery', icon: 'fa-battery-half', color: 'var(--success)' }
+    ];
+    
+    priorityFields.forEach(field => {
+        if (attrs[field.key] && attrs[field.key].value) {
+            sensorFields.push({
+                label: field.key.replace(/_/g, ' '),
+                value: esc(attrs[field.key].value),
+                icon: field.icon,
+                color: field.color
+            });
+        }
+    });
+    
+    // If no sensor data, return empty
+    if (sensorFields.length === 0) return '';
+    
+    // Build sensor data section
+    const sensorHtml = sensorFields.map(f => `
+        <div class="detail-item">
+            <label><i class="fa-solid ${f.icon}" style="color:${f.color};margin-right:4px"></i>${f.label}</label>
+            <span>${f.value}</span>
+        </div>
+    `).join('');
+    
+    return `
+        <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px">
+            <h4 style="font-size:12px;font-weight:600;color:var(--text-2);margin:0 0 8px 0;text-transform:uppercase;letter-spacing:0.5px">
+                <i class="fa-solid fa-microchip" style="margin-right:6px"></i>Sensor Data
+            </h4>
+            <div class="detail-grid">
+                ${sensorHtml}
+            </div>
+        </div>
+    `;
+}
+
 function _lmRenderDetail(t) {
     const panel = document.getElementById('lm-detail-panel');
     if (!panel) return;
@@ -10974,6 +11026,7 @@ function _lmRenderDetail(t) {
             <div class="detail-item"><label>Last Seen</label><span>${lastSeen}</span></div>
             <div class="detail-item detail-full"><label>Type</label><span>${tagTypeDisplay}</span></div>
         </div>
+        ${_lmRenderSensorData(t)}
         ${_lmMarkers[t.imei] ? `<div class="detail-actions">
             <button class="btn btn-primary btn-sm" onclick="lmSelectFromList('${esc(t.imei)}')">
                 <i class="fa-solid fa-crosshairs"></i> Centre on Map
