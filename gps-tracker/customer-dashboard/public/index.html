@@ -265,9 +265,12 @@
 
         <div class="header-right">
             <!-- Language Selector -->
-            <select id="header-language-selector" class="form-input" style="max-width:90px;padding:4px 8px;font-size:0.85rem;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--text);cursor:pointer" onchange="settingsSaveLanguage(this.value)" data-i18n-title="settings.interface_language" title="Interface language">
-                <!-- Options populated by JS -->
-            </select>
+            <div style="display:flex;align-items:center;gap:6px;position:relative">
+                <i class="fa-solid fa-globe" style="color:var(--text-3);font-size:0.9rem;pointer-events:none"></i>
+                <select id="header-language-selector" class="form-input" style="max-width:90px;padding:4px 8px;font-size:0.85rem;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--text);cursor:pointer" onchange="settingsSaveLanguage(this.value)" data-i18n-title="settings.interface_language" title="Interface language">
+                    <!-- Options populated by JS -->
+                </select>
+            </div>
             
             <div class="notif-wrap" id="notifWrap">
                 <button id="notif-btn" data-i18n-title="alerts.alerts_inbox" title="Alerts inbox" onclick="toggleNotifPanel(event)">
@@ -5003,6 +5006,9 @@ function showDashboard(user, group, effectiveFeatures) {
     // Apply developer nav access based on user role
     applyDeveloperNavAccess(user);
 
+    // Populate language selector in header
+    populateLanguageSelector().catch(e => console.warn('Failed to populate language selector:', e));
+
     // Defer map init so the browser has painted the dashboard container
     // and Leaflet can read real pixel dimensions (avoids 0×0 tile issue on login).
     requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -5943,11 +5949,18 @@ async function populateLanguageSelector() {
     const langSel = document.getElementById('header-language-selector');
     if (!langSel) return;
     
+    // Ensure languages are loaded before populating
     const languages = ts.getAvailableLanguages();
+    if (!languages || languages.length === 0) {
+        // Languages not loaded yet, wait for them
+        await ts.loadLanguages();
+    }
+    
+    const freshLanguages = ts.getAvailableLanguages();
     const currentLang = ts.getCurrentLanguage();
     
     langSel.innerHTML = '';
-    languages.forEach(lang => {
+    freshLanguages.forEach(lang => {
         const opt = document.createElement('option');
         opt.value = lang.code;
         opt.textContent = lang.name;
