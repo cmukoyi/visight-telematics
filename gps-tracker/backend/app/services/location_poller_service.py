@@ -271,8 +271,8 @@ class LocationPollerService:
                         if not tracker.device_model:
                             try:
                                 device_info = await hubble_provider.get_device(device_id)
-                                if device_info.get("success"):
-                                    hubble_name = device_info.get("name", "").strip()
+                                if device_info.get("success") and device_info.get("device"):
+                                    hubble_name = device_info["device"].get("name", "").strip()
                                     if hubble_name:
                                         tracker.device_model = hubble_name
                                         logger.info(f"📝 Series 5 device {device_id[:8]}: synced model name '{hubble_name}'")
