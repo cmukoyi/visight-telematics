@@ -65,6 +65,84 @@ class HubbleTagProvider(DeviceTagProvider):
     def tag_type(self) -> str:
         return "hubble"
 
+    @staticmethod
+    def decode_minew_payload(payload_b64: str) -> Dict[str, Any]:
+        """
+        Decode Minew beacon BLE advertising payload.
+        
+        Minew tags encode sensor data in the BLE advertisement packet.
+        Common format (varies by model):
+          Byte 0: Frame type (0x2F for temp/humidity)
+          Byte 1: Temperature in °C (signed)
+          Byte 2: Humidity in % (0-100) or battery level
+        
+        Args:
+            payload_b64: Base64-encoded payload from Hubble packet
+        
+        Returns:
+            {
+                "temperature": float or None,  # °C
+                "humidity": int or None,       # %
+                "battery": int or None,        # %
+                "frame_type": int,             # Frame type byte
+                "raw_hex": str,                # Raw hex string
+            }
+        """
+        import base64
+        
+        result = {
+            "temperature": None,
+            "humidity": None,
+            "battery": None,
+            "frame_type": None,
+            "raw_hex": None,
+        }
+        
+        try:
+            payload_bytes = base64.b64decode(payload_b64)
+            result["raw_hex"] = payload_bytes.hex()
+            
+            if len(payload_bytes) < 1:
+                return result
+            
+            frame_type = payload_bytes[0]
+            result["frame_type"] = frame_type
+            
+            # Frame type 0x2F or 0x30: Temperature + Humidity/Battery
+            if frame_type in (0x2F, 0x30) and len(payload_bytes) >= 3:
+                # Byte 1: Temperature in °C (signed int)
+                temp_raw = payload_bytes[1]
+                # Convert to signed (-128 to 127)
+                temperature = temp_raw if temp_raw < 128 else temp_raw - 256
+                result["temperature"] = float(temperature)
+                
+                # Byte 2: Could be humidity (%) or battery (%)
+                byte2 = payload_bytes[2]
+                if byte2 <= 100:
+                    # If <= 100, likely humidity %
+                    result["humidity"] = int(byte2)
+                else:
+                    # If > 100, could be battery in different encoding
+                    # or humidity scaled differently
+                    result["battery"] = int(byte2)
+            
+            # Frame type 0x01: iBeacon format (may have battery)
+            elif frame_type == 0x01 and len(payload_bytes) >= 3:
+                # Byte 2 might be battery level
+                if payload_bytes[2] <= 100:
+                    result["battery"] = int(payload_bytes[2])
+            
+            # Frame type 0xA1: Acceleration + Temperature
+            elif frame_type == 0xA1 and len(payload_bytes) >= 2:
+                temp_raw = payload_bytes[1]
+                temperature = temp_raw if temp_raw < 128 else temp_raw - 256
+                result["temperature"] = float(temperature)
+            
+        except Exception as e:
+            logger.warning(f"Payload decode error: {e}")
+        
+        return result
+
     async def validate_tag(self, imei: str) -> TagValidationResult:
         """
         Validate a Series 5 device by checking if it exists in Hubble Platform.
@@ -843,12 +921,26 @@ class HubbleTagProvider(DeviceTagProvider):
                         from datetime import datetime, timezone
                         timestamp = datetime.now(timezone.utc)
                     
+                    # Decode sensor data from payload
+                    payload_b64 = device_info.get("payload")
+                    sensor_data = {}
+                    if payload_b64:
+                        sensor_data = HubbleTagProvider.decode_minew_payload(payload_b64)
+                    
                     return {
                         "success": True,
                         "latitude": float(lat),
                         "longitude": float(lng),
                         "timestamp": timestamp,
                         "rssi": device_info.get("rssi"),  # Signal strength
+                        "altitude": location.get("altitude"),  # Gateway altitude
+                        "horizontal_accuracy": location.get("horizontal_accuracy"),
+                        "vertical_accuracy": location.get("vertical_accuracy"),
+                        "temperature": sensor_data.get("temperature"),  # °C
+                        "humidity": sensor_data.get("humidity"),  # %
+                        "battery": sensor_data.get("battery"),  # %
+                        "payload_hex": sensor_data.get("raw_hex"),  # Raw hex
+                        "frame_type": sensor_data.get("frame_type"),  # Frame type
                     }
                 
                 elif response.status_code == 404:

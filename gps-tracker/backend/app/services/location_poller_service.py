@@ -287,15 +287,74 @@ class LocationPollerService:
                                     tracker.expiry_date = tracker.activation_date + timedelta(days=pkg.validity_days)
                                     logger.info("📅 Tag %s activated — expiry set to %s", tracker.imei, tracker.expiry_date)
                         
-                        # Store RSSI (signal strength) as attribute if available
+                        # Store sensor data and packet metadata as attributes
+                        attrs = tracker.attributes or {}
+                        
+                        # RSSI (signal strength)
                         rssi = loc_result.get("rssi")
                         if rssi is not None:
-                            attrs = tracker.attributes or {}
                             attrs["RSSI"] = {
                                 "value": f"{rssi} dBm",
                                 "show_on_map": True,
                             }
-                            tracker.attributes = attrs
+                        
+                        # Temperature
+                        temperature = loc_result.get("temperature")
+                        if temperature is not None:
+                            attrs["Temperature"] = {
+                                "value": f"{temperature}°C",
+                                "show_on_map": True,
+                            }
+                        
+                        # Humidity
+                        humidity = loc_result.get("humidity")
+                        if humidity is not None:
+                            attrs["Humidity"] = {
+                                "value": f"{humidity}%",
+                                "show_on_map": True,
+                            }
+                        
+                        # Battery (if available from payload)
+                        battery = loc_result.get("battery")
+                        if battery is not None:
+                            tracker.battery_level = battery
+                            attrs["Battery"] = {
+                                "value": f"{battery}%",
+                                "show_on_map": True,
+                            }
+                        
+                        # Altitude (from gateway)
+                        altitude = loc_result.get("altitude")
+                        if altitude is not None:
+                            attrs["Altitude"] = {
+                                "value": f"{altitude:.1f}m",
+                                "show_on_map": False,
+                            }
+                        
+                        # GPS Accuracy
+                        h_accuracy = loc_result.get("horizontal_accuracy")
+                        if h_accuracy is not None:
+                            attrs["GPS_Accuracy"] = {
+                                "value": f"{h_accuracy:.1f}m",
+                                "show_on_map": False,
+                            }
+                        
+                        # Raw packet data (for debugging)
+                        payload_hex = loc_result.get("payload_hex")
+                        if payload_hex:
+                            attrs["Payload"] = {
+                                "value": payload_hex,
+                                "show_on_map": False,
+                            }
+                        
+                        frame_type = loc_result.get("frame_type")
+                        if frame_type is not None:
+                            attrs["Frame_Type"] = {
+                                "value": f"0x{frame_type:02X}",
+                                "show_on_map": False,
+                            }
+                        
+                        tracker.attributes = attrs
                         
                         # Reverse geocode for address
                         try:
