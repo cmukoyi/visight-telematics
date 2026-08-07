@@ -5530,8 +5530,8 @@ function _updateImeiLabelForTagType() {
         label.textContent = 'MAC Address *';
         input.placeholder = 'e.g. 48872D9DBC66 or AA:BB:CC:DD:EE:FF';
     } else if (tagType === 'series_5' || tagType === 'series5' || tagType === 'hubble') {
-        label.textContent = 'Device Name *';
-        input.placeholder = 'e.g. warehouse-scanner-01';
+        label.textContent = 'Hubble Device ID *';
+        input.placeholder = 'e.g. 5f1369f8-9c51-4724-918f-635f746e2ee6 (from Hubble Platform)';
     } else if (tagType === 'series3' || tagType === 'series_3') {
         label.textContent = 'QR / NFC ID *';
         input.placeholder = 'e.g. 4a8b2c3d-1e2f-3g4h-5i6j-7k8l9m0n1o2p';
@@ -5742,7 +5742,20 @@ async function _tagImeiValidate(imei, tagType) {
     const statusEl = document.getElementById('tagMgmtImeiStatus');
     statusEl.style.display = 'block';
     statusEl.style.color = 'var(--text-3, #6b7280)';
-    statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking tag on Scope platform…';
+    
+    // Show appropriate validation message based on tag type
+    let checkingMsg = 'Checking tag...';
+    if (tagType === 'series1' || tagType === 'scope') {
+        checkingMsg = '<i class="fa-solid fa-spinner fa-spin"></i> Checking tag on Scope platform…';
+    } else if (tagType === 'series2' || tagType === 'tracksolid') {
+        checkingMsg = '<i class="fa-solid fa-spinner fa-spin"></i> Checking tag on TrackSolid platform…';
+    } else if (tagType === 'series_4' || tagType === 'series4') {
+        checkingMsg = '<i class="fa-solid fa-spinner fa-spin"></i> Validating MAC address…';
+    } else if (tagType === 'series_5' || tagType === 'series5' || tagType === 'hubble') {
+        checkingMsg = '<i class="fa-solid fa-spinner fa-spin"></i> Checking device on Hubble Platform…';
+    }
+    statusEl.innerHTML = checkingMsg;
+    
     try {
         const res = await apiFetch('/api/portal/tags/validate', {
             method: 'POST',

@@ -2574,12 +2574,8 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
         if not validation.is_valid:
             raise HTTPException(status_code=422, detail=validation.message)
         
-        # For Hubble (Series 5), use device_id from registration as imei
-        if canonical_type == "hubble" and validation.device_id:
-            imei = validation.device_id
-            # Store device_key in description for now (TODO: add dedicated hubble_device_key column)
-            if validation.device_key and not data.description:
-                data.description = f"Hubble Key: {validation.device_key}"
+        # For Hubble (Series 5), the imei is already the device_id from Hubble
+        # No need to transform it - validation already confirmed it exists
                 
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

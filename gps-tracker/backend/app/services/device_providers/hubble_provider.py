@@ -67,29 +67,27 @@ class HubbleTagProvider(DeviceTagProvider):
 
     async def validate_tag(self, imei: str) -> TagValidationResult:
         """
-        Register a new device with Hubble Platform.
+        Validate a Series 5 device by checking if it exists in Hubble Platform.
         
-        For Series 5 tags, the "imei" parameter is actually the device name.
-        This method registers the device with Hubble and returns the generated
-        device_id and device_key.
+        For Series 5 tags, users must register devices in Hubble Platform first,
+        then provide the device_id here for validation. This method checks if
+        the device_id exists in Hubble.
         
         Args:
-            imei: Device name (NOT device ID - Hubble generates the ID)
+            imei: Hubble device_id (UUID format from Hubble Platform)
         
         Returns:
             TagValidationResult with:
-              - is_valid=True if registration succeeds
-              - message contains device_id and device_key for storage
-              - device_id should be stored in BLETag.imei
-              - device_key should be stored securely (currently in message)
+              - is_valid=True if device exists in Hubble
+              - is_valid=False if device not found or API error
         """
-        device_name = imei.strip()
+        device_id = imei.strip()
 
-        # Validate device name format
-        if not device_name or len(device_name) < 3:
+        # Validate device_id format (should be a UUID)
+        if not device_id or len(device_id) < 10:
             return TagValidationResult(
                 is_valid=False,
-                message="Device name must be at least 3 characters long.",
+                message="Device ID must be at least 10 characters. Please provide the Hubble device_id.",
             )
 
         # Check if API credentials are configured
@@ -100,49 +98,30 @@ class HubbleTagProvider(DeviceTagProvider):
                 message="Hubble API not configured. Please contact administrator to set up Series 5 integration.",
             )
 
-        # Check if device with this name already exists in Hubble
-        # This prevents duplicate device names and provides better error messages
+        # Check if device exists in Hubble Platform
         try:
-            existing_device = await self.get_device_by_name(device_name)
-            if existing_device:
-                logger.info(f"Device name '{device_name}' already exists in Hubble: {existing_device.get('device_id')}")
-                return TagValidationResult(
-                    is_valid=False,
-                    message=f"A device named '{device_name}' already exists in Hubble. Please use a unique name.",
-                )
-        except Exception as e:
-            # Don't fail registration if we can't check - just log and continue
-            logger.warning(f"Failed to check for existing device '{device_name}': {e}")
-
-        # Register device with Hubble API
-        try:
-            registration_result = await self._register_device_with_hubble(device_name)
+            device = await self.get_device(device_id)
             
-            if registration_result["success"]:
-                device_id = registration_result["device_id"]
-                device_key = registration_result["device_key"]
-                
-                # Return device_id to be stored as IMEI
-                # Device key will be stored in description field (temporary - need dedicated column)
-                logger.info(f"Successfully registered Hubble device: {device_name} -> {device_id}")
+            if device:
+                device_name = device.get("name", "Unknown")
+                logger.info(f"Series 5 device validated: {device_id} (name: {device_name})")
                 
                 return TagValidationResult(
                     is_valid=True,
-                    message=f"Hubble device registered successfully: {device_id}",
-                    device_id=device_id,  # This will replace the imei field
-                    device_key=device_key,  # This will be stored separately
+                    message=f"Series 5 device verified in Hubble: {device_name}",
+                    device_id=device_id,
                 )
             else:
                 return TagValidationResult(
                     is_valid=False,
-                    message=f"Hubble registration failed: {registration_result.get('error', 'Unknown error')}",
+                    message=f"Device ID '{device_id}' not found in Hubble. Please register the device in Hubble Platform first.",
                 )
                 
         except Exception as e:
-            logger.error(f"Hubble API error during device registration: {e}", exc_info=True)
+            logger.error(f"Hubble API error during device validation: {e}", exc_info=True)
             return TagValidationResult(
                 is_valid=False,
-                message=f"Hubble API error: {str(e)}",
+                message=f"Could not verify device in Hubble: {str(e)}",
             )
 
     async def _register_device_with_hubble(self, device_name: str) -> Dict[str, Any]:
