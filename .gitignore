@@ -34,6 +34,10 @@ gps-tracker/backend/.env
 gps-tracker/**/.env
 *.env.local
 
+# Documentation files — keep local only (never commit)
+*.md
+*.MD
+
 # Local reference files — not for source control
 dB_schema.md
 
