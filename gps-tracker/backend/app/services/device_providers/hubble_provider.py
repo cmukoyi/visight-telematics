@@ -756,3 +756,77 @@ class HubbleTagProvider(DeviceTagProvider):
                 "success": False,
                 "error": f"Unexpected error: {str(e)}",
             }
+
+    async def get_location(self, device_id: str) -> Dict[str, Any]:
+        """
+        Fetch the most recent location for a Hubble device.
+        
+        Uses GET /v1/org/{org_id}/devices/{device_id} and extracts
+        location from the most_recent_packet field.
+        
+        Args:
+            device_id: Hubble device identifier (UUID)
+        
+        Returns:
+            {
+                "success": True,
+                "latitude": float,
+                "longitude": float,
+                "timestamp": datetime,  # When location was observed
+                "battery_level": int or None,  # 0-100
+            }
+            or
+            {
+                "success": False,
+                "error": "error message",
+            }
+        """
+        result = await self.get_device(device_id)
+        
+        if not result.get("success"):
+            return result  # Pass through error
+        
+        device = result.get("device", {})
+        packet = device.get("most_recent_packet")
+        
+        if not packet:
+            return {
+                "success": False,
+                "error": "No location data available - device has not reported yet",
+            }
+        
+        # Hubble BLE packet structure (from Minew tags):
+        # {
+        #   "received_ts": 1722960123,
+        #   "latitude": 51.5074,
+        #   "longitude": -0.1278,
+        #   "battery_level": 85,  # 0-100
+        #   "rssi": -65,
+        #   "gateway_id": "gw-123",
+        # }
+        
+        lat = packet.get("latitude")
+        lng = packet.get("longitude")
+        
+        if lat is None or lng is None:
+            return {
+                "success": False,
+                "error": "Location data missing from packet",
+            }
+        
+        # Convert received_ts (Unix timestamp) to datetime
+        received_ts = packet.get("received_ts")
+        if received_ts:
+            from datetime import datetime, timezone
+            timestamp = datetime.fromtimestamp(received_ts, tz=timezone.utc)
+        else:
+            from datetime import datetime, timezone
+            timestamp = datetime.now(timezone.utc)
+        
+        return {
+            "success": True,
+            "latitude": float(lat),
+            "longitude": float(lng),
+            "timestamp": timestamp,
+            "battery_level": packet.get("battery_level"),  # May be None
+        }

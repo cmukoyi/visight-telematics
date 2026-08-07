@@ -148,12 +148,12 @@ class LocationPollerService:
                 logger.warning("⚠️  Tracker IMEI %s has unrecognised tag_type '%s' — skipping", t.imei, t.tag_type)
 
             # Series 4 (BLE indoor) and Series 5 (Hubble Platform BLE) are not GPS-enabled
-            # They report positions via mobile app scans (Series 4) or Hubble Platform (Series 5)
-            # For now, log them as recognized but skip location polling
+            # Series 4 reports positions via mobile app scans
+            # Series 5 reports positions via Hubble Platform gateway network
             if series4_trackers:
                 logger.debug("📍 Series 4 (BLE indoor): %d tags (position via mobile app scans)", len(series4_trackers))
             if series5_trackers:
-                logger.debug("📍 Series 5 (Hubble Platform): %d tags (location polling not yet implemented)", len(series5_trackers))
+                logger.debug("📍 Series 5 (Hubble Platform): %d tags", len(series5_trackers))
 
             updated_count = 0
 
@@ -254,6 +254,83 @@ class LocationPollerService:
                             logger.error("❌ Geofence check error for tracker %s: %s", tracker.id, exc)
 
                     updated_count += 1
+
+            # ── Poll Series 5 / Hubble Platform tags ──────────────────────
+            if series5_trackers:
+                from app.services.device_providers.hubble_provider import HubbleTagProvider
+                hubble_provider = HubbleTagProvider()
+                
+                logger.info(f"📡 Polling {len(series5_trackers)} Series 5 / Hubble Platform tags")
+                
+                for tracker in series5_trackers:
+                    # Series 5 uses device_id stored in imei field (Hubble UUIDs)
+                    device_id = tracker.imei
+                    
+                    try:
+                        loc_result = await hubble_provider.get_location(device_id)
+                        
+                        if not loc_result.get("success"):
+                            logger.warning(f"⚠️  Series 5 device {device_id}: {loc_result.get('error')}")
+                            continue
+                        
+                        # Update tracker position
+                        tracker.latitude = str(loc_result["latitude"])
+                        tracker.longitude = str(loc_result["longitude"])
+                        tracker.last_seen = loc_result["timestamp"]
+                        
+                        # Set activation_date on first GPS fix and calculate expiry
+                        if tracker.activation_date is None:
+                            tracker.activation_date = datetime.utcnow()
+                            if tracker.package_id:
+                                pkg = db.query(TagPackage).filter(TagPackage.id == str(tracker.package_id)).first()
+                                if pkg:
+                                    tracker.expiry_date = tracker.activation_date + timedelta(days=pkg.validity_days)
+                                    logger.info("📅 Tag %s activated — expiry set to %s", tracker.imei, tracker.expiry_date)
+                        
+                        # Update battery level if available
+                        battery = loc_result.get("battery_level")
+                        if battery is not None:
+                            tracker.battery_level = battery
+                            attrs = tracker.attributes or {}
+                            attrs["Battery"] = {
+                                "value": f"{battery}%",
+                                "show_on_map": True,
+                            }
+                            tracker.attributes = attrs
+                        
+                        # Reverse geocode for address
+                        try:
+                            geo_result = self.geocode_service.reverse_geocode(
+                                device_imei=device_id,
+                                lat=loc_result["latitude"],
+                                lng=loc_result["longitude"]
+                            )
+                            tracker.location_description = geo_result["address"]
+                            if not geo_result.get("cached"):
+                                logger.info("📍 Series 5 device %s: reverse geocoded to '%s'", 
+                                          device_id[:8], geo_result["address"])
+                        except Exception as exc:
+                            logger.warning("⚠️  Series 5 device %s geocode failed: %s", device_id[:8], exc)
+                        
+                        # Check geofences
+                        user = db.query(User).filter(User.id == tracker.user_id).first()
+                        if user:
+                            try:
+                                GeofenceService.check_geofences_for_tracker(
+                                    db,
+                                    str(tracker.id),
+                                    loc_result["latitude"],
+                                    loc_result["longitude"],
+                                    str(user.id),
+                                )
+                            except Exception as exc:
+                                logger.error("❌ Geofence check error for tracker %s: %s", tracker.id, exc)
+                        
+                        updated_count += 1
+                        logger.debug("✅ Series 5 device %s location updated", device_id[:8])
+                        
+                    except Exception as exc:
+                        logger.error("❌ Series 5 device %s location fetch failed: %s", device_id[:8], exc)
 
             # ── Poll Series 1 / MZone tags ────────────────────────────────────
             if series1_trackers:
