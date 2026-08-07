@@ -116,15 +116,16 @@ class HubbleTagProvider(DeviceTagProvider):
                 temperature = temp_raw if temp_raw < 128 else temp_raw - 256
                 result["temperature"] = float(temperature)
                 
-                # Byte 2: Could be humidity (%) or battery (%)
+                # Byte 2: Could be humidity (%) or battery (0-255 scale)
                 byte2 = payload_bytes[2]
                 if byte2 <= 100:
                     # If <= 100, likely humidity %
                     result["humidity"] = int(byte2)
                 else:
-                    # If > 100, could be battery in different encoding
-                    # or humidity scaled differently
-                    result["battery"] = int(byte2)
+                    # MTB02: Battery level on 0-255 scale, convert to %
+                    # 223/255 = 87%, 154/255 = 60%, etc.
+                    battery_pct = int((byte2 / 255.0) * 100)
+                    result["battery"] = battery_pct
             
             # Frame type 0x01: iBeacon format (may have battery)
             elif frame_type == 0x01 and len(payload_bytes) >= 3:
