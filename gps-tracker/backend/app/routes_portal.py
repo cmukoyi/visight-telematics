@@ -34,8 +34,10 @@ _TAG_TYPE_ALIAS = {
     "series_3": "series_3",
     "series4": "ble",       # Series 4 (DX-Smart indoor BLE tags)
     "series_4": "ble",
+    "ble": "ble",           # Allow 'ble' to map to itself
     "series5": "hubble",    # Series 5 (Hubble Platform BLE tags)
     "series_5": "hubble",
+    "hubble": "hubble",     # Allow 'hubble' to map to itself
 }
 
 router = APIRouter(prefix="/api/portal", tags=["portal"])

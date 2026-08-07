@@ -125,12 +125,14 @@ class LocationPollerService:
                 return
 
             # Split by provider type.
-            # Accept both the canonical DB names ('scope', 'tracksolid') and
-            # the Flutter app's series aliases ('series1', 'series2') so that
+            # Accept both the canonical DB names ('scope', 'tracksolid', 'ble', 'hubble') and
+            # the Flutter app's series aliases ('series1', 'series2', etc.) so that
             # tags added by any client version are polled correctly.
             _SERIES2_KEYS = {"series2", "tracksolid"}
             _SERIES1_KEYS = {"series1", "scope"}
             _SERIES3_KEYS = {"series3"}
+            _SERIES4_KEYS = {"series4", "ble"}  # Series 4 (DX-Smart indoor BLE)
+            _SERIES5_KEYS = {"series5", "hubble"}  # Series 5 (Hubble Platform BLE)
 
             def _tag_key(t) -> str:
                 return (t.tag_type or "series1").lower().replace("_", "").replace("-", "")
@@ -138,10 +140,20 @@ class LocationPollerService:
             series2_trackers = [t for t in live_trackers if _tag_key(t) in _SERIES2_KEYS]
             series1_trackers = [t for t in live_trackers if _tag_key(t) in _SERIES1_KEYS]
             series3_trackers = [t for t in live_trackers if _tag_key(t) in _SERIES3_KEYS]
+            series4_trackers = [t for t in live_trackers if _tag_key(t) in _SERIES4_KEYS]
+            series5_trackers = [t for t in live_trackers if _tag_key(t) in _SERIES5_KEYS]
             unknown_trackers = [t for t in live_trackers
-                                   if _tag_key(t) not in _SERIES2_KEYS | _SERIES1_KEYS | _SERIES3_KEYS]
+                                   if _tag_key(t) not in _SERIES2_KEYS | _SERIES1_KEYS | _SERIES3_KEYS | _SERIES4_KEYS | _SERIES5_KEYS]
             for t in unknown_trackers:
                 logger.warning("⚠️  Tracker IMEI %s has unrecognised tag_type '%s' — skipping", t.imei, t.tag_type)
+
+            # Series 4 (BLE indoor) and Series 5 (Hubble Platform BLE) are not GPS-enabled
+            # They report positions via mobile app scans (Series 4) or Hubble Platform (Series 5)
+            # For now, log them as recognized but skip location polling
+            if series4_trackers:
+                logger.debug("📍 Series 4 (BLE indoor): %d tags (position via mobile app scans)", len(series4_trackers))
+            if series5_trackers:
+                logger.debug("📍 Series 5 (Hubble Platform): %d tags (location polling not yet implemented)", len(series5_trackers))
 
             updated_count = 0
 
@@ -372,7 +384,9 @@ class LocationPollerService:
             # Commit all updates
             db.commit()
             logger.info(f"✅ Updated {updated_count} tracker positions and checked geofences "
-                        f"({len(series2_trackers)} Series 2 / TrackSolid, {len(series1_trackers)} Series 1 / MZone, {len(series3_trackers)} Series 3 / QR-NFC processed)")
+                        f"({len(series2_trackers)} Series 2 / TrackSolid, {len(series1_trackers)} Series 1 / MZone, "
+                        f"{len(series3_trackers)} Series 3 / QR-NFC, {len(series4_trackers)} Series 4 / BLE Indoor, "
+                        f"{len(series5_trackers)} Series 5 / Hubble processed)")
 
             # ── Generate battery-low and offline portal alerts ─────────────
             alert_count = 0
