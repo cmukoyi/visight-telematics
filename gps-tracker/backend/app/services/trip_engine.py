@@ -2681,6 +2681,40 @@ def start_stall_watchdog():
         logger.warning("⚠️  Stall watchdog task already running")
 
 
+def get_engine_status() -> Dict:
+    """
+    Get status of all background trip engine tasks.
+    
+    Returns:
+        Dict with status of each background task
+    """
+    from app.services.tracksolid_batch_service import _batch_sweep_task, BATCH_SWEEP_INTERVAL_MINUTES
+    from app.services.tracksolid_track_service import _selective_sweep_task, SELECTIVE_SWEEP_INTERVAL_MINUTES
+    
+    return {
+        "batch_sweep": {
+            "running": _batch_sweep_task is not None and not _batch_sweep_task.done(),
+            "interval_minutes": BATCH_SWEEP_INTERVAL_MINUTES,
+            "done": _batch_sweep_task.done() if _batch_sweep_task else None,
+        },
+        "selective_sweep": {
+            "running": _selective_sweep_task is not None and not _selective_sweep_task.done(),
+            "interval_minutes": SELECTIVE_SWEEP_INTERVAL_MINUTES,
+            "done": _selective_sweep_task.done() if _selective_sweep_task else None,
+        },
+        "journey_processor": {
+            "running": _trip_engine_task is not None and not _trip_engine_task.done(),
+            "interval_minutes": TRIP_ENGINE_INTERVAL_MINUTES,
+            "done": _trip_engine_task.done() if _trip_engine_task else None,
+        },
+        "stall_watchdog": {
+            "running": _stall_watchdog_task is not None and not _stall_watchdog_task.done(),
+            "interval_minutes": STALL_WATCHDOG_INTERVAL_MINUTES,
+            "done": _stall_watchdog_task.done() if _stall_watchdog_task else None,
+        },
+    }
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # TESTING / MANUAL TRIGGER
 # ═══════════════════════════════════════════════════════════════════════════

@@ -3241,6 +3241,17 @@ def health_system(request: Request, db: Session = Depends(get_db)):
     return result
 
 
+@router.get("/health/trip-engine")
+def health_trip_engine(request: Request, db: Session = Depends(get_db)):
+    """Return status of all trip engine background tasks."""
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=403, detail="Requires manager role")
+    
+    from app.services.trip_engine import get_engine_status
+    return get_engine_status()
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # SendGrid email statistics
 # ─────────────────────────────────────────────────────────────────────────────

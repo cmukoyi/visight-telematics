@@ -2218,6 +2218,19 @@
                             </div>
                         </div>
 
+                        <!-- Trip Engine Status -->
+                        <div class="card" style="margin-top:16px;padding:0">
+                            <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+                                <h3 style="font-size:15px;font-weight:600;margin:0">Trip Engine Background Tasks</h3>
+                                <span id="healthEngineError" style="display:none;color:var(--danger);font-size:13px"></span>
+                            </div>
+                            <div style="padding:16px">
+                                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px" id="healthEngineGrid">
+                                    <div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--gray)">Loading engine status…</div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- DB table counts -->
                         <div class="card" style="margin-top:16px">
                             <h3 style="font-size:15px;font-weight:600;margin:0 0 14px">Database Tables</h3>
@@ -5878,9 +5891,10 @@ dashboard.welcome,Bienvenue</pre>
         const btn = document.getElementById('healthRefreshBtn');
         if (btn) { btn.disabled = true; btn.textContent = '⏳ Loading…'; }
         try {
-            const [cRes, sRes] = await Promise.all([
+            const [cRes, sRes, eRes] = await Promise.all([
                 fetch(API_URL + '/api/admin/health/containers', { headers: { 'Authorization': 'Bearer ' + authToken } }),
                 fetch(API_URL + '/api/admin/health/system',     { headers: { 'Authorization': 'Bearer ' + authToken } }),
+                fetch(API_URL + '/api/admin/health/trip-engine', { headers: { 'Authorization': 'Bearer ' + authToken } }),
             ]);
             if (cRes.ok) {
                 const containers = await cRes.json();
@@ -5894,6 +5908,15 @@ dashboard.welcome,Bienvenue</pre>
             if (sRes.ok) {
                 const sys = await sRes.json();
                 renderSystem(sys);
+            }
+            if (eRes.ok) {
+                const engine = await eRes.json();
+                renderTripEngine(engine);
+                document.getElementById('healthEngineError').style.display = 'none';
+            } else {
+                const err = await eRes.json().catch(() => ({ detail: 'Unknown error' }));
+                document.getElementById('healthEngineError').textContent = err.detail || 'Failed to load engine status';
+                document.getElementById('healthEngineError').style.display = '';
             }
         } catch (e) {
             document.getElementById('healthContainerError').textContent = e.message;
@@ -5963,6 +5986,39 @@ dashboard.welcome,Bienvenue</pre>
                 ${upImage}
                 <div style="display:flex;gap:12px;flex-wrap:wrap">${statsCpu}${statsMem}</div>
                 <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">${actionBtns}</div>
+            </div>`;
+        }).join('');
+    }
+
+    function renderTripEngine(engine) {
+        const grid = document.getElementById('healthEngineGrid');
+        if (!grid) return;
+        
+        const tasks = [
+            { key: 'batch_sweep', icon: '📦', label: 'Batch Sweep' },
+            { key: 'selective_sweep', icon: '🎯', label: 'Selective Sweep' },
+            { key: 'journey_processor', icon: '🛣️', label: 'Journey Processor' },
+            { key: 'stall_watchdog', icon: '🔍', label: 'Stall Watchdog' },
+        ];
+        
+        grid.innerHTML = tasks.map(({ key, icon, label }) => {
+            const task = engine[key] || {};
+            const isRunning = task.running === true;
+            const statusColor = isRunning ? '#10b981' : '#ef4444';
+            const statusDot = `<span style="width:10px;height:10px;border-radius:50%;background:${statusColor};display:inline-block;flex-shrink:0"></span>`;
+            const statusLabel = isRunning ? 'Running' : 'Stopped';
+            const interval = task.interval_minutes ? `${task.interval_minutes} min` : '—';
+            
+            return `<div style="border:1px solid var(--border);border-radius:8px;padding:14px;background:var(--surface);display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    ${statusDot}
+                    <span style="font-size:20px">${icon}</span>
+                    <span style="font-weight:600;font-size:14px">${label}</span>
+                    <span style="font-size:12px;color:${statusColor}">${statusLabel}</span>
+                </div>
+                <div style="display:flex;gap:12px;flex-wrap:wrap">
+                    <span style="font-size:12px;color:var(--gray)">Interval: ${interval}</span>
+                </div>
             </div>`;
         }).join('');
     }
