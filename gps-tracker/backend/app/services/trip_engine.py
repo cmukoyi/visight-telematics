@@ -2578,12 +2578,15 @@ async def stall_watchdog_sweep(db: Session) -> Dict:
             # Re-enqueue for processing
             try:
                 await process_device_trips(db, device_state.device_imei)
+                db.commit()  # Commit after each successful device to isolate transactions
             except Exception as exc:
                 logger.error(
                     "❌ Watchdog: Failed to re-enqueue device %s: %s",
                     device_state.device_imei, exc, exc_info=True
                 )
                 db.rollback()
+                # Refresh the session to clear tainted state for next device
+                db.expire_all()
     
     if stats['devices_stalled'] > 0:
         logger.info(
