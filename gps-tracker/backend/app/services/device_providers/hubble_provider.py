@@ -72,9 +72,9 @@ class HubbleTagProvider(DeviceTagProvider):
         
         Minew tags encode sensor data in the BLE advertisement packet.
         Common format (varies by model):
-          Byte 0: Frame type (0x2F for temp/humidity)
+          Byte 0: Frame type (0x2F/0x30 for MTB02, 0x64 for E9)
           Byte 1: Temperature in °C (signed)
-          Byte 2: Humidity in % (0-100) or battery level
+          Byte 2: Humidity in % (0-100) or battery level (0-255 scale)
         
         Args:
             payload_b64: Base64-encoded payload from Hubble packet
@@ -108,8 +108,10 @@ class HubbleTagProvider(DeviceTagProvider):
             frame_type = payload_bytes[0]
             result["frame_type"] = frame_type
             
-            # Frame type 0x2F or 0x30: Temperature + Humidity/Battery
-            if frame_type in (0x2F, 0x30) and len(payload_bytes) >= 3:
+            # Frame type 0x2F, 0x30, or 0x64: Temperature + Battery/Humidity
+            # 0x2F/0x30: MTB02
+            # 0x64: E9
+            if frame_type in (0x2F, 0x30, 0x64) and len(payload_bytes) >= 3:
                 # Byte 1: Temperature in °C (signed int)
                 temp_raw = payload_bytes[1]
                 # Convert to signed (-128 to 127)
@@ -122,8 +124,8 @@ class HubbleTagProvider(DeviceTagProvider):
                     # If <= 100, likely humidity %
                     result["humidity"] = int(byte2)
                 else:
-                    # MTB02: Battery level on 0-255 scale, convert to %
-                    # 223/255 = 87%, 154/255 = 60%, etc.
+                    # MTB02/E9: Battery level on 0-255 scale, convert to %
+                    # 223/255 = 87%, 121/255 = 47%, etc.
                     battery_pct = int((byte2 / 255.0) * 100)
                     result["battery"] = battery_pct
             
