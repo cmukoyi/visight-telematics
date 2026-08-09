@@ -16,7 +16,7 @@ import base64
 from app.database import get_db
 from app.models import BLETag, User
 from app.services.geofence_service import GeofenceService
-from app.services.geocoding_service import GeocodingService
+from app.services.geocode_service import GeocodeService
 from app.services.device_providers.hubble_provider import HubbleTagProvider
 
 logger = logging.getLogger(__name__)
@@ -96,7 +96,7 @@ async def hubble_webhook(
         
         # Process each device's packets (use latest packet per device)
         updated_count = 0
-        geocoding_service = GeocodingService()
+        geocoding_service = GeocodeService()
         
         for device_id, device_packet_list in device_packets.items():
             # Get the most recent packet for this device
