@@ -230,6 +230,10 @@ app.include_router(auth_router)
 from app.routes_api_v2 import router as api_v2_router  # noqa: E402
 app.include_router(api_v2_router)
 
+# Webhooks (external service integrations - hidden from docs)
+from app.routes_webhooks import router as webhooks_router  # noqa: E402
+app.include_router(webhooks_router, include_in_schema=False)
+
 # ==============================================================================
 # INTERNAL APIS - Hidden from /docs (dashboard/admin use only)
 # ==============================================================================

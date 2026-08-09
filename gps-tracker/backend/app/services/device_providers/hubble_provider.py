@@ -108,10 +108,14 @@ class HubbleTagProvider(DeviceTagProvider):
             frame_type = payload_bytes[0]
             result["frame_type"] = frame_type
             
+            # Debug logging
+            logger.debug(f"decode_minew_payload: frame_type={frame_type}, hex=0x{frame_type:02x}, len={len(payload_bytes)}")
+            
             # Frame type 0x2F, 0x30, or 0x64: Temperature + Battery/Humidity
             # 0x2F/0x30: MTB02
             # 0x64: E9
             if frame_type in (0x2F, 0x30, 0x64) and len(payload_bytes) >= 3:
+                logger.debug(f"decode_minew_payload: matched frame type, decoding temp/battery")
                 # Byte 1: Temperature in °C (signed int)
                 temp_raw = payload_bytes[1]
                 # Convert to signed (-128 to 127)
