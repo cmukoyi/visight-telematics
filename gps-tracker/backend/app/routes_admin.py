@@ -4288,11 +4288,11 @@ class WebhookLogResponse(BaseModel):
 
 @router.get("/webhook-logs", response_model=List[WebhookLogResponse])
 async def get_webhook_logs(
+    request: Request,
     source: Optional[str] = Query(None, description="Filter by webhook source (e.g., 'hubble')"),
     hours: int = Query(24, description="Number of hours to look back"),
     limit: int = Query(100, description="Maximum number of logs to return"),
-    db: Session = Depends(get_db),
-    admin_user: AdminUser = Depends(check_role_permission("super_admin"))
+    db: Session = Depends(get_db)
 ):
     """
     Get webhook logs for debugging.
@@ -4300,6 +4300,14 @@ async def get_webhook_logs(
     Allows admins to see all webhook payloads received, which devices
     were included, and any errors that occurred.
     """
+    admin = get_admin_from_request(request, db)
+    
+    if not check_role_permission(admin.role, "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    
     cutoff_time = datetime.now() - timedelta(hours=hours)
     
     query = db.query(WebhookLog).filter(
@@ -4328,11 +4336,19 @@ async def get_webhook_logs(
 
 @router.get("/webhook-logs/{log_id}", response_model=WebhookLogResponse)
 async def get_webhook_log_detail(
+    request: Request,
     log_id: str,
-    db: Session = Depends(get_db),
-    admin_user: AdminUser = Depends(check_role_permission("super_admin"))
+    db: Session = Depends(get_db)
 ):
     """Get detailed payload for a specific webhook log"""
+    admin = get_admin_from_request(request, db)
+    
+    if not check_role_permission(admin.role, "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    
     log = db.query(WebhookLog).filter(WebhookLog.id == log_id).first()
     
     if not log:
