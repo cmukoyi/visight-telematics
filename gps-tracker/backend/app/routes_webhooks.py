@@ -14,10 +14,11 @@ import os
 import base64
 
 from app.database import get_db
-from app.models import BLETag, User
+from app.models import BLETag, User, DevicePosition, DeviceState
 from app.services.geofence_service import GeofenceService
 from app.services.geocode_service import GeocodeService
 from app.services.device_providers.hubble_provider import HubbleTagProvider
+from sqlalchemy.dialects.postgresql import insert
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
@@ -135,6 +136,54 @@ async def hubble_webhook(
                     tracker.last_seen = datetime.fromtimestamp(device_ts, tz=timezone.utc)
                 else:
                     tracker.last_seen = datetime.now(timezone.utc)
+                
+                # ═══════════════════════════════════════════════════════════════
+                # TRIP ENGINE INTEGRATION: Insert position into device_positions
+                # ═══════════════════════════════════════════════════════════════
+                # This enables Series 5 tags to use Advanced Trip Analysis (journeys/legs/stops)
+                # User enables via "Enable Advanced Trip Analysis" checkbox in tag edit dialog
+                
+                observed_at = datetime.fromtimestamp(device_ts, tz=timezone.utc) if device_ts else datetime.now(timezone.utc)
+                
+                # Insert position into device_positions table (trip engine reads from this)
+                position_data = {
+                    'device_imei': device_id,
+                    'lat': lat,
+                    'lng': lng,
+                    'observed_at': observed_at,  # When GPS fix occurred
+                    'received_at': datetime.now(timezone.utc),  # When webhook received it
+                    'direction': None,  # Hubble doesn't provide bearing
+                    'gps_speed': None,  # Hubble doesn't provide speed
+                    'satellite': None,  # Not in Hubble packet
+                    'source': 'webhook',  # Mark as webhook-sourced (vs 'batch' for TrackSolid)
+                }
+                
+                # Upsert with ON CONFLICT DO NOTHING (idempotent - handles webhook retries)
+                stmt = insert(DevicePosition).values(**position_data).on_conflict_do_nothing(
+                    index_elements=['device_imei', 'observed_at']
+                )
+                db.execute(stmt)
+                
+                # Ensure device_state row exists (for trip subscription toggle)
+                device_state = db.query(DeviceState).filter(
+                    DeviceState.device_imei == device_id
+                ).first()
+                
+                if not device_state:
+                    # Create device_state with trip_subscribed=False by default
+                    # User enables via UI: Assets → Edit Tag → "Enable Advanced Trip Analysis"
+                    device_state = DeviceState(
+                        device_imei=device_id,
+                        trip_subscribed=False,  # User must explicitly enable
+                        last_batch_ts=datetime.now(timezone.utc)
+                    )
+                    db.add(device_state)
+                    logger.debug(f"📊 Created device_state for {device_id[:8]} (trip_subscribed=False)")
+                else:
+                    # Update last_batch_ts timestamp
+                    device_state.last_batch_ts = datetime.now(timezone.utc)
+                
+                # ═══════════════════════════════════════════════════════════════
                 
                 # Decode sensor data from payload
                 payload_b64 = device_info.get("payload")
