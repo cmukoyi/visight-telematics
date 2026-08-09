@@ -104,6 +104,8 @@ async def hubble_webhook(
             # Packets are ordered by timestamp, so take the last one
             latest_packet = device_packet_list[-1]
             
+            logger.info(f"🔍 Processing webhook packet for device_id: {device_id}")
+            
             # Find the BLE tag in our database
             tracker = db.query(BLETag).filter(
                 BLETag.imei == device_id,
@@ -111,7 +113,7 @@ async def hubble_webhook(
             ).first()
             
             if not tracker:
-                logger.debug(f"⏭️  Device {device_id[:8]}... not found in database, skipping")
+                logger.warning(f"⚠️  Device {device_id} not found in database (queried imei='{device_id}', tag_type='hubble')")
                 continue
             
             try:
