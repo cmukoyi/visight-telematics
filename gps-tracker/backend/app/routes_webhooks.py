@@ -106,7 +106,7 @@ async def hubble_webhook(
             # Find the BLE tag in our database
             tracker = db.query(BLETag).filter(
                 BLETag.imei == device_id,
-                BLETag.tag_type == "series_5_hubble"
+                BLETag.tag_type == "hubble"
             ).first()
             
             if not tracker:
