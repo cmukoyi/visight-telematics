@@ -1156,3 +1156,21 @@ class TripConfig(Base):
     # Metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class WebhookLog(Base):
+    """Log all incoming webhook requests for debugging and audit"""
+    __tablename__ = "webhook_logs"
+    
+    id = get_uuid_column()
+    source = Column(String(50), nullable=False, index=True)  # 'hubble', 'tracksolid', etc.
+    received_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    payload = Column(JSON, nullable=False)  # Full webhook payload
+    packet_count = Column(Integer, nullable=False, default=0)  # Number of packets in batch
+    device_ids = Column(JSON, nullable=True)  # List of device IDs in this webhook
+    status_code = Column(Integer, nullable=False, default=200)  # Response status
+    error_message = Column(Text, nullable=True)  # Error details if any
+    
+    __table_args__ = (
+        Index('idx_webhook_logs_source_received', 'source', 'received_at'),
+    )

@@ -977,6 +977,12 @@
                         </button>
                     </li>
                     <li class="sidebar-item">
+                        <button class="sidebar-link" onclick="switchTab('webhook-logs')">
+                            <span>📨</span>
+                            <span>Webhook Logs</span>
+                        </button>
+                    </li>
+                    <li class="sidebar-item">
                         <button class="sidebar-link" onclick="switchTab('jobs')">
                             <span>⚙️</span>
                             <span>Background Jobs</span>
@@ -3018,6 +3024,71 @@
                     </div>
                     <!-- END DEVICE MANAGEMENT TAB -->
 
+                    <!-- WEBHOOK LOGS TAB -->
+                    <div id="webhook-logs" class="tab-content">
+                        <div class="page-header">
+                            <h2 class="page-title">📨 Webhook Logs</h2>
+                            <p class="page-subtitle">Debug webhook deliveries (see which devices were included)</p>
+                            <button class="btn btn-secondary" onclick="loadWebhookLogs()">↻ Refresh</button>
+                        </div>
+
+                        <!-- Filters -->
+                        <div class="card">
+                            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+                                <label class="form-label" style="margin:0">Source:</label>
+                                <select id="webhookSourceFilter" class="form-input" style="width:auto" onchange="loadWebhookLogs()">
+                                    <option value="">All Sources</option>
+                                    <option value="hubble" selected>Hubble</option>
+                                    <option value="tracksolid">TrackSolid</option>
+                                </select>
+                                <label class="form-label" style="margin:0 0 0 12px">Time Range:</label>
+                                <select id="webhookHoursFilter" class="form-input" style="width:auto" onchange="loadWebhookLogs()">
+                                    <option value="1">Last 1 hour</option>
+                                    <option value="6" selected>Last 6 hours</option>
+                                    <option value="24">Last 24 hours</option>
+                                    <option value="72">Last 3 days</option>
+                                    <option value="168">Last 7 days</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Webhooks List -->
+                        <div class="card">
+                            <div id="webhookAlert" class="alert" style="display:none"><span id="webhookAlertText"></span></div>
+                            <div class="table-wrapper">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Received At</th>
+                                            <th>Source</th>
+                                            <th>Packets</th>
+                                            <th>Device IDs</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="webhookLogsTableBody">
+                                        <tr><td colspan="6" style="text-align:center;color:var(--gray);padding:2rem">Click ↻ Refresh to load webhook logs</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Webhook Details Modal -->
+                        <div id="webhookDetailsModal" class="modal">
+                            <div class="modal-content" style="max-width:900px">
+                                <div class="modal-header">
+                                    <h3 class="modal-title">Webhook Payload</h3>
+                                    <button class="modal-close" onclick="closeModal('webhookDetailsModal')">×</button>
+                                </div>
+                                <div id="webhookDetailsContent" style="max-height:70vh;overflow-y:auto">
+                                    <p style="text-align:center;color:var(--gray);padding:2rem">Loading...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END WEBHOOK LOGS TAB -->
+
                     <!-- JOBS TAB -->
                     <div id="jobs" class="tab-content">
                         <div class="page-header">
@@ -3445,6 +3516,7 @@ dashboard.welcome,Bienvenue</pre>
                 'translations': 'Translation Manager',
                 'languages': 'Language Manager',
                 'device-management': 'Device Management',
+                'webhook-logs': 'Webhook Logs',
                 'jobs': 'Background Jobs'
             };
             document.getElementById('pageTitle').textContent = titles[tabName];
@@ -3469,6 +3541,7 @@ dashboard.welcome,Bienvenue</pre>
             if (tabName === 'translations') { loadTranslations(); }
             if (tabName === 'languages') { loadLanguages(); }
             if (tabName === 'device-management') { loadTenantOptions(); }
+            if (tabName === 'webhook-logs') { loadWebhookLogs(); }
             if (tabName === 'jobs') { loadJobs(); }
         }
 
@@ -5871,6 +5944,89 @@ dashboard.welcome,Bienvenue</pre>
             // Auto-hide success messages
             if (type === 'success') {
                 setTimeout(() => { alert.style.display = 'none'; }, 5000);
+            }
+        }
+
+        // WEBHOOK LOGS
+        async function loadWebhookLogs() {
+            const source = document.getElementById('webhookSourceFilter').value;
+            const hours = document.getElementById('webhookHoursFilter').value;
+            const url = `${API_URL}/api/admin/webhook-logs?${source ? 'source=' + source + '&' : ''}hours=${hours}&limit=100`;
+
+            try {
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const logs = await response.json();
+
+                const tbody = document.getElementById('webhookLogsTableBody');
+                if (logs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:2rem">No webhook logs found in this time range</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = logs.map(log => {
+                    const timestamp = new Date(log.received_at).toLocaleString();
+                    const statusColor = log.status_code === 200 ? '#48bb78' : '#f44336';
+                    const deviceList = (log.device_ids || []).join(', ');
+                    const devicePreview = deviceList.length > 50 ? deviceList.substring(0, 50) + '...' : deviceList;
+                    
+                    return `
+                        <tr>
+                            <td>${timestamp}</td>
+                            <td style="font-weight:600">${log.source}</td>
+                            <td style="text-align:center">${log.packet_count}</td>
+                            <td style="font-size:11px;max-width:300px;overflow:hidden;text-overflow:ellipsis" title="${deviceList}">${devicePreview || '—'}</td>
+                            <td><span style="display:inline-block;padding:4px 8px;border-radius:4px;background:${statusColor};color:white;font-size:12px;font-weight:600">${log.status_code}</span></td>
+                            <td><button class="btn btn-secondary btn-small" onclick="viewWebhookDetails('${log.id}')">View Payload</button></td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Failed to load webhook logs:', error);
+                showAlert('webhookAlert', 'error', 'Failed to load webhook logs: ' + error.message);
+            }
+        }
+
+        async function viewWebhookDetails(logId) {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/webhook-logs/${logId}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const log = await response.json();
+
+                const html = `
+                    <div style="padding:1rem">
+                        <h4 style="margin:0 0 16px">Webhook Received: ${new Date(log.received_at).toLocaleString()}</h4>
+                        
+                        <div style="display:grid;grid-template-columns:150px 1fr;gap:12px;font-size:14px;margin-bottom:16px">
+                            <strong>Source:</strong><span>${log.source}</span>
+                            <strong>Packet Count:</strong><span>${log.packet_count}</span>
+                            <strong>Status Code:</strong><span style="color:${log.status_code === 200 ? '#48bb78' : '#f44336'};font-weight:600">${log.status_code}</span>
+                            ${log.error_message ? `<strong>Error:</strong><span style="color:#f44336">${log.error_message}</span>` : ''}
+                        </div>
+
+                        ${log.device_ids && log.device_ids.length > 0 ? `
+                            <div style="margin-bottom:16px">
+                                <h5 style="margin:0 0 8px">Device IDs in this webhook:</h5>
+                                <div style="background:#f7fafc;padding:12px;border-radius:4px">
+                                    ${log.device_ids.map(id => `<div style="font-family:monospace;font-size:12px;padding:4px 0">${id}</div>`).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        <div>
+                            <h5 style="margin:0 0 8px">Full Payload:</h5>
+                            <pre style="background:#f7fafc;padding:12px;border-radius:4px;font-size:11px;overflow-x:auto;max-height:400px;overflow-y:auto">${JSON.stringify(log.payload, null, 2)}</pre>
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('webhookDetailsContent').innerHTML = html;
+                openModal('webhookDetailsModal');
+            } catch (error) {
+                console.error('Failed to load webhook details:', error);
+                alert('Failed to load webhook details: ' + error.message);
             }
         }
 

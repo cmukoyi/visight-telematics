@@ -14,7 +14,7 @@ import os
 import base64
 
 from app.database import get_db
-from app.models import BLETag, User, DevicePosition, DeviceState
+from app.models import BLETag, User, DevicePosition, DeviceState, WebhookLog
 from app.services.geofence_service import GeofenceService
 from app.services.geocode_service import GeocodeService
 from app.services.device_providers.hubble_provider import HubbleTagProvider
@@ -76,11 +76,30 @@ async def hubble_webhook(
         payload = await request.json()
         packets = payload.get("packets", [])
         
+        # Extract device IDs for logging
+        device_ids_in_webhook = []
+        for packet in packets:
+            device_info = packet.get("device", {})
+            device_id = device_info.get("id")
+            if device_id:
+                device_ids_in_webhook.append(device_id)
+        
+        # Log webhook to database for debugging
+        webhook_log = WebhookLog(
+            source="hubble",
+            payload=payload,
+            packet_count=len(packets),
+            device_ids=device_ids_in_webhook,
+            status_code=200
+        )
+        db.add(webhook_log)
+        db.commit()
+        
         if not packets:
             logger.warning("⚠️  Hubble webhook received with no packets")
             return {"status": "ok", "processed": 0}
         
-        logger.info(f"📨 Hubble webhook: processing {len(packets)} packet(s)")
+        logger.info(f"📨 Hubble webhook: processing {len(packets)} packet(s) from devices: {device_ids_in_webhook}")
         
         # Group packets by device for efficient processing
         device_packets = {}
@@ -282,5 +301,20 @@ async def hubble_webhook(
         
     except Exception as exc:
         logger.error(f"❌ Hubble webhook error: {exc}", exc_info=True)
+        
+        # Log error to webhook_logs table
+        try:
+            error_log = WebhookLog(
+                source="hubble",
+                payload={},
+                packet_count=0,
+                status_code=500,
+                error_message=str(exc)
+            )
+            db.add(error_log)
+            db.commit()
+        except:
+            pass  # Don't fail on logging failure
+        
         db.rollback()
         raise HTTPException(status_code=500, detail="Webhook processing failed")

@@ -35,6 +35,7 @@ from app.models import (
     TagIndoorPosition,
     DeviceState,
     TenantFeature,
+    WebhookLog,
 )
 from app.models_i18n import Language
 from app.admin_auth import (
@@ -4267,3 +4268,83 @@ async def delete_hubble_device(
             status_code=500,
             detail=f"Failed to delete Hubble device: {str(e)}"
         )
+
+
+# ===== WEBHOOK LOGS =====
+
+class WebhookLogResponse(BaseModel):
+    id: str
+    source: str
+    received_at: datetime
+    packet_count: int
+    device_ids: Optional[List[str]]
+    status_code: int
+    error_message: Optional[str]
+    payload: Dict[str, Any]
+    
+    class Config:
+        from_attributes = True
+
+
+@router.get("/webhook-logs", response_model=List[WebhookLogResponse])
+async def get_webhook_logs(
+    source: Optional[str] = Query(None, description="Filter by webhook source (e.g., 'hubble')"),
+    hours: int = Query(24, description="Number of hours to look back"),
+    limit: int = Query(100, description="Maximum number of logs to return"),
+    db: Session = Depends(get_db),
+    admin_user: AdminUser = Depends(check_role_permission("super_admin"))
+):
+    """
+    Get webhook logs for debugging.
+    
+    Allows admins to see all webhook payloads received, which devices
+    were included, and any errors that occurred.
+    """
+    cutoff_time = datetime.now() - timedelta(hours=hours)
+    
+    query = db.query(WebhookLog).filter(
+        WebhookLog.received_at >= cutoff_time
+    )
+    
+    if source:
+        query = query.filter(WebhookLog.source == source)
+    
+    logs = query.order_by(WebhookLog.received_at.desc()).limit(limit).all()
+    
+    return [
+        WebhookLogResponse(
+            id=str(log.id),
+            source=log.source,
+            received_at=log.received_at,
+            packet_count=log.packet_count,
+            device_ids=log.device_ids,
+            status_code=log.status_code,
+            error_message=log.error_message,
+            payload=log.payload
+        )
+        for log in logs
+    ]
+
+
+@router.get("/webhook-logs/{log_id}", response_model=WebhookLogResponse)
+async def get_webhook_log_detail(
+    log_id: str,
+    db: Session = Depends(get_db),
+    admin_user: AdminUser = Depends(check_role_permission("super_admin"))
+):
+    """Get detailed payload for a specific webhook log"""
+    log = db.query(WebhookLog).filter(WebhookLog.id == log_id).first()
+    
+    if not log:
+        raise HTTPException(status_code=404, detail="Webhook log not found")
+    
+    return WebhookLogResponse(
+        id=str(log.id),
+        source=log.source,
+        received_at=log.received_at,
+        packet_count=log.packet_count,
+        device_ids=log.device_ids,
+        status_code=log.status_code,
+        error_message=log.error_message,
+        payload=log.payload
+    )
