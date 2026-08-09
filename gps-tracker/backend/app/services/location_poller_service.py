@@ -255,158 +255,14 @@ class LocationPollerService:
 
                     updated_count += 1
 
-            # ── Poll Series 5 / Hubble Platform tags ──────────────────────
+            # ── Series 5 / Hubble Platform tags ────────────────────────────
+            # NOTE: Series 5 tags are updated via webhook (real-time push from Hubble)
+            # API polling disabled to avoid overwriting fresh webhook data with stale page 1 results
+            # See routes_webhooks.py for webhook implementation
             if series5_trackers:
-                from app.services.device_providers.hubble_provider import HubbleTagProvider
-                hubble_provider = HubbleTagProvider()
-                
-                logger.info(f"📡 Polling {len(series5_trackers)} Series 5 / Hubble Platform tags")
-                
-                for tracker in series5_trackers:
-                    # Series 5 uses device_id stored in imei field (Hubble UUIDs)
-                    device_id = tracker.imei
-                    
-                    try:
-                        # Fetch device model from Hubble if not set (for sensor decoding)
-                        if not tracker.device_model:
-                            try:
-                                device_info = await hubble_provider.get_device(device_id)
-                                if device_info.get("success") and device_info.get("device"):
-                                    hubble_name = device_info["device"].get("name", "").strip()
-                                    if hubble_name:
-                                        tracker.device_model = hubble_name
-                                        logger.info(f"📝 Series 5 device {device_id[:8]}: synced model name '{hubble_name}'")
-                            except Exception as exc:
-                                logger.warning(f"⚠️  Series 5 device {device_id[:8]}: failed to fetch device model: {exc}")
-                        
-                        loc_result = await hubble_provider.get_location(device_id)
-                        
-                        if not loc_result.get("success"):
-                            logger.warning(f"⚠️  Series 5 device {device_id}: {loc_result.get('error')}")
-                            continue
-                        
-                        # Update tracker position
-                        tracker.latitude = str(loc_result["latitude"])
-                        tracker.longitude = str(loc_result["longitude"])
-                        tracker.last_seen = loc_result["timestamp"]
-                        
-                        # Set activation_date on first GPS fix and calculate expiry
-                        if tracker.activation_date is None:
-                            tracker.activation_date = datetime.utcnow()
-                            if tracker.package_id:
-                                pkg = db.query(TagPackage).filter(TagPackage.id == str(tracker.package_id)).first()
-                                if pkg:
-                                    tracker.expiry_date = tracker.activation_date + timedelta(days=pkg.validity_days)
-                                    logger.info("📅 Tag %s activated — expiry set to %s", tracker.imei, tracker.expiry_date)
-                        
-                        # Store sensor data and packet metadata as attributes
-                        attrs = tracker.attributes or {}
-                        
-                        # RSSI (signal strength)
-                        rssi = loc_result.get("rssi")
-                        if rssi is not None:
-                            attrs["RSSI"] = {
-                                "value": f"{rssi} dBm",
-                                "show_on_map": True,
-                            }
-                        
-                        # Temperature
-                        temperature = loc_result.get("temperature")
-                        if temperature is not None:
-                            attrs["Temperature"] = {
-                                "value": f"{temperature}°C",
-                                "show_on_map": True,
-                            }
-                        
-                        # Humidity
-                        humidity = loc_result.get("humidity")
-                        if humidity is not None:
-                            attrs["Humidity"] = {
-                                "value": f"{humidity}%",
-                                "show_on_map": True,
-                            }
-                        
-                        # Battery (if available from payload)
-                        battery = loc_result.get("battery")
-                        if battery is not None:
-                            tracker.battery_level = battery
-                            attrs["Battery"] = {
-                                "value": f"{battery}%",
-                                "show_on_map": True,
-                            }
-                        
-                        # Altitude (from gateway)
-                        altitude = loc_result.get("altitude")
-                        if altitude is not None:
-                            attrs["Altitude"] = {
-                                "value": f"{altitude:.1f}m",
-                                "show_on_map": False,
-                            }
-                        
-                        # GPS Accuracy
-                        h_accuracy = loc_result.get("horizontal_accuracy")
-                        if h_accuracy is not None:
-                            attrs["GPS_Accuracy"] = {
-                                "value": f"{h_accuracy:.1f}m",
-                                "show_on_map": False,
-                            }
-                        
-                        # Raw packet data (for debugging)
-                        payload_hex = loc_result.get("payload_hex")
-                        if payload_hex:
-                            attrs["Payload"] = {
-                                "value": payload_hex,
-                                "show_on_map": False,
-                            }
-                        
-                        frame_type = loc_result.get("frame_type")
-                        if frame_type is not None:
-                            attrs["Frame_Type"] = {
-                                "value": f"0x{frame_type:02X}",
-                                "show_on_map": False,
-                            }
-                        
-                        tracker.attributes = attrs
-                        
-                        # Force SQLAlchemy to detect JSON column change
-                        from sqlalchemy.orm.attributes import flag_modified
-                        flag_modified(tracker, "attributes")
-                        
-                        logger.info(f"✅ Series 5 device {device_id[:8]}: updated with temp={temperature}°C, rssi={rssi}dBm")
-                        
-                        # Reverse geocode for address
-                        try:
-                            geo_result = self.geocode_service.reverse_geocode(
-                                device_imei=device_id,
-                                lat=loc_result["latitude"],
-                                lng=loc_result["longitude"]
-                            )
-                            tracker.location_description = geo_result["address"]
-                            if not geo_result.get("cached"):
-                                logger.info("📍 Series 5 device %s: reverse geocoded to '%s'", 
-                                          device_id[:8], geo_result["address"])
-                        except Exception as exc:
-                            logger.warning("⚠️  Series 5 device %s geocode failed: %s", device_id[:8], exc)
-                        
-                        # Check geofences
-                        user = db.query(User).filter(User.id == tracker.user_id).first()
-                        if user:
-                            try:
-                                GeofenceService.check_geofences_for_tracker(
-                                    db,
-                                    str(tracker.id),
-                                    loc_result["latitude"],
-                                    loc_result["longitude"],
-                                    str(user.id),
-                                )
-                            except Exception as exc:
-                                logger.error("❌ Geofence check error for tracker %s: %s", tracker.id, exc)
-                        
-                        updated_count += 1
-                        logger.debug("✅ Series 5 device %s location updated", device_id[:8])
-                        
-                    except Exception as exc:
-                        logger.error("❌ Series 5 device %s location fetch failed: %s", device_id[:8], exc)
+                logger.info(f"📡 Skipping {len(series5_trackers)} Series 5 / Hubble tags (webhook-only mode)")
+                # Webhook handles: position, last_seen, sensor data, geofences, geocoding
+                # No API polling needed - webhooks provide real-time updates
 
             # ── Poll Series 1 / MZone tags ────────────────────────────────────
             if series1_trackers:
@@ -539,7 +395,7 @@ class LocationPollerService:
             logger.info(f"✅ Updated {updated_count} tracker positions and checked geofences "
                         f"({len(series2_trackers)} Series 2 / TrackSolid, {len(series1_trackers)} Series 1 / MZone, "
                         f"{len(series3_trackers)} Series 3 / QR-NFC, {len(series4_trackers)} Series 4 / BLE Indoor, "
-                        f"{len(series5_trackers)} Series 5 / Hubble processed)")
+                        f"{len(series5_trackers)} Series 5 / Hubble webhook-only)")
 
             # ── Generate battery-low and offline portal alerts ─────────────
             alert_count = 0
