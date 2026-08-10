@@ -377,6 +377,7 @@ class EngineContext:
     
     # Current journey context
     current_journey_id: Optional[str] = None
+    current_leg: Optional[str] = None  # Track open leg ID (UUID string)
     last_stationary_ended_at: Optional[datetime] = None
     last_stationary_flush: Optional[datetime] = None  # v2.2 R4c: Track last flush time
     journey_just_created: bool = False  # Flag for tracking new journey creation
@@ -1611,14 +1612,11 @@ class TripEngine:
         self.context = self._load_state()
         
         # FIX 2a: Invalid-state self-correct (recovers already-wedged devices)
-        # A device in MOVE with no leg, or with a current_journey that's ended, is invalid
+        # Check if current_journey is ended (invalid state)
         invalid_state = False
         invalid_reason = None
         
-        if self.context.current_state == "MOVE" and not self.context.current_leg:
-            invalid_state = True
-            invalid_reason = "MOVE with no current_leg"
-        elif self.context.current_journey_id:
+        if self.context.current_journey_id:
             # Check if current journey is ended in the database
             journey = self.db.execute(
                 select(Journey).where(Journey.id == self.context.current_journey_id)
@@ -2372,8 +2370,10 @@ async def process_all_subscribed_devices(db: Session) -> Dict:
     }
     
     for device_state in subscribed:
+        # Capture device_imei before processing so it's available in exception handler
+        device_imei = device_state.device_imei
         try:
-            stats = await process_device_trips(db, device_state.device_imei)
+            stats = await process_device_trips(db, device_imei)
             total_stats['devices_processed'] += 1
             total_stats['total_positions'] += stats['positions_processed']
             total_stats['total_stationaries'] += stats['stationaries_created']
@@ -2381,7 +2381,7 @@ async def process_all_subscribed_devices(db: Session) -> Dict:
             total_stats['total_journeys'] += stats['journeys_created']
             total_stats['device_results'].append(stats)
         except Exception as exc:
-            logger.error("❌ IMEI %s: Processing failed: %s", device_state.device_imei, exc, exc_info=True)
+            logger.error("❌ IMEI %s: Processing failed: %s", device_imei, exc, exc_info=True)
             # Roll back the poisoned transaction so remaining devices can process
             db.rollback()
             logger.info("🔄 Session rolled back, continuing with next device...")
