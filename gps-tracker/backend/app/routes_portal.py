@@ -1836,7 +1836,7 @@ class PortalTagOut(BaseModel):
     #   idle    : reported within last 7 days but not within 24 h
     #   offline : older than 7 days, or never reported
     activity_status: Optional[str] = None
-    # Sensor data and metadata (Series 5: Temperature, Humidity, RSSI, etc.)
+    # Sensor data and metadata (Series 5: Temperature, Battery, RSSI, etc.)
     attributes: Optional[dict] = None
 
     class Config:

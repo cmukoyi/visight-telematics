@@ -68,33 +68,36 @@ class HubbleTagProvider(DeviceTagProvider):
     @staticmethod
     def decode_minew_payload(payload_b64: str) -> Dict[str, Any]:
         """
-        Decode Minew beacon BLE advertising payload.
+        Decode Hubble Minew beacon payload per official Hubble documentation.
         
-        Minew tags encode sensor data in the BLE advertisement packet.
-        Common format (varies by model):
-          Byte 0: Frame type (0x2F/0x30 for MTB02, 0x64 for E9)
-          Byte 1: Temperature in °C (signed)
-          Byte 2: Humidity in % (0-100) or battery level (0-255 scale)
+        Official Hubble Payload Format (Custom Payload / Hubble Frame):
+          Byte 0:    Battery Level (0-100%)
+          Bytes 1-2: Temperature (big-endian uint16, divide by 100 for °C)
+        
+        Example:
+          Base64: "ZApd"
+          Decoded HEX: 64 0A 5D
+          Battery: 0x64 = 100 decimal = 100%
+          Temperature: 0x0A5D = 2653 decimal = 2653/100 = 26.53°C
+        
+        Reference: Hubble Platform API Documentation
+        Supported devices: E9, MST03, MTB02
         
         Args:
-            payload_b64: Base64-encoded payload from Hubble packet
+            payload_b64: Base64-encoded payload from Hubble webhook packet
         
         Returns:
             {
-                "temperature": float or None,  # °C
-                "humidity": int or None,       # %
-                "battery": int or None,        # %
-                "frame_type": int,             # Frame type byte
-                "raw_hex": str,                # Raw hex string
+                "temperature": float or None,  # °C (divide by 100)
+                "battery": int or None,        # % (0-100)
+                "raw_hex": str,                # Raw hex string for debugging
             }
         """
         import base64
         
         result = {
             "temperature": None,
-            "humidity": None,
             "battery": None,
-            "frame_type": None,
             "raw_hex": None,
         }
         
@@ -102,48 +105,25 @@ class HubbleTagProvider(DeviceTagProvider):
             payload_bytes = base64.b64decode(payload_b64)
             result["raw_hex"] = payload_bytes.hex()
             
-            if len(payload_bytes) < 1:
+            # Minimum 3 bytes required: 1 byte battery + 2 bytes temperature
+            if len(payload_bytes) < 3:
+                logger.debug(f"decode_minew_payload: payload too short ({len(payload_bytes)} bytes), expected >= 3")
                 return result
             
-            frame_type = payload_bytes[0]
-            result["frame_type"] = frame_type
+            # Byte 0: Battery Level (0-100%)
+            battery = payload_bytes[0]
+            if 0 <= battery <= 100:
+                result["battery"] = int(battery)
+                logger.debug(f"decode_minew_payload: battery={battery}%")
+            else:
+                logger.warning(f"decode_minew_payload: battery value out of range: {battery}")
             
-            # Debug logging
-            logger.debug(f"decode_minew_payload: frame_type={frame_type}, hex=0x{frame_type:02x}, len={len(payload_bytes)}")
-            
-            # Frame type 0x2F, 0x30, or 0x64: Temperature + Battery/Humidity
-            # 0x2F/0x30: MTB02
-            # 0x64: E9
-            if frame_type in (0x2F, 0x30, 0x64) and len(payload_bytes) >= 3:
-                logger.debug(f"decode_minew_payload: matched frame type, decoding temp/battery")
-                # Byte 1: Temperature in °C (signed int)
-                temp_raw = payload_bytes[1]
-                # Convert to signed (-128 to 127)
-                temperature = temp_raw if temp_raw < 128 else temp_raw - 256
-                result["temperature"] = float(temperature)
-                
-                # Byte 2: Could be humidity (%) or battery (0-255 scale)
-                byte2 = payload_bytes[2]
-                if byte2 <= 100:
-                    # If <= 100, likely humidity %
-                    result["humidity"] = int(byte2)
-                else:
-                    # MTB02/E9: Battery level on 0-255 scale, convert to %
-                    # 223/255 = 87%, 121/255 = 47%, etc.
-                    battery_pct = int((byte2 / 255.0) * 100)
-                    result["battery"] = battery_pct
-            
-            # Frame type 0x01: iBeacon format (may have battery)
-            elif frame_type == 0x01 and len(payload_bytes) >= 3:
-                # Byte 2 might be battery level
-                if payload_bytes[2] <= 100:
-                    result["battery"] = int(payload_bytes[2])
-            
-            # Frame type 0xA1: Acceleration + Temperature
-            elif frame_type == 0xA1 and len(payload_bytes) >= 2:
-                temp_raw = payload_bytes[1]
-                temperature = temp_raw if temp_raw < 128 else temp_raw - 256
-                result["temperature"] = float(temperature)
+            # Bytes 1-2: Temperature (big-endian uint16, divide by 100)
+            # Example: 0x0A 0x5D = (10 << 8) | 93 = 2653 → 26.53°C
+            temp_raw = (payload_bytes[1] << 8) | payload_bytes[2]
+            temp_celsius = temp_raw / 100.0
+            result["temperature"] = temp_celsius
+            logger.debug(f"decode_minew_payload: temp_raw={temp_raw} (0x{temp_raw:04x}), celsius={temp_celsius}°C")
             
         except Exception as e:
             logger.warning(f"Payload decode error: {e}")
@@ -944,10 +924,8 @@ class HubbleTagProvider(DeviceTagProvider):
                         "horizontal_accuracy": location.get("horizontal_accuracy"),
                         "vertical_accuracy": location.get("vertical_accuracy"),
                         "temperature": sensor_data.get("temperature"),  # °C
-                        "humidity": sensor_data.get("humidity"),  # %
                         "battery": sensor_data.get("battery"),  # %
                         "payload_hex": sensor_data.get("raw_hex"),  # Raw hex
-                        "frame_type": sensor_data.get("frame_type"),  # Frame type
                     }
                 
                 elif response.status_code == 404:

@@ -225,11 +225,6 @@ async def hubble_webhook(
                 if temperature is not None:
                     attrs["Temperature"] = {"value": f"{temperature}°C", "show_on_map": True}
                 
-                # Humidity
-                humidity = sensor_data.get("humidity")
-                if humidity is not None:
-                    attrs["Humidity"] = {"value": f"{humidity}%", "show_on_map": True}
-                
                 # Battery
                 battery = sensor_data.get("battery")
                 if battery is not None:
@@ -250,10 +245,6 @@ async def hubble_webhook(
                 payload_hex = sensor_data.get("raw_hex")
                 if payload_hex:
                     attrs["Payload"] = {"value": payload_hex, "show_on_map": False}
-                
-                frame_type = sensor_data.get("frame_type")
-                if frame_type is not None:
-                    attrs["Frame_Type"] = {"value": f"0x{frame_type:02X}", "show_on_map": False}
                 
                 tracker.attributes = attrs
                 flag_modified(tracker, "attributes")
