@@ -392,6 +392,39 @@
             display: block;
         }
 
+        /* SUBTABS (for webhook logs) */
+        .subtab-btn {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            color: var(--gray);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+        }
+
+        .subtab-btn:hover {
+            color: var(--dark);
+            background: rgba(0, 0, 0, 0.02);
+        }
+
+        .subtab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            font-weight: 600;
+        }
+
+        .subtab-content {
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
         /* FEATURE TOGGLE ROWS */
         .feature-toggle-row {
             display: flex;
@@ -3027,50 +3060,109 @@
                     <!-- WEBHOOK LOGS TAB -->
                     <div id="webhook-logs" class="tab-content">
                         <div class="page-header">
-                            <h2 class="page-title">📨 Webhook Logs</h2>
-                            <p class="page-subtitle">Debug webhook deliveries (see which devices were included)</p>
-                            <button class="btn btn-secondary" onclick="loadWebhookLogs()">↻ Refresh</button>
+                            <h2 class="page-title">📨 Webhook Logs & Device Locations</h2>
+                            <p class="page-subtitle">Debug webhook deliveries and track Series 5 device positions</p>
                         </div>
 
-                        <!-- Filters -->
-                        <div class="card">
-                            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-                                <label class="form-label" style="margin:0">Source:</label>
-                                <select id="webhookSourceFilter" class="form-input" style="width:auto" onchange="loadWebhookLogs()">
-                                    <option value="">All Sources</option>
-                                    <option value="hubble" selected>Hubble</option>
-                                    <option value="tracksolid">TrackSolid</option>
-                                </select>
-                                <label class="form-label" style="margin:0 0 0 12px">Time Range:</label>
-                                <select id="webhookHoursFilter" class="form-input" style="width:auto" onchange="loadWebhookLogs()">
-                                    <option value="1">Last 1 hour</option>
-                                    <option value="6" selected>Last 6 hours</option>
-                                    <option value="24">Last 24 hours</option>
-                                    <option value="72">Last 3 days</option>
-                                    <option value="168">Last 7 days</option>
-                                </select>
+                        <!-- Sub-tabs -->
+                        <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid var(--border-color)">
+                            <button id="webhookSubtab1" class="subtab-btn active" onclick="switchWebhookSubtab('logs')">Webhook Logs</button>
+                            <button id="webhookSubtab2" class="subtab-btn" onclick="switchWebhookSubtab('locations')">Device Locations</button>
+                        </div>
+
+                        <!-- Webhook Logs Subtab -->
+                        <div id="webhookLogsSubtab" class="subtab-content">
+                            <button class="btn btn-secondary" onclick="loadWebhookLogs()" style="margin-bottom:12px">↻ Refresh</button>
+
+                            <!-- Filters -->
+                            <div class="card">
+                                <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+                                    <label class="form-label" style="margin:0">Source:</label>
+                                    <select id="webhookSourceFilter" class="form-input" style="width:auto" onchange="loadWebhookLogs()">
+                                        <option value="">All Sources</option>
+                                        <option value="hubble" selected>Hubble</option>
+                                        <option value="tracksolid">TrackSolid</option>
+                                    </select>
+                                    <label class="form-label" style="margin:0 0 0 12px">Time Range:</label>
+                                    <select id="webhookHoursFilter" class="form-input" style="width:auto" onchange="loadWebhookLogs()">
+                                        <option value="1">Last 1 hour</option>
+                                        <option value="6" selected>Last 6 hours</option>
+                                        <option value="24">Last 24 hours</option>
+                                        <option value="72">Last 3 days</option>
+                                        <option value="168">Last 7 days</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Webhooks List -->
+                            <div class="card">
+                                <div id="webhookAlert" class="alert" style="display:none"><span id="webhookAlertText"></span></div>
+                                <div class="table-wrapper">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Received At</th>
+                                                <th>Source</th>
+                                                <th>Packets</th>
+                                                <th>Device IDs</th>
+                                                <th>Status</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="webhookLogsTableBody">
+                                            <tr><td colspan="6" style="text-align:center;color:var(--gray);padding:2rem">Click ↻ Refresh to load webhook logs</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Webhooks List -->
-                        <div class="card">
-                            <div id="webhookAlert" class="alert" style="display:none"><span id="webhookAlertText"></span></div>
-                            <div class="table-wrapper">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Received At</th>
-                                            <th>Source</th>
-                                            <th>Packets</th>
-                                            <th>Device IDs</th>
-                                            <th>Status</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="webhookLogsTableBody">
-                                        <tr><td colspan="6" style="text-align:center;color:var(--gray);padding:2rem">Click ↻ Refresh to load webhook logs</td></tr>
-                                    </tbody>
-                                </table>
+                        <!-- Device Locations Subtab -->
+                        <div id="webhookLocationsSubtab" class="subtab-content" style="display:none">
+                            <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+                                <label class="form-label" style="margin:0;font-weight:600">Series 5 Device:</label>
+                                <select id="series5DeviceSelect" class="form-input" style="width:300px" onchange="loadDeviceLocations()">
+                                    <option value="">— Select a device —</option>
+                                </select>
+                                <label class="form-label" style="margin:0 0 0 12px">Time Range:</label>
+                                <select id="locationHoursFilter" class="form-input" style="width:auto">
+                                    <option value="1">Last 1 hour</option>
+                                    <option value="6">Last 6 hours</option>
+                                    <option value="24" selected>Last 24 hours</option>
+                                    <option value="72">Last 3 days</option>
+                                    <option value="168">Last 7 days</option>
+                                </select>
+                                <button class="btn btn-secondary" onclick="loadDeviceLocations()">↻ Refresh</button>
+                            </div>
+
+                            <!-- Locations List -->
+                            <div class="card">
+                                <div id="locationAlert" class="alert" style="display:none"><span id="locationAlertText"></span></div>
+                                <div id="locationSummary" style="display:none;padding:12px;background:#f7fafc;border-radius:4px;margin-bottom:16px;font-size:14px">
+                                    <strong>Total Positions:</strong> <span id="locationCount">0</span> | 
+                                    <strong>Oldest:</strong> <span id="locationOldest">—</span> | 
+                                    <strong>Newest:</strong> <span id="locationNewest">—</span>
+                                </div>
+                                <div class="table-wrapper">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Observed At</th>
+                                                <th>Received At</th>
+                                                <th>Latitude</th>
+                                                <th>Longitude</th>
+                                                <th>Speed</th>
+                                                <th>Direction</th>
+                                                <th>Address</th>
+                                                <th>Trip Link</th>
+                                                <th>Source</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="locationTableBody">
+                                            <tr><td colspan="9" style="text-align:center;color:var(--gray);padding:2rem">Select a device to load positions</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
 
@@ -3541,7 +3633,11 @@ dashboard.welcome,Bienvenue</pre>
             if (tabName === 'translations') { loadTranslations(); }
             if (tabName === 'languages') { loadLanguages(); }
             if (tabName === 'device-management') { loadTenantOptions(); }
-            if (tabName === 'webhook-logs') { loadWebhookLogs(); }
+            if (tabName === 'webhook-logs') { 
+                // Initialize to logs subtab and load data
+                switchWebhookSubtab('logs');
+                loadWebhookLogs(); 
+            }
             if (tabName === 'jobs') { loadJobs(); }
         }
 
@@ -6027,6 +6123,116 @@ dashboard.welcome,Bienvenue</pre>
             } catch (error) {
                 console.error('Failed to load webhook details:', error);
                 alert('Failed to load webhook details: ' + error.message);
+            }
+        }
+
+        // WEBHOOK SUBTAB SWITCHING
+        function switchWebhookSubtab(subtab) {
+            // Update buttons
+            document.querySelectorAll('.subtab-btn').forEach(btn => btn.classList.remove('active'));
+            if (subtab === 'logs') {
+                document.getElementById('webhookSubtab1').classList.add('active');
+                document.getElementById('webhookLogsSubtab').style.display = 'block';
+                document.getElementById('webhookLocationsSubtab').style.display = 'none';
+            } else if (subtab === 'locations') {
+                document.getElementById('webhookSubtab2').classList.add('active');
+                document.getElementById('webhookLogsSubtab').style.display = 'none';
+                document.getElementById('webhookLocationsSubtab').style.display = 'block';
+                // Load Series 5 devices on first access
+                if (document.getElementById('series5DeviceSelect').options.length === 1) {
+                    loadSeries5Devices();
+                }
+            }
+        }
+
+        // SERIES 5 DEVICE LOCATIONS
+        async function loadSeries5Devices() {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/series5-devices`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const devices = await response.json();
+
+                const select = document.getElementById('series5DeviceSelect');
+                const currentValue = select.value;
+                
+                select.innerHTML = '<option value="">— Select a device —</option>' +
+                    devices.map(d => {
+                        const lastSeen = d.last_seen ? new Date(d.last_seen).toLocaleString() : 'Never';
+                        const battery = d.battery_level ? `${d.battery_level}%` : '—';
+                        return `<option value="${d.imei}">${d.device_model} (Battery: ${battery}, Last: ${lastSeen})</option>`;
+                    }).join('');
+                
+                // Restore selection if it still exists
+                if (currentValue && devices.find(d => d.imei === currentValue)) {
+                    select.value = currentValue;
+                }
+            } catch (error) {
+                console.error('Failed to load Series 5 devices:', error);
+                showAlert('locationAlert', 'error', 'Failed to load Series 5 devices: ' + error.message);
+            }
+        }
+
+        async function loadDeviceLocations() {
+            const deviceImei = document.getElementById('series5DeviceSelect').value;
+            const hours = document.getElementById('locationHoursFilter').value;
+
+            if (!deviceImei) {
+                document.getElementById('locationTableBody').innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--gray);padding:2rem">Select a device to load positions</td></tr>';
+                document.getElementById('locationSummary').style.display = 'none';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/admin/device-locations/${deviceImei}?hours=${hours}&limit=200`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const locations = await response.json();
+
+                const tbody = document.getElementById('locationTableBody');
+                
+                if (locations.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--gray);padding:2rem">No positions found in this time range</td></tr>';
+                    document.getElementById('locationSummary').style.display = 'none';
+                    return;
+                }
+
+                // Update summary
+                document.getElementById('locationCount').textContent = locations.length;
+                document.getElementById('locationOldest').textContent = new Date(locations[locations.length - 1].observed_at).toLocaleString();
+                document.getElementById('locationNewest').textContent = new Date(locations[0].observed_at).toLocaleString();
+                document.getElementById('locationSummary').style.display = 'block';
+
+                // Render table
+                tbody.innerHTML = locations.map(loc => {
+                    const observedAt = new Date(loc.observed_at).toLocaleString();
+                    const receivedAt = new Date(loc.received_at).toLocaleString();
+                    const speed = loc.gps_speed !== null ? `${loc.gps_speed.toFixed(1)} km/h` : '—';
+                    const direction = loc.direction !== null ? `${loc.direction}°` : '—';
+                    const address = loc.address || '—';
+                    const tripLink = loc.leg_id ? `<span style="color:#48bb78;font-weight:600">Leg ${loc.leg_id.substring(0, 8)}</span>` : 
+                                   loc.stationary_id ? `<span style="color:#f59e0b;font-weight:600">Stationary</span>` : 
+                                   '<span style="color:#94a3b8">—</span>';
+                    const source = loc.source;
+                    
+                    return `
+                        <tr>
+                            <td style="font-size:13px">${observedAt}</td>
+                            <td style="font-size:13px;color:#6b7280">${receivedAt}</td>
+                            <td style="font-family:monospace;font-size:12px">${loc.lat.toFixed(6)}</td>
+                            <td style="font-family:monospace;font-size:12px">${loc.lng.toFixed(6)}</td>
+                            <td>${speed}</td>
+                            <td>${direction}</td>
+                            <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${address}">${address}</td>
+                            <td>${tripLink}</td>
+                            <td style="font-size:11px;color:#6b7280">${source}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+            } catch (error) {
+                console.error('Failed to load device locations:', error);
+                showAlert('locationAlert', 'error', 'Failed to load device locations: ' + error.message);
             }
         }
 

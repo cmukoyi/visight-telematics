@@ -4,7 +4,7 @@ Admin API endpoints: authentication, logging, billing, user management
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from pydantic import BaseModel, EmailStr, field_validator
@@ -34,6 +34,7 @@ from app.models import (
     PortalAlert,
     TagIndoorPosition,
     DeviceState,
+    DevicePosition,
     TenantFeature,
     WebhookLog,
 )
@@ -4364,3 +4365,92 @@ async def get_webhook_log_detail(
         error_message=log.error_message,
         payload=log.payload
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SERIES 5 DEVICE LOCATIONS (for debugging trip tracking)
+# ═══════════════════════════════════════════════════════════════════════════
+
+class DeviceLocationResponse(BaseModel):
+    id: int
+    device_imei: str
+    lat: float
+    lng: float
+    observed_at: datetime
+    received_at: datetime
+    gps_speed: Optional[float]
+    direction: Optional[int]
+    address: Optional[str]
+    source: str
+    leg_id: Optional[str]
+    stationary_id: Optional[str]
+
+
+@router.get("/series5-devices")
+async def get_series5_devices(
+    admin_user: AdminUser = Depends(get_admin_from_request),
+    db: Session = Depends(get_db)
+):
+    """
+    Get list of Series 5 (Hubble) devices for location tracking dropdown.
+    Returns only devices with tag_type='hubble'.
+    """
+    devices = db.query(BLETag).filter(
+        BLETag.tag_type == "hubble"
+    ).order_by(BLETag.device_model).all()
+    
+    return [
+        {
+            "imei": device.imei,
+            "device_model": device.device_model or device.imei[:8],
+            "last_seen": device.last_seen,
+            "battery_level": device.battery_level
+        }
+        for device in devices
+    ]
+
+
+@router.get("/device-locations/{device_imei}", response_model=List[DeviceLocationResponse])
+async def get_device_locations(
+    device_imei: str,
+    hours: int = Query(default=24, ge=1, le=168),  # 1 hour to 7 days
+    limit: int = Query(default=200, ge=1, le=1000),
+    admin_user: AdminUser = Depends(get_admin_from_request),
+    db: Session = Depends(get_db)
+):
+    """
+    Get device position history for a Series 5 device.
+    Used for debugging trip tracking issues.
+    
+    Args:
+        device_imei: Device IMEI/ID
+        hours: Lookback window (default 24 hours)
+        limit: Max positions to return (default 200)
+    
+    Returns:
+        List of device positions ordered by observed_at DESC
+    """
+    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
+    
+    positions = db.query(DevicePosition).filter(
+        DevicePosition.device_imei == device_imei,
+        DevicePosition.observed_at >= cutoff_time
+    ).order_by(DevicePosition.observed_at.desc()).limit(limit).all()
+    
+    return [
+        DeviceLocationResponse(
+            id=pos.id,
+            device_imei=pos.device_imei,
+            lat=pos.lat,
+            lng=pos.lng,
+            observed_at=pos.observed_at,
+            received_at=pos.received_at,
+            gps_speed=pos.gps_speed,
+            direction=pos.direction,
+            address=pos.address,
+            source=pos.source,
+            leg_id=str(pos.leg_id) if pos.leg_id else None,
+            stationary_id=str(pos.stationary_id) if pos.stationary_id else None
+        )
+        for pos in positions
+    ]
