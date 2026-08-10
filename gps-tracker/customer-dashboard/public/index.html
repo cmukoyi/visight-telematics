@@ -10529,7 +10529,6 @@ function _lmPlaceMarkers() {
             const attrs = t.attributes;
             const snippets = [];
             if (attrs.Temperature?.value) snippets.push(`🌡️ ${esc(attrs.Temperature.value)}`);
-            if (attrs.Humidity?.value) snippets.push(`💧 ${esc(attrs.Humidity.value)}`);
             if (attrs.Altitude?.value) snippets.push(`⛰️ ${esc(attrs.Altitude.value)}`);
             console.log('[POPUP] Sensor snippets:', snippets);
             if (snippets.length > 0) {
@@ -10957,7 +10956,7 @@ function _lmSelectTag(imei) {
 
 function _lmRenderSensorData(t) {
     // Render sensor data for Series 5 (Hubble) tags
-    // Data comes from attributes field: { Temperature: {value, show_on_map}, Humidity: {value, show_on_map}, ... }
+    // Data comes from attributes field: { Temperature: {value, show_on_map}, Altitude: {value, show_on_map}, ... }
     console.log('[SENSOR] _lmRenderSensorData called for tag:', t.imei);
     console.log('[SENSOR] Tag attributes:', t.attributes);
     
@@ -10973,7 +10972,6 @@ function _lmRenderSensorData(t) {
     // Priority sensor fields to display
     const priorityFields = [
         { key: 'Temperature', icon: 'fa-temperature-half', color: 'var(--primary)' },
-        { key: 'Humidity', icon: 'fa-droplet', color: 'var(--info)' },
         { key: 'Altitude', icon: 'fa-mountain', color: 'var(--success)' },
         { key: 'RSSI', icon: 'fa-signal', color: 'var(--warning)' },
         { key: 'GPS_Accuracy', icon: 'fa-bullseye', color: 'var(--text-3)' },
