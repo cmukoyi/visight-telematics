@@ -11265,7 +11265,12 @@ async function initHistoryTab() {
     const sel = document.getElementById('hist-asset-select');
     if (sel && _lmTags.length) {
         const cur = _histPendingImei || sel.value;
-        sel.innerHTML = _lmTags.map(t =>
+        // Filter to ONLY Series 2 (TrackSolid) devices - they have trip/movement history from TrackSolid API
+        // Series 1/3/4/5 do not have TrackSolid trip data, so exclude them from Movement History dropdown
+        const series2Tags = _lmTags.filter(t => 
+            t.tag_type === 'tracksolid' || t.tag_type === 'series2'
+        );
+        sel.innerHTML = series2Tags.map(t =>
             `<option value="${esc(t.imei)}">${esc(t.description || t.device_name || t.imei)}</option>`
         ).join('');
         if (cur) sel.value = cur;
