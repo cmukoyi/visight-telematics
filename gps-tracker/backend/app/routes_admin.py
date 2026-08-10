@@ -4388,13 +4388,21 @@ class DeviceLocationResponse(BaseModel):
 
 @router.get("/series5-devices")
 async def get_series5_devices(
-    admin_user: AdminUser = Depends(get_admin_from_request),
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """
     Get list of Series 5 (Hubble) devices for location tracking dropdown.
     Returns only devices with tag_type='hubble'.
     """
+    # Check admin authentication
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    
     devices = db.query(BLETag).filter(
         BLETag.tag_type == "hubble"
     ).order_by(BLETag.device_model).all()
@@ -4413,9 +4421,9 @@ async def get_series5_devices(
 @router.get("/device-locations/{device_imei}", response_model=List[DeviceLocationResponse])
 async def get_device_locations(
     device_imei: str,
+    request: Request,
     hours: int = Query(default=24, ge=1, le=168),  # 1 hour to 7 days
     limit: int = Query(default=200, ge=1, le=1000),
-    admin_user: AdminUser = Depends(get_admin_from_request),
     db: Session = Depends(get_db)
 ):
     """
@@ -4430,6 +4438,14 @@ async def get_device_locations(
     Returns:
         List of device positions ordered by observed_at DESC
     """
+    # Check admin authentication
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    
     cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
     
     positions = db.query(DevicePosition).filter(
