@@ -3254,6 +3254,250 @@ def health_trip_engine(request: Request, db: Session = Depends(get_db)):
     return get_engine_status()
 
 
+@router.get("/diagnostics/trip-processing/{imei}")
+def diagnostics_trip_processing(
+    imei: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Diagnostic endpoint to troubleshoot why automatic trip processing isn't working for a device.
+    
+    Returns comprehensive state including:
+    - Device subscription status
+    - Last batch sweep timestamp
+    - Last selective sweep timestamp
+    - Last trip engine run
+    - Coalesce floor setting
+    - Whether device qualifies for next selective sweep
+    - Recent positions count
+    - Recent journeys count
+    """
+    from app.models import TripConfig, TrackSolidSyncState
+    from sqlalchemy import select, func
+    from datetime import datetime, timezone
+    
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=403, detail="Requires manager role")
+    
+    # Get device state
+    device_state = db.query(DeviceState).filter(DeviceState.device_imei == imei).first()
+    if not device_state:
+        raise HTTPException(status_code=404, detail=f"DeviceState not found for {imei}")
+    
+    # Get device info
+    device = db.query(BLETag).filter(BLETag.imei == imei).first()
+    
+    # Get global trip config
+    global_config = db.execute(
+        select(TripConfig).where(TripConfig.tenant_id == None)
+    ).scalar_one_or_none()
+    
+    # Get sync state
+    sync_state = db.execute(
+        select(TrackSolidSyncState).where(TrackSolidSyncState.id == 1)
+    ).scalar_one_or_none()
+    
+    # Count recent positions (last 24 hours)
+    now = datetime.now(timezone.utc)
+    recent_positions = db.execute(
+        select(func.count(DevicePosition.id))
+        .where(
+            DevicePosition.device_imei == imei,
+            DevicePosition.observed_at >= now - timedelta(hours=24)
+        )
+    ).scalar()
+    
+    # Count recent journeys (last 7 days)
+    from app.models import Journey
+    recent_journeys = db.execute(
+        select(func.count(Journey.id))
+        .where(
+            Journey.device_imei == imei,
+            Journey.started_at >= now - timedelta(days=7)
+        )
+    ).scalar()
+    
+    # Calculate coalesce floor
+    coalesce_floor_minutes = device_state.coalesce_floor_minutes or (global_config.coalesce_floor_minutes if global_config else 120)
+    
+    # Check if device qualifies for next selective sweep
+    qualifies_subscription = device_state.trip_subscribed
+    qualifies_new_data = device_state.last_batch_ts and (
+        device_state.last_position_ts is None or 
+        device_state.last_batch_ts > device_state.last_position_ts
+    )
+    qualifies_coalesce = device_state.last_tracklist_pull_at is None or (
+        (now - device_state.last_tracklist_pull_at).total_seconds() / 60 >= coalesce_floor_minutes
+    )
+    
+    # Calculate time until next selective sweep (if coalesce blocking)
+    minutes_until_next_sweep = None
+    if not qualifies_coalesce and device_state.last_tracklist_pull_at:
+        elapsed_minutes = (now - device_state.last_tracklist_pull_at).total_seconds() / 60
+        minutes_until_next_sweep = max(0, coalesce_floor_minutes - elapsed_minutes)
+    
+    return {
+        "device_imei": imei,
+        "device_name": device.device_name if device else None,
+        "device_model": device.device_model if device else None,
+        "subscription": {
+            "trip_subscribed": device_state.trip_subscribed,
+            "qualifies": qualifies_subscription,
+            "message": "✅ Subscribed" if qualifies_subscription else "❌ NOT SUBSCRIBED - Device will not be automatically processed"
+        },
+        "new_data_check": {
+            "last_batch_ts": device_state.last_batch_ts.isoformat() if device_state.last_batch_ts else None,
+            "last_position_ts": device_state.last_position_ts.isoformat() if device_state.last_position_ts else None,
+            "qualifies": qualifies_new_data,
+            "message": "✅ New data available" if qualifies_new_data else "❌ No new data since last pull"
+        },
+        "coalesce_check": {
+            "coalesce_floor_minutes": coalesce_floor_minutes,
+            "last_tracklist_pull_at": device_state.last_tracklist_pull_at.isoformat() if device_state.last_tracklist_pull_at else None,
+            "minutes_since_last_pull": (now - device_state.last_tracklist_pull_at).total_seconds() / 60 if device_state.last_tracklist_pull_at else None,
+            "qualifies": qualifies_coalesce,
+            "minutes_until_next_sweep": minutes_until_next_sweep,
+            "message": f"✅ Coalesce passed ({coalesce_floor_minutes} min)" if qualifies_coalesce else f"⏳ Waiting {minutes_until_next_sweep:.0f} more minutes (coalesce floor: {coalesce_floor_minutes} min)"
+        },
+        "selective_sweep_qualification": {
+            "qualifies_all_checks": qualifies_subscription and qualifies_new_data and qualifies_coalesce,
+            "will_process_on_next_sweep": qualifies_subscription and qualifies_new_data and qualifies_coalesce,
+            "blocking_reason": None if (qualifies_subscription and qualifies_new_data and qualifies_coalesce) else (
+                "Not subscribed" if not qualifies_subscription else
+                "No new data" if not qualifies_new_data else
+                f"Coalesce floor not passed (wait {minutes_until_next_sweep:.0f} min)"
+            )
+        },
+        "background_tasks": {
+            "last_batch_sweep": sync_state.last_batch_sweep_at.isoformat() if sync_state and sync_state.last_batch_sweep_at else None,
+            "last_selective_sweep": sync_state.last_selective_sweep_at.isoformat() if sync_state and sync_state.last_selective_sweep_at else None,
+            "next_selective_sweep_in_minutes": 12 - ((now - sync_state.last_selective_sweep_at).total_seconds() / 60) if sync_state and sync_state.last_selective_sweep_at else None
+        },
+        "data_summary": {
+            "positions_last_24h": recent_positions,
+            "journeys_last_7d": recent_journeys
+        },
+        "recommendation": (
+            "✅ Device is properly configured and will be processed automatically" 
+            if (qualifies_subscription and qualifies_new_data and qualifies_coalesce) else
+            f"⚠️ Device will NOT be automatically processed: {('Not subscribed - click Subscribe button' if not qualifies_subscription else 'No new data detected by batch sweep' if not qualifies_new_data else f'Coalesce floor blocking - wait {minutes_until_next_sweep:.0f} minutes or reduce coalesce setting')}"
+        )
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Global Trip Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/config/trip-engine")
+def get_trip_engine_config(request: Request, db: Session = Depends(get_db)):
+    """Get global trip engine configuration (manager+)."""
+    from app.models import TripConfig
+    from sqlalchemy import select
+    
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=403, detail="Requires manager role")
+    
+    # Get global config (tenant_id = NULL)
+    global_config = db.execute(
+        select(TripConfig).where(TripConfig.tenant_id == None)
+    ).scalar_one_or_none()
+    
+    if not global_config:
+        # Return defaults if no config exists
+        return {
+            "coalesce_floor_minutes": 120,
+            "batch_sweep_interval_minutes": 10,
+            "engine_anchor_radius_m": 100,
+            "engine_min_leg_distance_m": 300,
+            "engine_journey_break_dwell_min": 30,
+            "message": "Using default values (no global config row exists)"
+        }
+    
+    return {
+        "coalesce_floor_minutes": global_config.coalesce_floor_minutes,
+        "batch_sweep_interval_minutes": global_config.batch_sweep_interval_minutes,
+        "engine_anchor_radius_m": global_config.engine_anchor_radius_m,
+        "engine_min_leg_distance_m": global_config.engine_min_leg_distance_m,
+        "engine_journey_break_dwell_min": global_config.engine_journey_break_dwell_min,
+        "created_at": global_config.created_at.isoformat() if global_config.created_at else None,
+        "updated_at": global_config.updated_at.isoformat() if global_config.updated_at else None
+    }
+
+
+class TripEngineConfigUpdate(BaseModel):
+    coalesce_floor_minutes: Optional[int] = None
+
+
+@router.put("/config/trip-engine")
+def update_trip_engine_config(
+    data: TripEngineConfigUpdate,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Update global trip engine configuration (manager+)."""
+    from app.models import TripConfig
+    from sqlalchemy import select
+    
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=403, detail="Requires manager role")
+    
+    # Validation
+    if data.coalesce_floor_minutes is not None:
+        if data.coalesce_floor_minutes < 5:
+            raise HTTPException(status_code=400, detail="coalesce_floor_minutes must be at least 5 minutes")
+        if data.coalesce_floor_minutes > 1440:
+            raise HTTPException(status_code=400, detail="coalesce_floor_minutes must be at most 1440 minutes (24 hours)")
+    
+    # Get or create global config
+    global_config = db.execute(
+        select(TripConfig).where(TripConfig.tenant_id == None)
+    ).scalar_one_or_none()
+    
+    if not global_config:
+        # Create new global config with defaults
+        global_config = TripConfig(
+            tenant_id=None,
+            coalesce_floor_minutes=data.coalesce_floor_minutes or 120,
+            batch_sweep_interval_minutes=10,
+            engine_anchor_radius_m=100,
+            engine_min_leg_distance_m=300,
+            engine_journey_break_dwell_min=30
+        )
+        db.add(global_config)
+        logger.info("Created global TripConfig with coalesce_floor_minutes=%d", global_config.coalesce_floor_minutes)
+    else:
+        # Update existing config
+        old_value = global_config.coalesce_floor_minutes
+        if data.coalesce_floor_minutes is not None:
+            global_config.coalesce_floor_minutes = data.coalesce_floor_minutes
+            logger.info("Updated global coalesce_floor_minutes: %d → %d", old_value, data.coalesce_floor_minutes)
+    
+    db.commit()
+    
+    # Log audit
+    log_audit(
+        db,
+        str(admin.id),
+        "update_trip_config",
+        "TripConfig",
+        "global",
+        old_value={"coalesce_floor_minutes": old_value} if 'old_value' in locals() else None,
+        new_value={"coalesce_floor_minutes": global_config.coalesce_floor_minutes},
+        description=f"Updated global trip engine config: coalesce_floor_minutes={global_config.coalesce_floor_minutes}",
+        ip_address=request.client.host if request.client else None
+    )
+    
+    return {
+        "coalesce_floor_minutes": global_config.coalesce_floor_minutes,
+        "message": f"Global coalesce floor updated to {global_config.coalesce_floor_minutes} minutes"
+    }
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # SendGrid email statistics
 # ─────────────────────────────────────────────────────────────────────────────

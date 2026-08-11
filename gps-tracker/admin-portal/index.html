@@ -1004,6 +1004,12 @@
                         </button>
                     </li>
                     <li class="sidebar-item">
+                        <button class="sidebar-link" onclick="switchTab('system-settings')">
+                            <span>⚙️</span>
+                            <span>System Settings</span>
+                        </button>
+                    </li>
+                    <li class="sidebar-item">
                         <button class="sidebar-link" onclick="switchTab('device-management')">
                             <span>🔧</span>
                             <span>Device Management</span>
@@ -2896,6 +2902,83 @@
                     </div>
                     <!-- END LANGUAGES TAB -->
 
+                    <!-- SYSTEM SETTINGS TAB -->
+                    <div id="system-settings" class="tab-content">
+                        <div class="page-header">
+                            <h2 class="page-title">⚙️ System Settings</h2>
+                            <p class="page-subtitle">Global configuration for trip engine and automatic processing</p>
+                        </div>
+
+                        <!-- Trip Engine Configuration -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">🔄 Trip Engine Configuration</h3>
+                            </div>
+                            <div id="systemSettingsAlert" class="alert" style="display:none"><span id="systemSettingsAlertText"></span></div>
+                            
+                            <div style="margin-bottom:24px;padding:12px;background:var(--light);border-radius:8px">
+                                <p style="margin:0;font-size:14px;color:var(--text-secondary)">
+                                    <strong>Coalesce Floor</strong> controls how often the system fetches detailed track data from TrackSolid API for subscribed devices. 
+                                    Lower values = fresher trip data but more API calls. Higher values = less API usage but longer delays before trips appear.
+                                </p>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">
+                                    Global Coalesce Floor (minutes)
+                                    <span style="font-weight:normal;color:var(--text-secondary);margin-left:8px">Default: 120 minutes (2 hours)</span>
+                                </label>
+                                <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 12px">
+                                    Minimum time between automatic track data fetches for each subscribed device. 
+                                    This setting applies to all customer groups unless they have a custom override.
+                                </p>
+                                <div style="display:flex;gap:12px;align-items:center">
+                                    <input 
+                                        type="number" 
+                                        id="ssCoalesceFloor" 
+                                        class="form-input" 
+                                        style="max-width:200px"
+                                        min="5" 
+                                        max="1440" 
+                                        step="5"
+                                        placeholder="120"
+                                    >
+                                    <span style="color:var(--text-secondary)">minutes</span>
+                                </div>
+                                <p style="font-size:12px;color:var(--text-secondary);margin:8px 0 0">
+                                    <strong>Recommended ranges:</strong><br>
+                                    • Real-time tracking: 30-60 minutes (higher API usage)<br>
+                                    • Standard tracking: 60-120 minutes (balanced)<br>
+                                    • Historical tracking: 120-240 minutes (lower API usage)
+                                </p>
+                            </div>
+
+                            <div style="margin-top:24px">
+                                <button class="btn btn-primary" onclick="saveTripEngineConfig()">💾 Save Configuration</button>
+                                <button class="btn btn-secondary" onclick="loadTripEngineConfig()" style="margin-left:8px">↻ Reload</button>
+                            </div>
+
+                            <div style="margin-top:32px;padding:16px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px">
+                                <p style="margin:0;font-size:14px;color:#92400e">
+                                    <strong>⚠️ Important:</strong> Changes to coalesce floor affect how quickly trips appear for subscribed devices. 
+                                    Lowering this value increases API calls to TrackSolid. Monitor API usage to avoid rate limits.
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Current Status -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">📊 Background Task Status</h3>
+                            </div>
+                            <div id="engineStatusContainer">
+                                <p style="text-align:center;color:var(--gray);padding:2rem">Click ↻ Refresh to load status</p>
+                            </div>
+                            <button class="btn btn-secondary" onclick="loadEngineStatus()" style="margin-top:16px">↻ Refresh Status</button>
+                        </div>
+                    </div>
+                    <!-- END SYSTEM SETTINGS TAB -->
+
                     <!-- DEVICE MANAGEMENT TAB -->
                     <div id="device-management" class="tab-content">
                         <div class="page-header">
@@ -3052,6 +3135,19 @@
                                         <button type="submit" class="btn btn-primary" id="brSubmitBtn">🔄 Queue Batch Job</button>
                                     </div>
                                 </form>
+                            </div>
+                        </div>
+
+                        <!-- Diagnostics Modal -->
+                        <div id="diagnosticsModal" class="modal">
+                            <div class="modal-content" style="max-width:700px">
+                                <div class="modal-header">
+                                    <h3 class="modal-title">Device Diagnostics</h3>
+                                    <button class="modal-close" onclick="closeModal('diagnosticsModal')">×</button>
+                                </div>
+                                <div id="diagnosticsContent">
+                                    <p style="text-align:center;color:var(--gray);padding:2rem">Loading...</p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -3607,6 +3703,7 @@ dashboard.welcome,Bienvenue</pre>
                 'imei': 'IMEI / Tags',
                 'translations': 'Translation Manager',
                 'languages': 'Language Manager',
+                'system-settings': 'System Settings',
                 'device-management': 'Device Management',
                 'webhook-logs': 'Webhook Logs',
                 'jobs': 'Background Jobs'
@@ -3632,6 +3729,7 @@ dashboard.welcome,Bienvenue</pre>
             if (tabName === 'imei') { loadIMEI(); }
             if (tabName === 'translations') { loadTranslations(); }
             if (tabName === 'languages') { loadLanguages(); }
+            if (tabName === 'system-settings') { loadTripEngineConfig(); loadEngineStatus(); }
             if (tabName === 'device-management') { loadTenantOptions(); }
             if (tabName === 'webhook-logs') { 
                 // Initialize to logs subtab and load data
@@ -5670,6 +5768,7 @@ dashboard.welcome,Bienvenue</pre>
                                 <td>${device.device_state?.last_tracklist_pull_at || '—'}</td>
                                 <td style="white-space:nowrap">
                                     <span id="subscription-toggle-${device.imei}">${toggleButton}</span>
+                                    <button class="btn btn-secondary btn-small" onclick="showDeviceDiagnostics('${device.imei}')" title="View diagnostics for automatic processing" style="padding:6px 10px;font-size:12px;width:auto;min-width:80px">🔍 Diagnostics</button>
                                     <button class="btn btn-secondary btn-small" onclick="openDeviceBackfillModal('${device.imei}')" ${!isSubscribed ? 'disabled' : ''} style="padding:6px 10px;font-size:12px;width:auto;min-width:80px">⬇️ Backfill</button>
                                     <button class="btn btn-secondary btn-small" onclick="openDeviceReprocessModal('${device.imei}')" ${!isSubscribed ? 'disabled' : ''} style="padding:6px 10px;font-size:12px;width:auto;min-width:80px">🔄 Reprocess</button>
                                 </td>
@@ -6040,6 +6139,230 @@ dashboard.welcome,Bienvenue</pre>
             // Auto-hide success messages
             if (type === 'success') {
                 setTimeout(() => { alert.style.display = 'none'; }, 5000);
+            }
+        }
+
+        // ====================================================================
+        // SYSTEM SETTINGS
+        // ====================================================================
+
+        async function loadTripEngineConfig() {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/config/trip-engine`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const config = await response.json();
+                
+                document.getElementById('ssCoalesceFloor').value = config.coalesce_floor_minutes || 120;
+                
+                showAlert('systemSettingsAlert', 'success', 'Configuration loaded successfully');
+            } catch (error) {
+                console.error('Failed to load trip engine config:', error);
+                showAlert('systemSettingsAlert', 'error', 'Failed to load configuration: ' + error.message);
+            }
+        }
+
+        async function saveTripEngineConfig() {
+            const coalesceFloor = parseInt(document.getElementById('ssCoalesceFloor').value);
+            
+            if (!coalesceFloor || coalesceFloor < 5 || coalesceFloor > 1440) {
+                showAlert('systemSettingsAlert', 'error', 'Coalesce floor must be between 5 and 1440 minutes');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/admin/config/trip-engine`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        coalesce_floor_minutes: coalesceFloor
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to save configuration');
+                }
+
+                const result = await response.json();
+                showAlert('systemSettingsAlert', 'success', result.message);
+            } catch (error) {
+                console.error('Failed to save trip engine config:', error);
+                showAlert('systemSettingsAlert', 'error', 'Failed to save: ' + error.message);
+            }
+        }
+
+        async function loadEngineStatus() {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/health/trip-engine`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const status = await response.json();
+                
+                const html = `
+                    <div style="display:grid;gap:16px">
+                        <div style="padding:16px;background:${status.batch_sweep.running ? '#d1fae5' : '#fee2e2'};border-radius:8px">
+                            <div style="display:flex;justify-content:space-between;align-items:center">
+                                <div>
+                                    <strong>Batch Sweep (TrackSolid Tier 1)</strong>
+                                    <p style="margin:4px 0 0;font-size:13px;color:var(--text-secondary)">Fetches latest positions for all devices</p>
+                                </div>
+                                <div style="text-align:right">
+                                    <span style="font-size:24px">${status.batch_sweep.running ? '✅' : '❌'}</span>
+                                    <p style="margin:4px 0 0;font-size:12px">${status.batch_sweep.running ? 'Running' : 'Stopped'}</p>
+                                    <p style="margin:2px 0 0;font-size:12px">Every ${status.batch_sweep.interval_minutes} min</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="padding:16px;background:${status.selective_sweep.running ? '#d1fae5' : '#fee2e2'};border-radius:8px">
+                            <div style="display:flex;justify-content:space-between;align-items:center">
+                                <div>
+                                    <strong>Selective Sweep (TrackSolid Tier 2)</strong>
+                                    <p style="margin:4px 0 0;font-size:13px;color:var(--text-secondary)">Fetches detailed track data for subscribed devices</p>
+                                </div>
+                                <div style="text-align:right">
+                                    <span style="font-size:24px">${status.selective_sweep.running ? '✅' : '❌'}</span>
+                                    <p style="margin:4px 0 0;font-size:12px">${status.selective_sweep.running ? 'Running' : 'Stopped'}</p>
+                                    <p style="margin:2px 0 0;font-size:12px">Every ${status.selective_sweep.interval_minutes} min</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="padding:16px;background:${status.journey_processor.running ? '#d1fae5' : '#fee2e2'};border-radius:8px">
+                            <div style="display:flex;justify-content:space-between;align-items:center">
+                                <div>
+                                    <strong>Journey Processor</strong>
+                                    <p style="margin:4px 0 0;font-size:13px;color:var(--text-secondary)">Processes positions into trips for subscribed devices</p>
+                                </div>
+                                <div style="text-align:right">
+                                    <span style="font-size:24px">${status.journey_processor.running ? '✅' : '❌'}</span>
+                                    <p style="margin:4px 0 0;font-size:12px">${status.journey_processor.running ? 'Running' : 'Stopped'}</p>
+                                    <p style="margin:2px 0 0;font-size:12px">Every ${status.journey_processor.interval_minutes} min</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="padding:16px;background:${status.stall_watchdog.running ? '#d1fae5' : '#fee2e2'};border-radius:8px">
+                            <div style="display:flex;justify-content:space-between;align-items:center">
+                                <div>
+                                    <strong>Stall Watchdog</strong>
+                                    <p style="margin:4px 0 0;font-size:13px;color:var(--text-secondary)">Monitors and fixes stuck journeys</p>
+                                </div>
+                                <div style="text-align:right">
+                                    <span style="font-size:24px">${status.stall_watchdog.running ? '✅' : '❌'}</span>
+                                    <p style="margin:4px 0 0;font-size:12px">${status.stall_watchdog.running ? 'Running' : 'Stopped'}</p>
+                                    <p style="margin:2px 0 0;font-size:12px">Every ${status.stall_watchdog.interval_minutes} min</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('engineStatusContainer').innerHTML = html;
+            } catch (error) {
+                console.error('Failed to load engine status:', error);
+                document.getElementById('engineStatusContainer').innerHTML = `
+                    <p style="text-align:center;color:#f44336;padding:2rem">Failed to load status: ${error.message}</p>
+                `;
+            }
+        }
+
+        async function showDeviceDiagnostics(imei) {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/diagnostics/trip-processing/${imei}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to fetch diagnostics');
+                }
+                
+                const diag = await response.json();
+                
+                const html = `
+                    <div style="padding:1rem;max-height:600px;overflow-y:auto">
+                        <h4 style="margin:0 0 16px">Diagnostics: ${diag.device_name || imei.substring(0, 16)}</h4>
+                        
+                        <!-- Recommendation Banner -->
+                        <div style="padding:16px;background:${diag.selective_sweep_qualification.qualifies_all_checks ? '#d1fae5' : '#fef3c7'};border-radius:8px;margin-bottom:20px">
+                            <p style="margin:0;font-weight:600;font-size:15px">${diag.recommendation}</p>
+                        </div>
+                        
+                        <!-- Qualification Checks -->
+                        <div style="margin-bottom:24px">
+                            <h5 style="margin:0 0 12px;font-size:14px;color:var(--text-secondary)">AUTOMATIC PROCESSING QUALIFICATION</h5>
+                            
+                            <div style="display:grid;gap:12px">
+                                <!-- Subscription Check -->
+                                <div style="padding:12px;background:${diag.subscription.qualifies ? '#d1fae5' : '#fee2e2'};border-radius:6px">
+                                    <div style="display:flex;align-items:center;gap:8px">
+                                        <span style="font-size:20px">${diag.subscription.qualifies ? '✅' : '❌'}</span>
+                                        <div style="flex:1">
+                                            <strong>1. Subscription Check</strong>
+                                            <p style="margin:4px 0 0;font-size:13px">${diag.subscription.message}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- New Data Check -->
+                                <div style="padding:12px;background:${diag.new_data_check.qualifies ? '#d1fae5' : '#fee2e2'};border-radius:6px">
+                                    <div style="display:flex;align-items:center;gap:8px">
+                                        <span style="font-size:20px">${diag.new_data_check.qualifies ? '✅' : '❌'}</span>
+                                        <div style="flex:1">
+                                            <strong>2. New Data Check</strong>
+                                            <p style="margin:4px 0 0;font-size:13px">${diag.new_data_check.message}</p>
+                                            <p style="margin:4px 0 0;font-size:12px;color:var(--text-secondary)">
+                                                Last batch: ${diag.new_data_check.last_batch_ts || 'Never'}<br>
+                                                Last position: ${diag.new_data_check.last_position_ts || 'Never'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Coalesce Check -->
+                                <div style="padding:12px;background:${diag.coalesce_check.qualifies ? '#d1fae5' : '#fee2e2'};border-radius:6px">
+                                    <div style="display:flex;align-items:center;gap:8px">
+                                        <span style="font-size:20px">${diag.coalesce_check.qualifies ? '✅' : '⏳'}</span>
+                                        <div style="flex:1">
+                                            <strong>3. Coalesce Floor Check</strong>
+                                            <p style="margin:4px 0 0;font-size:13px">${diag.coalesce_check.message}</p>
+                                            <p style="margin:4px 0 0;font-size:12px;color:var(--text-secondary)">
+                                                Last pull: ${diag.coalesce_check.last_tracklist_pull_at || 'Never'}<br>
+                                                Minutes since last pull: ${diag.coalesce_check.minutes_since_last_pull ? diag.coalesce_check.minutes_since_last_pull.toFixed(0) : 'N/A'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Data Summary -->
+                        <div style="margin-bottom:20px">
+                            <h5 style="margin:0 0 12px;font-size:14px;color:var(--text-secondary)">DATA SUMMARY</h5>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                                <div style="padding:12px;background:var(--light);border-radius:6px">
+                                    <p style="margin:0;font-size:12px;color:var(--text-secondary)">Positions (24h)</p>
+                                    <p style="margin:4px 0 0;font-size:20px;font-weight:600">${diag.data_summary.positions_last_24h}</p>
+                                </div>
+                                <div style="padding:12px;background:var(--light);border-radius:6px">
+                                    <p style="margin:0;font-size:12px;color:var(--text-secondary)">Journeys (7d)</p>
+                                    <p style="margin:4px 0 0;font-size:20px;font-weight:600">${diag.data_summary.journeys_last_7d}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('diagnosticsContent').innerHTML = html;
+                openModal('diagnosticsModal');
+            } catch (error) {
+                console.error('Failed to load diagnostics:', error);
+                alert('Failed to load diagnostics: ' + error.message);
             }
         }
 
