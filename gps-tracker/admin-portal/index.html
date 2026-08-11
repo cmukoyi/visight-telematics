@@ -260,23 +260,74 @@
             margin-bottom: 0;
         }
 
+        .sidebar-category {
+            margin-bottom: 4px;
+        }
+
+        .sidebar-category-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            margin: 8px 0 4px 0;
+        }
+
+        .sidebar-category-header:hover {
+            color: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .sidebar-category-icon {
+            font-size: 16px;
+            margin-right: 8px;
+        }
+
+        .sidebar-category-toggle {
+            font-size: 12px;
+            transition: transform 0.2s ease;
+        }
+
+        .sidebar-category.expanded .sidebar-category-toggle {
+            transform: rotate(90deg);
+        }
+
+        .sidebar-subcategories {
+            display: none;
+            padding-left: 8px;
+        }
+
+        .sidebar-category.expanded .sidebar-subcategories {
+            display: block;
+        }
+
         .sidebar-link {
             display: flex;
             align-items: center;
-            gap: 16px;
-            padding: 12px 24px;
-            color: rgba(255, 255, 255, 0.9);
+            gap: 12px;
+            padding: 10px 20px 10px 32px;
+            color: rgba(255, 255, 255, 0.85);
             text-decoration: none;
             cursor: pointer;
             transition: all 0.2s ease;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 500;
             border: none;
             background: none;
             width: 100%;
             text-align: left;
             border-left: 3px solid transparent;
-            margin: 2px 0;
+            margin: 1px 0;
         }
 
         .sidebar-link:hover {
@@ -883,149 +934,218 @@
                 </div>
 
                 <ul class="sidebar-menu">
-                    <li class="sidebar-item">
-                        <button class="sidebar-link active" onclick="switchTab('dashboard')">
-                            <span>📊</span>
-                            <span>Dashboard</span>
+                    <!-- OVERVIEW -->
+                    <li class="sidebar-category expanded" id="cat-overview">
+                        <button class="sidebar-category-header" onclick="toggleCategory('overview')">
+                            <span><span class="sidebar-category-icon">📊</span>Overview</span>
+                            <span class="sidebar-category-toggle">▶</span>
                         </button>
+                        <ul class="sidebar-subcategories">
+                            <li class="sidebar-item">
+                                <button class="sidebar-link active" onclick="switchTab('dashboard')">
+                                    <span>📈</span>
+                                    <span>Dashboard</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('health')">
+                                    <span>🩺</span>
+                                    <span>System Health</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('logs')">
+                                    <span>📝</span>
+                                    <span>Application Logs</span>
+                                </button>
+                            </li>
+                        </ul>
                     </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('logs')">
-                            <span>📝</span>
-                            <span>Logs</span>
+
+                    <!-- USERS & TENANTS -->
+                    <li class="sidebar-category" id="cat-users">
+                        <button class="sidebar-category-header" onclick="toggleCategory('users')">
+                            <span><span class="sidebar-category-icon">👥</span>Users & Tenants</span>
+                            <span class="sidebar-category-toggle">▶</span>
                         </button>
+                        <ul class="sidebar-subcategories">
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('usergroups')">
+                                    <span>🏢</span>
+                                    <span>User Groups</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('endusers')">
+                                    <span>👤</span>
+                                    <span>Portal Users</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('flutter-users')">
+                                    <span>📲</span>
+                                    <span>Mobile App Users</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('users')">
+                                    <span>🔑</span>
+                                    <span>Admin Users</span>
+                                </button>
+                            </li>
+                        </ul>
                     </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('billing')">
-                            <span>💰</span>
-                            <span>Billing</span>
+
+                    <!-- ASSETS & DEVICES -->
+                    <li class="sidebar-category" id="cat-assets">
+                        <button class="sidebar-category-header" onclick="toggleCategory('assets')">
+                            <span><span class="sidebar-category-icon">📡</span>Assets & Devices</span>
+                            <span class="sidebar-category-toggle">▶</span>
                         </button>
+                        <ul class="sidebar-subcategories">
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('ble-tags')">
+                                    <span>📡</span>
+                                    <span>BLE Tags</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('imei')">
+                                    <span>📱</span>
+                                    <span>IMEI Lookup</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('device-management')">
+                                    <span>🔧</span>
+                                    <span>Device Management</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('buildings')">
+                                    <span>🏗️</span>
+                                    <span>Buildings & Floors</span>
+                                </button>
+                            </li>
+                        </ul>
                     </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('users')">
-                            <span>👥</span>
-                            <span>Users</span>
+
+                    <!-- CONFIGURATION -->
+                    <li class="sidebar-category" id="cat-config">
+                        <button class="sidebar-category-header" onclick="toggleCategory('config')">
+                            <span><span class="sidebar-category-icon">⚙️</span>Configuration</span>
+                            <span class="sidebar-category-toggle">▶</span>
                         </button>
+                        <ul class="sidebar-subcategories">
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('system-settings')">
+                                    <span>⚙️</span>
+                                    <span>System Settings</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('features')">
+                                    <span>🎛️</span>
+                                    <span>App Features</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('tenant-features')">
+                                    <span>🎯</span>
+                                    <span>Tenant Features</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('packages')">
+                                    <span>📦</span>
+                                    <span>Tag Packages</span>
+                                </button>
+                            </li>
+                        </ul>
                     </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('audit')">
-                            <span>🔐</span>
-                            <span>Audit</span>
+
+                    <!-- ALERTS & NOTIFICATIONS -->
+                    <li class="sidebar-category" id="cat-alerts">
+                        <button class="sidebar-category-header" onclick="toggleCategory('alerts')">
+                            <span><span class="sidebar-category-icon">🔔</span>Alerts & Notifications</span>
+                            <span class="sidebar-category-toggle">▶</span>
                         </button>
+                        <ul class="sidebar-subcategories">
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('critical-alerts')">
+                                    <span>🚨</span>
+                                    <span>Critical Alerts</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('email-alert-stats')">
+                                    <span>📊</span>
+                                    <span>Email Alert Stats</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('sendgrid')">
+                                    <span>📧</span>
+                                    <span>SendGrid Stats</span>
+                                </button>
+                            </li>
+                        </ul>
                     </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('features')">
-                            <span>🎛️</span>
-                            <span>Features</span>
+
+                    <!-- LOCALIZATION -->
+                    <li class="sidebar-category" id="cat-localization">
+                        <button class="sidebar-category-header" onclick="toggleCategory('localization')">
+                            <span><span class="sidebar-category-icon">🌍</span>Localization</span>
+                            <span class="sidebar-category-toggle">▶</span>
                         </button>
+                        <ul class="sidebar-subcategories">
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('translations')">
+                                    <span>🔤</span>
+                                    <span>Translations</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('languages')">
+                                    <span>🗣️</span>
+                                    <span>Languages</span>
+                                </button>
+                            </li>
+                        </ul>
                     </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('usergroups')">
-                            <span>🏢</span>
-                            <span>User Groups</span>
+
+                    <!-- OPERATIONS -->
+                    <li class="sidebar-category" id="cat-operations">
+                        <button class="sidebar-category-header" onclick="toggleCategory('operations')">
+                            <span><span class="sidebar-category-icon">⚡</span>Operations</span>
+                            <span class="sidebar-category-toggle">▶</span>
                         </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('tenant-features')">
-                            <span>🎛️</span>
-                            <span>Tenant Features</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('packages')">
-                            <span>📦</span>
-                            <span>Packages</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('buildings')">
-                            <span>🏗️</span>
-                            <span>Buildings</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('ble-tags')">
-                            <span>📡</span>
-                            <span>BLE Tags</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('health')">
-                            <span>🩺</span>
-                            <span>Health</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('critical-alerts')">
-                            <span>🚨</span>
-                            <span>Critical Alerts</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('sendgrid')">
-                            <span>📧</span>
-                            <span>SendGrid</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('email-alert-stats')">
-                            <span>📊</span>
-                            <span>Email Alert Stats</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('endusers')">
-                            <span>👥</span>
-                            <span>End Users</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('flutter-users')">
-                            <span>📲</span>
-                            <span>Manage Flutter Users</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('imei')">
-                            <span>📱</span>
-                            <span>IMEI</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('translations')">
-                            <span>🌍</span>
-                            <span>Translations</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('languages')">
-                            <span>🗣️</span>
-                            <span>Languages</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('system-settings')">
-                            <span>⚙️</span>
-                            <span>System Settings</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('device-management')">
-                            <span>🔧</span>
-                            <span>Device Management</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('webhook-logs')">
-                            <span>📨</span>
-                            <span>Webhook Logs</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('jobs')">
-                            <span>⚙️</span>
-                            <span>Background Jobs</span>
-                        </button>
+                        <ul class="sidebar-subcategories">
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('jobs')">
+                                    <span>⏱️</span>
+                                    <span>Background Jobs</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('webhook-logs')">
+                                    <span>📨</span>
+                                    <span>Webhook Logs</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('audit')">
+                                    <span>🔐</span>
+                                    <span>Audit Logs</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('billing')">
+                                    <span>💰</span>
+                                    <span>Billing & Usage</span>
+                                </button>
+                            </li>
+                        </ul>
                     </li>
                 </ul>
             </div>
@@ -3672,6 +3792,11 @@ dashboard.welcome,Bienvenue</pre>
         }
 
         // TAB SWITCHING
+        function toggleCategory(categoryId) {
+            const category = document.getElementById('cat-' + categoryId);
+            category.classList.toggle('expanded');
+        }
+
         function switchTab(tabName) {
             // Hide all tabs
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
