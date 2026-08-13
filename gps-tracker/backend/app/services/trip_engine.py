@@ -80,7 +80,7 @@ from math import radians, cos, sin, asin, sqrt
 from statistics import median
 from uuid import uuid4
 
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_, or_, delete, func
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
@@ -1540,8 +1540,15 @@ class TripEngine:
         """
         Reset engine state to a rebuild point for late-arrival reprocessing.
         
-        Finds the last confirmed stationary before rebuild_from and restores
-        state to that point. Positions from rebuild_from onward will be reprocessed.
+        Implements idempotent D1 rebuild: DELETE-then-INSERT approach.
+        
+        1. Finds the last confirmed stationary before rebuild_from (anchor)
+        2. DELETES all journeys/legs/stationaries from anchor forward
+        3. Restores in-memory state to anchor point
+        4. Positions from rebuild_from onward will be reprocessed and inserted fresh
+        
+        This prevents UniqueViolation on (device_imei, started_at) while maintaining
+        correct trip history when late arrivals change journey boundaries.
         
         Args:
             rebuild_from: Timestamp to rebuild from
@@ -1551,7 +1558,7 @@ class TripEngine:
             rebuild_from.isoformat()
         )
         
-        # Find last confirmed stationary before rebuild point
+        # Find last confirmed stationary before rebuild point (this becomes our anchor)
         anchor_query = select(Stationary).where(
             and_(
                 Stationary.device_imei == self.device_imei,
@@ -1560,6 +1567,77 @@ class TripEngine:
         ).order_by(Stationary.started_at.desc()).limit(1)
         
         anchor_stat = self.db.execute(anchor_query).scalar_one_or_none()
+        
+        # Determine deletion boundary: delete everything from anchor forward
+        # If no anchor exists, delete everything for this device
+        delete_from = anchor_stat.started_at if anchor_stat else None
+        
+        # DELETE PHASE: Remove stale trip artifacts from deletion boundary forward
+        # This makes the rebuild idempotent - no duplicate key violations possible
+        if delete_from:
+            logger.info(
+                "🗑️  D1: Deleting trips from %s forward (anchor boundary)",
+                delete_from.isoformat()
+            )
+            delete_filter = and_(
+                Stationary.device_imei == self.device_imei,
+                Stationary.started_at >= delete_from
+            )
+        else:
+            logger.info("🗑️  D1: Deleting ALL trips (no anchor found)")
+            delete_filter = Stationary.device_imei == self.device_imei
+        
+        # Delete in correct order: children first, or rely on CASCADE
+        # Count before deletion for logging
+        stat_count = self.db.execute(
+            select(func.count()).select_from(Stationary).where(delete_filter)
+        ).scalar()
+        leg_count = self.db.execute(
+            select(func.count()).select_from(Leg).where(
+                and_(
+                    Leg.device_imei == self.device_imei,
+                    Leg.started_at >= delete_from
+                ) if delete_from else Leg.device_imei == self.device_imei
+            )
+        ).scalar()
+        journey_count = self.db.execute(
+            select(func.count()).select_from(Journey).where(
+                and_(
+                    Journey.device_imei == self.device_imei,
+                    Journey.started_at >= delete_from
+                ) if delete_from else Journey.device_imei == self.device_imei
+            )
+        ).scalar()
+        
+        # Execute deletions (assuming foreign keys have ON DELETE CASCADE)
+        self.db.execute(
+            delete(Stationary).where(delete_filter)
+        )
+        self.db.execute(
+            delete(Leg).where(
+                and_(
+                    Leg.device_imei == self.device_imei,
+                    Leg.started_at >= delete_from
+                ) if delete_from else Leg.device_imei == self.device_imei
+            )
+        )
+        self.db.execute(
+            delete(Journey).where(
+                and_(
+                    Journey.device_imei == self.device_imei,
+                    Journey.started_at >= delete_from
+                ) if delete_from else Journey.device_imei == self.device_imei
+            )
+        )
+        
+        self.db.flush()  # Ensure deletions complete before reprocessing
+        
+        logger.info(
+            "✅ D1: Deleted %d journeys, %d legs, %d stationaries",
+            journey_count, leg_count, stat_count
+        )
+        
+        # STATE RESET PHASE: Restore in-memory state to anchor point
         
         if anchor_stat:
             # Reset to STATIONARY state at anchor
