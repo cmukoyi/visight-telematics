@@ -27,14 +27,15 @@ def upgrade():
     Critical for scaling to 100+ subscribed devices.
     Uses CONCURRENTLY to avoid locking table during creation.
     """
-    # Create composite index for trip engine queries
-    # Pattern: SELECT * FROM tracksolid_locations 
-    #          WHERE imei = ? AND recorded_at > ? 
-    #          ORDER BY recorded_at
-    op.execute("""
-        CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tracksolid_imei_recorded 
-        ON tracksolid_locations (imei, recorded_at DESC)
-    """)
+    # CONCURRENTLY requires running outside transaction
+    connection = op.get_bind()
+    connection.execute(sa.text("COMMIT"))  # End Alembic transaction
+    connection.execution_options(isolation_level="AUTOCOMMIT").execute(
+        sa.text("""
+            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tracksolid_imei_recorded 
+            ON tracksolid_locations (imei, recorded_at DESC)
+        """)
+    )
     
     print("✅ Created composite index idx_tracksolid_imei_recorded")
     print("   Expected performance: 6-12x faster trip engine queries")
@@ -44,5 +45,10 @@ def downgrade():
     """
     Remove composite index if needed for rollback.
     """
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS idx_tracksolid_imei_recorded")
+    # CONCURRENTLY requires running outside transaction
+    connection = op.get_bind()
+    connection.execute(sa.text("COMMIT"))  # End Alembic transaction
+    connection.execution_options(isolation_level="AUTOCOMMIT").execute(
+        sa.text("DROP INDEX CONCURRENTLY IF EXISTS idx_tracksolid_imei_recorded")
+    )
     print("⬇️ Removed composite index idx_tracksolid_imei_recorded")
