@@ -380,11 +380,11 @@ jobs:
           mkdir -p .env-snapshot
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             "${USER}@${SERVER}" \
-            "sudo bash -c \"cd '${SERVER_DIR}/gps-tracker' && \
+            "cd '${SERVER_DIR}/gps-tracker' && \
              find . -type f \( -name '.env' -o -name '*.env' -o -name '.env.*' \) \
                -not -path '*/node_modules/*' \
                -not -path '*/.git/*' \
-               -print0 2>/dev/null | xargs -0 -r sha256sum 2>/dev/null | sort\"" \
+               -print0 2>/dev/null | xargs -0 -r sha256sum 2>/dev/null | sort" \
             > .env-snapshot/before.txt
           echo "── .env files on server BEFORE rsync ──"
           cat .env-snapshot/before.txt || echo "(none)"
@@ -403,7 +403,6 @@ jobs:
           # .env.example, anything matching *.env, in any subdirectory.
           # Documentation excludes — skip *.md files (guides, implementation docs)
           rsync -avz --delete \
-            --rsync-path="sudo rsync" \
             -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
             --exclude '.git' \
             --exclude '.gitignore' \
@@ -428,7 +427,7 @@ jobs:
 
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             "${USER}@${SERVER}" \
-            "sudo test -f ${SERVER_DIR}/gps-tracker/mobile-app/ble_tracker_app/build/web/main.dart.js \
+            "test -f ${SERVER_DIR}/gps-tracker/mobile-app/ble_tracker_app/build/web/main.dart.js \
              && echo '✅ Flutter artifacts on server' \
              || (echo '❌ Flutter artifacts missing on server' && exit 1)"
 
@@ -441,11 +440,11 @@ jobs:
           USER=$(echo "$DO_USER" | tr -d '[:space:]')
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             "${USER}@${SERVER}" \
-            "sudo bash -c \"cd '${SERVER_DIR}/gps-tracker' && \
+            "cd '${SERVER_DIR}/gps-tracker' && \
              find . -type f \( -name '.env' -o -name '*.env' -o -name '.env.*' \) \
                -not -path '*/node_modules/*' \
                -not -path '*/.git/*' \
-               -print0 2>/dev/null | xargs -0 -r sha256sum 2>/dev/null | sort\"" \
+               -print0 2>/dev/null | xargs -0 -r sha256sum 2>/dev/null | sort" \
             > .env-snapshot/after.txt
           echo "── .env files on server AFTER rsync ──"
           cat .env-snapshot/after.txt || echo "(none)"
@@ -467,13 +466,13 @@ jobs:
           USER=$(echo "$DO_USER" | tr -d '[:space:]')
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             "${USER}@${SERVER}" \
-            "sudo bash -c 'set -e; cd ${SERVER_DIR}/gps-tracker; \
+            "set -e; cd '${SERVER_DIR}/gps-tracker'; \
              test -f backend/alembic/versions/046_critical_alert_subscriptions.py; \
              test -f backend/alembic/versions/047_hive_outlier_audit_fields.py; \
-             grep -q \"^revision = \\047046_critical_alert_subs\\047\" backend/alembic/versions/046_critical_alert_subscriptions.py; \
-             grep -q \"^down_revision = \\047046_critical_alert_subs\\047\" backend/alembic/versions/047_hive_outlier_audit_fields.py; \
-             echo \"✅ Alembic chain check passed (046 -> 047)\"; \
-             ls -l backend/alembic/versions/046_critical_alert_subscriptions.py backend/alembic/versions/047_hive_outlier_audit_fields.py'"
+             grep -q \"^revision = '046_critical_alert_subs'\" backend/alembic/versions/046_critical_alert_subscriptions.py; \
+             grep -q \"^down_revision = '046_critical_alert_subs'\" backend/alembic/versions/047_hive_outlier_audit_fields.py; \
+             echo '✅ Alembic chain check passed (046 -> 047)'; \
+             ls -l backend/alembic/versions/046_critical_alert_subscriptions.py backend/alembic/versions/047_hive_outlier_audit_fields.py"
 
       # ── Docker Hub Authentication ─────────────────────────────────
       # Increases pull rate limit from 100 to 200 pulls/6hrs (free account)
@@ -595,11 +594,11 @@ jobs:
           # Same script handles both tenants — it operates on Docker globally.
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             "${USER}@${SERVER}" \
-            'sudo bash -c "chmod +x /usr/local/bin/docker-daily-cleanup.sh && \
-             printf \"0 3 * * * root /usr/local/bin/docker-daily-cleanup.sh\\n\" \
+            'chmod +x /usr/local/bin/docker-daily-cleanup.sh && \
+             printf "0 3 * * * root /usr/local/bin/docker-daily-cleanup.sh\n" \
                > /etc/cron.d/docker-cleanup && \
              chmod 0644 /etc/cron.d/docker-cleanup && \
-             echo \"✅ Cron job installed: 03:00 daily → /usr/local/bin/docker-daily-cleanup.sh\""'
+             echo "✅ Cron job installed: 03:00 daily → /usr/local/bin/docker-daily-cleanup.sh"'
 
       # ── Health checks ─────────────────────────────────────────────
       - name: Health checks
