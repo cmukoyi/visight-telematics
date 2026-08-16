@@ -96,7 +96,7 @@ from app.models import (
 logger = logging.getLogger(__name__)
 
 # ── Engine Version (v2.2.0 - Fix Register) ────────────────────────────────
-ENGINE_VERSION = "2.1.16"  # v2.1.16: D1 state rebuild for late arrivals (incremental path)
+ENGINE_VERSION = "2.1.17"  # v2.1.17: Fix D1 re-entrancy flag reset after state rebuild
 
 # ── Configuration (defaults from spec validation) ─────────────────────────
 DEFAULT_ANCHOR_RADIUS_M = 100
@@ -1655,6 +1655,9 @@ class TripEngine:
             self.context.stop_candidate_since = None
             self.context.stop_candidate_points = []
             
+            # v2.1.17 D1: Clear re-entrancy flag after state reset
+            self.context.leg_persisted_this_invocation = False
+            
             logger.info(
                 "🔄 D1: State reset to anchor stationary at (%.4f, %.4f) ending %s",
                 anchor_stat.anchor_lat, anchor_stat.anchor_lng,
@@ -1673,6 +1676,9 @@ class TripEngine:
             self.context.leg_buffer = []
             self.context.stop_candidate_since = None
             self.context.stop_candidate_points = []
+            
+            # v2.1.17 D1: Clear re-entrancy flag after state reset
+            self.context.leg_persisted_this_invocation = False
             
             logger.info("🔄 D1: State reset to initial (no anchor found before rebuild point)")
     
