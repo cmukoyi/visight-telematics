@@ -380,11 +380,11 @@ jobs:
           mkdir -p .env-snapshot
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             "${USER}@${SERVER}" \
-            "cd '${SERVER_DIR}/gps-tracker' && \
+            "sudo bash -c \"cd '${SERVER_DIR}/gps-tracker' && \
              find . -type f \( -name '.env' -o -name '*.env' -o -name '.env.*' \) \
                -not -path '*/node_modules/*' \
                -not -path '*/.git/*' \
-               -print0 2>/dev/null | xargs -0 -r sha256sum 2>/dev/null | sort" \
+               -print0 2>/dev/null | xargs -0 -r sha256sum 2>/dev/null | sort\"" \
             > .env-snapshot/before.txt
           echo "── .env files on server BEFORE rsync ──"
           cat .env-snapshot/before.txt || echo "(none)"
@@ -440,11 +440,11 @@ jobs:
           USER=$(echo "$DO_USER" | tr -d '[:space:]')
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             "${USER}@${SERVER}" \
-            "cd '${SERVER_DIR}/gps-tracker' && \
+            "sudo bash -c \"cd '${SERVER_DIR}/gps-tracker' && \
              find . -type f \( -name '.env' -o -name '*.env' -o -name '.env.*' \) \
                -not -path '*/node_modules/*' \
                -not -path '*/.git/*' \
-               -print0 2>/dev/null | xargs -0 -r sha256sum 2>/dev/null | sort" \
+               -print0 2>/dev/null | xargs -0 -r sha256sum 2>/dev/null | sort\"" \
             > .env-snapshot/after.txt
           echo "── .env files on server AFTER rsync ──"
           cat .env-snapshot/after.txt || echo "(none)"
