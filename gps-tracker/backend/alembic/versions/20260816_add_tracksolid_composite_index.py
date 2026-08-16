@@ -25,16 +25,31 @@ def upgrade():
     - After: 50-100ms per device query (6-12x faster)
     
     Critical for scaling to 100+ subscribed devices.
-    Uses CONCURRENTLY to avoid locking table during creation.
+    
+    NOTE: For production with large tables (2M+ rows), create manually first:
+      docker exec pinplot_db psql -U pinplot_db_user -d pinplot_db -c \
+        "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tracksolid_imei_recorded ON tracksolid_locations (imei, recorded_at DESC);"
+    
+    Migration will skip if index already exists.
     """
-    # CONCURRENTLY requires running outside transaction
+    # Check if index already exists (handles manual creation)
     connection = op.get_bind()
-    connection.execute(sa.text("COMMIT"))  # End Alembic transaction
-    connection.execution_options(isolation_level="AUTOCOMMIT").execute(
-        sa.text("""
-            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tracksolid_imei_recorded 
-            ON tracksolid_locations (imei, recorded_at DESC)
-        """)
+    result = connection.execute(sa.text("""
+        SELECT 1 FROM pg_indexes 
+        WHERE indexname = 'idx_tracksolid_imei_recorded'
+    """))
+    
+    if result.fetchone():
+        print("✅ Index idx_tracksolid_imei_recorded already exists (skipped)")
+        return
+    
+    # Create index (regular mode, works in transaction)
+    # For large tables, prefer manual CONCURRENTLY creation before deployment
+    op.create_index(
+        'idx_tracksolid_imei_recorded',
+        'tracksolid_locations',
+        ['imei', sa.text('recorded_at DESC')],
+        postgresql_concurrently=False
     )
     
     print("✅ Created composite index idx_tracksolid_imei_recorded")
@@ -45,10 +60,15 @@ def downgrade():
     """
     Remove composite index if needed for rollback.
     """
-    # CONCURRENTLY requires running outside transaction
+    # Check if index exists before dropping
     connection = op.get_bind()
-    connection.execute(sa.text("COMMIT"))  # End Alembic transaction
-    connection.execution_options(isolation_level="AUTOCOMMIT").execute(
-        sa.text("DROP INDEX CONCURRENTLY IF EXISTS idx_tracksolid_imei_recorded")
-    )
-    print("⬇️ Removed composite index idx_tracksolid_imei_recorded")
+    result = connection.execute(sa.text("""
+        SELECT 1 FROM pg_indexes 
+        WHERE indexname = 'idx_tracksolid_imei_recorded'
+    """))
+    
+    if result.fetchone():
+        op.drop_index('idx_tracksolid_imei_recorded', 'tracksolid_locations')
+        print("⬇️ Removed composite index idx_tracksolid_imei_recorded")
+    else:
+        print("⬇️ Index idx_tracksolid_imei_recorded does not exist (skipped)")
