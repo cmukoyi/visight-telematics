@@ -29,8 +29,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-__TENANT_DB_NAME__}
     volumes:
       - __TENANT_PREFIX___postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5433:5432"
     networks:
       - __TENANT_PREFIX___network
     restart: unless-stopped
