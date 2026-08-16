@@ -470,10 +470,10 @@ jobs:
             "sudo bash -c 'set -e; cd ${SERVER_DIR}/gps-tracker; \
              test -f backend/alembic/versions/046_critical_alert_subscriptions.py; \
              test -f backend/alembic/versions/047_hive_outlier_audit_fields.py; \
-             grep -q \"^revision = '046_critical_alert_subs'\" backend/alembic/versions/046_critical_alert_subscriptions.py; \
-             grep -q \"^down_revision = '046_critical_alert_subs'\" backend/alembic/versions/047_hive_outlier_audit_fields.py; \
+             grep -q \"^revision = \\047046_critical_alert_subs\\047\" backend/alembic/versions/046_critical_alert_subscriptions.py; \
+             grep -q \"^down_revision = \\047046_critical_alert_subs\\047\" backend/alembic/versions/047_hive_outlier_audit_fields.py; \
              echo \"✅ Alembic chain check passed (046 -> 047)\"; \
-             ls -l backend/alembic/versions/046_critical_alert_subscriptions.py backend/alembic/versions/047_hive_outlier_audit_fields.py"
+             ls -l backend/alembic/versions/046_critical_alert_subscriptions.py backend/alembic/versions/047_hive_outlier_audit_fields.py'"
 
       # ── Docker Hub Authentication ─────────────────────────────────
       # Increases pull rate limit from 100 to 200 pulls/6hrs (free account)
