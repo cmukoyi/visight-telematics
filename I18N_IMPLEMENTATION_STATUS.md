@@ -211,7 +211,7 @@ Estimated: ~20 strings
    - Go to Movement Analytics tab
    - Verify all text is translated (no English)
 
-### For Beacon Production (beacontelematics.co.uk)
+### For Beacon Production (prod/beacon branch)
 
 1. **Merge to prod/beacon** (after PinPlot verification):
    ```bash
