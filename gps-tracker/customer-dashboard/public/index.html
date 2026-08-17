@@ -3498,19 +3498,19 @@ input.hive-range::-moz-range-track {
                             <div>
                                 <div class="mha-pills" id="mha-category-pills">
                                     <!-- Dynamic category pills loaded from database -->
-                                    <span class="mha-pill on" data-filter="all" onclick="mhaSetFilter('all', this)">All</span>
+                                    <span class="mha-pill on" data-filter="all" onclick="mhaSetFilter('all', this)" data-i18n="common.all">All</span>
                                 </div>
                             </div>
                             
                             <div style="flex:1;display:flex;flex-direction:column;">
                                 <div class="mha-ap-label" style="display:flex;justify-content:space-between;align-items:center">
-                                    <span>Assets</span>
-                                    <span style="text-transform:none;letter-spacing:0;font-size:10px"><i class="fa-solid fa-arrow-down" style="font-size:10px;margin-right:2px"></i> last reported</span>
+                                    <span data-i18n="assets.title">Assets</span>
+                                    <span style="text-transform:none;letter-spacing:0;font-size:10px"><i class="fa-solid fa-arrow-down" style="font-size:10px;margin-right:2px"></i> <span data-i18n="general.last_reported">last reported</span></span>
                                 </div>
                                 <div class="mha-ap-list" id="mha-asset-list">
                                     <div style="padding:40px 16px;text-align:center;color:var(--text-3);font-size:13px;">
                                         <i class="fa-solid fa-spinner fa-spin" style="font-size:24px;margin-bottom:12px;display:block;"></i>
-                                        Loading assets...
+                                        <span data-i18n="assets.loading_assets">Loading assets...</span>
                                     </div>
                                 </div>
                             </div>
@@ -3520,27 +3520,27 @@ input.hive-range::-moz-range-track {
                     <!-- Map Panel (Phase 5.4) -->
                     <div class="mha-map-panel">
                         <!-- Vertical "Show Assets" button (appears when panel collapsed) -->
-                        <button class="mha-show-assets-btn" onclick="mhaToggleAssetsPanel()" title="Show Assets Panel">
+                        <button class="mha-show-assets-btn" onclick="mhaToggleAssetsPanel()" data-i18n-title="general.show_assets_panel" title="Show Assets Panel">
                             <i class="fa-solid fa-tags"></i>
-                            SHOW ASSETS
+                            <span data-i18n="general.show_assets">SHOW ASSETS</span>
                         </button>
                         
                         <!-- Vertical "Show Journeys" button (appears when panel collapsed) -->
-                        <button class="mha-show-journeys-btn" onclick="mhaTogglePanel()" title="Show Journeys Panel">
+                        <button class="mha-show-journeys-btn" onclick="mhaTogglePanel()" data-i18n-title="general.show_journeys_panel" title="Show Journeys Panel">
                             <i class="fa-solid fa-route"></i>
-                            SHOW JOURNEYS
+                            <span data-i18n="general.show_journeys">SHOW JOURNEYS</span>
                         </button>
                         
                         <div class="mha-map-head">
                             <div style="display:flex;align-items:center;gap:12px;flex:1">
                                 <div class="t">
                                     <i class="fa-solid fa-map"></i>
-                                    <span>Journey Map</span>
+                                    <span data-i18n="general.journey_map">Journey Map</span>
                                 </div>
-                                <div class="meta" id="mha-map-meta">Select an asset to view journeys</div>
+                                <div class="meta" id="mha-map-meta" data-i18n="trips.select_asset_date">Select an asset to view journeys</div>
                             </div>
-                            <button class="btn btn-secondary btn-small" onclick="mhaOpenHelp()" title="Open the Movement Analytics user manual in a new tab">
-                                <i class="fa-solid fa-circle-question"></i> How To
+                            <button class="btn btn-secondary btn-small" onclick="mhaOpenHelp()" data-i18n-title="general.open_user_manual" title="Open the Movement Analytics user manual in a new tab">
+                                <i class="fa-solid fa-circle-question"></i> <span data-i18n="general.how_to">How To</span>
                             </button>
                         </div>
                         <div class="mha-map-container">
@@ -3548,10 +3548,10 @@ input.hive-range::-moz-range-track {
                             
                             <!-- Map Style Switcher -->
                             <div class="map-style-switcher" id="mha-style-switcher">
-                                <button class="map-style-btn active" data-style="streets" onclick="mhaSwitchMapStyle('streets')">
+                                <button class="map-style-btn active" data-style="streets" onclick="mhaSwitchMapStyle('streets')" data-i18n="map.streets">
                                     Streets
                                 </button>
-                                <button class="map-style-btn" data-style="satellite" onclick="mhaSwitchMapStyle('satellite')">
+                                <button class="map-style-btn" data-style="satellite" onclick="mhaSwitchMapStyle('satellite')" data-i18n="map.satellite">
                                     Satellite
                                 </button>
                             </div>
@@ -3559,23 +3559,23 @@ input.hive-range::-moz-range-track {
                             <!-- Map Controls -->
                             <div class="mha-map-controls">
                                 <button class="mha-map-btn" id="mha-reset-view" style="display:none;" onclick="mhaResetView()">
-                                    <i class="fa-solid fa-compress"></i> Reset view
+                                    <i class="fa-solid fa-compress"></i> <span data-i18n="map.reset_view">Reset view</span>
                                 </button>
                                 <button class="mha-map-btn" id="mha-show-geofences" onclick="mhaToggleGeofences()">
-                                    <i class="fa-solid fa-draw-polygon"></i> Show geofences
+                                    <i class="fa-solid fa-draw-polygon"></i> <span data-i18n="geofence.show_geofences">Show geofences</span>
                                 </button>
                                 <button class="mha-map-btn" onclick="mhaClearMarkers()">
-                                    <i class="fa-solid fa-eraser"></i> Clear markers
+                                    <i class="fa-solid fa-eraser"></i> <span data-i18n="map.clear_markers">Clear markers</span>
                                 </button>
                             </div>
                             
                             <!-- Legend -->
                             <div class="mha-legend">
-                                <span><i class="mha-legend-dot" style="background:#22c55e;"></i> Start</span>
-                                <span><i class="mha-legend-line" style="background:#3b82f6;"></i> Leg</span>
-                                <span><i class="mha-legend-dot" style="background:#3b82f6;width:6px;height:6px;"></i> Position</span>
-                                <span><i class="mha-legend-dot" style="background:#f59e0b;"></i> Stationary</span>
-                                <span><i class="mha-legend-dot" style="background:#ef4444;"></i> End</span>
+                                <span><i class="mha-legend-dot" style="background:#22c55e;"></i> <span data-i18n="trips.start">Start</span></span>
+                                <span><i class="mha-legend-line" style="background:#3b82f6;"></i> <span data-i18n="general.leg">Leg</span></span>
+                                <span><i class="mha-legend-dot" style="background:#3b82f6;width:6px;height:6px;"></i> <span data-i18n="general.position">Position</span></span>
+                                <span><i class="mha-legend-dot" style="background:#f59e0b;"></i> <span data-i18n="general.stationary">Stationary</span></span>
+                                <span><i class="mha-legend-dot" style="background:#ef4444;"></i> <span data-i18n="trips.end">End</span></span>
                             </div>
                             
                             <!-- Journey Badge -->
@@ -3590,26 +3590,26 @@ input.hive-range::-moz-range-track {
                         <div class="mha-jp-tabs">
                             <div class="mha-jp-tab active" data-mha-tab="journeys" onclick="mhaSwitchTab('journeys')">
                                 <i class="fa-solid fa-route"></i>
-                                <span>Journeys</span>
+                                <span data-i18n="trips.journeys">Journeys</span>
                             </div>
                             <div class="mha-jp-tab" data-mha-tab="positions" onclick="mhaSwitchTab('positions')">
                                 <i class="fa-solid fa-location-dot"></i>
-                                <span>Positions</span>
+                                <span data-i18n="general.positions">Positions</span>
                             </div>
-                            <button class="mha-jp-collapse" onclick="mhaTogglePanel()" title="Collapse panel">
+                            <button class="mha-jp-collapse" onclick="mhaTogglePanel()" data-i18n-title="general.collapse_panel" title="Collapse panel">
                                 <i class="fa-solid fa-chevron-right"></i>
                             </button>
                         </div>
                         <div class="mha-jp-body" id="mha-journeys-body">
                             <div class="mha-jp-placeholder">
                                 <i class="fa-solid fa-route"></i>
-                                <p>Select an asset to view journeys</p>
+                                <p data-i18n="trips.select_asset_date">Select an asset to view journeys</p>
                             </div>
                         </div>
                         <div class="mha-jp-body" id="mha-positions-body" style="display:none;">
                             <div class="mha-jp-placeholder">
                                 <i class="fa-solid fa-location-dot"></i>
-                                <p>Select an asset to view positions</p>
+                                <p data-i18n="general.select_asset_positions">Select an asset to view positions</p>
                             </div>
                         </div>
                     </div>
