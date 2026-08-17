@@ -1948,8 +1948,8 @@ input.hive-range::-moz-range-track {
                       <canvas id="interactCanvas"></canvas>
                       <div class="canvas-drop-hint" id="dropHint">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                        <div>Drop floor plan image to use as tracing overlay</div>
-                        <div class="hint-sub">PNG, JPG, PDF, SVG supported</div>
+                        <div data-i18n="floor_plan.drop_image_hint">Drop floor plan image to use as tracing overlay</div>
+                        <div class="hint-sub" data-i18n="floor_plan.supported_formats">PNG, JPG, PDF, SVG supported</div>
                       </div>
                     </div>
                   </main>
@@ -2078,16 +2078,16 @@ input.hive-range::-moz-range-track {
                       <div class="preview-floor-tabs" id="previewFloorTabs"></div>
                       <div class="preview-controls">
                         <label class="toggle-row sm" style="gap:6px">
-                          <span style="color:var(--text-muted);font-size:11px">Gateways</span>
+                          <span style="color:var(--text-muted);font-size:11px" data-i18n="floor_plan.gateways">Gateways</span>
                           <label class="toggle sm"><input type="checkbox" id="previewGatewayToggle" checked><span class="slider"></span></label>
                         </label>
                         <label class="toggle-row sm" style="gap:6px">
-                          <span style="color:var(--text-muted);font-size:11px">Labels</span>
+                          <span style="color:var(--text-muted);font-size:11px" data-i18n="floor_plan.labels">Labels</span>
                           <label class="toggle sm"><input type="checkbox" id="previewLabelToggle" checked><span class="slider"></span></label>
                         </label>
-                        <button class="btn-icon sm" id="previewClose" title="Close preview">
+                        <button class="btn-icon sm" id="previewClose" data-i18n-title="floor_plan.close_preview" title="Close preview">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                          Close
+                          <span data-i18n="common.close">Close</span>
                         </button>
                       </div>
                     </div>
@@ -2115,32 +2115,32 @@ input.hive-range::-moz-range-track {
                 <div class="modal-overlay" id="sketchSetupModal" style="display:none">
                   <div class="modal" style="max-width:500px">
                     <div class="modal-title" data-i18n="general.floor_plan_setup">Floor Plan Setup</div>
-                    <div style="margin-bottom:16px;padding:12px;background:var(--primary-dim);border-radius:6px;font-size:13px;color:var(--text-muted)">
+                    <div style="margin-bottom:16px;padding:12px;background:var(--primary-dim);border-radius:6px;font-size:13px;color:var(--text-muted)" data-i18n="floor_plan.link_to_database">
                       Link this floor plan to a building and floor in your database.
                     </div>
                     <div style="margin-bottom:16px">
-                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">Building</label>
+                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)" data-i18n="floor_plan.building">Building</label>
                       <select id="sketchBuildingSelect" class="prop-input" style="width:100%">
-                        <option value="">Select or create new...</option>
+                        <option value="" data-i18n="floor_plan.select_or_create">Select or create new...</option>
                       </select>
                       <div id="sketchNewBuildingFields" style="display:none;margin-top:8px">
-                        <input type="text" id="sketchBuildingName" class="prop-input" placeholder="Building name" style="width:100%;margin-bottom:8px">
-                        <input type="text" id="sketchBuildingAddress" class="prop-input" placeholder="Address (optional)" style="width:100%">
+                        <input type="text" id="sketchBuildingName" class="prop-input" data-i18n-placeholder="floor_plan.building_name" placeholder="Building name" style="width:100%;margin-bottom:8px">
+                        <input type="text" id="sketchBuildingAddress" class="prop-input" data-i18n-placeholder="floor_plan.address_optional" placeholder="Address (optional)" style="width:100%">
                       </div>
                     </div>
                     <div style="margin-bottom:16px">
-                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">Floor</label>
+                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)" data-i18n="floor_plan.floor">Floor</label>
                       <select id="sketchFloorSelect" class="prop-input" style="width:100%">
-                        <option value="">Select or create new...</option>
+                        <option value="" data-i18n="floor_plan.select_or_create">Select or create new...</option>
                       </select>
                       <div id="sketchNewFloorFields" style="display:none;margin-top:8px">
-                        <input type="text" id="sketchFloorName" class="prop-input" placeholder="Floor name (e.g., Ground Floor)" style="width:100%;margin-bottom:8px">
-                        <input type="number" id="sketchFloorNumber" class="prop-input" placeholder="Floor number (0 = ground, 1 = first, -1 = basement)" style="width:100%">
+                        <input type="text" id="sketchFloorName" class="prop-input" data-i18n-placeholder="floor_plan.floor_name" placeholder="Floor name (e.g., Ground Floor)" style="width:100%;margin-bottom:8px">
+                        <input type="number" id="sketchFloorNumber" class="prop-input" data-i18n-placeholder="floor_plan.floor_number" placeholder="Floor number (0 = ground, 1 = first, -1 = basement)" style="width:100%">
                       </div>
                     </div>
                     <div class="modal-actions">
                       <button class="btn-ghost" id="sketchSetupCancel" data-i18n="common.cancel">Cancel</button>
-                      <button class="btn-primary" id="sketchSetupSave">Link Floor Plan</button>
+                      <button class="btn-primary" id="sketchSetupSave" data-i18n="floor_plan.link_floor_plan">Link Floor Plan</button>
                     </div>
                   </div>
                 </div>
@@ -2169,7 +2169,7 @@ input.hive-range::-moz-range-track {
                     <div id="sketchExistingGatewayFields" style="margin-bottom:16px;display:none">
                       <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">Gateway</label>
                       <select id="sketchGatewaySelect" class="prop-input" style="width:100%">
-                        <option value="">Loading...</option>
+                        <option value="" data-i18n="users.loading">Loading...</option>
                       </select>
                     </div>
                     <div class="modal-actions">
@@ -2194,7 +2194,7 @@ input.hive-range::-moz-range-track {
                                 <input type="text" id="fp-search-input" placeholder="Search assets or tags…" oninput="_fpFilterAssetsD(this.value)">
                             </div>
                             <div class="fp-status-grid">
-                                <div class="fp-status-card fp-active" id="fp-sc-all"     onclick="FP.filterByStatus('all',this)">    <div class="fp-count" id="fp-count-total">0</div>   <div class="fp-slabel">Total</div></div>
+                                <div class="fp-status-card fp-active" id="fp-sc-all"     onclick="FP.filterByStatus('all',this)">    <div class="fp-count" id="fp-count-total">0</div>   <div class="fp-slabel" data-i18n="floor_plan.total">Total</div></div>
                                 <div class="fp-status-card"           id="fp-sc-online"  onclick="FP.filterByStatus('online',this)"> <div class="fp-count fp-online"  id="fp-count-online">0</div>  <div class="fp-slabel">Online</div></div>
                                 <div class="fp-status-card"           id="fp-sc-idle"    onclick="FP.filterByStatus('idle',this)">   <div class="fp-count fp-idle"    id="fp-count-idle">0</div>    <div class="fp-slabel">Idle</div></div>
                                 <div class="fp-status-card"           id="fp-sc-offline" onclick="FP.filterByStatus('offline',this)"><div class="fp-count fp-offline" id="fp-count-offline">0</div> <div class="fp-slabel">Offline</div></div>
@@ -2219,7 +2219,7 @@ input.hive-range::-moz-range-track {
                         <div class="fp-asset-list" id="fp-asset-list">
                             <div class="fp-empty-state" id="fp-empty-state">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
-                                <p id="fp-empty-msg">Loading assets…</p>
+                                <p id="fp-empty-msg" data-i18n="floor_plan.loading_assets">Loading assets…</p>
                             </div>
                         </div>
                     </div>
@@ -2270,7 +2270,7 @@ input.hive-range::-moz-range-track {
                         <!-- Zone legend -->
                         <div class="fp-zone-legend" id="fp-zone-legend">
                             <div class="fp-legend-title">Zones</div>
-                            <div class="fp-legend-item"><div class="fp-legend-swatch" style="background:rgba(0,100,0,.2);border:1.5px solid rgba(0,100,0,.55)"></div>Active / Dispatch</div>
+                            <div class="fp-legend-item"><div class="fp-legend-swatch" style="background:rgba(0,100,0,.2);border:1.5px solid rgba(0,100,0,.55)"></div><span data-i18n="floor_plan.active_dispatch">Active / Dispatch</span></div>
                             <div class="fp-legend-item"><div class="fp-legend-swatch" style="background:rgba(239,68,68,.18);border:1.5px solid rgba(239,68,68,.5)"></div>Alert zone</div>
                             <div class="fp-legend-item"><div class="fp-legend-swatch" style="background:rgba(59,130,246,.15);border:1.5px solid rgba(59,130,246,.45)"></div>Restricted</div>
                             <div class="fp-legend-item"><div class="fp-legend-swatch" style="background:rgba(245,158,11,.15);border:1.5px solid rgba(245,158,11,.45)"></div>Staging</div>
@@ -2777,8 +2777,8 @@ input.hive-range::-moz-range-track {
             <div id="tab-qr" class="tab-content">
                 <!-- QR/NFC Toolbar with How To button -->
                 <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
-                    <button class="btn btn-secondary btn-small" style="margin-left:auto" onclick="qrOpenHelp()" title="Open the QR/NFC user guide in a new tab">
-                        <i class="fa-solid fa-circle-question"></i> How To
+                    <button class="btn btn-secondary btn-small" style="margin-left:auto" onclick="qrOpenHelp()" data-i18n-title="qr.open_user_guide" title="Open the QR/NFC user guide in a new tab">
+                        <i class="fa-solid fa-circle-question"></i> <span data-i18n="general.how_to">How To</span>
                     </button>
                 </div>
                 
@@ -2969,7 +2969,7 @@ input.hive-range::-moz-range-track {
                             </tr>
                         </thead>
                         <tbody id="rpt-trips-tbody">
-                            <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-3)">Select a tag and date range, then click <strong>Load Journeys</strong>.</td></tr>
+                            <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-3)"><span data-i18n="common.select_tag_and_date">Select a tag and date range, then click <strong>Load Journeys</strong>.</span></td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -3621,10 +3621,10 @@ input.hive-range::-moz-range-track {
 
               <!-- ── HIVE sub-nav ─────────────────────────────── -->
               <div id="hive-subnav" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-                <button class="hive-btn hive-btn-ghost hive-subnav-btn" data-hscreen="list" onclick="hiveShowScreen('list')"><i class="fa-solid fa-grip"></i> Hive List</button>
-                <button class="hive-btn hive-btn-ghost hive-subnav-btn" data-hscreen="archive" onclick="hiveShowScreen('archive')"><i class="fa-solid fa-box-archive"></i> Archive</button>
-                <button class="hive-btn hive-btn-ghost" style="margin-left:auto" onclick="hiveOpenHelp()" title="Open the HIVE user manual in a new tab"><i class="fa-solid fa-circle-question"></i> How To</button>
-                <button class="hive-btn" onclick="hiveShowWizard()"><i class="fa-solid fa-plus"></i> New Hive</button>
+                <button class="hive-btn hive-btn-ghost hive-subnav-btn" data-hscreen="list" onclick="hiveShowScreen('list')"><i class="fa-solid fa-grip"></i> <span data-i18n="hive.hive_list">Hive List</span></button>
+                <button class="hive-btn hive-btn-ghost hive-subnav-btn" data-hscreen="archive" onclick="hiveShowScreen('archive')"><i class="fa-solid fa-box-archive"></i> <span data-i18n="hive.archive">Archive</span></button>
+                <button class="hive-btn hive-btn-ghost" style="margin-left:auto" onclick="hiveOpenHelp()" data-i18n-title="hive.open_user_manual" title="Open the HIVE user manual in a new tab"><i class="fa-solid fa-circle-question"></i> <span data-i18n="general.how_to">How To</span></button>
+                <button class="hive-btn" onclick="hiveShowWizard()"><i class="fa-solid fa-plus"></i> <span data-i18n="hive.new_hive">New Hive</span></button>
               </div>
 
               <!-- ════════════════════════════════════════
@@ -3632,28 +3632,28 @@ input.hive-range::-moz-range-track {
               ════════════════════════════════════════ -->
               <div id="hive-screen-list">
                 <div class="hive-page-header">
-                  <div class="hive-page-title"><i class="fa-solid fa-shield-halved"></i> HIVE Tracking</div>
+                  <div class="hive-page-title"><i class="fa-solid fa-shield-halved"></i> <span data-i18n="hive.hive_tracking">HIVE Tracking</span></div>
                   <div class="hive-search-box">
                     <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" placeholder="Search hives, tag IDs, names…" oninput="_hiveFilterCardsD(this.value)">
+                    <input type="text" data-i18n-placeholder="hive.search_hives" placeholder="Search hives, tag IDs, names…" oninput="_hiveFilterCardsD(this.value)">
                   </div>
                 </div>
                 <div class="hive-stats-row">
                   <div class="hive-stat-card">
                     <div class="hive-stat-icon hive-green"><i class="fa-solid fa-shield-halved"></i></div>
-                    <div><div id="hive-stat-active" class="hive-stat-num">—</div><div class="hive-stat-label">Active Hives</div></div>
+                    <div><div id="hive-stat-active" class="hive-stat-num">—</div><div class="hive-stat-label" data-i18n="hive.active_hives">Active Hives</div></div>
                   </div>
                   <div class="hive-stat-card">
                     <div class="hive-stat-icon hive-red"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                    <div><div id="hive-stat-breach" class="hive-stat-num">—</div><div class="hive-stat-label">In Breach</div></div>
+                    <div><div id="hive-stat-breach" class="hive-stat-num">—</div><div class="hive-stat-label" data-i18n="hive.in_breach">In Breach</div></div>
                   </div>
                   <div class="hive-stat-card">
                     <div class="hive-stat-icon hive-blue"><i class="fa-solid fa-tag"></i></div>
-                    <div><div id="hive-stat-tags" class="hive-stat-num">—</div><div class="hive-stat-label">Tags Tracked</div></div>
+                    <div><div id="hive-stat-tags" class="hive-stat-num">—</div><div class="hive-stat-label" data-i18n="hive.tags_tracked">Tags Tracked</div></div>
                   </div>
                   <div class="hive-stat-card">
                     <div class="hive-stat-icon hive-amber"><i class="fa-solid fa-clock"></i></div>
-                    <div><div id="hive-stat-stale" class="hive-stat-num">—</div><div class="hive-stat-label">Stale Tags</div></div>
+                    <div><div id="hive-stat-stale" class="hive-stat-num">—</div><div class="hive-stat-label" data-i18n="hive.stale_tags">Stale Tags</div></div>
                   </div>
                 </div>
                 <div id="hive-list-err" class="alert" style="display:none"><span id="hive-list-err-text"></span></div>
@@ -3674,9 +3674,9 @@ input.hive-range::-moz-range-track {
                     <div id="hive-detail-meta" class="hive-detail-head-meta"></div>
                   </div>
                   <div class="hive-btn-row">
-                    <button class="hive-btn hive-btn-ghost" onclick="hiveOpenConfigModal()"><i class="fa-solid fa-pen"></i> Configure</button>
-                    <button class="hive-btn hive-btn-danger" onclick="hiveArchiveCurrent()"><i class="fa-solid fa-trash"></i> Delete</button>
-                    <button class="hive-btn hive-btn-ghost" onclick="hiveShowScreen('list')"><i class="fa-solid fa-arrow-left"></i> Back</button>
+                    <button class="hive-btn hive-btn-ghost" onclick="hiveOpenConfigModal()"><i class="fa-solid fa-pen"></i> <span data-i18n="hive.configure">Configure</span></button>
+                    <button class="hive-btn hive-btn-danger" onclick="hiveArchiveCurrent()"><i class="fa-solid fa-trash"></i> <span data-i18n="common.delete">Delete</span></button>
+                    <button class="hive-btn hive-btn-ghost" onclick="hiveShowScreen('list')"><i class="fa-solid fa-arrow-left"></i> <span data-i18n="common.back">Back</span></button>
                   </div>
                 </div>
 
@@ -3685,7 +3685,7 @@ input.hive-range::-moz-range-track {
                   <div>
                     <div class="hive-panel" style="margin-bottom:16px">
                       <div class="hive-panel-head">
-                        <div class="hive-panel-title"><i class="fa-solid fa-map-location-dot"></i> Live Position</div>
+                        <div class="hive-panel-title"><i class="fa-solid fa-map-location-dot"></i> <span data-i18n="hive.live_position">Live Position</span></div>
                         <div id="hive-detail-updated" class="hive-panel-meta"></div>
                       </div>
                       <!-- map -->
@@ -3702,10 +3702,10 @@ input.hive-range::-moz-range-track {
                           <button onclick="hiveMapZoom(0)" title="Reset"><i class="fa-solid fa-expand"></i></button>
                         </div>
                         <div class="hive-map-legend">
-                          <div class="hive-legend-item"><div class="hive-legend-dot" style="background:var(--hive-green)"></div>Fresh</div>
-                          <div class="hive-legend-item"><div class="hive-legend-dot" style="background:var(--hive-blue)"></div>Recent</div>
-                          <div class="hive-legend-item"><div class="hive-legend-dot" style="background:var(--hive-amber)"></div>Stale</div>
-                          <div class="hive-legend-item"><div class="hive-legend-dot" style="background:var(--hive-red)"></div>Outlier</div>
+                          <div class="hive-legend-item"><div class="hive-legend-dot" style="background:var(--hive-green)"></div><span data-i18n="hive.fresh">Fresh</span></div>
+                          <div class="hive-legend-item"><div class="hive-legend-dot" style="background:var(--hive-blue)"></div><span data-i18n="hive.recent">Recent</span></div>
+                          <div class="hive-legend-item"><div class="hive-legend-dot" style="background:var(--hive-amber)"></div><span data-i18n="hive.stale">Stale</span></div>
+                          <div class="hive-legend-item"><div class="hive-legend-dot" style="background:var(--hive-red)"></div><span data-i18n="hive.outlier">Outlier</span></div>
                         </div>
                       </div>
                       <!-- diameter -->
@@ -3951,7 +3951,7 @@ input.hive-range::-moz-range-track {
             <span class="modal-title" data-i18n="general.upload_floor_plan">Upload Floor Plan</span>
             <button class="modal-close" onclick="closeModal('uploadFloorModal')">×</button>
         </div>
-        <p style="font-size:13px;color:var(--gray);margin-bottom:16px">Upload a PNG or JPEG image of the floor plan. It will be stored in the browser for this building.</p>
+        <p style="font-size:13px;color:var(--gray);margin-bottom:16px" data-i18n="floor_plan.upload_instructions">Upload a PNG or JPEG image of the floor plan. It will be stored in the browser for this building.</p>
         <div class="drop-zone" onclick="document.getElementById('floorFileInput').click()">
             <div class="dz-icon">🏗️</div>
             <p><strong>Click to browse</strong> or drag & drop an image</p>
@@ -4061,13 +4061,13 @@ input.hive-range::-moz-range-track {
             <div class="form-group">
                 <label>Assign to User</label>
                 <select id="tagMgmtUser">
-                    <option value="">Loading users…</option>
+                    <option value="" data-i18n="common.loading_users">Loading users…</option>
                 </select>
             </div>
             <div id="tagMgmtPackageGroup" class="form-group">
                 <label>Package *</label>
                 <select id="tagMgmtPackage" required>
-                    <option value="">Loading packages…</option>
+                    <option value="" data-i18n="common.loading_packages">Loading packages…</option>
                 </select>
             </div>
             <input type="hidden" id="tagMgmtTagId">
@@ -4201,7 +4201,7 @@ input.hive-range::-moz-range-track {
         <div class="modal-body">
             <div class="loc-dropzone" id="am-dropzone">
                 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                <div class="loc-dropzone-title">Drop your file here, or click to browse</div>
+                <div class="loc-dropzone-title" data-i18n="asset_mgmt.drop_file_hint">Drop your file here, or click to browse</div>
                 <div class="loc-dropzone-sub">.xlsx or .csv — columns: imei, owner_email (optional), description, tag_type</div>
                 <input type="file" id="am-bulk-file" accept=".xlsx,.xls,.csv" style="display:none">
             </div>
@@ -4213,7 +4213,7 @@ input.hive-range::-moz-range-track {
                 <div class="loc-template-banner-icon"><i class="fa-solid fa-table"></i></div>
                 <div class="loc-template-banner-text">
                     <div class="loc-template-banner-title">Need a template?</div>
-                    <div class="loc-template-banner-sub">Download the Excel template with correct column headers and example rows.</div>
+                    <div class="loc-template-banner-sub" data-i18n="asset_mgmt.download_template">Download the Excel template with correct column headers and example rows.</div>
                 </div>
                 <button class="btn btn-ghost btn-sm" id="am-bulk-template-btn"><i class="fa-solid fa-download"></i> Template</button>
             </div>
@@ -4225,7 +4225,7 @@ input.hive-range::-moz-range-track {
             </div>
             <div class="loc-progress-row" id="am-bulk-progress">
                 <div class="loc-progress-bar"><div class="loc-progress-fill" id="am-progress-fill"></div></div>
-                <div class="loc-progress-text"><span id="am-progress-label">Uploading…</span><span id="am-progress-count"></span></div>
+                <div class="loc-progress-text"><span id="am-progress-label" data-i18n="asset_mgmt.uploading">Uploading…</span><span id="am-progress-count"></span></div>
             </div>
             <div id="am-bulk-result" style="display:none;margin-top:12px"></div>
         </div>
