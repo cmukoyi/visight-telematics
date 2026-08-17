@@ -6,8 +6,8 @@ but don't yet exist in the database.
 """
 import sys
 from sqlalchemy.orm import Session
-from database import SessionLocal
-from models_i18n import TranslationKey, Translation, Language
+from app.database import SessionLocal
+from app.models_i18n import TranslationKey, Translation, Language
 from datetime import datetime
 
 # Translation keys to add (key, default_english_text, french, dutch, italian, chinese)
