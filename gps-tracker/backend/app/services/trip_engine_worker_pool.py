@@ -236,7 +236,7 @@ class TripEngineWorkerPool:
             MAX(dp.received_at) as latest_position,
             es.last_received_at,
             EXTRACT(EPOCH FROM (NOW() - MAX(dp.received_at))) as age_seconds
-        FROM device_states ds
+        FROM device_state ds
         LEFT JOIN engine_state es ON es.device_imei = ds.device_imei
         LEFT JOIN device_positions dp ON dp.device_imei = ds.device_imei
             AND dp.received_at > COALESCE(es.last_received_at, '1970-01-01'::timestamp)
