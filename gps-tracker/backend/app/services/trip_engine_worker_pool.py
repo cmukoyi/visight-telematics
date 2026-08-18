@@ -313,11 +313,15 @@ class TripEngineWorkerPool:
                 from app.database import SessionLocal
                 db = SessionLocal()
                 try:
-                    result = self._process_device_batched(
-                        db=db,
-                        device_imei=work_item.device_imei,
-                        batch_size=self.batch_size,
-                        max_batch_count=self.max_batch_count
+                    # Run blocking database operations in thread pool to avoid blocking event loop
+                    loop = asyncio.get_event_loop()
+                    result = await loop.run_in_executor(
+                        None,  # Use default ThreadPoolExecutor
+                        self._process_device_batched,
+                        db,
+                        work_item.device_imei,
+                        self.batch_size,
+                        self.max_batch_count
                     )
                 finally:
                     db.close()
