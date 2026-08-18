@@ -196,7 +196,7 @@ class TripEngineWorkerPool:
         Returns:
             Number of devices enqueued
         """
-        items = await self._discover_work(db)
+        items = self._discover_work(db)
         
         enqueued = 0
         for item in items:
@@ -221,7 +221,7 @@ class TripEngineWorkerPool:
         
         return enqueued
     
-    async def _discover_work(self, db: Session) -> List[WorkItem]:
+    def _discover_work(self, db: Session) -> List[WorkItem]:
         """
         Query database for devices needing processing.
         
@@ -311,13 +311,16 @@ class TripEngineWorkerPool:
                 busy_start = datetime.now(timezone.utc)
                 
                 from app.database import SessionLocal
-                async with SessionLocal() as db:
-                    result = await self._process_device_batched(
+                db = SessionLocal()
+                try:
+                    result = self._process_device_batched(
                         db=db,
                         device_imei=work_item.device_imei,
                         batch_size=self.batch_size,
                         max_batch_count=self.max_batch_count
                     )
+                finally:
+                    db.close()
                 
                 busy_duration = (datetime.now(timezone.utc) - busy_start).total_seconds()
                 if self.metrics:
@@ -388,7 +391,7 @@ class TripEngineWorkerPool:
         
         logger.info(f"Worker {worker_id} stopped")
     
-    async def _process_device_batched(
+    def _process_device_batched(
         self,
         db: Session,
         device_imei: str,
@@ -530,8 +533,11 @@ async def _worker_pool_loop(
     while True:
         try:
             # Scan for devices needing processing
-            async with SessionLocal() as db:
+            db = SessionLocal()
+            try:
                 enqueued = await _worker_pool.enqueue_work(db)
+            finally:
+                db.close()
             
             if enqueued == 0:
                 logger.debug("No devices need processing")
