@@ -473,11 +473,17 @@ async def shutdown_event():
     location_poller.stop()
     from app.services import hive_service as _hive_svc
     _hive_svc.stop_sweeper()
+    
+    # Stop Pareto bridge if enabled
     if _FLOORPLAN_BRIDGE_ENABLED:
         try:
             from app.services import pareto_bridge as _pareto
             await _pareto.stop_bridge()
             print("🛑 Pareto bridge stopped")
+        except Exception:
+            logger.exception("pareto_bridge: shutdown encountered an error")
+    else:
+        print("⏭️ Pareto bridge stop skipped (disabled by FLOORPLAN_BRIDGE_ENABLED)")
     
     # Gracefully stop worker pool if enabled
     if _WORKER_POOL_ENABLED:
@@ -487,10 +493,7 @@ async def shutdown_event():
             print("🛑 Trip Engine worker pool stopped")
         except Exception as e:
             logger.exception("Error stopping worker pool: %s", e)
-        except Exception:
-            logger.exception("pareto_bridge: shutdown encountered an error")
-    else:
-        print("⏭️ Pareto bridge stop skipped (disabled by FLOORPLAN_BRIDGE_ENABLED)")
+    
     critical_service_alerts.stop()
     print("🛑 Location Poller Service stopped")
     print("🛑 HIVE sweeper stopped")
