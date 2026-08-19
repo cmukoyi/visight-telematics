@@ -96,7 +96,7 @@ from app.models import (
 logger = logging.getLogger(__name__)
 
 # ── Engine Version (v2.2.0 - Fix Register) ────────────────────────────────
-ENGINE_VERSION = "2.1.19"  # v2.1.19: D1-FIX - Reconciliation watermark + rewind floor (fix late-arrival loop)
+ENGINE_VERSION = "2.1.20"  # v2.1.20: Fix admin portal status to recognize worker pool
 
 # ── Verbose Debug Logging for Specific Devices ────────────────────────────
 VERBOSE_DEBUG_DEVICES = set()  # Disabled - only enable for specific debugging
@@ -2884,6 +2884,46 @@ def get_engine_status() -> Dict:
     from app.services.tracksolid_batch_service import _batch_sweep_task, BATCH_SWEEP_INTERVAL_MINUTES
     from app.services.tracksolid_track_service import _selective_sweep_task, SELECTIVE_SWEEP_INTERVAL_MINUTES
     
+    # Check if worker pool is enabled (v2.1.18+)
+    import os
+    worker_pool_enabled = os.getenv("TRIP_ENGINE_WORKER_POOL", "true").lower() == "true"
+    
+    journey_processor_status = {}
+    if worker_pool_enabled:
+        # Worker pool mode - check worker pool status
+        try:
+            from app.services import trip_engine_worker_pool
+            worker_pool = trip_engine_worker_pool.get_worker_pool()
+            if worker_pool and worker_pool._pool_task and not worker_pool._pool_task.done():
+                journey_processor_status = {
+                    "running": True,
+                    "mode": "worker_pool",
+                    "num_workers": worker_pool.num_workers,
+                    "interval_seconds": worker_pool.scan_interval_sec,
+                    "done": False,
+                }
+            else:
+                journey_processor_status = {
+                    "running": False,
+                    "mode": "worker_pool",
+                    "done": True,
+                }
+        except Exception as e:
+            journey_processor_status = {
+                "running": False,
+                "mode": "worker_pool",
+                "error": str(e),
+                "done": True,
+            }
+    else:
+        # Legacy mode - check old 15-minute task
+        journey_processor_status = {
+            "running": _trip_engine_task is not None and not _trip_engine_task.done(),
+            "mode": "legacy",
+            "interval_minutes": TRIP_ENGINE_INTERVAL_MINUTES,
+            "done": _trip_engine_task.done() if _trip_engine_task else None,
+        }
+    
     return {
         "batch_sweep": {
             "running": _batch_sweep_task is not None and not _batch_sweep_task.done(),
@@ -2895,11 +2935,7 @@ def get_engine_status() -> Dict:
             "interval_minutes": SELECTIVE_SWEEP_INTERVAL_MINUTES,
             "done": _selective_sweep_task.done() if _selective_sweep_task else None,
         },
-        "journey_processor": {
-            "running": _trip_engine_task is not None and not _trip_engine_task.done(),
-            "interval_minutes": TRIP_ENGINE_INTERVAL_MINUTES,
-            "done": _trip_engine_task.done() if _trip_engine_task else None,
-        },
+        "journey_processor": journey_processor_status,
         "stall_watchdog": {
             "running": _stall_watchdog_task is not None and not _stall_watchdog_task.done(),
             "interval_minutes": STALL_WATCHDOG_INTERVAL_MINUTES,
