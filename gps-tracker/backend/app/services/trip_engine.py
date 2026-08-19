@@ -99,7 +99,7 @@ logger = logging.getLogger(__name__)
 ENGINE_VERSION = "2.1.20"  # v2.1.20: Fix admin portal status to recognize worker pool
 
 # ── Verbose Debug Logging for Specific Devices ────────────────────────────
-VERBOSE_DEBUG_DEVICES = set()  # Disabled - only enable for specific debugging
+VERBOSE_DEBUG_DEVICES = {"6796e753-707d-40ce-8ce1-8315e19b71ff"}  # Enable for Hubble device debugging
 
 # ── Late-Arrival Rewind Floor ─────────────────────────────────────────────
 MAX_LIVE_REWIND_HOURS = 48  # v2.1.19 D1-FIX: Cap how far back a live rewind may go
