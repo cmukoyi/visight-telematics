@@ -98,6 +98,9 @@ logger = logging.getLogger(__name__)
 # ── Engine Version (v2.2.0 - Fix Register) ────────────────────────────────
 ENGINE_VERSION = "2.1.17"  # v2.1.17: Fix D1 re-entrancy flag reset after state rebuild
 
+# ── Verbose Debug Logging for Specific Devices ────────────────────────────
+VERBOSE_DEBUG_DEVICES = {"780901807708767"}  # Enable verbose logging for these IMEIs
+
 # ── Configuration (defaults from spec validation) ─────────────────────────
 DEFAULT_ANCHOR_RADIUS_M = 100
 DEFAULT_MIN_LEG_DISTANCE_M = 300
@@ -498,7 +501,30 @@ class TripEngine:
             }
         )
         self.db.execute(stmt)
-        self.db.commit()
+        
+        # Verbose logging for specific devices
+        if context.device_imei in VERBOSE_DEBUG_DEVICES:
+            logger.info(
+                f"🔍 VERBOSE {context.device_imei}: About to COMMIT engine_state - "
+                f"last_processed_at={context.last_processed_at}, "
+                f"last_received_at={context.last_received_at}, "
+                f"current_journey_id={context.current_journey_id}"
+            )
+        
+        try:
+            self.db.commit()
+            
+            # Verbose logging for specific devices
+            if context.device_imei in VERBOSE_DEBUG_DEVICES:
+                logger.info(
+                    f"🔍 VERBOSE {context.device_imei}: COMMIT succeeded"
+                )
+        except Exception as exc:
+            if context.device_imei in VERBOSE_DEBUG_DEVICES:
+                logger.error(
+                    f"🔍 VERBOSE {context.device_imei}: COMMIT FAILED - Error: {exc}"
+                )
+            raise
     
     def _ensure_journey_open(self, timestamp: datetime) -> str:
         """
@@ -945,6 +971,14 @@ class TripEngine:
         centroid_lat, centroid_lng = calculate_centroid([(p[0], p[1]) for p in points])
         started_at = points[0][2]
         ended_at = points[-1][2]
+        
+        # Verbose logging for specific devices
+        if self.device_imei in VERBOSE_DEBUG_DEVICES:
+            logger.info(
+                f"🔍 VERBOSE {self.device_imei}: _create_stationary() called - "
+                f"started={started_at}, ended={ended_at}, points={len(points)}, reason={reason}, "
+                f"current_journey={self.context.current_journey_id}"
+            )
         duration_seconds = (ended_at - started_at).total_seconds()
         point_count = len(points)
         
@@ -1106,6 +1140,14 @@ class TripEngine:
         # v2.1.6 B1: Overlap guard - reject if overlaps existing stationary
         # Route through merge check first - if it qualifies for merge, that's handled above
         # This check catches cases where overlap exists but merge criteria not met
+        
+        # Verbose logging for specific devices
+        if self.device_imei in VERBOSE_DEBUG_DEVICES:
+            logger.info(
+                f"🔍 VERBOSE {self.device_imei}: Checking for overlaps - "
+                f"started={started_at}, ended={ended_at}"
+            )
+        
         overlap_check = self.db.execute(
             select(Stationary).where(
                 and_(
@@ -1125,6 +1167,14 @@ class TripEngine:
                 "🚨 IMEI %s: Overlap violation! Stationary %s → %s overlaps existing %s → %s",
                 self.device_imei, started_at, ended_at, overlap_check.started_at, overlap_check.ended_at
             )
+            
+            # Verbose logging for specific devices
+            if self.device_imei in VERBOSE_DEBUG_DEVICES:
+                logger.error(
+                    f"🔍 VERBOSE {self.device_imei}: OVERLAP DETECTED - "
+                    f"Rejecting stationary due to overlap with {overlap_check.id}"
+                )
+            
             # Log and discard per spec - never insert overlapping rows
             return None
         
@@ -1133,6 +1183,14 @@ class TripEngine:
         from sqlalchemy.dialects.postgresql import insert as pg_insert
         
         stationary_id = uuid4()
+        
+        # Verbose logging for specific devices
+        if self.device_imei in VERBOSE_DEBUG_DEVICES:
+            logger.info(
+                f"🔍 VERBOSE {self.device_imei}: About to INSERT stationary - "
+                f"id={stationary_id}, started={started_at}, ended={ended_at}, "
+                f"journey_id={self.context.current_journey_id}, breaks_journey={breaks_journey}"
+            )
         
         stmt = pg_insert(Stationary).values(
             id=stationary_id,
@@ -1161,8 +1219,23 @@ class TripEngine:
             }
         ).returning(Stationary.id)
         
-        result = self.db.execute(stmt)
-        returned_id = result.scalar_one()
+        try:
+            result = self.db.execute(stmt)
+            returned_id = result.scalar_one()
+            
+            # Verbose logging for specific devices
+            if self.device_imei in VERBOSE_DEBUG_DEVICES:
+                logger.info(
+                    f"🔍 VERBOSE {self.device_imei}: Stationary INSERT succeeded - "
+                    f"returned_id={returned_id}"
+                )
+        except Exception as exc:
+            if self.device_imei in VERBOSE_DEBUG_DEVICES:
+                logger.error(
+                    f"🔍 VERBOSE {self.device_imei}: Stationary INSERT FAILED - "
+                    f"Error: {exc}"
+                )
+            raise
         
         # Fetch the stationary object
         stationary = self.db.query(Stationary).filter(Stationary.id == returned_id).one()
