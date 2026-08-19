@@ -4453,65 +4453,88 @@ async def delete_hubble_device(
     db: Session = Depends(get_db)
 ):
     """
-    Delete a registered device from Hubble Platform (Series 5).
+    Remove a Hubble device from PinPlot tracking (local deletion only).
     
-    WARNING: This operation is PERMANENT and cannot be undone.
-    All historical packet data for this device may be lost.
+    IMPORTANT: This does NOT delete the device from Hubble Platform.
+    The device remains registered on Hubble and can be re-added to PinPlot later.
     
-    Useful for:
-      - Removing decommissioned devices
-      - Cleaning up test devices after development
-      - Removing incorrectly registered devices
-      - Revoking device access from organization
+    This operation:
+      - Removes device from ble_tags (PinPlot tracking)
+      - Deletes local trip data (positions, journeys, engine state)
+      - Does NOT affect the device on Hubble Platform
+      - Device can be re-added by clicking "Sync Devices" in admin portal
+    
+    Use cases:
+      - Temporarily stop tracking a device in PinPlot
+      - Clean up local data while keeping device registered on Hubble
+      - Re-sync devices after configuration changes
     
     Path parameters:
-      - device_id: Hubble device identifier
-    
-    Alternative approaches to consider before deleting:
-      - Update device tags to mark as "inactive" or "decommissioned"
-      - Transfer device to a different organization (if applicable)
-      - Keep device registered but stop monitoring it in PinPlot
+      - device_id: Hubble device identifier (IMEI/UUID)
     
     Example:
-      DELETE /api/admin/hubble/devices/abc123def456
+      DELETE /api/admin/hubble/devices/fe95058a-e867-4bac-b19a-bf2806762b71
     
-    Returns 200 with success message if deleted.
-    Returns 404 if device not found.
-    Requires HUBBLE_API_KEY and HUBBLE_ORG_ID in environment variables.
+    Returns 200 with success message if deleted locally.
+    Returns 404 if device not found in local database.
     """
     admin = get_admin_from_request(request, db)
     
     try:
-        # Get Hubble provider
-        provider = DeviceProviderFactory.get_provider("hubble")
+        # Check if device exists locally
+        device = db.query(BLETag).filter(BLETag.imei == device_id).first()
         
-        # Call delete_device method
-        result = await provider.delete_device(device_id)
+        if not device:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Device {device_id} not found in PinPlot database"
+            )
         
-        if not result["success"]:
-            error_msg = result.get('error', 'Unknown error')
-            
-            # Return 404 for device not found
-            if "not found" in error_msg.lower():
-                raise HTTPException(status_code=404, detail=error_msg)
-            
-            # Otherwise return 500
-            raise HTTPException(status_code=500, detail=f"Hubble API error: {error_msg}")
+        # POLICY: Never delete from Hubble Platform
+        # Only remove from local PinPlot database
+        # Device remains registered on Hubble and can be re-synced
+        
+        logger.info(f"Removing device {device_id} from PinPlot (local deletion only)")
+        
+        # Delete all local data for this device
+        from app.models import DevicePosition, Journey, Leg, Stationary, EngineState, DeviceState
+        
+        deleted_counts = {
+            "positions": db.query(DevicePosition).filter(DevicePosition.device_imei == device_id).delete(),
+            "journeys": db.query(Journey).filter(Journey.device_imei == device_id).delete(),
+            "legs": db.query(Leg).filter(Leg.device_imei == device_id).delete(),
+            "stationaries": db.query(Stationary).filter(Stationary.device_imei == device_id).delete(),
+            "engine_state": db.query(EngineState).filter(EngineState.device_imei == device_id).delete(),
+            "device_state": db.query(DeviceState).filter(DeviceState.device_imei == device_id).delete(),
+        }
+        
+        # Delete the device record last
+        db.delete(device)
+        db.commit()
+        
+        logger.info(
+            f"Device {device_id} removed from PinPlot: "
+            f"{deleted_counts['positions']} positions, "
+            f"{deleted_counts['journeys']} journeys, "
+            f"{deleted_counts['legs']} legs, "
+            f"{deleted_counts['stationaries']} stationaries deleted"
+        )
         
         return {
             "success": True,
-            "message": result["message"],
+            "message": f"Device {device_id} removed from PinPlot tracking (still registered on Hubble)",
+            "deleted_local_data": deleted_counts,
+            "note": "Device remains on Hubble Platform. Click 'Sync Devices' to re-add."
         }
         
     except HTTPException:
         raise  # Re-raise HTTPExceptions
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Error deleting Hubble device {device_id}: {e}", exc_info=True)
+        db.rollback()
+        logger.error(f"Error removing device {device_id} from PinPlot: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to delete Hubble device: {str(e)}"
+            detail=f"Failed to remove device from PinPlot: {str(e)}"
         )
 
 
