@@ -998,6 +998,10 @@ class EngineState(Base):
     # v2.1.11 D1: Arrival-time checkpoint (captures late-arriving positions)
     last_received_at = Column(DateTime(timezone=True), nullable=True)
     
+    # v2.1.19 D1-FIX: Reconciliation watermark (prevents late-arrival rewind loop)
+    # Tracks highest received_at seen, so late arrivals are detected exactly once
+    last_reconciled_received_at = Column(DateTime(timezone=True), nullable=True)
+    
     # Metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -96,10 +96,13 @@ from app.models import (
 logger = logging.getLogger(__name__)
 
 # ── Engine Version (v2.2.0 - Fix Register) ────────────────────────────────
-ENGINE_VERSION = "2.1.18"  # v2.1.18: Worker pool - fresh TripEngine per batch (fix state pollution)
+ENGINE_VERSION = "2.1.19"  # v2.1.19: D1-FIX - Reconciliation watermark + rewind floor (fix late-arrival loop)
 
 # ── Verbose Debug Logging for Specific Devices ────────────────────────────
 VERBOSE_DEBUG_DEVICES = set()  # Disabled - only enable for specific debugging
+
+# ── Late-Arrival Rewind Floor ─────────────────────────────────────────────
+MAX_LIVE_REWIND_HOURS = 48  # v2.1.19 D1-FIX: Cap how far back a live rewind may go
 
 # ── Configuration (defaults from spec validation) ─────────────────────────
 DEFAULT_ANCHOR_RADIUS_M = 100
@@ -373,6 +376,7 @@ class EngineContext:
     # Last processed
     last_processed_at: Optional[datetime] = None  # Still used for reporting
     last_received_at: Optional[datetime] = None  # v2.1.11 D1: Checkpoint on arrival time
+    last_reconciled_received_at: Optional[datetime] = None  # v2.1.19 D1-FIX: Ingestion-time high-water mark
     last_position_lat: Optional[float] = None
     last_position_lng: Optional[float] = None
     last_position_time: Optional[datetime] = None
@@ -437,6 +441,8 @@ class TripEngine:
                 anchor_points=[],  # Reconstructed from anchor
                 leg_buffer=[],  # Reconstructed from open leg if needed
                 last_processed_at=state_row.last_processed_at,
+                last_received_at=state_row.last_received_at,
+                last_reconciled_received_at=state_row.last_reconciled_received_at,
                 current_journey_id=state_row.current_journey_id,
             )
             
@@ -486,6 +492,7 @@ class TripEngine:
             current_journey_id=context.current_journey_id,
             last_processed_at=context.last_processed_at,
             last_received_at=context.last_received_at,  # v2.1.11 D1: Arrival checkpoint
+            last_reconciled_received_at=context.last_reconciled_received_at,  # v2.1.19 D1-FIX: Reconciliation checkpoint
             updated_at=datetime.now(timezone.utc),
         ).on_conflict_do_update(
             index_elements=['device_imei'],
@@ -497,6 +504,7 @@ class TripEngine:
                 'current_journey_id': context.current_journey_id,
                 'last_processed_at': context.last_processed_at,
                 'last_received_at': context.last_received_at,  # v2.1.11 D1: Arrival checkpoint
+                'last_reconciled_received_at': context.last_reconciled_received_at,  # v2.1.19 D1-FIX
                 'updated_at': datetime.now(timezone.utc),
             }
         )
@@ -1840,20 +1848,34 @@ class TripEngine:
             logger.info("✅ IMEI %s: All positions were duplicates", self.device_imei)
             return stats
         
-        # v2.1.16 D1: State rebuild for late-arriving positions
-        # If any position has observed_at < last_processed_at, rebuild state from that point
+        # v2.1.19 D1-FIX: Late-arrival detection with reconciliation watermark + rewind floor
+        # Only check NEW ingestions (received_at > last_reconciled_received_at) to prevent rewind loop
         rebuild_from = None
-        if self.context.last_processed_at:
-            min_observed = min(p.observed_at for p in positions)
-            if min_observed < self.context.last_processed_at:
+        if self.context.last_processed_at and self.context.last_reconciled_received_at:
+            # Find NEW late arrivals - only positions ingested since last reconciliation
+            new_late = [p for p in positions if p.observed_at < self.context.last_processed_at]
+            
+            if new_late:
+                min_observed = min(p.observed_at for p in new_late)
                 logger.warning(
-                    "⚠️  D1 late arrivals: min(observed_at)=%s < last_processed_at=%s",
+                    "⚠️  D1-FIX late arrivals: %d new late positions, min(observed_at)=%s < last_processed_at=%s",
+                    len(new_late),
                     min_observed.isoformat(),
                     self.context.last_processed_at.isoformat()
                 )
                 
-                # Find rebuild anchor point: earlier of (min observed_at, last stationary start)
+                # Apply rewind floor: cap how far back a live rewind may go
                 rebuild_from = min_observed
+                rewind_floor = datetime.now(timezone.utc) - timedelta(hours=MAX_LIVE_REWIND_HOURS)
+                
+                if rebuild_from < rewind_floor:
+                    logger.warning(
+                        "⚠️  D1-FIX rewind floor: late arrival older than %dh floor (%s < %s), capping to floor",
+                        MAX_LIVE_REWIND_HOURS,
+                        rebuild_from.isoformat(),
+                        rewind_floor.isoformat()
+                    )
+                    rebuild_from = rewind_floor
                 
                 # If we have a last stationary, use its start time if earlier
                 last_stat_query = select(Stationary).where(
@@ -1864,12 +1886,12 @@ class TripEngine:
                 if last_stat and last_stat.started_at < rebuild_from:
                     rebuild_from = last_stat.started_at
                     logger.info(
-                        "🔄 D1 rebuild anchor: last stationary start (%s)",
+                        "🔄 D1-FIX rebuild anchor: last stationary start (%s)",
                         rebuild_from.isoformat()
                     )
                 else:
                     logger.info(
-                        "🔄 D1 rebuild anchor: earliest late position (%s)",
+                        "🔄 D1-FIX rebuild anchor: floored late position (%s)",
                         rebuild_from.isoformat()
                     )
                 
@@ -1887,13 +1909,20 @@ class TripEngine:
                 positions = list(self.db.execute(rebuild_query).scalars().all())
                 
                 logger.warning(
-                    "⚠️  D1 state rebuild: reprocessing %d positions from %s",
+                    "⚠️  D1-FIX state rebuild: reprocessing %d positions from %s",
                     len(positions),
                     rebuild_from.isoformat()
                 )
                 
                 # Reset state to rebuild point
                 self._reset_state_to_rebuild_point(rebuild_from)
+        elif self.context.last_processed_at and not self.context.last_reconciled_received_at:
+            # First run after upgrade - detect late arrivals without reconciliation watermark
+            min_observed = min(p.observed_at for p in positions)
+            if min_observed < self.context.last_processed_at:
+                logger.warning(
+                    "⚠️  D1-FIX: First run after upgrade, initializing reconciliation watermark"
+                )
         
         # Apply median smoothing
         smoothed = median_smooth_positions(positions, self.config.smoothing_window)
@@ -1919,13 +1948,20 @@ class TripEngine:
             if result.get('journey_created'):
                 stats['journeys_created'] += 1
         
-        # v2.1.11 D1: Update received_at checkpoint (arrival time, not observation time)
-        # This allows late-arriving buffered positions to be captured
+        # v2.1.19 D1-FIX: Update BOTH watermarks - reconciliation always advances
+        # This breaks the rewind loop: late arrivals are detected exactly once
         if positions:
             self.context.last_received_at = max(p.received_at for p in positions)
+            # CRITICAL: Always advance reconciliation watermark, even after rebuild
+            # This marks old buffered points as "already seen" so they won't re-trigger
+            self.context.last_reconciled_received_at = max(
+                self.context.last_reconciled_received_at or datetime.min.replace(tzinfo=timezone.utc),
+                max(p.received_at for p in positions)
+            )
             logger.debug(
-                "📌 D1 checkpoint: received_at=%s (last observed_at=%s)",
+                "📌 D1-FIX checkpoint: received_at=%s, reconciled_at=%s (last observed_at=%s)",
                 self.context.last_received_at.isoformat(),
+                self.context.last_reconciled_received_at.isoformat(),
                 self.context.last_processed_at.isoformat()
             )
         
