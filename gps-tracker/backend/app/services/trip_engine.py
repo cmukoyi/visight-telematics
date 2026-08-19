@@ -2894,12 +2894,15 @@ def get_engine_status() -> Dict:
         try:
             from app.services import trip_engine_worker_pool
             worker_pool = trip_engine_worker_pool.get_worker_pool()
-            if worker_pool and worker_pool._pool_task and not worker_pool._pool_task.done():
+            # Check the global _worker_pool_task (not an attribute on worker_pool)
+            worker_pool_task = trip_engine_worker_pool._worker_pool_task
+            
+            if worker_pool_task and not worker_pool_task.done():
                 journey_processor_status = {
                     "running": True,
                     "mode": "worker_pool",
-                    "num_workers": worker_pool.num_workers,
-                    "interval_seconds": worker_pool.scan_interval_sec,
+                    "num_workers": worker_pool.num_workers if worker_pool else 5,
+                    "interval_seconds": 30,  # scan_interval_sec from worker pool loop
                     "done": False,
                 }
             else:
