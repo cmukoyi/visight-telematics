@@ -425,10 +425,14 @@ class TripEngineWorkerPool:
         error_msg = None
         
         try:
-            processor = TripEngine(db, device_imei)
-            
             for batch_num in range(max_batch_count):
                 try:
+                    # CRITICAL: Create fresh TripEngine instance for each batch
+                    # This ensures we load the updated watermark from engine_state
+                    # after the previous batch committed. Without this, we reprocess
+                    # the same data repeatedly because the old instance has stale state.
+                    processor = TripEngine(db, device_imei)
+                    
                     # Process one batch
                     stats = processor.process_positions(limit=batch_size)
                     

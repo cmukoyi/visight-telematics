@@ -96,10 +96,10 @@ from app.models import (
 logger = logging.getLogger(__name__)
 
 # ── Engine Version (v2.2.0 - Fix Register) ────────────────────────────────
-ENGINE_VERSION = "2.1.17"  # v2.1.17: Fix D1 re-entrancy flag reset after state rebuild
+ENGINE_VERSION = "2.1.18"  # v2.1.18: Worker pool - fresh TripEngine per batch (fix state pollution)
 
 # ── Verbose Debug Logging for Specific Devices ────────────────────────────
-VERBOSE_DEBUG_DEVICES = {"780901807708767"}  # Enable verbose logging for these IMEIs
+VERBOSE_DEBUG_DEVICES = set()  # Disabled - only enable for specific debugging
 
 # ── Configuration (defaults from spec validation) ─────────────────────────
 DEFAULT_ANCHOR_RADIUS_M = 100
