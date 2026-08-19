@@ -96,10 +96,10 @@ from app.models import (
 logger = logging.getLogger(__name__)
 
 # ── Engine Version (v2.2.0 - Fix Register) ────────────────────────────────
-ENGINE_VERSION = "2.1.20"  # v2.1.20: Fix admin portal status to recognize worker pool
+ENGINE_VERSION = "2.1.21"  # v2.1.21: Fix orphan stationaries after journey breaks (open new journey)
 
 # ── Verbose Debug Logging for Specific Devices ────────────────────────────
-VERBOSE_DEBUG_DEVICES = {"6796e753-707d-40ce-8ce1-8315e19b71ff"}  # Enable for Hubble device debugging
+VERBOSE_DEBUG_DEVICES = set()  # Disabled - bug found: journey-breaking stationaries didn't open new journey
 
 # ── Late-Arrival Rewind Floor ─────────────────────────────────────────────
 MAX_LIVE_REWIND_HOURS = 48  # v2.1.19 D1-FIX: Cap how far back a live rewind may go
@@ -1313,6 +1313,16 @@ class TripEngine:
                 "🔓 IMEI %s: Detached crossing stationary %s (journey_id = NULL)",
                 self.device_imei, stationary.id
             )
+        
+        # v2.1.21: Open new journey after journey-breaking stationary
+        # The journey-breaking stationary closes the previous journey but must start a new one
+        # Otherwise all subsequent stationaries/legs become orphans
+        if breaks_journey:
+            logger.info(
+                "🆕 IMEI %s: Opening new journey after journey break at %s",
+                self.device_imei, ended_at.isoformat()
+            )
+            self._ensure_journey_open(ended_at)
         
         # Update journey context
         self.context.last_stationary_ended_at = ended_at
