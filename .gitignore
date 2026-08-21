@@ -38,6 +38,10 @@ gps-tracker/**/.env
 *.md
 *.MD
 
+# Security audit reports — NEVER commit (contain vulnerability details)
+SECURITY_AUDIT*.md
+SECURITY_AUDIT*.MD
+
 # Local reference files — not for source control
 dB_schema.md
 
