@@ -559,6 +559,8 @@ async def _gdpr_cleanup_loop():
                 for tag in tags_to_delete:
                     tag_id  = tag.id
                     tag_imei = tag.imei
+                    
+                    # ── GDPR-specific cleanup (not in standard deletion) ────
                     # 1. Beacon sightings (keyed by IMEI string)
                     db.query(BeaconSighting).filter(
                         BeaconSighting.tag_id == tag_imei
@@ -575,8 +577,12 @@ async def _gdpr_cleanup_loop():
                     db.query(PortalAlert).filter(
                         PortalAlert.tag_id == tag_id
                     ).delete(synchronize_session=False)
-                    # 5. Delete the tag itself
-                    db.delete(tag)
+                    
+                    # ── Standard trip engine cleanup (positions, journeys, etc) ────
+                    # Use centralized helper to ensure all trip data is deleted
+                    from app.routes_portal import _delete_tag_with_cleanup
+                    _delete_tag_with_cleanup(db, tag, logger_prefix=f"GDPR DELETE")
+                    
                     deleted_count += 1
                     print(f"[GDPR] Hard-deleted tag {tag_imei} (expired {tag.expiry_date})")
                 if deleted_count:

@@ -4496,20 +4496,10 @@ async def delete_hubble_device(
         
         logger.info(f"Removing device {device_id} from PinPlot (local deletion only)")
         
-        # Delete all local data for this device
-        from app.models import DevicePosition, Journey, Leg, Stationary, EngineState, DeviceState
+        # Use centralized cleanup helper to ensure all related data is deleted
+        from app.routes_portal import _delete_tag_with_cleanup
         
-        deleted_counts = {
-            "positions": db.query(DevicePosition).filter(DevicePosition.device_imei == device_id).delete(),
-            "journeys": db.query(Journey).filter(Journey.device_imei == device_id).delete(),
-            "legs": db.query(Leg).filter(Leg.device_imei == device_id).delete(),
-            "stationaries": db.query(Stationary).filter(Stationary.device_imei == device_id).delete(),
-            "engine_state": db.query(EngineState).filter(EngineState.device_imei == device_id).delete(),
-            "device_state": db.query(DeviceState).filter(DeviceState.device_imei == device_id).delete(),
-        }
-        
-        # Delete the device record last
-        db.delete(device)
+        deleted_counts = _delete_tag_with_cleanup(db, device, logger_prefix="ADMIN DELETE")
         db.commit()
         
         logger.info(

@@ -248,6 +248,88 @@ def _user_can_manage(me, feature: str) -> bool:
     return False
 
 
+def _delete_tag_with_cleanup(db: Session, tag: BLETag, logger_prefix: str = "TAG DELETE") -> dict:
+    """
+    Properly delete a BLE tag with ALL related data cleanup.
+    
+    This is the SINGLE SOURCE OF TRUTH for tag deletion to prevent orphaned data.
+    
+    Args:
+        db: Database session
+        tag: BLETag object to delete
+        logger_prefix: Logging prefix for identification
+    
+    Returns:
+        dict with deletion counts for each table
+    
+    Raises:
+        Exception if deletion fails (caller should handle rollback)
+    """
+    from app.models import DevicePosition, Journey, Leg, Stationary, EngineState, DeviceState
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    device_imei = tag.imei
+    
+    logger.info(f"{logger_prefix}: Starting cleanup for device {device_imei} (tag_id={tag.id})")
+    
+    try:
+        # Delete in proper order (respecting foreign key dependencies)
+        # Order matters: delete children before parents
+        
+        deleted_counts = {}
+        
+        # 1. Device positions (no foreign key dependencies)
+        deleted_counts['positions'] = db.query(DevicePosition).filter(
+            DevicePosition.device_imei == device_imei
+        ).delete(synchronize_session=False)
+        
+        # 2. Journeys (referenced by legs/stationaries)
+        deleted_counts['journeys'] = db.query(Journey).filter(
+            Journey.device_imei == device_imei
+        ).delete(synchronize_session=False)
+        
+        # 3. Legs (no children)
+        deleted_counts['legs'] = db.query(Leg).filter(
+            Leg.device_imei == device_imei
+        ).delete(synchronize_session=False)
+        
+        # 4. Stationaries (no children)
+        deleted_counts['stationaries'] = db.query(Stationary).filter(
+            Stationary.device_imei == device_imei
+        ).delete(synchronize_session=False)
+        
+        # 5. Engine state (no children)
+        deleted_counts['engine_state'] = db.query(EngineState).filter(
+            EngineState.device_imei == device_imei
+        ).delete(synchronize_session=False)
+        
+        # 6. Device state (no children)
+        deleted_counts['device_state'] = db.query(DeviceState).filter(
+            DeviceState.device_imei == device_imei
+        ).delete(synchronize_session=False)
+        
+        # 7. Finally delete the tag itself
+        db.delete(tag)
+        db.flush()  # Ensure deletion happens before commit
+        
+        logger.info(
+            f"{logger_prefix}: Device {device_imei} cleanup complete - "
+            f"positions={deleted_counts['positions']}, "
+            f"journeys={deleted_counts['journeys']}, "
+            f"legs={deleted_counts['legs']}, "
+            f"stationaries={deleted_counts['stationaries']}, "
+            f"engine_state={deleted_counts['engine_state']}, "
+            f"device_state={deleted_counts['device_state']}"
+        )
+        
+        return deleted_counts
+        
+    except Exception as exc:
+        logger.error(f"{logger_prefix}: Cleanup failed for device {device_imei}: {exc}", exc_info=True)
+        raise  # Let caller handle rollback
+
+
 # ---------------------------------------------------------------------------
 # Pydantic schemas
 # ---------------------------------------------------------------------------
@@ -2678,6 +2760,7 @@ def delete_tags(data: PortalTagDelete, request: Request, db: Session = Depends(g
     group = _get_group_and_assert_domain(me, db)
     all_owner_ids = _get_group_owner_ids(group, db)
 
+    deleted_count = 0
     for tag_id in data.tag_ids:
         tag = (
             db.query(BLETag)
@@ -2685,9 +2768,16 @@ def delete_tags(data: PortalTagDelete, request: Request, db: Session = Depends(g
             .first()
         )
         if tag:
-            db.delete(tag)
+            try:
+                _delete_tag_with_cleanup(db, tag, logger_prefix=f"BULK DELETE [{deleted_count+1}/{len(data.tag_ids)}]")
+                deleted_count += 1
+            except Exception as exc:
+                logger.error(f"Failed to delete tag {tag_id}: {exc}")
+                db.rollback()
+                raise HTTPException(status_code=500, detail=f"Failed to delete tag {tag_id}: {str(exc)}")
 
     db.commit()
+    logger.info(f"Bulk delete completed: {deleted_count}/{len(data.tag_ids)} tags deleted successfully")
 
 
 @router.delete("/tags/{tag_id}", status_code=204)
@@ -2706,8 +2796,14 @@ def delete_tag_single(tag_id: str, request: Request, db: Session = Depends(get_d
     )
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found in your group")
-    db.delete(tag)
-    db.commit()
+    
+    try:
+        _delete_tag_with_cleanup(db, tag, logger_prefix="SINGLE DELETE")
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.error(f"Failed to delete tag {tag_id}: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to delete tag: {str(exc)}")
 
 
 class BulkTagRow(BaseModel):
