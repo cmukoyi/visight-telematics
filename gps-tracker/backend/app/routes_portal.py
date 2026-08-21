@@ -2568,12 +2568,14 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
                         base = datetime.utcnow()
                     tag.expiry_date = base + timedelta(days=pkg.validity_days)
                 else:
+                    # No activation_date yet — calculate expiry from now (or added_at if available)
+                    # This ensures the countdown starts immediately when the package is assigned,
+                    # not waiting for first GPS fix (fixes issue where never-activated tags show Expires—)
+                    base = tag.added_at.replace(tzinfo=None) if tag.added_at else datetime.utcnow()
                     if (tag.tag_type or "").lower() in ("series3", "series_3"):
-                        # QR/NFC tags should show an expiry immediately after package assignment.
+                        # QR/NFC tags: set activation_date to now for immediate expiry
                         tag.activation_date = datetime.utcnow()
-                        tag.expiry_date = tag.activation_date + timedelta(days=pkg.validity_days)
-                    else:
-                        tag.expiry_date = None  # pending first GPS fix
+                    tag.expiry_date = base + timedelta(days=pkg.validity_days)
 
     # Handle trip subscription (DeviceState management)
     if data.trip_subscribed is not None:
