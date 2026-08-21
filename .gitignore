@@ -182,3 +182,6 @@ all_translation_keys.txt
 HIVE Tracking UI.html
 HIVE_User_Manual.html
 I18N_IMPLEMENTATION_STATUS.md
+
+# Feature development and bug fix documentation
+features_dev/
