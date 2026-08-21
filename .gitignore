@@ -166,3 +166,19 @@ scripts/monitor-*.sh
 scripts/validate-*.sh
 TRANSLATION_KEYS_DEPLOYMENT.md
 TRANSLATION_KEYS_DEPLOYMENT.md
+
+# ═══════════════════════════════════════════════════════════════════
+# One-time fix scripts - archived after execution
+# ═══════════════════════════════════════════════════════════════════
+ADD_REMAINING_TRANSLATION_KEYS.sh
+add_missing_translation_keys.py
+add_series_4_5_translation_keys.sql
+fix_duplicate_journeys.py
+fix_duplicate_journeys.sql
+fix_overlap_violations.sql
+all_translation_keys.txt
+
+# Manual/documentation files
+HIVE Tracking UI.html
+HIVE_User_Manual.html
+I18N_IMPLEMENTATION_STATUS.md
