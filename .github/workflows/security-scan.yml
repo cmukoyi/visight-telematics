@@ -105,8 +105,7 @@ jobs:
   semgrep:
     name: SAST (Semgrep)
     runs-on: ubuntu-latest
-    continue-on-error: true  # Non-blocking
-    if: ${{ secrets.SEMGREP_APP_TOKEN != '' }}  # Only run if token is configured
+    continue-on-error: true  # Non-blocking - will skip if token not configured
     container:
       image: returntocorp/semgrep
     steps:
