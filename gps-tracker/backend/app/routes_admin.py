@@ -41,12 +41,21 @@ from app.models import (
 from app.models_i18n import Language
 from app.admin_auth import (
     hash_password, verify_password, create_admin_access_token,
-    decode_admin_token, check_role_permission
+    decode_admin_token, check_role_permission, get_current_admin_user
 )
 from app.services.critical_service_alert_service import CATEGORY_DEFS
 from app.services.device_providers.provider_factory import DeviceProviderFactory
 
-router = APIRouter(prefix="/api/admin", tags=["admin"])
+# SECURITY: All admin endpoints require authentication by default
+# Public endpoints (login, logs) use separate router below
+router = APIRouter(
+    prefix="/api/admin", 
+    tags=["admin"],
+    dependencies=[Depends(get_current_admin_user)]  # 🔒 Enforces auth on ALL routes
+)
+
+# Public endpoints that should NOT require authentication
+public_router = APIRouter(prefix="/api/admin", tags=["admin-public"])
 logger = logging.getLogger(__name__)
 
 
@@ -309,9 +318,9 @@ def log_audit(
 
 
 # AUTHENTICATION ENDPOINTS
-@router.post("/login", response_model=AdminToken)
+@public_router.post("/login", response_model=AdminToken)
 async def admin_login(credentials: AdminLogin, request: Request, db: Session = Depends(get_db)):
-    """Admin login endpoint"""
+    """Admin login endpoint - PUBLIC (no auth required)"""
     admin = db.query(AdminUser).filter(AdminUser.username == credentials.username).first()
     
     if not admin or not verify_password(admin.hashed_password, credentials.password):
@@ -518,9 +527,9 @@ async def update_admin_user(
 
 
 # LOGGING ENDPOINTS
-@router.post("/logs")
+@public_router.post("/logs")
 async def submit_app_log(log_data: AppLogRequest, request: Request, db: Session = Depends(get_db)):
-    """Submit log from mobile app"""
+    """Submit log from mobile app - PUBLIC (no auth required)"""
     # Sanitize the log (remove sensitive data)
     sanitized_message = log_data.message
     sanitized_context = log_data.context or {}

@@ -25,7 +25,7 @@ from app.services.mzone_service import mzone_service
 from app.services.geofence_service import GeofenceService
 from app.services.location_poller_service import location_poller
 from app.services.critical_service_alert_service import critical_service_alerts
-from app.routes_admin import router as admin_router
+from app.routes_admin import router as admin_router, public_router as admin_public_router
 from app.services.device_providers import DeviceProviderFactory
 import asyncio
 from app.schemas.poi import (
@@ -242,7 +242,10 @@ app.include_router(webhooks_router, include_in_schema=False)
 # INTERNAL APIS - Hidden from /docs (dashboard/admin use only)
 # ==============================================================================
 
-# Include admin router (hidden from public API docs)
+# Include admin PUBLIC router (login, logs - no auth required)
+app.include_router(admin_public_router, include_in_schema=False)
+
+# Include admin router (hidden from public API docs, AUTH REQUIRED)
 app.include_router(admin_router, include_in_schema=False)
 
 # Include portal router (dashboard internal endpoints - hidden)
