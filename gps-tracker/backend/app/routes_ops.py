@@ -9,13 +9,23 @@ Endpoints:
 Requires /var/run/docker.sock mounted into the backend container (read for
 list/logs; the restart call needs write access, so mount without :ro for POST).
 Only containers whose name starts with 'pinplot_' can be managed.
+
+SECURITY: All endpoints require admin authentication.
 """
 import logging
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
+
+from app.admin_auth import get_current_admin_user
+from app.models_admin import AdminUser
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/admin/ops", tags=["admin-ops"])
+# SECURITY: All ops endpoints require admin authentication
+router = APIRouter(
+    prefix="/api/admin/ops",
+    tags=["admin-ops"],
+    dependencies=[Depends(get_current_admin_user)]  # 🔒 Enforces auth on ALL routes
+)
 
 # Safety guard — only containers with this prefix may be touched.
 # Per-tenant override via ADMIN_OPS_CONTAINER_PREFIX (e.g. 'beacon_telematics_'
