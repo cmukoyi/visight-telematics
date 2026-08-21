@@ -32,6 +32,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.models import (
+    BLETag,
     DevicePosition,
     DeviceState,
     TrackSolidSyncState,
@@ -386,7 +387,9 @@ async def _update_device_states(db: Session, locations: list[dict]):
     """
     Update device_state.last_batch_ts for all devices in the batch.
     
-    Creates device_state rows if they don't exist (with trip_subscribed=false default).
+    ONLY creates device_state rows for IMEIs that exist in ble_tags.
+    This prevents pollution from bulk TrackSolid API responses containing
+    devices users never added to PinPlot.
     """
     if not locations:
         return
@@ -398,7 +401,24 @@ async def _update_device_states(db: Session, locations: list[dict]):
     if not imeis:
         return
     
-    for imei in imeis:
+    # CRITICAL: Only create device_state for IMEIs that exist in ble_tags
+    # This prevents creating 2000+ orphaned records for devices users never added
+    valid_imeis = set(
+        db.query(BLETag.imei)
+        .filter(BLETag.imei.in_(imeis))
+        .scalar_subquery()
+        .all()
+    )
+    
+    skipped = len(imeis) - len(valid_imeis)
+    if skipped > 0:
+        logger.debug("⏭️  Skipped %d IMEIs not in ble_tags (not added by users)", skipped)
+    
+    if not valid_imeis:
+        logger.debug("⏭️  No valid IMEIs in batch (all devices not added to PinPlot)")
+        return
+    
+    for imei in valid_imeis:
         # UPSERT device_state row
         stmt = insert(DeviceState).values(
             device_imei=imei,
@@ -416,7 +436,7 @@ async def _update_device_states(db: Session, locations: list[dict]):
         db.execute(stmt)
     
     db.commit()
-    logger.info("📊 Updated device_state.last_batch_ts for %d devices", len(imeis))
+    logger.info("📊 Updated device_state.last_batch_ts for %d devices (%d skipped)", len(valid_imeis), skipped)
 
 
 async def _increment_api_call_counter(db: Session):
