@@ -196,13 +196,15 @@ async def hubble_webhook(
                     device_state = DeviceState(
                         device_imei=device_id,
                         trip_subscribed=False,  # User must explicitly enable
-                        last_batch_ts=datetime.now(timezone.utc)
+                        last_batch_ts=datetime.now(timezone.utc),
+                        last_position_ts=observed_at  # v2.1.22: Set last_position for stall watchdog
                     )
                     db.add(device_state)
                     logger.debug(f"📊 Created device_state for {device_id[:8]} (trip_subscribed=False)")
                 else:
-                    # Update last_batch_ts timestamp
+                    # Update timestamps
                     device_state.last_batch_ts = datetime.now(timezone.utc)
+                    device_state.last_position_ts = observed_at  # v2.1.22: Update last_position (enables stall watchdog)
                 
                 # ═══════════════════════════════════════════════════════════════
                 

@@ -91,12 +91,13 @@ from app.models import (
     Leg,
     Journey,
     TripConfig,
+    BLETag,
 )
 
 logger = logging.getLogger(__name__)
 
 # ── Engine Version (v2.2.0 - Fix Register) ────────────────────────────────
-ENGINE_VERSION = "2.1.21"  # v2.1.21: Fix orphan stationaries after journey breaks (open new journey)
+ENGINE_VERSION = "2.1.22"  # v2.1.22: Displacement-aware gap handling for webhook devices (Minew)
 
 # ── Verbose Debug Logging for Specific Devices ────────────────────────────
 VERBOSE_DEBUG_DEVICES = set()  # Disabled - bug found: journey-breaking stationaries didn't open new journey
@@ -126,6 +127,79 @@ DEFAULT_DEDUPE_WINDOW_S = 60  # R5: Deduplication time window
 
 # v2.1.6 B3: Air leg gate parameters
 DEFAULT_AIR_MIN_GAP_MIN = 60  # B3: Minimum gap in minutes for air leg classification
+
+# ═══════════════════════════════════════════════════════════════════════════
+# WEBHOOK DEVICE PROFILE (Minew E9/MST03/MTB02)
+# ═══════════════════════════════════════════════════════════════════════════
+# v2.1.22: Minew/Hubble webhook devices have different characteristics:
+# - GPS-grade accuracy (5-9m median) → keep anchor_radius_m = 100m
+# - Bursty reporting (2-6s bursts, gaps of minutes to hours) → displacement-aware gaps
+# - Large legitimate gaps during transit (201-min Channel crossing) → bridge by displacement
+# - No TrackSolid backfill → positions arrive in real-time via webhook
+
+WEBHOOK_PROFILE = {
+    # Geometry (UNCHANGED from Jimi - positions are GPS-grade accurate)
+    "anchor_radius_m": 100,
+    "min_leg_distance_m": 300,
+    "move_confirm_m": 150,
+    
+    # Speed gates (UNCHANGED)
+    "max_speed_kmh": 200,
+    "air_speed_kmh": 300,
+    "air_min_distance_km": 150,
+    
+    # Gap handling (DISPLACEMENT-BASED, not time-based)
+    "gap_bridge_min_disp_m": 300,  # Bridge if displacement >= 300m (== min_leg_distance)
+    "speed_gate_kmh": 200,  # Don't bridge if implied speed > 200 km/h (teleport protection)
+    
+    # Stationary detection (QUALITY FLOOR to prevent 1-point spam)
+    "stationary_min_dwell_s": 60,  # Must dwell >= 60s
+    "stationary_min_points": 2,  # Must have >= 2 points
+    
+    # Journey breaks (DISPLACEMENT-BASED, not time-based)
+    # A stationary only breaks a journey if it shows ZERO meaningful displacement
+    # (i.e. device stayed in place across the gap)
+    "journey_break_enabled": False,  # Disable time-based journey breaks for webhook devices
+    
+    # Other (same as Jimi)
+    "settle_min_dwell_min": 3,
+    "smoothing_window": 3,
+}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# DEVICE TYPE DETECTION
+# ═══════════════════════════════════════════════════════════════════════════
+
+def is_webhook_device(db: Session, device_imei: str) -> bool:
+    """
+    Detect if device is a webhook/Minew device (vs Jimi PB708 polled device).
+    
+    Webhook devices (Minew E9/MST03/MTB02):
+    - Identified by UUID (not IMEI)
+    - tag_type = 'hubble' or 'series_5'
+    - Fed by real-time webhook push (not polled/buffered)
+    - Characteristics: GPS-grade accuracy, bursty reporting, large legitimate gaps
+    
+    Args:
+        db: Database session
+        device_imei: Device identifier (UUID for webhook, IMEI for Jimi)
+    
+    Returns:
+        True if webhook device, False if Jimi/TrackSolid device
+    """
+    try:
+        device = db.execute(
+            select(BLETag).where(BLETag.imei == device_imei)
+        ).scalar_one_or_none()
+        
+        if device and device.tag_type in ('hubble', 'series_5'):
+            return True
+        
+        return False
+    except Exception as exc:
+        logger.warning(f"Failed to detect device type for {device_imei}: {exc}")
+        return False  # Default to Jimi behavior if detection fails
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -421,8 +495,43 @@ class TripEngine:
     def __init__(self, db: Session, device_imei: str):
         self.db = db
         self.device_imei = device_imei
-        self.config = _load_config(db)
+        
+        # v2.1.22: Detect device type and apply appropriate configuration
+        self.is_webhook = is_webhook_device(db, device_imei)
+        
+        if self.is_webhook:
+            # Webhook device (Minew E9/MST03/MTB02) - use displacement-aware profile
+            logger.info(f"🔷 Device {device_imei[:8]} detected as WEBHOOK device (Minew) - using displacement-aware profile")
+            self.config = self._create_webhook_config()
+        else:
+            # Jimi PB708 or other polled device - use existing time-based profile
+            logger.debug(f"📡 Device {device_imei[:8]} detected as POLLED device (Jimi) - using time-based profile")
+            self.config = _load_config(db)
+        
         self.context: Optional[EngineContext] = None
+    
+    def _create_webhook_config(self) -> EngineConfig:
+        """
+        Create configuration for webhook devices (Minew E9/MST03/MTB02).
+        
+        These devices have GPS-grade accuracy but bursty reporting with large
+        legitimate gaps during transit (e.g., 201-min Channel crossing).
+        
+        Returns:
+            EngineConfig with webhook-specific parameters
+        """
+        return EngineConfig(
+            anchor_radius_m=WEBHOOK_PROFILE["anchor_radius_m"],
+            min_leg_distance_m=WEBHOOK_PROFILE["min_leg_distance_m"],
+            move_confirm_m=WEBHOOK_PROFILE["move_confirm_m"],
+            max_speed_kmh=WEBHOOK_PROFILE["max_speed_kmh"],
+            gap_timeout_min=999999,  # Effectively disabled - use displacement instead
+            air_speed_kmh=WEBHOOK_PROFILE["air_speed_kmh"],
+            air_min_distance_km=WEBHOOK_PROFILE["air_min_distance_km"],
+            journey_break_dwell_min=999999,  # Effectively disabled for webhook devices
+            settle_min_dwell_min=WEBHOOK_PROFILE["settle_min_dwell_min"],
+            smoothing_window=WEBHOOK_PROFILE["smoothing_window"],
+        )
     
     def _load_state(self) -> EngineContext:
         """Load engine state from database or create new."""
@@ -990,6 +1099,20 @@ class TripEngine:
         duration_seconds = (ended_at - started_at).total_seconds()
         point_count = len(points)
         
+        # v2.1.22: Webhook device quality floor (min-dwell + min-points)
+        # Prevents 1-point, zero-duration stationary spam from bursty reporting
+        if self.is_webhook:
+            min_dwell_s = WEBHOOK_PROFILE["stationary_min_dwell_s"]
+            min_points = WEBHOOK_PROFILE["stationary_min_points"]
+            
+            if duration_seconds < min_dwell_s or point_count < min_points:
+                logger.debug(
+                    "⏭️  IMEI %s (webhook): Stationary below quality floor (%.0f s < %d s OR %d points < %d) - discarding",
+                    self.device_imei, duration_seconds, min_dwell_s, point_count, min_points
+                )
+                # Don't persist - fold these points into adjacent leg/anchor
+                return None
+        
         # Get start/end position IDs (if available)
         start_position_id = points[0][3] if len(points) > 0 and points[0][3] else None
         end_position_id = points[-1][3] if len(points) > 0 and points[-1][3] else None
@@ -999,9 +1122,11 @@ class TripEngine:
         # Skip journey-breaking logic if:
         # - called from journey_close (prevents recursive close)
         # - called from R4c flush (duration not final yet)
+        # - v2.1.22: webhook device (displacement-aware, no time-based journey breaks)
         is_flush_operation = (reason == "heartbeat_flush")
         breaks_journey = (
-            duration_seconds > (self.config.journey_break_dwell_min * 60) 
+            not self.is_webhook  # v2.1.22: Disable time-based journey breaks for webhook devices
+            and duration_seconds > (self.config.journey_break_dwell_min * 60) 
             and reason != "journey_close"
             and not is_flush_operation  # B4: Don't evaluate breaks for open stationaries
         )
@@ -2120,8 +2245,107 @@ class TripEngine:
                 # Let it fall through to be processed as spatial gap
 
         
-        # Step 2: Gap timeout check
-        if self.context.current_state == "MOVE" and time_diff_seconds > self.config.gap_timeout_min * 60:
+        # Step 2: Gap handling (device-type-specific)
+        # v2.1.22: Webhook devices use DISPLACEMENT-aware gap logic
+        #          Jimi devices use TIME-based gap timeout (30 min)
+        
+        if self.is_webhook and self.context.current_state == "MOVE":
+            # WEBHOOK DEVICE: Displacement-aware gap handling
+            # Decision: Bridge vs Break based on DISPLACEMENT across the gap (not time)
+            # 
+            # Rationale: Minew devices have large gaps during normal transit (ferry,
+            # tunnel, sparse coverage). A 201-minute gap with 76km displacement is a
+            # Channel crossing (vehicle moving), NOT a stop.
+            #
+            # Rules:
+            # - Bridge if displacement >= 300m AND speed <= 200 km/h (continue journey)
+            # - Break if displacement < 300m (device stayed in place → genuine stop)
+            
+            gap_displacement_m = distance_m
+            gap_speed_kmh = implied_speed_kmh
+            
+            # Apply displacement-aware decision
+            if gap_displacement_m < WEBHOOK_PROFILE["gap_bridge_min_disp_m"]:
+                # Device did NOT move meaningfully during the gap → genuine stop
+                logger.info(
+                    "🛑 IMEI %s (webhook): Gap BREAK - low displacement (%.0f m < %.0f m) → genuine stop",
+                    self.device_imei, gap_displacement_m, WEBHOOK_PROFILE["gap_bridge_min_disp_m"]
+                )
+                
+                # Close current leg
+                if len(self.context.leg_buffer) >= 2:
+                    leg = self._create_leg(self.context.leg_buffer, is_air_leg=False)
+                    if leg:
+                        result['leg_created'] = True
+                        if self.context.journey_just_created:
+                            result['journey_created'] = True
+                    self.context.leg_buffer = []
+                
+                # Create stationary from last position until now
+                gap_stationary_points = [
+                    (self.context.last_position_lat, self.context.last_position_lng, 
+                     self.context.last_position_time, None),
+                    (lat, lng, observed_at, position_id)
+                ]
+                stationary = self._create_stationary(gap_stationary_points, reason="gap_break_webhook")
+                if stationary:
+                    result['stationary_created'] = True
+                    if self.context.journey_just_created:
+                        result['journey_created'] = True
+                
+                # Return to STATIONARY state (ANCHOR ASSIGNMENT)
+                self.context.current_state = "STATIONARY"
+                self.context.anchor_lat = lat
+                self.context.anchor_lng = lng
+                self.context.anchor_points = [(lat, lng, observed_at, position_id)]
+                self.context.leg_buffer = []
+            
+            elif gap_speed_kmh > WEBHOOK_PROFILE["speed_gate_kmh"]:
+                # Teleport protection: implied speed > 200 km/h suggests bad fix, not real transit
+                logger.warning(
+                    "⚠️  IMEI %s (webhook): Gap BREAK - speed gate exceeded (%.0f km/h > %.0f km/h) → likely teleport",
+                    self.device_imei, gap_speed_kmh, WEBHOOK_PROFILE["speed_gate_kmh"]
+                )
+                
+                # Treat as break (same as low-displacement case above)
+                if len(self.context.leg_buffer) >= 2:
+                    leg = self._create_leg(self.context.leg_buffer, is_air_leg=False)
+                    if leg:
+                        result['leg_created'] = True
+                        if self.context.journey_just_created:
+                            result['journey_created'] = True
+                    self.context.leg_buffer = []
+                
+                gap_stationary_points = [
+                    (self.context.last_position_lat, self.context.last_position_lng, 
+                     self.context.last_position_time, None),
+                    (lat, lng, observed_at, position_id)
+                ]
+                stationary = self._create_stationary(gap_stationary_points, reason="gap_break_webhook_speed_gate")
+                if stationary:
+                    result['stationary_created'] = True
+                    if self.context.journey_just_created:
+                        result['journey_created'] = True
+                
+                self.context.current_state = "STATIONARY"
+                self.context.anchor_lat = lat
+                self.context.anchor_lng = lng
+                self.context.anchor_points = [(lat, lng, observed_at, position_id)]
+                self.context.leg_buffer = []
+            
+            else:
+                # BRIDGE: Device demonstrably travelled during the gap (displacement >= 300m, speed <= 200 km/h)
+                # Continue current leg straight through the gap
+                logger.info(
+                    "🌉 IMEI %s (webhook): Gap BRIDGE - transit detected (%.0f m @ %.0f km/h over %.0f min) → continue leg",
+                    self.device_imei, gap_displacement_m, gap_speed_kmh, time_diff_seconds / 60
+                )
+                # Continue MOVE state - current leg stays open, no stationary created
+                # The gap becomes a segment in the leg (prev_point → current_point)
+                pass
+        
+        elif not self.is_webhook and self.context.current_state == "MOVE" and time_diff_seconds > self.config.gap_timeout_min * 60:
+            # JIMI DEVICE: Time-based gap timeout (existing 30-minute logic)
             logger.info(
                 "⏱️  IMEI %s: Gap timeout (%.0f min) → force close leg",
                 self.device_imei, time_diff_seconds / 60
