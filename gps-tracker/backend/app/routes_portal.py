@@ -2712,12 +2712,18 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
     
     # Handle trip subscription (DeviceState management)
     if data.trip_subscribed:
-        # Create DeviceState record for Trip Engine subscription
-        device_state = DeviceState(
-            device_imei=imei,
-            trip_subscribed=True,
-        )
-        db.add(device_state)
+        # Upsert DeviceState (may already exist from webhook/trip engine)
+        device_state = db.query(DeviceState).filter(
+            DeviceState.device_imei == imei
+        ).first()
+        if device_state:
+            device_state.trip_subscribed = True
+        else:
+            device_state = DeviceState(
+                device_imei=imei,
+                trip_subscribed=True,
+            )
+            db.add(device_state)
         db.commit()
     
     return _build_tag_out(tag, target_user.email if target_user else "unknown@unknown", db)
