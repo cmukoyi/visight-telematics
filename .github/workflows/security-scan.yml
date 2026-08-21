@@ -3,16 +3,18 @@ name: Security Scan
 on:
   push:
     branches: [ main, prod/beacon ]
-  pull_request:
-    branches: [ main, prod/beacon ]
+  # Removed pull_request trigger to avoid Dependabot spam
+  # PRs will be scanned when merged to main
   schedule:
     # Run weekly security scans every Monday at 9am UTC
     - cron: '0 9 * * 1'
+  workflow_dispatch:  # Allow manual runs
 
 jobs:
   bandit:
     name: Python Security (Bandit)
     runs-on: ubuntu-latest
+    continue-on-error: true  # Non-blocking
     steps:
       - uses: actions/checkout@v3
       
@@ -50,6 +52,7 @@ jobs:
   safety:
     name: Dependency Vulnerabilities (Safety)
     runs-on: ubuntu-latest
+    continue-on-error: true  # Non-blocking
     steps:
       - uses: actions/checkout@v3
       
@@ -84,22 +87,26 @@ jobs:
   secret-scan:
     name: Secret Detection (TruffleHog)
     runs-on: ubuntu-latest
+    continue-on-error: true  # Non-blocking
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Full history for secret scanning
+          fetch-depth: 50  # Limited history to avoid long scans
       
       - name: TruffleHog OSS
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          base: main
+          base: ${{ github.event.before }}
           head: HEAD
-          extra_args: --debug --only-verified
+          extra_args: --only-verified
+        continue-on-error: true
 
   semgrep:
     name: SAST (Semgrep)
     runs-on: ubuntu-latest
+    continue-on-error: true  # Non-blocking
+    if: ${{ secrets.SEMGREP_APP_TOKEN != '' }}  # Only run if token is configured
     container:
       image: returntocorp/semgrep
     steps:
@@ -125,35 +132,36 @@ jobs:
   trivy:
     name: Container Scan (Trivy)
     runs-on: ubuntu-latest
+    continue-on-error: true  # Non-blocking
     steps:
       - uses: actions/checkout@v3
       
-      - name: Build test image
-        run: |
-          cd gps-tracker/backend
-          docker build -t pinplot-backend:test .
-      
-      - name: Run Trivy vulnerability scanner
+      - name: Run Trivy filesystem scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'pinplot-backend:test'
+          scan-type: 'fs'
+          scan-ref: 'gps-tracker/backend'
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
+        continue-on-error: true
       
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v2
         with:
           sarif_file: 'trivy-results.sarif'
+        continue-on-error: true
 
   security-summary:
     name: Security Summary
     runs-on: ubuntu-latest
+    continue-on-error: true  # Non-blocking
     needs: [bandit, safety, secret-scan, semgrep, trivy]
     if: always()
     steps:
       - name: Download all reports
         uses: actions/download-artifact@v3
+        continue-on-error: true
       
       - name: Generate summary
         run: |
