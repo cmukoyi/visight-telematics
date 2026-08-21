@@ -1784,20 +1784,21 @@ class TripEngine:
         
         anchor_stat = self.db.execute(anchor_query).scalar_one_or_none()
         
-        # Determine deletion boundary: delete everything from anchor forward
+        # Determine deletion boundary: delete everything AFTER anchor (not including anchor)
         # If no anchor exists, delete everything for this device
         delete_from = anchor_stat.started_at if anchor_stat else None
         
         # DELETE PHASE: Remove stale trip artifacts from deletion boundary forward
         # This makes the rebuild idempotent - no duplicate key violations possible
+        # CRITICAL: Use > (not >=) to preserve the anchor stationary and its journey
         if delete_from:
             logger.info(
-                "🗑️  D1: Deleting trips from %s forward (anchor boundary)",
+                "🗑️  D1: Deleting trips AFTER %s (preserving anchor)",
                 delete_from.isoformat()
             )
             delete_filter = and_(
                 Stationary.device_imei == self.device_imei,
-                Stationary.started_at >= delete_from
+                Stationary.started_at > delete_from  # FIXED: > not >= (preserve anchor)
             )
         else:
             logger.info("🗑️  D1: Deleting ALL trips (no anchor found)")
@@ -1812,7 +1813,7 @@ class TripEngine:
             select(func.count()).select_from(Leg).where(
                 and_(
                     Leg.device_imei == self.device_imei,
-                    Leg.started_at >= delete_from
+                    Leg.started_at > delete_from  # FIXED: > not >= (preserve anchor's journey legs)
                 ) if delete_from else Leg.device_imei == self.device_imei
             )
         ).scalar()
@@ -1820,7 +1821,7 @@ class TripEngine:
             select(func.count()).select_from(Journey).where(
                 and_(
                     Journey.device_imei == self.device_imei,
-                    Journey.started_at >= delete_from
+                    Journey.started_at > delete_from  # FIXED: > not >= (preserve anchor's journey)
                 ) if delete_from else Journey.device_imei == self.device_imei
             )
         ).scalar()
@@ -1833,7 +1834,7 @@ class TripEngine:
             delete(Leg).where(
                 and_(
                     Leg.device_imei == self.device_imei,
-                    Leg.started_at >= delete_from
+                    Leg.started_at > delete_from  # FIXED: > not >= (preserve anchor's journey legs)
                 ) if delete_from else Leg.device_imei == self.device_imei
             )
         )
@@ -1841,7 +1842,7 @@ class TripEngine:
             delete(Journey).where(
                 and_(
                     Journey.device_imei == self.device_imei,
-                    Journey.started_at >= delete_from
+                    Journey.started_at > delete_from  # FIXED: > not >= (preserve anchor's journey)
                 ) if delete_from else Journey.device_imei == self.device_imei
             )
         )
