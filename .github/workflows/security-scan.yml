@@ -1,10 +1,10 @@
 name: Security Scan
 
 on:
-  push:
-    branches: [ main, prod/beacon ]
-  # Removed pull_request trigger to avoid Dependabot spam
-  # PRs will be scanned when merged to main
+  # DISABLED: No longer runs on every commit (too noisy)
+  # Security scans still run weekly and can be triggered manually
+  # push:
+  #   branches: [ main, prod/beacon ]
   schedule:
     # Run weekly security scans every Monday at 9am UTC
     - cron: '0 9 * * 1'
