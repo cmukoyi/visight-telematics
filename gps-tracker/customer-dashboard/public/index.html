@@ -3366,33 +3366,47 @@ input.hive-range::-moz-range-track {
                 display: none !important;
             }
             
-            /* Ensure map-sidebar stays above graph panel */
-            #tab-livemap .map-sidebar {
-                position: relative;
-                z-index: 10001;
-            }
-            
             .temp-graph-panel { 
-                position:fixed; 
-                left: calc(340px + 280px); /* Main nav + asset list sidebar */
-                right:0;
-                bottom:-50%; 
-                height:50vh; 
-                background:var(--panel); 
-                border-top:2px solid var(--border-strong); 
-                box-shadow:0 -4px 28px rgba(0,0,0,0.2); 
-                z-index:10000; 
-                transition:bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-                overflow:hidden;
+                position: fixed;
+                top: 60px; /* Account for header */
+                bottom: 0;
+                right: -600px; /* Hidden off-screen initially, will slide in from right */
+                width: 600px;
+                max-width: calc(100vw - 340px - 280px - 20px); /* Max width considering nav + sidebar */
+                background: var(--panel);
+                border-left: 2px solid var(--border-strong);
+                box-shadow: -4px 0 28px rgba(0,0,0,0.2);
+                z-index: 10000;
+                transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                overflow: hidden;
             }
-            .temp-graph-panel.open { bottom:0; }
-            
-            @media (max-width: 768px) {
-                .temp-graph-panel { left: 0; }
+            .temp-graph-panel.open {
+                right: 0;
             }
             
+            /* When main sidebar collapses, stretch the graph */
             body.sidebar-collapsed .temp-graph-panel {
-                left: calc(60px + 280px);
+                max-width: calc(100vw - 60px - 280px - 20px);
+            }
+            
+            /* Mobile: Full width from bottom */
+            @media (max-width: 768px) {
+                .temp-graph-panel {
+                    left: 0;
+                    right: auto;
+                    bottom: -50%;
+                    width: 100%;
+                    max-width: 100%;
+                    height: 50vh;
+                    border-left: none;
+                    border-top: 2px solid var(--border-strong);
+                    box-shadow: 0 -4px 28px rgba(0,0,0,0.2);
+                    transition: bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                }
+                .temp-graph-panel.open {
+                    bottom: 0;
+                    right: auto;
+                }
             }
             
             .temp-graph-content { 
@@ -3484,7 +3498,10 @@ input.hive-range::-moz-range-track {
                 flex:none; display:flex; flex-direction:column; gap:8px;
             }
             .temp-graph-stat {
-                background:var(--card); border-radius:9px; padding:9px 11px;
+                background: var(--bg-3); /* Grey tile background */
+                border: 1px solid var(--border);
+                border-radius: 9px;
+                padding: 9px 11px;
             }
             .temp-graph-stat .l {
                 font-size:9px; color:var(--text-3);
@@ -16423,19 +16440,10 @@ function mhaOpenHelp() {
         initPresets();
         initToggles();
         
-        // Show panel
+        // Show panel (slides in from right)
         const panel = document.getElementById('temp-graph-panel');
         panel.classList.add('open');
         _tempGraphOpen = true;
-        
-        // Adjust map area height
-        const mapArea = document.querySelector('#tab-livemap .map-area');
-        if (mapArea) {
-            mapArea.style.height = '50vh';
-            if (typeof _liveMap !== 'undefined' && _liveMap) {
-                setTimeout(() => _liveMap.invalidateSize(), 100);
-            }
-        }
         
         // Load data
         loadTemperatureData(_tempGraphTagId, 1);
@@ -16446,15 +16454,6 @@ function mhaOpenHelp() {
         const panel = document.getElementById('temp-graph-panel');
         panel.classList.remove('open');
         _tempGraphOpen = false;
-        
-        // Restore map area
-        const mapArea = document.querySelector('#tab-livemap .map-area');
-        if (mapArea) {
-            mapArea.style.height = '';
-            if (typeof _liveMap !== 'undefined' && _liveMap) {
-                setTimeout(() => _liveMap.invalidateSize(), 100);
-            }
-        }
         
         // Destroy charts
         if (_tempGraphChart) {
