@@ -3374,8 +3374,6 @@ input.hive-range::-moz-range-track {
             
             .temp-graph-panel { 
                 position:fixed; 
-                /* Main sidebar (340px) + map-sidebar asset list (~280px-320px depending on CSS) */
-                /* For now, let's use CSS variables or calc if available, otherwise estimate */
                 left: calc(340px + 280px); /* Main nav + asset list sidebar */
                 right:0;
                 bottom:-50%; 
@@ -3385,56 +3383,57 @@ input.hive-range::-moz-range-track {
                 box-shadow:0 -4px 28px rgba(0,0,0,0.2); 
                 z-index:10000; 
                 transition:bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-                overflow-y:auto;
+                overflow:hidden;
             }
             .temp-graph-panel.open { bottom:0; }
             
-            /* Responsive: Full width on mobile when sidebar is hidden */
             @media (max-width: 768px) {
-                .temp-graph-panel {
-                    left: 0;
-                }
+                .temp-graph-panel { left: 0; }
             }
             
-            /* When main sidebar is collapsed */
             body.sidebar-collapsed .temp-graph-panel {
-                left: calc(60px + 280px); /* Collapsed main nav + asset list */
+                left: calc(60px + 280px);
             }
+            
             .temp-graph-content { 
-                padding:20px; 
+                padding:14px 18px; 
                 height:100%; 
                 display:flex; 
-                flex-direction:column; 
+                flex-direction:column;
+                overflow:hidden;
             }
             .temp-graph-header { 
                 display:flex; 
                 align-items:center; 
-                justify-content:space-between; 
-                margin-bottom:16px; 
-                padding-bottom:12px; 
-                border-bottom:1px solid var(--border); 
+                gap:10px;
+                flex-wrap:wrap;
+                margin-bottom:12px; 
             }
             .temp-graph-title { 
-                font-size:18px; 
+                font-size:13px; 
                 font-weight:600; 
                 display:flex; 
                 align-items:center; 
-                gap:10px; 
+                gap:9px; 
             }
+            .temp-graph-title .icon-badge {
+                width:22px; height:22px; border-radius:6px;
+                background:var(--success-bg); color:var(--success-text);
+                display:flex; align-items:center; justify-content:center;
+                font-size:11px;
+            }
+            .temp-graph-meta {
+                font-size:10px; color:var(--text-3);
+                text-transform:uppercase; letter-spacing:.05em;
+            }
+            .temp-graph-spacer { margin-left:auto; }
             .temp-graph-close { 
                 background:none; 
                 border:none; 
                 color:var(--text-3); 
-                font-size:24px; 
+                font-size:20px; 
                 cursor:pointer; 
                 padding:4px 8px; 
-            }
-            .temp-graph-controls { 
-                display:flex; 
-                align-items:center; 
-                gap:10px; 
-                flex-wrap:wrap; 
-                margin-bottom:16px; 
             }
             .temp-graph-preset { 
                 font-family:inherit; 
@@ -3452,16 +3451,133 @@ input.hive-range::-moz-range-track {
                 color:var(--success-text); 
                 font-weight:600; 
             }
-            .temp-graph-chart-box { 
-                position:relative; 
-                flex:1; 
-                min-height:250px; 
-                background:transparent; 
-                padding:16px; 
+            .temp-graph-chip {
+                font-family:inherit; display:flex; align-items:center;
+                gap:6px; font-size:11px; padding:5px 11px;
+                border-radius:20px; border:1px solid var(--border-strong);
+                background:transparent; color:var(--text-2); cursor:pointer;
             }
-            .temp-graph-chart-box canvas { 
-                cursor:crosshair; 
+            .temp-graph-chip .dot {
+                width:7px; height:7px; border-radius:2px;
             }
+            .temp-graph-chip.on {
+                background:var(--primary-bg); border-color:var(--primary);
+                color:var(--primary-text);
+            }
+            .temp-graph-chip.alt.on {
+                background:var(--warning-bg); border-color:var(--warning);
+                color:var(--warning-text);
+            }
+            .temp-graph-smooth {
+                display:flex; align-items:center; gap:6px;
+                font-size:11px; color:var(--text-2); cursor:pointer;
+            }
+            .temp-graph-smooth input[type="checkbox"] {
+                width:auto; cursor:pointer;
+            }
+            
+            .temp-graph-main {
+                display:flex; gap:16px; flex:1; min-height:0;
+            }
+            .temp-graph-stats {
+                width:auto; min-width:132px; max-width:190px;
+                flex:none; display:flex; flex-direction:column; gap:8px;
+            }
+            .temp-graph-stat {
+                background:var(--card); border-radius:9px; padding:9px 11px;
+            }
+            .temp-graph-stat .l {
+                font-size:9px; color:var(--text-3);
+                text-transform:uppercase; letter-spacing:.04em;
+                margin-bottom:2px; line-height:1.25;
+            }
+            .temp-graph-stat .v {
+                font-size:17px; font-weight:600;
+            }
+            .temp-graph-stat .v-blue { color:var(--primary-text); }
+            .temp-graph-stat .v-amber { color:var(--warning-text); }
+            .temp-graph-stat .v-red { color:var(--danger-text); }
+            .temp-graph-stat .v-green { color:var(--success-text); }
+            .temp-graph-stats.scoped .temp-graph-stat {
+                box-shadow:inset 2px 0 0 var(--primary);
+            }
+            .temp-graph-export {
+                font-family:inherit; font-size:11px; padding:7px 10px;
+                border-radius:9px; margin-top:2px;
+                display:inline-flex; align-items:center; justify-content:center;
+                gap:6px; width:100%;
+                border:1px solid var(--border-strong);
+                background:var(--card); color:var(--text-2); cursor:pointer;
+            }
+            .temp-graph-export:hover:not(:disabled) {
+                border-color:var(--success); color:var(--success-text);
+            }
+            .temp-graph-export:disabled {
+                opacity:.45; cursor:not-allowed;
+            }
+            .temp-graph-export .ico {
+                width:13px; height:13px; flex:none;
+            }
+            
+            .temp-graph-charts {
+                flex:1; min-width:0; display:flex; flex-direction:column;
+            }
+            .temp-graph-chart-box {
+                position:relative; flex:1; min-height:0;
+            }
+            .temp-graph-chart-box canvas { cursor:crosshair; }
+            
+            .temp-graph-overview {
+                margin-top:8px; position:relative;
+            }
+            .temp-graph-ov-wrap {
+                position:relative; height:38px; border-radius:7px;
+                overflow:hidden; background:var(--card);
+                border:1px solid var(--border); cursor:grab;
+            }
+            .temp-graph-ov-wrap:active { cursor:grabbing; }
+            .temp-graph-ov-wrap canvas {
+                display:block; width:100%; height:100%;
+            }
+            .temp-graph-ov-bar {
+                display:flex; align-items:center; gap:10px; margin-top:5px;
+            }
+            .temp-graph-ov-hint {
+                font-size:10px; color:var(--text-3);
+            }
+            .temp-graph-reset {
+                font-family:inherit; font-size:10px; padding:3px 9px;
+                border-radius:20px; border:1px solid var(--border-strong);
+                background:transparent; color:var(--text-2); cursor:pointer;
+                display:none;
+            }
+            .temp-graph-reset.show {
+                display:inline-block; border-color:var(--success);
+                color:var(--success-text);
+            }
+            
+            .temp-graph-footer {
+                display:flex; align-items:center; gap:14px; margin-top:9px;
+                font-size:11px; color:var(--text-2); flex-wrap:wrap;
+            }
+            .temp-graph-legend {
+                display:flex; align-items:center; gap:6px;
+            }
+            .temp-graph-legend .d {
+                width:8px; height:8px; border-radius:50%;
+            }
+            .temp-graph-legend.gap-legend {
+                color:var(--text-3);
+            }
+            .temp-graph-legend .sw {
+                width:15px; height:9px; border-radius:2px;
+                background:rgba(150,134,205,0.20);
+                border:1px dashed rgba(168,152,220,0.60);
+            }
+            .temp-graph-gap-note {
+                font-size:11px; color:var(--warning-text);
+            }
+            
             .temp-graph-loading { 
                 display:flex; 
                 align-items:center; 
@@ -3475,6 +3591,14 @@ input.hive-range::-moz-range-track {
                 justify-content:center; 
                 height:250px; 
                 color:var(--danger); 
+            }
+            
+            @media (max-width:720px) {
+                .temp-graph-main { flex-direction:column; }
+                .temp-graph-stats {
+                    flex-direction:row; max-width:none; width:100%;
+                }
+                .temp-graph-stats .temp-graph-stat { flex:1; }
             }
             
             /* Live Map Time Badges (matching Movement Analytics style) */
@@ -15957,19 +16081,27 @@ function mhaOpenHelp() {
     <div class="temp-graph-content">
         <div class="temp-graph-header">
             <div class="temp-graph-title">
-                <i class="fa-solid fa-chart-line"></i>
+                <span class="icon-badge">●</span>
                 <span id="temp-graph-tag-name">Temperature Graph</span>
             </div>
+            <div class="temp-graph-meta" id="temp-graph-meta"></div>
+            <div class="temp-graph-spacer"></div>
+            <div style="display:flex; gap:5px;" id="temp-graph-presets"></div>
+            <label class="temp-graph-smooth">
+                <input type="checkbox" id="temp-graph-smooth-toggle" checked>
+                <span>Smooth</span>
+            </label>
+            <button class="temp-graph-chip" id="temp-graph-batt-btn">
+                <span class="dot" style="background:var(--primary);"></span>
+                <span>Battery</span>
+            </button>
+            <button class="temp-graph-chip alt" id="temp-graph-alt-btn">
+                <span class="dot" style="background:var(--warning);"></span>
+                <span>Altitude</span>
+            </button>
             <button class="temp-graph-close" onclick="closeTemperatureGraph()" aria-label="Close">
                 <i class="fa-solid fa-xmark"></i>
             </button>
-        </div>
-        
-        <div class="temp-graph-controls">
-            <button class="temp-graph-preset active" data-days="1" onclick="loadTemperatureRange(1)">24h</button>
-            <button class="temp-graph-preset" data-days="7" onclick="loadTemperatureRange(7)">7d</button>
-            <button class="temp-graph-preset" data-days="30" onclick="loadTemperatureRange(30)">30d</button>
-            <button class="temp-graph-preset" data-days="90" onclick="loadTemperatureRange(90)">All</button>
         </div>
         
         <div id="temp-graph-loading" class="temp-graph-loading" style="display:none">
@@ -15982,8 +16114,67 @@ function mhaOpenHelp() {
             <span id="temp-graph-error-msg">Error loading data</span>
         </div>
         
-        <div id="temp-graph-chart-container" class="temp-graph-chart-box" style="display:none">
-            <canvas id="temp-graph-canvas"></canvas>
+        <div class="temp-graph-main" id="temp-graph-main" style="display:none">
+            <div class="temp-graph-stats" id="temp-graph-stats">
+                <div class="temp-graph-stat">
+                    <div class="l">Temperature</div>
+                    <div class="v" id="temp-stat-temp">—</div>
+                </div>
+                <div class="temp-graph-stat">
+                    <div class="l">Range</div>
+                    <div class="v" id="temp-stat-range" style="font-size:14px;">—</div>
+                </div>
+                <div class="temp-graph-stat">
+                    <div class="l">Reports</div>
+                    <div class="v" id="temp-stat-count">—</div>
+                </div>
+                <div class="temp-graph-stat">
+                    <div class="l">Coverage</div>
+                    <div class="v" id="temp-stat-coverage">—</div>
+                </div>
+                <button class="temp-graph-export" id="temp-graph-export">
+                    <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9.3 1.6H4.3a1.2 1.2 0 0 0-1.2 1.2v10.4a1.2 1.2 0 0 0 1.2 1.2h7.4a1.2 1.2 0 0 0 1.2-1.2V5.3z"/>
+                        <path d="M9.3 1.6v3.7h3.6"/>
+                        <path d="M8 7.7v4"/>
+                        <path d="M6.4 10.1 8 11.7l1.6-1.6"/>
+                    </svg>
+                    <span>Export PDF</span>
+                </button>
+            </div>
+            <div class="temp-graph-charts">
+                <div class="temp-graph-chart-box">
+                    <canvas id="temp-graph-canvas" role="img" aria-label="Temperature over time"></canvas>
+                </div>
+                <div class="temp-graph-overview">
+                    <div class="temp-graph-ov-wrap" id="temp-graph-ov-wrap" tabindex="0">
+                        <canvas id="temp-graph-ov-canvas"></canvas>
+                    </div>
+                    <div class="temp-graph-ov-bar">
+                        <span class="temp-graph-ov-hint">Drag the window to pan, drag its edges to zoom</span>
+                        <button class="temp-graph-reset" id="temp-graph-reset">Reset zoom</button>
+                    </div>
+                </div>
+                <div class="temp-graph-footer">
+                    <span class="temp-graph-legend">
+                        <span class="d" style="background:var(--success);"></span>
+                        <span>Temperature</span>
+                    </span>
+                    <span class="temp-graph-legend" id="temp-graph-batt-legend" style="display:none;">
+                        <span class="d" style="background:var(--primary);"></span>
+                        <span>Battery %</span>
+                    </span>
+                    <span class="temp-graph-legend" id="temp-graph-alt-legend" style="display:none;">
+                        <span class="d" style="background:var(--warning);"></span>
+                        <span>Altitude m</span>
+                    </span>
+                    <span class="temp-graph-legend gap-legend" id="temp-graph-gap-legend">
+                        <span class="sw"></span>
+                        <span>No reports</span>
+                    </span>
+                    <span class="temp-graph-gap-note" id="temp-graph-gap-note"></span>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -15995,11 +16186,210 @@ function mhaOpenHelp() {
 (function() {
     'use strict';
     
+    // Core state
     let _tempGraphOpen = false;
     let _tempGraphImei = null;
+    let _tempGraphTagId = null;
     let _tempGraphTagName = null;
     let _tempGraphChart = null;
+    let _tempGraphOverviewChart = null;
     let _tempGraphDays = 1;
+    let _tempGraphData = null;
+    let _tempGraphGaps = [];
+    let _showBattery = false;
+    let _showAltitude = false;
+    let _zoomView = null;
+    let _dragState = null;
+    
+    const GAP_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 hours
+    const MIN_VIEW_MS = 5 * 60 * 1000; // 5 minutes minimum zoom
+    
+    // Helper: Find gaps in data (periods >2h without reports)
+    function findGaps(points, thresholdMs) {
+        if (points.length < 2) return [];
+        const gaps = [];
+        for (let i = 1; i < points.length; i++) {
+            const ms = points[i].x - points[i-1].x;
+            if (ms > thresholdMs) {
+                gaps.push({
+                    from: points[i-1].x,
+                    to: points[i].x,
+                    ms: ms
+                });
+            }
+        }
+        return gaps;
+    }
+    
+    // Helper: Format duration
+    function formatDuration(ms) {
+        const h = Math.floor(ms / 3600000);
+        const m = Math.round((ms % 3600000) / 60000);
+        if (h === 0) return `${m}m`;
+        if (m === 0) return `${h}h`;
+        return `${h}h ${m}m`;
+    }
+    
+    // Helper: Calculate stats for visible window
+    function calculateStats(points, gaps, viewFrom, viewTo) {
+        const visiblePts = points.filter(p => p.x >= viewFrom && p.x <= viewTo);
+        const temps = visiblePts.map(p => p.temp).filter(t => t != null);
+        
+        let result = {
+            count: visiblePts.length,
+            latest: null,
+            min: null,
+            max: null,
+            coverage: 100
+        };
+        
+        if (temps.length > 0) {
+            result.latest = temps[temps.length - 1];
+            result.min = Math.min(...temps);
+            result.max = Math.max(...temps);
+        }
+        
+        // Calculate coverage (percentage of time with reports)
+        const totalMs = viewTo - viewFrom;
+        const gapMs = gaps.reduce((sum, g) => {
+            const overlapStart = Math.max(g.from, viewFrom);
+            const overlapEnd = Math.min(g.to, viewTo);
+            return sum + Math.max(0, overlapEnd - overlapStart);
+        }, 0);
+        result.coverage = Math.round(100 - (gapMs / Math.max(1, totalMs)) * 100);
+        
+        return result;
+    }
+    
+    // Helper: Update stats sidebar
+    function updateStats(points, gaps) {
+        if (!points || points.length === 0) return;
+        
+        const viewFrom = _zoomView ? _zoomView.from : points[0].x;
+        const viewTo = _zoomView ? _zoomView.to : points[points.length - 1].x;
+        const stats = calculateStats(points, gaps, viewFrom, viewTo);
+        
+        // Temperature
+        const tempEl = document.getElementById('temp-stat-temp');
+        if (stats.latest != null) {
+            tempEl.textContent = `${stats.latest.toFixed(1)}°C`;
+            tempEl.className = 'v ' + (stats.latest < 10 ? 'v-blue' : stats.latest < 20 ? 'v-amber' : 'v-red');
+        } else {
+            tempEl.textContent = '—';
+            tempEl.className = 'v';
+        }
+        
+        // Range
+        document.getElementById('temp-stat-range').textContent = 
+            (stats.min != null && stats.max != null) ? `${stats.min.toFixed(1)}° / ${stats.max.toFixed(1)}°` : '—';
+        
+        // Reports
+        document.getElementById('temp-stat-count').textContent = stats.count;
+        
+        // Coverage
+        const covEl = document.getElementById('temp-stat-coverage');
+        covEl.textContent = `${stats.coverage}%`;
+        covEl.className = 'v ' + (stats.coverage <= 50 ? 'v-amber' : stats.coverage <= 75 ? '' : 'v-green');
+        
+        // Gap note
+        const visibleGaps = gaps.filter(g => {
+            const overlapStart = Math.max(g.from, viewFrom);
+            const overlapEnd = Math.min(g.to, viewTo);
+            return overlapEnd > overlapStart;
+        });
+        
+        const gapNote = document.getElementById('temp-graph-gap-note');
+        if (visibleGaps.length > 0 && gaps.length > 0) {
+            const longest = visibleGaps.reduce((a, g) => g.ms > a.ms ? g : a);
+            const plural = visibleGaps.length > 1 ? 's' : '';
+            gapNote.textContent = `${visibleGaps.length} gap${plural} over 2h · longest ${formatDuration(longest.ms)}`;
+        } else {
+            gapNote.textContent = '';
+        }
+    }
+    
+    // Chart.js plugin: Gap band visualization
+    const gapBandPlugin = {
+        id: 'gapBands',
+        beforeDatasetsDraw(chart, args, opts) {
+            const gaps = opts.gaps || [];
+            if (!gaps.length) return;
+            const {ctx, chartArea, scales} = chart;
+            if (!chartArea || !scales.x) return;
+            
+            ctx.save();
+            gaps.forEach(g => {
+                const x1 = Math.max(chartArea.left, scales.x.getPixelForValue(g.from));
+                const x2 = Math.min(chartArea.right, scales.x.getPixelForValue(g.to));
+                if (x2 <= x1) return;
+                
+                // Fill gap area
+                ctx.fillStyle = 'rgba(150,134,205,0.15)';
+                ctx.fillRect(x1, chartArea.top, x2 - x1, chartArea.bottom - chartArea.top);
+                
+                // Draw dashed edges
+                ctx.strokeStyle = 'rgba(168,152,220,0.50)';
+                ctx.setLineDash([3,3]);
+                ctx.lineWidth = 1;
+                [x1, x2].forEach(x => {
+                    ctx.beginPath();
+                    ctx.moveTo(x, chartArea.top);
+                    ctx.lineTo(x, chartArea.bottom);
+                    ctx.stroke();
+                });
+                ctx.setLineDash([]);
+            });
+            ctx.restore();
+        }
+    };
+    
+    // Initialize preset buttons
+    function initPresets() {
+        const presetsEl = document.getElementById('temp-graph-presets');
+        if (!presetsEl) return;
+        presetsEl.innerHTML = '';
+        
+        [1, 7, 30, 90].forEach(days => {
+            const btn = document.createElement('button');
+            btn.className = 'temp-graph-preset' + (days === 1 ? ' active' : '');
+            btn.dataset.days = days;
+            btn.textContent = days === 1 ? '24h' : days === 7 ? '7d' : days === 30 ? '30d' : 'All';
+            btn.onclick = () => loadTemperatureRange(days);
+            presetsEl.appendChild(btn);
+        });
+    }
+    
+    // Initialize toggle buttons
+    function initToggles() {
+        const smoothToggle = document.getElementById('temp-graph-smooth-toggle');
+        const battBtn = document.getElementById('temp-graph-batt-btn');
+        const altBtn = document.getElementById('temp-graph-alt-btn');
+        
+        if (smoothToggle) smoothToggle.checked = true;
+        if (smoothToggle) smoothToggle.onchange = () => { if (_tempGraphData) buildChart(_tempGraphData); };
+        
+        if (battBtn) battBtn.onclick = () => {
+            _showBattery = !_showBattery;
+            battBtn.classList.toggle('on', _showBattery);
+            document.getElementById('temp-graph-batt-legend').style.display = _showBattery ? 'flex' : 'none';
+            if (_tempGraphChart && _tempGraphChart.data.datasets[1]) {
+                _tempGraphChart.data.datasets[1].hidden = !_showBattery;
+                _tempGraphChart.options.scales.y1.display = _showBattery;
+                _tempGraphChart.update();
+            }
+        };
+        
+        if (altBtn) altBtn.onclick = () => {
+            _showAltitude = !_showAltitude;
+            altBtn.classList.toggle('on', _showAltitude);
+            document.getElementById('temp-graph-alt-legend').style.display = _showAltitude ? 'flex' : 'none';
+            if (_tempGraphChart && _tempGraphChart.data.datasets[2]) {
+                _tempGraphChart.data.datasets[2].hidden = !_showAltitude;
+                _tempGraphChart.options.scales.y2.display = _showAltitude;
+                _tempGraphChart.update();
+            }
+        };
+    }
     
     // Toggle temperature graph panel
     window.toggleTemperatureGraph = function(imei, tagName) {
@@ -16010,35 +16400,45 @@ function mhaOpenHelp() {
             return;
         }
         
+        // Find tag to get ID
+        const tag = _lmTags.find(t => t.imei === imei);
+        if (!tag) {
+            console.error('[TEMP GRAPH] Tag not found for IMEI:', imei);
+            return;
+        }
+        
         _tempGraphImei = imei;
+        _tempGraphTagId = tag.id;
         _tempGraphTagName = tagName;
-        _tempGraphDays = 1; // Reset to 24h
+        _tempGraphDays = 1;
+        _zoomView = null;
+        _showBattery = false;
+        _showAltitude = false;
         
-        // Update panel title
-        document.getElementById('temp-graph-tag-name').textContent = tagName || 'Temperature Graph';
+        // Update UI
+        document.getElementById('temp-graph-tag-name').textContent = tagName || 'Temperature';
+        document.getElementById('temp-graph-meta').textContent = `${tag.tag_type || 'Tag'} · ${imei.substring(0, 8)}`;
         
-        // Reset preset buttons
-        document.querySelectorAll('.temp-graph-preset').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.days === '1');
-        });
+        // Initialize presets and toggles
+        initPresets();
+        initToggles();
         
         // Show panel
         const panel = document.getElementById('temp-graph-panel');
         panel.classList.add('open');
         _tempGraphOpen = true;
         
-        // Adjust map area height to make room for graph (50-50 split)
+        // Adjust map area height
         const mapArea = document.querySelector('#tab-livemap .map-area');
         if (mapArea) {
             mapArea.style.height = '50vh';
-            // Force Leaflet to recalculate size
             if (typeof _liveMap !== 'undefined' && _liveMap) {
                 setTimeout(() => _liveMap.invalidateSize(), 100);
             }
         }
         
         // Load data
-        loadTemperatureData(imei, 1);
+        loadTemperatureData(_tempGraphTagId, 1);
     };
     
     window.closeTemperatureGraph = function() {
@@ -16047,59 +16447,61 @@ function mhaOpenHelp() {
         panel.classList.remove('open');
         _tempGraphOpen = false;
         
-        // Restore map area to full height
+        // Restore map area
         const mapArea = document.querySelector('#tab-livemap .map-area');
         if (mapArea) {
             mapArea.style.height = '';
-            // Force Leaflet to recalculate size
             if (typeof _liveMap !== 'undefined' && _liveMap) {
                 setTimeout(() => _liveMap.invalidateSize(), 100);
             }
         }
         
-        // Destroy chart
+        // Destroy charts
         if (_tempGraphChart) {
             _tempGraphChart.destroy();
             _tempGraphChart = null;
         }
+        if (_tempGraphOverviewChart) {
+            _tempGraphOverviewChart.destroy();
+            _tempGraphOverviewChart = null;
+        }
         
-        // Hide all content
+        // Hide content
         document.getElementById('temp-graph-loading').style.display = 'none';
         document.getElementById('temp-graph-error').style.display = 'none';
-        document.getElementById('temp-graph-chart-container').style.display = 'none';
+        document.getElementById('temp-graph-main').style.display = 'none';
+        
+        // Reset state
+        _tempGraphData = null;
+        _tempGraphGaps = [];
+        _zoomView = null;
     };
     
-    window.loadTemperatureRange = function(days) {
+    function loadTemperatureRange(days) {
         console.log('[TEMP GRAPH] loadTemperatureRange called for', days, 'days');
         _tempGraphDays = days;
+        _zoomView = null; // Reset zoom
         
         // Update preset buttons
         document.querySelectorAll('.temp-graph-preset').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.days === String(days));
         });
         
-        if (_tempGraphImei) {
-            loadTemperatureData(_tempGraphImei, days);
+        if (_tempGraphTagId) {
+            loadTemperatureData(_tempGraphTagId, days);
         }
-    };
+    }
     
-    async function loadTemperatureData(imei, days) {
-        console.log('[TEMP GRAPH] loadTemperatureData called for IMEI:', imei, 'days:', days);
-        
-        // Find tag by IMEI
-        const tag = _lmTags.find(t => t.imei === imei);
-        if (!tag) {
-            showError('Tag not found');
-            return;
-        }
+    async function loadTemperatureData(tagId, days) {
+        console.log('[TEMP GRAPH] loadTemperatureData called for tag ID:', tagId, 'days:', days);
         
         // Show loading
         document.getElementById('temp-graph-loading').style.display = 'flex';
         document.getElementById('temp-graph-error').style.display = 'none';
-        document.getElementById('temp-graph-chart-container').style.display = 'none';
+        document.getElementById('temp-graph-main').style.display = 'none';
         
         try {
-            const res = await apiFetch(`/api/portal/tags/${tag.id}/temperature?days=${days}`);
+            const res = await apiFetch(`/api/portal/tags/${tagId}/temperature?days=${days}`);
             if (!res.ok) {
                 const errData = await res.json();
                 throw new Error(errData.detail || errData.error || 'Failed to load temperature data');
@@ -16117,12 +16519,13 @@ function mhaOpenHelp() {
                 return;
             }
             
-            // Hide loading, show chart
+            // Hide loading, show main
             document.getElementById('temp-graph-loading').style.display = 'none';
-            document.getElementById('temp-graph-chart-container').style.display = 'block';
+            document.getElementById('temp-graph-main').style.display = 'flex';
             
-            // Build chart
-            buildTemperatureChart(data.points);
+            // Store data and build chart
+            _tempGraphData = data.points;
+            buildChart(_tempGraphData);
             
         } catch (err) {
             console.error('[TEMP GRAPH] Error loading data:', err);
@@ -16134,140 +16537,96 @@ function mhaOpenHelp() {
         document.getElementById('temp-graph-loading').style.display = 'none';
         document.getElementById('temp-graph-error').style.display = 'flex';
         document.getElementById('temp-graph-error-msg').textContent = message;
-        document.getElementById('temp-graph-chart-container').style.display = 'none';
+        document.getElementById('temp-graph-main').style.display = 'none';
     }
     
-    function buildTemperatureChart(points) {
-        console.log('[TEMP GRAPH] buildTemperatureChart called with', points.length, 'points');
+    function buildChart(points) {
+        console.log('[TEMP GRAPH] buildChart called with', points.length, 'points');
         
-        // Destroy existing chart
+        // Destroy existing
         if (_tempGraphChart) {
             _tempGraphChart.destroy();
             _tempGraphChart = null;
         }
         
-        // Check if Chart.js is loaded
         if (typeof Chart === 'undefined') {
             showError('Chart library not loaded');
             return;
         }
         
-        const canvas = document.getElementById('temp-graph-canvas');
-        if (!canvas) {
-            showError('Chart canvas not found');
-            return;
+        // Detect gaps
+        _tempGraphGaps = findGaps(points, GAP_THRESHOLD_MS);
+        const showGaps = _tempGraphDays <= 7; // Only show gap bands for 7d or less
+        const visibleGaps = showGaps ? _tempGraphGaps : [];
+        
+        // Register plugin
+        if (!Chart.registry.plugins.get('gapBands')) {
+            Chart.register(gapBandPlugin);
         }
         
-        const ctx = canvas.getContext('2d');
+        // Prepare datasets
+        const smoothOn = document.getElementById('temp-graph-smooth-toggle')?.checked ?? true;
+        const tension = smoothOn ? 0.4 : 0;
         
-        // Prepare data
-        const data = points.map(p => ({
-            x: p.x,
-            y: p.temp
-        }));
+        const datasets = [
+            {
+                label: 'Temperature (°C)',
+                data: points.map(p => ({x: p.x, y: p.temp})),
+                borderColor: 'rgb(34, 197, 94)',
+                backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                borderWidth: 2,
+                pointRadius: smoothOn ? 0 : 2,
+                tension: tension,
+                yAxisID: 'y',
+                fill: true
+            },
+            {
+                label: 'Battery (%)',
+                data: points.map(p => ({x: p.x, y: p.batt})),
+                borderColor: 'rgb(59, 130, 246)',
+                borderWidth: 1.5,
+                borderDash: [5,3],
+                pointRadius: 0,
+                tension: 0.2,
+                hidden: !_showBattery,
+                yAxisID: 'y1'
+            },
+            {
+                label: 'Altitude (m)',
+                data: points.map(p => ({x: p.x, y: p.alt})),
+                borderColor: 'rgb(245, 158, 11)',
+                borderWidth: 1.5,
+                borderDash: [2,3],
+                pointRadius: 0,
+                tension: 0.2,
+                hidden: !_showAltitude,
+                yAxisID: 'y2'
+            }
+        ];
         
-        const batteryData = points.map(p => ({
-            x: p.x,
-            y: p.batt
-        }));
-        
-        const altitudeData = points.map(p => ({
-            x: p.x,
-            y: p.alt
-        }));
-        
-        // Create chart
+        // Build chart
+        const ctx = document.getElementById('temp-graph-canvas').getContext('2d');
         _tempGraphChart = new Chart(ctx, {
             type: 'line',
-            data: {
-                datasets: [
-                    {
-                        label: 'Temperature (°C)',
-                        data: data,
-                        borderColor: 'rgb(34, 197, 94)',
-                        backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                        borderWidth: 2,
-                        pointRadius: 2,
-                        pointHoverRadius: 4,
-                        tension: 0.4,
-                        yAxisID: 'y'
-                    },
-                    {
-                        label: 'Battery (%)',
-                        data: batteryData,
-                        borderColor: 'rgb(59, 130, 246)',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        pointHoverRadius: 4,
-                        tension: 0.4,
-                        hidden: true,
-                        yAxisID: 'y1'
-                    },
-                    {
-                        label: 'Altitude (m)',
-                        data: altitudeData,
-                        borderColor: 'rgb(245, 158, 11)',
-                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        pointHoverRadius: 4,
-                        tension: 0.4,
-                        hidden: true,
-                        yAxisID: 'y2'
-                    }
-                ]
-            },
+            data: {datasets},
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                interaction: {
-                    mode: 'index',
-                    intersect: false
-                },
+                interaction: {mode: 'index', intersect: false},
                 plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top',
-                        labels: {
-                            usePointStyle: true,
-                            padding: 15,
-                            font: {
-                                size: 12
-                            }
-                        },
-                        onClick: function(e, legendItem, legend) {
-                            // Toggle dataset visibility
-                            const index = legendItem.datasetIndex;
-                            const chart = legend.chart;
-                            const meta = chart.getDatasetMeta(index);
-                            meta.hidden = meta.hidden === null ? !chart.data.datasets[index].hidden : null;
-                            chart.update();
-                        }
-                    },
+                    legend: {display: false},
+                    gapBands: {gaps: visibleGaps},
                     tooltip: {
                         backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                        titleColor: '#fff',
-                        bodyColor: '#fff',
-                        borderColor: '#333',
-                        borderWidth: 1,
-                        padding: 10,
-                        displayColors: true,
                         callbacks: {
-                            title: function(context) {
-                                const date = new Date(context[0].parsed.x);
-                                return date.toLocaleString();
-                            },
-                            label: function(context) {
-                                let label = context.dataset.label || '';
-                                if (label) {
-                                    label += ': ';
-                                }
-                                if (context.parsed.y !== null) {
-                                    label += context.parsed.y.toFixed(1);
-                                    if (context.datasetIndex === 0) label += '°C';
-                                    else if (context.datasetIndex === 1) label += '%';
-                                    else if (context.datasetIndex === 2) label += 'm';
+                            title: ctx => ctx.length ? new Date(ctx[0].parsed.x).toLocaleString() : '',
+                            label: ctx => {
+                                let label = ctx.dataset.label || '';
+                                if (ctx.parsed.y !== null) {
+                                    label += ': ' + ctx.parsed.y.toFixed(1);
+                                    if (ctx.datasetIndex === 0) label += '°C';
+                                    else if (ctx.datasetIndex === 1) label += '%';
+                                    else if (ctx.datasetIndex === 2) label += 'm';
                                 }
                                 return label;
                             }
@@ -16279,63 +16638,39 @@ function mhaOpenHelp() {
                         type: 'time',
                         time: {
                             unit: _tempGraphDays <= 1 ? 'hour' : _tempGraphDays <= 7 ? 'day' : 'week',
-                            displayFormats: {
-                                hour: 'HH:mm',
-                                day: 'MMM d',
-                                week: 'MMM d'
-                            }
+                            displayFormats: {hour: 'HH:mm', day: 'MMM d', week: 'MMM d'}
                         },
-                        grid: {
-                            display: true,
-                            color: 'rgba(0, 0, 0, 0.05)'
-                        },
-                        ticks: {
-                            maxRotation: 0,
-                            autoSkipPadding: 20
-                        }
+                        grid: {color: 'rgba(0,0,0,0.05)'},
+                        ticks: {maxRotation: 0}
                     },
                     y: {
-                        type: 'linear',
-                        display: true,
                         position: 'left',
-                        title: {
-                            display: true,
-                            text: 'Temperature (°C)'
-                        },
-                        grid: {
-                            display: true,
-                            color: 'rgba(0, 0, 0, 0.05)'
-                        }
+                        grid: {color: 'rgba(0,0,0,0.05)'},
+                        ticks: {callback: v => v.toFixed(0) + '°'}
                     },
                     y1: {
-                        type: 'linear',
-                        display: false,
                         position: 'right',
+                        display: _showBattery,
                         min: 0,
                         max: 100,
-                        title: {
-                            display: false,
-                            text: 'Battery (%)'
-                        },
-                        grid: {
-                            drawOnChartArea: false
-                        }
+                        grid: {drawOnChartArea: false},
+                        ticks: {callback: v => v.toFixed(0) + '%', color: 'rgb(59, 130, 246)'}
                     },
                     y2: {
-                        type: 'linear',
-                        display: false,
                         position: 'right',
-                        title: {
-                            display: false,
-                            text: 'Altitude (m)'
-                        },
-                        grid: {
-                            drawOnChartArea: false
-                        }
+                        display: _showAltitude,
+                        grid: {drawOnChartArea: false},
+                        ticks: {callback: v => v.toFixed(0) + 'm', color: 'rgb(245, 158, 11)'}
                     }
                 }
             }
         });
+        
+        // Update stats
+        updateStats(points, _tempGraphGaps);
+        
+        // Show gap legend if needed
+        document.getElementById('temp-graph-gap-legend').style.display = showGaps && _tempGraphGaps.length > 0 ? 'flex' : 'none';
         
         console.log('[TEMP GRAPH] Chart created successfully');
     }
