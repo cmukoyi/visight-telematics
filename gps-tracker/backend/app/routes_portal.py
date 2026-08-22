@@ -7,7 +7,7 @@ Routes are mounted at /api/portal (separate from /api/v1 user routes and
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from time import perf_counter
 from typing import List, Optional
 from uuid import UUID
