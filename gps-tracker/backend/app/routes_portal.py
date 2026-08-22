@@ -2913,8 +2913,8 @@ class PortalTripsRequest(BaseModel):
 @router.get("/tags/{tag_id}/temperature")
 async def get_tag_temperature_history(
     tag_id: str,
+    request: Request,
     days: int = Query(7, ge=1, le=365, description="Number of days of history (1-365)"),
-    current_user: PortalUser = Depends(get_current_portal_user_from_token),
     db: Session = Depends(get_db),
 ):
     """
@@ -2951,6 +2951,9 @@ async def get_tag_temperature_history(
         }
     """
     from app.models import DevicePosition
+    
+    # Authenticate portal user
+    current_user = get_portal_user_from_request(request, db)
     
     # Verify tag exists and belongs to user's tenant
     tag = db.query(BLETag).filter(BLETag.id == tag_id).first()
