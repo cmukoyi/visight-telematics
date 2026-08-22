@@ -120,6 +120,7 @@
 
     <!-- Chart.js and jsPDF for temperature graph -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
     <!-- MQTT -->
@@ -3365,9 +3366,17 @@ input.hive-range::-moz-range-track {
                 display: none !important;
             }
             
+            /* Ensure map-sidebar stays above graph panel */
+            #tab-livemap .map-sidebar {
+                position: relative;
+                z-index: 10001;
+            }
+            
             .temp-graph-panel { 
                 position:fixed; 
-                left:340px; /* Sidebar width */
+                /* Main sidebar (340px) + map-sidebar asset list (~280px-320px depending on CSS) */
+                /* For now, let's use CSS variables or calc if available, otherwise estimate */
+                left: calc(340px + 280px); /* Main nav + asset list sidebar */
                 right:0;
                 bottom:-50%; 
                 height:50vh; 
@@ -3387,9 +3396,9 @@ input.hive-range::-moz-range-track {
                 }
             }
             
-            /* When sidebar is expanded/collapsed */
+            /* When main sidebar is collapsed */
             body.sidebar-collapsed .temp-graph-panel {
-                left: 60px; /* Collapsed sidebar width */
+                left: calc(60px + 280px); /* Collapsed main nav + asset list */
             }
             .temp-graph-content { 
                 padding:20px; 
