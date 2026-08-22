@@ -3362,18 +3362,18 @@ input.hive-range::-moz-range-track {
             /* ══════════════════ TEMPERATURE GRAPH ══════════════════ */
             .temp-graph-panel { 
                 position:fixed; 
-                top:0; 
-                right:-100%; 
-                width:min(95vw, 1200px); 
-                height:100vh; 
+                left:0; 
+                right:0;
+                bottom:-50%; 
+                height:50vh; 
                 background:var(--panel); 
-                border-left:1px solid var(--border); 
-                box-shadow:-4px 0 28px rgba(0,0,0,0.15); 
+                border-top:2px solid var(--border-strong); 
+                box-shadow:0 -4px 28px rgba(0,0,0,0.2); 
                 z-index:10000; 
-                transition:right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                transition:bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1);
                 overflow-y:auto;
             }
-            .temp-graph-panel.open { right:0; }
+            .temp-graph-panel.open { bottom:0; }
             .temp-graph-content { 
                 padding:20px; 
                 height:100%; 
@@ -3429,7 +3429,7 @@ input.hive-range::-moz-range-track {
             .temp-graph-chart-box { 
                 position:relative; 
                 flex:1; 
-                min-height:400px; 
+                min-height:250px; 
                 background:var(--card); 
                 border-radius:12px; 
                 padding:16px; 
@@ -3441,14 +3441,14 @@ input.hive-range::-moz-range-track {
                 display:flex; 
                 align-items:center; 
                 justify-content:center; 
-                height:400px; 
+                height:250px; 
                 color:var(--text-3); 
             }
             .temp-graph-error { 
                 display:flex; 
                 align-items:center; 
                 justify-content:center; 
-                height:400px; 
+                height:250px; 
                 color:var(--danger); 
             }
             
@@ -11110,11 +11110,6 @@ function _lmRenderSensorData(t) {
             <div class="detail-grid">
                 ${sensorHtml}
             </div>
-            ${t.tag_type && ['series_5', 'series5', 'hubble'].includes(t.tag_type) && attrs.Temperature ? `
-                <button class="btn btn-secondary btn-sm" style="margin-top:10px;width:100%" onclick="toggleTemperatureGraph('${esc(t.imei)}', '${esc(t.description || t.device_name || t.imei)}')">
-                    <i class="fa-solid fa-chart-line"></i> Temperature Graph
-                </button>
-            ` : ''}
         </div>
     `;
 }
@@ -11169,6 +11164,11 @@ function _lmRenderDetail(t) {
             <button class="btn btn-primary btn-sm" onclick="lmSelectFromList('${esc(t.imei)}')">
                 <i class="fa-solid fa-crosshairs"></i> Centre on Map
             </button>
+            ${t.tag_type && ['series_5', 'series5', 'hubble'].includes(t.tag_type) && t.attributes && t.attributes.Temperature ? `
+                <button class="btn btn-secondary btn-sm" onclick="toggleTemperatureGraph('${esc(t.imei)}', '${esc(t.description || t.device_name || t.imei)}')">
+                    <i class="fa-solid fa-chart-line"></i> Graph
+                </button>
+            ` : ''}
         </div>` : ''}
     `;
 }
