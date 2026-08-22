@@ -3360,9 +3360,14 @@ input.hive-range::-moz-range-track {
             .battery-wrap.good { color:#22c55e; }
             
             /* ══════════════════ TEMPERATURE GRAPH ══════════════════ */
+            /* Only show in live map tab */
+            #tab-livemap:not(.active) ~ .temp-graph-panel {
+                display: none !important;
+            }
+            
             .temp-graph-panel { 
                 position:fixed; 
-                left:0; 
+                left:340px; /* Sidebar width */
                 right:0;
                 bottom:-50%; 
                 height:50vh; 
@@ -3374,6 +3379,18 @@ input.hive-range::-moz-range-track {
                 overflow-y:auto;
             }
             .temp-graph-panel.open { bottom:0; }
+            
+            /* Responsive: Full width on mobile when sidebar is hidden */
+            @media (max-width: 768px) {
+                .temp-graph-panel {
+                    left: 0;
+                }
+            }
+            
+            /* When sidebar is expanded/collapsed */
+            body.sidebar-collapsed .temp-graph-panel {
+                left: 60px; /* Collapsed sidebar width */
+            }
             .temp-graph-content { 
                 padding:20px; 
                 height:100%; 
@@ -16002,6 +16019,16 @@ function mhaOpenHelp() {
         panel.classList.add('open');
         _tempGraphOpen = true;
         
+        // Adjust map area height to make room for graph (50-50 split)
+        const mapArea = document.querySelector('#tab-livemap .map-area');
+        if (mapArea) {
+            mapArea.style.height = '50vh';
+            // Force Leaflet to recalculate size
+            if (typeof _liveMap !== 'undefined' && _liveMap) {
+                setTimeout(() => _liveMap.invalidateSize(), 100);
+            }
+        }
+        
         // Load data
         loadTemperatureData(imei, 1);
     };
@@ -16011,6 +16038,16 @@ function mhaOpenHelp() {
         const panel = document.getElementById('temp-graph-panel');
         panel.classList.remove('open');
         _tempGraphOpen = false;
+        
+        // Restore map area to full height
+        const mapArea = document.querySelector('#tab-livemap .map-area');
+        if (mapArea) {
+            mapArea.style.height = '';
+            // Force Leaflet to recalculate size
+            if (typeof _liveMap !== 'undefined' && _liveMap) {
+                setTimeout(() => _liveMap.invalidateSize(), 100);
+            }
+        }
         
         // Destroy chart
         if (_tempGraphChart) {
