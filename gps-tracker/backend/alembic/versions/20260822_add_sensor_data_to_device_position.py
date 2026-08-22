@@ -1,6 +1,6 @@
 """Add sensor data columns to device_position table
 
-Revision ID: add_sensor_data_to_device_position
+Revision ID: add_sensor_data
 Revises: tracksolid_composite_idx
 Create Date: 2026-08-22 12:00:00.000000
 
@@ -15,7 +15,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'add_sensor_data_to_device_position'
+revision = 'add_sensor_data'
 down_revision = 'tracksolid_composite_idx'
 branch_labels = None
 depends_on = None
