@@ -3379,11 +3379,12 @@ input.hive-range::-moz-range-track {
                 right: 0;
                 bottom: -50%; /* Hidden below */
                 height: 50vh; /* Match typical detail panel height */
+                width: auto; /* Allow stretching */
                 background: var(--panel);
                 border-top: 2px solid var(--border-strong);
                 box-shadow: 0 -4px 28px rgba(0,0,0,0.2);
                 z-index: 10000;
-                transition: bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1), left 0.3s ease;
+                transition: bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1), left 0.3s ease, width 0.3s ease;
                 overflow: hidden;
             }
             .temp-graph-panel.open {
@@ -3393,6 +3394,7 @@ input.hive-range::-moz-range-track {
             /* When main sidebar collapses, shift left and stretch */
             body.sidebar-collapsed .temp-graph-panel {
                 left: calc(60px + 280px); /* Collapsed nav + asset list */
+                width: calc(100vw - 60px - 280px); /* Full width minus collapsed nav and asset list */
             }
             
             /* Mobile: Full width */
@@ -3408,13 +3410,16 @@ input.hive-range::-moz-range-track {
                 display:flex; 
                 flex-direction:column;
                 overflow:hidden;
+                background: var(--panel); /* Solid background, no transparency */
             }
             .temp-graph-header { 
                 display:flex; 
                 align-items:center; 
                 gap:10px;
                 flex-wrap:wrap;
-                margin-bottom:12px; 
+                margin-bottom:12px;
+                background: var(--panel); /* Solid background for header text */
+                padding-bottom: 8px;
             }
             .temp-graph-title { 
                 font-size:13px; 
@@ -3531,11 +3536,16 @@ input.hive-range::-moz-range-track {
             
             .temp-graph-charts {
                 flex:1; min-width:0; display:flex; flex-direction:column;
+                background: transparent; /* No white background */
             }
             .temp-graph-chart-box {
                 position:relative; flex:1; min-height:0;
+                background: transparent; /* No white background behind chart */
             }
-            .temp-graph-chart-box canvas { cursor:crosshair; }
+            .temp-graph-chart-box canvas { 
+                cursor:crosshair; 
+                background: transparent !important; /* Remove any canvas white background */
+            }
             
             .temp-graph-overview {
                 margin-top:8px; position:relative;
