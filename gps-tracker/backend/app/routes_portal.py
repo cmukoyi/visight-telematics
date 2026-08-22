@@ -4426,6 +4426,7 @@ class PositionListResponse(BaseModel):
 
 @router.get("/positions", response_model=PositionListResponse)
 def list_positions(
+    request: Request,
     device_imei: str = Query(..., description="Device IMEI"),
     start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
@@ -4436,9 +4437,14 @@ def list_positions(
     """
     List raw GPS positions for a device with optional date filtering.
     
+    🔒 REQUIRES AUTHENTICATION - User must be logged in to view position data.
+    
     Returns paginated list of positions ordered by observed_at DESC.
     Used for timeline view and raw data inspection.
     """
+    # SECURITY: Require authentication before returning any position data
+    me = get_portal_user_from_request(request, db)
+    
     from app.models import DevicePosition
     
     # Build query
@@ -4513,14 +4519,20 @@ class DeviceSubscriptionUpdate(BaseModel):
 
 @router.get("/devices/{device_imei}/subscription", response_model=DeviceSubscriptionResponse)
 def get_device_subscription(
+    request: Request,
     device_imei: str,
     db: Session = Depends(get_db),
 ):
     """
     Get trip subscription status for a device.
     
+    🔒 REQUIRES AUTHENTICATION
+    
     Returns whether the device is enrolled in trip processing.
     """
+    # SECURITY: Require authentication
+    me = get_portal_user_from_request(request, db)
+    
     from app.models import DeviceState
     
     state = db.query(DeviceState).filter(DeviceState.device_imei == device_imei).first()
@@ -4542,6 +4554,7 @@ def get_device_subscription(
 
 @router.put("/devices/{device_imei}/subscription", response_model=DeviceSubscriptionResponse)
 def update_device_subscription(
+    request: Request,
     device_imei: str,
     data: DeviceSubscriptionUpdate,
     db: Session = Depends(get_db),
@@ -4549,11 +4562,16 @@ def update_device_subscription(
     """
     Update trip subscription status for a device.
     
+    🔒 REQUIRES AUTHENTICATION
+    
     Enables or disables trip processing for this device. When enabled:
     - Device included in batch sweep (Tier 1)
     - Selective track.list pulls triggered (Tier 2)
     - Positions flow through trip engine
     """
+    # SECURITY: Require authentication
+    me = get_portal_user_from_request(request, db)
+    
     from app.models import DeviceState
     
     # Get or create device state
