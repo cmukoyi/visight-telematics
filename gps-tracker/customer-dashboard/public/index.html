@@ -3379,12 +3379,11 @@ input.hive-range::-moz-range-track {
                 right: 0;
                 bottom: -50%; /* Hidden below */
                 height: 50vh; /* Match typical detail panel height */
-                width: auto; /* Allow stretching */
-                background: var(--panel);
-                border-top: 2px solid var(--border-strong);
+                background: var(--bg-2) !important; /* Solid panel background - force override */
+                border-top: 2px solid var(--border-2);
                 box-shadow: 0 -4px 28px rgba(0,0,0,0.2);
                 z-index: 10000;
-                transition: bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1), left 0.3s ease, width 0.3s ease;
+                transition: bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1), left 0.3s ease;
                 overflow: hidden;
             }
             .temp-graph-panel.open {
@@ -3393,8 +3392,7 @@ input.hive-range::-moz-range-track {
             
             /* When main sidebar collapses, shift left and stretch */
             body.sidebar-collapsed .temp-graph-panel {
-                left: calc(60px + 280px); /* Collapsed nav + asset list */
-                width: calc(100vw - 60px - 280px); /* Full width minus collapsed nav and asset list */
+                left: calc(60px + 280px) !important; /* Collapsed nav + asset list - force override */
             }
             
             /* Mobile: Full width */
@@ -3410,7 +3408,7 @@ input.hive-range::-moz-range-track {
                 display:flex; 
                 flex-direction:column;
                 overflow:hidden;
-                background: var(--panel); /* Solid background, no transparency */
+                background: var(--bg-2) !important; /* Solid background, no transparency - force override */
             }
             .temp-graph-header { 
                 display:flex; 
@@ -3418,8 +3416,10 @@ input.hive-range::-moz-range-track {
                 gap:10px;
                 flex-wrap:wrap;
                 margin-bottom:12px;
-                background: var(--panel); /* Solid background for header text */
+                background: var(--bg-2) !important; /* Solid background for header text - force override */
                 padding-bottom: 8px;
+                position: relative;
+                z-index: 1;
             }
             .temp-graph-title { 
                 font-size:13px; 
@@ -3430,7 +3430,7 @@ input.hive-range::-moz-range-track {
             }
             .temp-graph-title .icon-badge {
                 width:22px; height:22px; border-radius:6px;
-                background:var(--success-bg); color:var(--success-text);
+                background:rgba(16, 185, 129, 0.15); color:var(--success);
                 display:flex; align-items:center; justify-content:center;
                 font-size:11px;
             }
@@ -3452,33 +3452,33 @@ input.hive-range::-moz-range-track {
                 font-size:11px; 
                 padding:5px 11px; 
                 border-radius:20px; 
-                border:1px solid var(--border-strong); 
+                border:1px solid var(--border-2); 
                 background:transparent; 
                 color:var(--text-2); 
                 cursor:pointer; 
             }
             .temp-graph-preset.active { 
-                background:var(--success-bg); 
+                background:rgba(16, 185, 129, 0.15); 
                 border-color:var(--success); 
-                color:var(--success-text); 
+                color:var(--success); 
                 font-weight:600; 
             }
             .temp-graph-chip {
                 font-family:inherit; display:flex; align-items:center;
                 gap:6px; font-size:11px; padding:5px 11px;
-                border-radius:20px; border:1px solid var(--border-strong);
+                border-radius:20px; border:1px solid var(--border-2);
                 background:transparent; color:var(--text-2); cursor:pointer;
             }
             .temp-graph-chip .dot {
                 width:7px; height:7px; border-radius:2px;
             }
             .temp-graph-chip.on {
-                background:var(--primary-bg); border-color:var(--primary);
-                color:var(--primary-text);
+                background:rgba(59, 130, 246, 0.15); border-color:var(--primary);
+                color:var(--primary);
             }
             .temp-graph-chip.alt.on {
-                background:var(--warning-bg); border-color:var(--warning);
-                color:var(--warning-text);
+                background:rgba(245, 158, 11, 0.15); border-color:var(--warning);
+                color:var(--warning);
             }
             .temp-graph-smooth {
                 display:flex; align-items:center; gap:6px;
@@ -3490,6 +3490,7 @@ input.hive-range::-moz-range-track {
             
             .temp-graph-main {
                 display:flex; gap:16px; flex:1; min-height:0;
+                background: var(--bg-2) !important; /* Match panel background */
             }
             .temp-graph-stats {
                 width:auto; min-width:132px; max-width:190px;
@@ -3509,10 +3510,10 @@ input.hive-range::-moz-range-track {
             .temp-graph-stat .v {
                 font-size:17px; font-weight:600;
             }
-            .temp-graph-stat .v-blue { color:var(--primary-text); }
-            .temp-graph-stat .v-amber { color:var(--warning-text); }
-            .temp-graph-stat .v-red { color:var(--danger-text); }
-            .temp-graph-stat .v-green { color:var(--success-text); }
+            .temp-graph-stat .v-blue { color:var(--primary); }
+            .temp-graph-stat .v-amber { color:var(--warning); }
+            .temp-graph-stat .v-red { color:var(--danger); }
+            .temp-graph-stat .v-green { color:var(--success); }
             .temp-graph-stats.scoped .temp-graph-stat {
                 box-shadow:inset 2px 0 0 var(--primary);
             }
@@ -3521,11 +3522,11 @@ input.hive-range::-moz-range-track {
                 border-radius:9px; margin-top:2px;
                 display:inline-flex; align-items:center; justify-content:center;
                 gap:6px; width:100%;
-                border:1px solid var(--border-strong);
-                background:var(--card); color:var(--text-2); cursor:pointer;
+                border:1px solid var(--border-2);
+                background:var(--bg-3); color:var(--text-2); cursor:pointer;
             }
             .temp-graph-export:hover:not(:disabled) {
-                border-color:var(--success); color:var(--success-text);
+                border-color:var(--success); color:var(--success);
             }
             .temp-graph-export:disabled {
                 opacity:.45; cursor:not-allowed;
@@ -3552,7 +3553,7 @@ input.hive-range::-moz-range-track {
             }
             .temp-graph-ov-wrap {
                 position:relative; height:38px; border-radius:7px;
-                overflow:hidden; background:var(--card);
+                overflow:hidden; background:var(--bg-3);
                 border:1px solid var(--border); cursor:grab;
             }
             .temp-graph-ov-wrap:active { cursor:grabbing; }
@@ -3567,13 +3568,13 @@ input.hive-range::-moz-range-track {
             }
             .temp-graph-reset {
                 font-family:inherit; font-size:10px; padding:3px 9px;
-                border-radius:20px; border:1px solid var(--border-strong);
+                border-radius:20px; border:1px solid var(--border-2);
                 background:transparent; color:var(--text-2); cursor:pointer;
                 display:none;
             }
             .temp-graph-reset.show {
                 display:inline-block; border-color:var(--success);
-                color:var(--success-text);
+                color:var(--success);
             }
             
             .temp-graph-footer {
@@ -16633,6 +16634,9 @@ function mhaOpenHelp() {
                 responsive: true,
                 maintainAspectRatio: false,
                 interaction: {mode: 'index', intersect: false},
+                layout: {
+                    padding: 0
+                },
                 plugins: {
                     legend: {display: false},
                     gapBands: {gaps: visibleGaps},
