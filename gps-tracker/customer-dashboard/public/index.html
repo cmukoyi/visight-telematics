@@ -11335,8 +11335,8 @@ function _lmRenderDetail(t) {
                 <i class="fa-solid fa-crosshairs"></i> Centre on Map
             </button>
             ${t.tag_type && ['series_5', 'series5', 'hubble'].includes(t.tag_type) && t.attributes && t.attributes.Temperature ? `
-                <button class="btn btn-primary btn-sm" onclick="toggleTemperatureGraph('${esc(t.imei)}', '${esc(t.description || t.device_name || t.imei)}')">
-                    <i class="fa-solid fa-chart-line"></i> Graph
+                <button class="btn btn-primary btn-sm" style="background-color: var(--success); border-color: var(--success);" onclick="toggleTemperatureGraph('${esc(t.imei)}', '${esc(t.description || t.device_name || t.imei)}')">
+                    <i class="fa-solid fa-temperature-half"></i> Graph
                 </button>
             ` : ''}
         </div>` : ''}
