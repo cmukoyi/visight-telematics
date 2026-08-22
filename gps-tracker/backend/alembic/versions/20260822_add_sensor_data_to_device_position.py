@@ -1,7 +1,7 @@
 """Add sensor data columns to device_position table
 
-Revision ID: 060
-Revises: 059
+Revision ID: add_sensor_data_to_device_position
+Revises: tracksolid_composite_idx
 Create Date: 2026-08-22 12:00:00.000000
 
 Purpose: Add temperature, battery_pct, altitude, and rssi columns to device_positions
@@ -15,8 +15,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '060'
-down_revision = '059'
+revision = 'add_sensor_data_to_device_position'
+down_revision = 'tracksolid_composite_idx'
 branch_labels = None
 depends_on = None
 
