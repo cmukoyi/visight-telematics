@@ -118,6 +118,10 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
     <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 
+    <!-- Chart.js and jsPDF for temperature graph -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
     <!-- MQTT -->
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
@@ -3354,6 +3358,99 @@ input.hive-range::-moz-range-track {
             .battery-wrap i { font-size:13px; }
             .battery-wrap.low { color:#ef4444; }
             .battery-wrap.good { color:#22c55e; }
+            
+            /* ══════════════════ TEMPERATURE GRAPH ══════════════════ */
+            .temp-graph-panel { 
+                position:fixed; 
+                top:0; 
+                right:-100%; 
+                width:min(95vw, 1200px); 
+                height:100vh; 
+                background:var(--panel); 
+                border-left:1px solid var(--border); 
+                box-shadow:-4px 0 28px rgba(0,0,0,0.15); 
+                z-index:10000; 
+                transition:right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                overflow-y:auto;
+            }
+            .temp-graph-panel.open { right:0; }
+            .temp-graph-content { 
+                padding:20px; 
+                height:100%; 
+                display:flex; 
+                flex-direction:column; 
+            }
+            .temp-graph-header { 
+                display:flex; 
+                align-items:center; 
+                justify-content:space-between; 
+                margin-bottom:16px; 
+                padding-bottom:12px; 
+                border-bottom:1px solid var(--border); 
+            }
+            .temp-graph-title { 
+                font-size:18px; 
+                font-weight:600; 
+                display:flex; 
+                align-items:center; 
+                gap:10px; 
+            }
+            .temp-graph-close { 
+                background:none; 
+                border:none; 
+                color:var(--text-3); 
+                font-size:24px; 
+                cursor:pointer; 
+                padding:4px 8px; 
+            }
+            .temp-graph-controls { 
+                display:flex; 
+                align-items:center; 
+                gap:10px; 
+                flex-wrap:wrap; 
+                margin-bottom:16px; 
+            }
+            .temp-graph-preset { 
+                font-family:inherit; 
+                font-size:11px; 
+                padding:5px 11px; 
+                border-radius:20px; 
+                border:1px solid var(--border-strong); 
+                background:transparent; 
+                color:var(--text-2); 
+                cursor:pointer; 
+            }
+            .temp-graph-preset.active { 
+                background:var(--success-bg); 
+                border-color:var(--success); 
+                color:var(--success-text); 
+                font-weight:600; 
+            }
+            .temp-graph-chart-box { 
+                position:relative; 
+                flex:1; 
+                min-height:400px; 
+                background:var(--card); 
+                border-radius:12px; 
+                padding:16px; 
+            }
+            .temp-graph-chart-box canvas { 
+                cursor:crosshair; 
+            }
+            .temp-graph-loading { 
+                display:flex; 
+                align-items:center; 
+                justify-content:center; 
+                height:400px; 
+                color:var(--text-3); 
+            }
+            .temp-graph-error { 
+                display:flex; 
+                align-items:center; 
+                justify-content:center; 
+                height:400px; 
+                color:var(--danger); 
+            }
             
             /* Live Map Time Badges (matching Movement Analytics style) */
             .lm-time-badge { font-size:10.5px; font-weight:600; font-variant-numeric:tabular-nums; line-height:1; border:1px solid currentColor; border-radius:5px; padding:2px 6px; text-align:center; min-width:65px; white-space:nowrap; }
@@ -11013,6 +11110,11 @@ function _lmRenderSensorData(t) {
             <div class="detail-grid">
                 ${sensorHtml}
             </div>
+            ${t.tag_type && ['series_5', 'series5', 'hubble'].includes(t.tag_type) && attrs.Temperature ? `
+                <button class="btn btn-secondary btn-sm" style="margin-top:10px;width:100%" onclick="toggleTemperatureGraph('${esc(t.imei)}', '${esc(t.description || t.device_name || t.imei)}')">
+                    <i class="fa-solid fa-chart-line"></i> Temperature Graph
+                </button>
+            ` : ''}
         </div>
     `;
 }
@@ -15822,5 +15924,377 @@ function mhaOpenHelp() {
   };
 
   console.log('[MHA] Movement Analytics module loaded');
+})();
+</script>
+
+<!-- ══════════════════ TEMPERATURE GRAPH PANEL ══════════════════ -->
+<div id="temp-graph-panel" class="temp-graph-panel">
+    <div class="temp-graph-content">
+        <div class="temp-graph-header">
+            <div class="temp-graph-title">
+                <i class="fa-solid fa-chart-line"></i>
+                <span id="temp-graph-tag-name">Temperature Graph</span>
+            </div>
+            <button class="temp-graph-close" onclick="closeTemperatureGraph()" aria-label="Close">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        
+        <div class="temp-graph-controls">
+            <button class="temp-graph-preset active" data-days="1" onclick="loadTemperatureRange(1)">24h</button>
+            <button class="temp-graph-preset" data-days="7" onclick="loadTemperatureRange(7)">7d</button>
+            <button class="temp-graph-preset" data-days="30" onclick="loadTemperatureRange(30)">30d</button>
+            <button class="temp-graph-preset" data-days="90" onclick="loadTemperatureRange(90)">All</button>
+        </div>
+        
+        <div id="temp-graph-loading" class="temp-graph-loading" style="display:none">
+            <i class="fa-solid fa-spinner fa-spin" style="font-size:32px;margin-right:12px"></i>
+            <span>Loading temperature data...</span>
+        </div>
+        
+        <div id="temp-graph-error" class="temp-graph-error" style="display:none">
+            <i class="fa-solid fa-triangle-exclamation" style="font-size:32px;margin-right:12px"></i>
+            <span id="temp-graph-error-msg">Error loading data</span>
+        </div>
+        
+        <div id="temp-graph-chart-container" class="temp-graph-chart-box" style="display:none">
+            <canvas id="temp-graph-canvas"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// TEMPERATURE GRAPH
+// ══════════════════════════════════════════
+(function() {
+    'use strict';
+    
+    let _tempGraphOpen = false;
+    let _tempGraphImei = null;
+    let _tempGraphTagName = null;
+    let _tempGraphChart = null;
+    let _tempGraphDays = 1;
+    
+    // Toggle temperature graph panel
+    window.toggleTemperatureGraph = function(imei, tagName) {
+        console.log('[TEMP GRAPH] toggleTemperatureGraph called for', imei, tagName);
+        
+        if (_tempGraphOpen && _tempGraphImei === imei) {
+            closeTemperatureGraph();
+            return;
+        }
+        
+        _tempGraphImei = imei;
+        _tempGraphTagName = tagName;
+        _tempGraphDays = 1; // Reset to 24h
+        
+        // Update panel title
+        document.getElementById('temp-graph-tag-name').textContent = tagName || 'Temperature Graph';
+        
+        // Reset preset buttons
+        document.querySelectorAll('.temp-graph-preset').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.days === '1');
+        });
+        
+        // Show panel
+        const panel = document.getElementById('temp-graph-panel');
+        panel.classList.add('open');
+        _tempGraphOpen = true;
+        
+        // Load data
+        loadTemperatureData(imei, 1);
+    };
+    
+    window.closeTemperatureGraph = function() {
+        console.log('[TEMP GRAPH] closeTemperatureGraph called');
+        const panel = document.getElementById('temp-graph-panel');
+        panel.classList.remove('open');
+        _tempGraphOpen = false;
+        
+        // Destroy chart
+        if (_tempGraphChart) {
+            _tempGraphChart.destroy();
+            _tempGraphChart = null;
+        }
+        
+        // Hide all content
+        document.getElementById('temp-graph-loading').style.display = 'none';
+        document.getElementById('temp-graph-error').style.display = 'none';
+        document.getElementById('temp-graph-chart-container').style.display = 'none';
+    };
+    
+    window.loadTemperatureRange = function(days) {
+        console.log('[TEMP GRAPH] loadTemperatureRange called for', days, 'days');
+        _tempGraphDays = days;
+        
+        // Update preset buttons
+        document.querySelectorAll('.temp-graph-preset').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.days === String(days));
+        });
+        
+        if (_tempGraphImei) {
+            loadTemperatureData(_tempGraphImei, days);
+        }
+    };
+    
+    async function loadTemperatureData(imei, days) {
+        console.log('[TEMP GRAPH] loadTemperatureData called for IMEI:', imei, 'days:', days);
+        
+        // Find tag by IMEI
+        const tag = _lmTags.find(t => t.imei === imei);
+        if (!tag) {
+            showError('Tag not found');
+            return;
+        }
+        
+        // Show loading
+        document.getElementById('temp-graph-loading').style.display = 'flex';
+        document.getElementById('temp-graph-error').style.display = 'none';
+        document.getElementById('temp-graph-chart-container').style.display = 'none';
+        
+        try {
+            const res = await apiFetch(`/api/portal/tags/${tag.id}/temperature?days=${days}`);
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.detail || errData.error || 'Failed to load temperature data');
+            }
+            
+            const data = await res.json();
+            console.log('[TEMP GRAPH] Received data:', data);
+            
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to load temperature data');
+            }
+            
+            if (!data.points || data.points.length === 0) {
+                showError('No temperature data available for this period');
+                return;
+            }
+            
+            // Hide loading, show chart
+            document.getElementById('temp-graph-loading').style.display = 'none';
+            document.getElementById('temp-graph-chart-container').style.display = 'block';
+            
+            // Build chart
+            buildTemperatureChart(data.points);
+            
+        } catch (err) {
+            console.error('[TEMP GRAPH] Error loading data:', err);
+            showError(err.message || 'Failed to load temperature data');
+        }
+    }
+    
+    function showError(message) {
+        document.getElementById('temp-graph-loading').style.display = 'none';
+        document.getElementById('temp-graph-error').style.display = 'flex';
+        document.getElementById('temp-graph-error-msg').textContent = message;
+        document.getElementById('temp-graph-chart-container').style.display = 'none';
+    }
+    
+    function buildTemperatureChart(points) {
+        console.log('[TEMP GRAPH] buildTemperatureChart called with', points.length, 'points');
+        
+        // Destroy existing chart
+        if (_tempGraphChart) {
+            _tempGraphChart.destroy();
+            _tempGraphChart = null;
+        }
+        
+        // Check if Chart.js is loaded
+        if (typeof Chart === 'undefined') {
+            showError('Chart library not loaded');
+            return;
+        }
+        
+        const canvas = document.getElementById('temp-graph-canvas');
+        if (!canvas) {
+            showError('Chart canvas not found');
+            return;
+        }
+        
+        const ctx = canvas.getContext('2d');
+        
+        // Prepare data
+        const data = points.map(p => ({
+            x: p.x,
+            y: p.temp
+        }));
+        
+        const batteryData = points.map(p => ({
+            x: p.x,
+            y: p.batt
+        }));
+        
+        const altitudeData = points.map(p => ({
+            x: p.x,
+            y: p.alt
+        }));
+        
+        // Create chart
+        _tempGraphChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: [
+                    {
+                        label: 'Temperature (°C)',
+                        data: data,
+                        borderColor: 'rgb(34, 197, 94)',
+                        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 2,
+                        pointHoverRadius: 4,
+                        tension: 0.4,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Battery (%)',
+                        data: batteryData,
+                        borderColor: 'rgb(59, 130, 246)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        tension: 0.4,
+                        hidden: true,
+                        yAxisID: 'y1'
+                    },
+                    {
+                        label: 'Altitude (m)',
+                        data: altitudeData,
+                        borderColor: 'rgb(245, 158, 11)',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        tension: 0.4,
+                        hidden: true,
+                        yAxisID: 'y2'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 15,
+                            font: {
+                                size: 12
+                            }
+                        },
+                        onClick: function(e, legendItem, legend) {
+                            // Toggle dataset visibility
+                            const index = legendItem.datasetIndex;
+                            const chart = legend.chart;
+                            const meta = chart.getDatasetMeta(index);
+                            meta.hidden = meta.hidden === null ? !chart.data.datasets[index].hidden : null;
+                            chart.update();
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        borderColor: '#333',
+                        borderWidth: 1,
+                        padding: 10,
+                        displayColors: true,
+                        callbacks: {
+                            title: function(context) {
+                                const date = new Date(context[0].parsed.x);
+                                return date.toLocaleString();
+                            },
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += context.parsed.y.toFixed(1);
+                                    if (context.datasetIndex === 0) label += '°C';
+                                    else if (context.datasetIndex === 1) label += '%';
+                                    else if (context.datasetIndex === 2) label += 'm';
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: _tempGraphDays <= 1 ? 'hour' : _tempGraphDays <= 7 ? 'day' : 'week',
+                            displayFormats: {
+                                hour: 'HH:mm',
+                                day: 'MMM d',
+                                week: 'MMM d'
+                            }
+                        },
+                        grid: {
+                            display: true,
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        },
+                        ticks: {
+                            maxRotation: 0,
+                            autoSkipPadding: 20
+                        }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Temperature (°C)'
+                        },
+                        grid: {
+                            display: true,
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: false,
+                        position: 'right',
+                        min: 0,
+                        max: 100,
+                        title: {
+                            display: false,
+                            text: 'Battery (%)'
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    },
+                    y2: {
+                        type: 'linear',
+                        display: false,
+                        position: 'right',
+                        title: {
+                            display: false,
+                            text: 'Altitude (m)'
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    }
+                }
+            }
+        });
+        
+        console.log('[TEMP GRAPH] Chart created successfully');
+    }
+    
+    console.log('[TEMP GRAPH] Temperature graph module loaded');
 })();
 </script>

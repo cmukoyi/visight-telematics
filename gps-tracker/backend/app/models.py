@@ -914,6 +914,12 @@ class DevicePosition(Base):
     # Reverse geocoding (Section 3.6 - cached at ingest)
     address = Column(Text, nullable=True)                # Human-readable location
     
+    # Sensor data (Series 5 / Hubble tags only - nullable for TrackSolid positions)
+    temperature = Column(Float, nullable=True)       # °C (canonical, always Celsius)
+    battery_pct = Column(Integer, nullable=True)     # % (0-100)
+    altitude = Column(Float, nullable=True)          # meters (canonical)
+    rssi = Column(Integer, nullable=True)            # dBm (signal strength)
+    
     # Metadata
     source = Column(String(20), nullable=False, default="batch")  # 'batch' or 'tracklist'
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)

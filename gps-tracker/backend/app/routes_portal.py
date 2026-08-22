@@ -2910,6 +2910,134 @@ class PortalTripsRequest(BaseModel):
     endDate: str     # ISO 8601 UTC e.g. "2025-10-01T18:00:59Z"
 
 
+@router.get("/tags/{tag_id}/temperature")
+async def get_tag_temperature_history(
+    tag_id: str,
+    days: int = Query(7, ge=1, le=365, description="Number of days of history (1-365)"),
+    current_user: PortalUser = Depends(get_current_portal_user_from_token),
+    db: Session = Depends(get_db),
+):
+    """
+    Get temperature history for a Series 5 (Hubble/Minew) tag.
+    
+    Returns historical temperature, battery, altitude, and RSSI readings from
+    DevicePosition records. Only returns data for tags owned by the authenticated
+    user's tenant.
+    
+    Auth: Portal JWT (PortalUser scoped to a UserGroup)
+    
+    Query Parameters:
+        - days: Number of days of history (default 7, max 365)
+    
+    Returns:
+        {
+            "success": true,
+            "tag_id": "uuid",
+            "imei": "string",
+            "device_name": "string",
+            "tag_type": "series_5",
+            "points": [
+                {
+                    "x": 1724342400000,  # epoch milliseconds
+                    "temp": 23.5,         # °C (canonical)
+                    "batt": 85,           # % (0-100)
+                    "alt": 42.3           # meters (canonical)
+                },
+                ...
+            ],
+            "start": 1724256000000,
+            "end": 1724342400000,
+            "count": 1234
+        }
+    """
+    from app.models import DevicePosition
+    
+    # Verify tag exists and belongs to user's tenant
+    tag = db.query(BLETag).filter(BLETag.id == tag_id).first()
+    if not tag:
+        raise HTTPException(status_code=404, detail="Tag not found")
+    
+    # Get user's tenant
+    group = db.query(UserGroup).filter(UserGroup.id == current_user.usergroup_id).first()
+    if not group:
+        raise HTTPException(status_code=403, detail="User group not found")
+    
+    # Check if tag belongs to this tenant (domain-matched or manually assigned)
+    domains = _domains(group)
+    
+    # Get all user IDs that belong to this group
+    domain_user_ids = []
+    if domains:
+        domain_user_ids = [str(uid) for (uid,) in db.query(User.id).filter(_domain_filter(domains)).all()]
+    
+    portal_user_ids = [
+        str(uid) for (uid,) in 
+        db.query(User.id)
+        .join(PortalUser, User.email == PortalUser.email)
+        .filter(PortalUser.usergroup_id == current_user.usergroup_id)
+        .all()
+    ]
+    
+    all_owner_ids = list(set(domain_user_ids + portal_user_ids))
+    group_id = str(group.id)
+    
+    # Verify ownership: tag must be owned by a user in this group OR created by this group
+    tag_owner_id = str(tag.user_id) if tag.user_id else None
+    tag_created_by_group = tag.attributes and tag.attributes.get("_created_usergroup_id") == group_id
+    
+    if tag_owner_id not in all_owner_ids and not tag_created_by_group:
+        raise HTTPException(status_code=403, detail="Access denied - tag not owned by your organization")
+    
+    # Only Series 5 tags have temperature data
+    if tag.tag_type not in ['series_5', 'series5', 'hubble']:
+        return {
+            "success": False,
+            "error": "Temperature history only available for Series 5 (Hubble/Minew) tags",
+            "tag_id": str(tag.id),
+            "imei": tag.imei,
+            "device_name": tag.device_name,
+            "tag_type": tag.tag_type,
+            "points": [],
+            "count": 0
+        }
+    
+    # Calculate time window
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(days=days)
+    
+    # Query DevicePosition for temperature history
+    # Filter by: IMEI, time range, has temperature data, order by time ascending
+    positions = db.query(DevicePosition).filter(
+        DevicePosition.device_imei == tag.imei,
+        DevicePosition.observed_at >= start,
+        DevicePosition.observed_at <= now,
+        DevicePosition.temperature.isnot(None)  # Only positions with sensor data
+    ).order_by(DevicePosition.observed_at.asc()).all()
+    
+    # Format response
+    points = []
+    for pos in positions:
+        point = {
+            "x": int(pos.observed_at.timestamp() * 1000),  # epoch milliseconds
+            "temp": round(pos.temperature, 2) if pos.temperature is not None else None,
+            "batt": pos.battery_pct if pos.battery_pct is not None else None,
+            "alt": round(pos.altitude, 1) if pos.altitude is not None else None
+        }
+        points.append(point)
+    
+    return {
+        "success": True,
+        "tag_id": str(tag.id),
+        "imei": tag.imei,
+        "device_name": tag.device_name,
+        "tag_type": tag.tag_type,
+        "points": points,
+        "start": int(start.timestamp() * 1000),
+        "end": int(now.timestamp() * 1000),
+        "count": len(points)
+    }
+
+
 @router.post("/trips")
 async def portal_get_trips(
     data: PortalTripsRequest,

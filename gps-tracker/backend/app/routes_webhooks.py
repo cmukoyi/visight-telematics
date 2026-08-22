@@ -167,6 +167,12 @@ async def hubble_webhook(
                 observed_at = datetime.fromtimestamp(device_ts, tz=timezone.utc) if device_ts else datetime.now(timezone.utc)
                 
                 # Insert position into device_positions table (trip engine reads from this)
+                # Decode sensor data from payload BEFORE creating position
+                payload_b64 = device_info.get("payload")
+                sensor_data_pre = {}
+                if payload_b64:
+                    sensor_data_pre = HubbleTagProvider.decode_minew_payload(payload_b64)
+                
                 position_data = {
                     'device_imei': device_id,
                     'lat': lat,
@@ -177,6 +183,11 @@ async def hubble_webhook(
                     'gps_speed': None,  # Hubble doesn't provide speed
                     'satellite': None,  # Not in Hubble packet
                     'source': 'webhook',  # Mark as webhook-sourced (vs 'batch' for TrackSolid)
+                    # Sensor data (canonical units: °C, %, meters, dBm)
+                    'temperature': sensor_data_pre.get('temperature'),  # °C
+                    'battery_pct': sensor_data_pre.get('battery'),      # %
+                    'altitude': location.get('altitude'),                # meters
+                    'rssi': device_info.get('rssi'),                     # dBm
                 }
                 
                 # Upsert with ON CONFLICT DO NOTHING (idempotent - handles webhook retries)
