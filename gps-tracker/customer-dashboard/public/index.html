@@ -11345,8 +11345,20 @@ function _lmRenderDetail(t) {
                 const sess = getSession();
                 const features = sess && sess.features ? new Set(sess.features) : new Set();
                 const hasFeature = features.has('temperature-graph');
-                const isSeries5 = t.tag_type && ['series_5', 'series5', 'hubble'].includes(t.tag_type);
+                const isSeries5 = t.tag_type && ['series_5', 'series5', 'hubble'].includes(t.tag_type.toLowerCase());
                 const hasTemp = t.attributes && t.attributes.Temperature;
+                
+                console.log('[TEMP-GRAPH-CHECK]', {
+                    imei: t.imei,
+                    tag_type: t.tag_type,
+                    isSeries5,
+                    hasTemp,
+                    temperature: t.attributes?.Temperature,
+                    allFeatures: Array.from(features),
+                    hasFeature,
+                    willShow: hasFeature && isSeries5 && hasTemp
+                });
+                
                 return (hasFeature && isSeries5 && hasTemp) ? `
                     <button class="btn btn-primary btn-sm" style="background-color: var(--success); border-color: var(--success);" onclick="toggleTemperatureGraph('${esc(t.imei)}', '${esc(t.description || t.device_name || t.imei)}')">
                         <i class="fa-solid fa-temperature-half"></i> Graph
