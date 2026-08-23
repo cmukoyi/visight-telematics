@@ -137,8 +137,13 @@ TENANT_FEATURE_TABS: dict = {
     "settings": ["settings"],
     "hive": ["hive"],
     "developers": ["api-tokens"],  # Developers section (API Tokens tab)
-    "temperature-graph": ["temperature-graph"],  # Temperature sensor visualization for Series 5
-    "hubble": ["hubble"],  # Series 5 Hubble Platform integration
+}
+
+# Standalone tenant features (not navigation tabs, but UI feature flags)
+# These are always included in effective_features when tenant enables them
+STANDALONE_TENANT_FEATURES: set = {
+    "temperature-graph",  # Temperature sensor visualization for Series 5
+    "hubble",  # Series 5 Hubble Platform integration
 }
 
 
@@ -212,6 +217,10 @@ def _compute_effective_features(user: "PortalUser", group: "UserGroup") -> list:
                 
                 # User sees tab only if BOTH tenant enables it AND user role allows it
                 result = [f for f in result if f in tenant_enabled_tabs]
+                
+                # Add standalone features (not tabs) that tenant enabled
+                standalone_features = tenant_enabled_features & STANDALONE_TENANT_FEATURES
+                result.extend(standalone_features)
     except Exception:
         # If tenant features table doesn't exist yet or query fails,
         # fall back to user features only (backward compatible)
