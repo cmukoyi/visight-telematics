@@ -5825,10 +5825,17 @@ async function openAddTagModal() {
     imeiInput.setAttribute('required', '');
     document.getElementById('tagMgmtDesc').value = '';
     
-    // Filter tag type options based on usergroup permissions
+    // Filter tag type options based on usergroup permissions AND tenant features
     const _typeSelAdd = document.getElementById('tagMgmtType');
     const session = getSession();
-    const allowedTypes = session.group?.allowed_tag_types || ['series1', 'series2', 'series3', 'series_4', 'series_5'];
+    let allowedTypes = session.group?.allowed_tag_types || ['series1', 'series2', 'series3', 'series_4', 'series_5'];
+    
+    // Check tenant features - hide Series 5 (Hubble) if hubble feature is disabled
+    const features = session && session.features ? new Set(session.features) : new Set();
+    if (!features.has('hubble')) {
+        allowedTypes = allowedTypes.filter(t => t !== 'series_5');
+    }
+    
     // Show/hide options based on allowed types
     Array.from(_typeSelAdd.options).forEach(opt => {
         opt.style.display = allowedTypes.includes(opt.value) ? '' : 'none';
@@ -11334,11 +11341,18 @@ function _lmRenderDetail(t) {
             <button class="btn btn-primary btn-sm" onclick="lmSelectFromList('${esc(t.imei)}')">
                 <i class="fa-solid fa-crosshairs"></i> Centre on Map
             </button>
-            ${t.tag_type && ['series_5', 'series5', 'hubble'].includes(t.tag_type) && t.attributes && t.attributes.Temperature ? `
-                <button class="btn btn-primary btn-sm" style="background-color: var(--success); border-color: var(--success);" onclick="toggleTemperatureGraph('${esc(t.imei)}', '${esc(t.description || t.device_name || t.imei)}')">
-                    <i class="fa-solid fa-temperature-half"></i> Graph
-                </button>
-            ` : ''}
+            ${(() => {
+                const sess = getSession();
+                const features = sess && sess.features ? new Set(sess.features) : new Set();
+                const hasFeature = features.has('temperature-graph');
+                const isSeries5 = t.tag_type && ['series_5', 'series5', 'hubble'].includes(t.tag_type);
+                const hasTemp = t.attributes && t.attributes.Temperature;
+                return (hasFeature && isSeries5 && hasTemp) ? `
+                    <button class="btn btn-primary btn-sm" style="background-color: var(--success); border-color: var(--success);" onclick="toggleTemperatureGraph('${esc(t.imei)}', '${esc(t.description || t.device_name || t.imei)}')">
+                        <i class="fa-solid fa-temperature-half"></i> Graph
+                    </button>
+                ` : '';
+            })()}
         </div>` : ''}
     `;
 }

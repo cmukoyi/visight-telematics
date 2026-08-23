@@ -1960,6 +1960,22 @@
                                         <div class="feature-desc">API tokens and developer tools</div>
                                     </div>
                                 </label>
+
+                                <label class="feature-checkbox-item">
+                                    <input type="checkbox" id="tf_temperature-graph" data-feature="temperature-graph">
+                                    <div>
+                                        <div class="feature-name">🌡️ Temperature Graph</div>
+                                        <div class="feature-desc">Temperature sensor data visualization for Series 5 tags</div>
+                                    </div>
+                                </label>
+
+                                <label class="feature-checkbox-item">
+                                    <input type="checkbox" id="tf_hubble" data-feature="hubble">
+                                    <div>
+                                        <div class="feature-name">📡 Hubble Integration</div>
+                                        <div class="feature-desc">Series 5 Hubble Platform tag management and registration</div>
+                                    </div>
+                                </label>
                             </div>
 
                             <div style="margin-top:20px;padding:14px;background:var(--bg-secondary);border-radius:8px;border-left:4px solid var(--primary-color)">
@@ -8383,7 +8399,7 @@ dashboard.welcome,Bienvenue</pre>
 
         try {
             const features = {};
-            ['livemap', 'history', 'history-advanced', 'alerts', 'geofences', 'reports', 'management', 'floorplan', 'settings', 'hive', 'developers'].forEach(feature => {
+            ['livemap', 'history', 'history-advanced', 'alerts', 'geofences', 'reports', 'management', 'floorplan', 'settings', 'hive', 'developers', 'temperature-graph', 'hubble'].forEach(feature => {
                 const checkbox = document.getElementById(`tf_${feature}`);
                 if (checkbox) {
                     features[feature] = checkbox.checked;
