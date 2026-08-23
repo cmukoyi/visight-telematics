@@ -618,42 +618,38 @@ jobs:
           DO_SERVER_IP: ${{ secrets.DO_SERVER_IP }}
           DO_USER: ${{ secrets.DO_USER }}
         run: |
-          check() {
-            local NAME="$1" URL="$2" RETRIES="${3:-20}"
-            for i in $(seq 1 $RETRIES); do
-              if curl -fsS --max-time 5 "$URL" >/dev/null 2>&1; then
-                echo "✅ $NAME healthy"
-                return 0
-              fi
-              echo "  ↻ $NAME not ready ($i/$RETRIES)..."
-              sleep 5
-            done
-            echo "❌ $NAME FAILED"
-            return 1
-          }
+          echo "Running health checks via SSH (bypasses cloud firewall)..."
+          
+          ssh "$DO_USER@$DO_SERVER_IP" bash <<'HEALTHCHECK'
+            check() {
+              local NAME="$1" URL="$2" RETRIES="${3:-20}"
+              for i in $(seq 1 $RETRIES); do
+                if curl -fsS --max-time 5 "$URL" >/dev/null 2>&1; then
+                  echo "✅ $NAME healthy"
+                  return 0
+                fi
+                echo "  ↻ $NAME not ready ($i/$RETRIES)..."
+                sleep 5
+              done
+              echo "❌ $NAME FAILED"
+              return 1
+            }
 
-          FAILED=0
-          check "Backend"      "http://$DO_SERVER_IP:8001/api/health" 20 || FAILED=1
-          check "Admin Portal" "http://$DO_SERVER_IP:3010"            15 || FAILED=1
-          check "Flutter Web"  "http://$DO_SERVER_IP:3012"            15 || FAILED=1
-          check "Customer UI"  "http://$DO_SERVER_IP:3011"            15 || FAILED=1
+            FAILED=0
+            check "Backend"      "http://localhost:8001/api/health" 20 || FAILED=1
+            check "Admin Portal" "http://localhost:3010"            15 || FAILED=1
+            check "Flutter Web"  "http://localhost:3012"            15 || FAILED=1
+            check "Customer UI"  "http://localhost:3011"            15 || FAILED=1
 
-          if [ "$FAILED" -eq 1 ]; then
-            echo "❌ Health checks failed — collecting logs..."
-            ssh "$DO_USER@$DO_SERVER_IP" \
-              "cd ${SERVER_DIR}/gps-tracker && \
-               docker compose ps && \
-               docker logs --tail 30 ${BACKEND_CONTAINER}"
-            echo ""
-            echo "🔁 AUTO-ROLLBACK: redeploying previous image..."
-            ssh "$DO_USER@$DO_SERVER_IP" \
-              "cd ${SERVER_DIR}/gps-tracker && \
-               docker compose up -d --pull missing --force-recreate && \
-               sleep 8 && \
-               docker compose ps"
-            echo "⚠️  Rollback attempted. Marking deployment as FAILED."
+            exit $FAILED
+HEALTHCHECK
+          
+          if [ $? -ne 0 ]; then
+            echo "❌ Health checks failed"
             exit 1
           fi
+          
+          echo "✅ All health checks passed"
 
       - name: Deployment summary
         if: always()
