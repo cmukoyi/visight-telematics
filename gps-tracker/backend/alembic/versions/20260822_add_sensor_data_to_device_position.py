@@ -22,11 +22,20 @@ depends_on = None
 
 
 def upgrade():
-    # Add sensor data columns (nullable for TrackSolid positions)
-    op.add_column('device_positions', sa.Column('temperature', sa.Float(), nullable=True, comment='°C (canonical, always Celsius)'))
-    op.add_column('device_positions', sa.Column('battery_pct', sa.Integer(), nullable=True, comment='% (0-100)'))
-    op.add_column('device_positions', sa.Column('altitude', sa.Float(), nullable=True, comment='meters (canonical)'))
-    op.add_column('device_positions', sa.Column('rssi', sa.Integer(), nullable=True, comment='dBm (signal strength)'))
+    # Check if columns already exist (idempotent migration)
+    connection = op.get_bind()
+    inspector = sa.inspect(connection)
+    existing_columns = {col['name'] for col in inspector.get_columns('device_positions')}
+    
+    # Add sensor data columns only if they don't exist
+    if 'temperature' not in existing_columns:
+        op.add_column('device_positions', sa.Column('temperature', sa.Float(), nullable=True, comment='°C (canonical, always Celsius)'))
+    if 'battery_pct' not in existing_columns:
+        op.add_column('device_positions', sa.Column('battery_pct', sa.Integer(), nullable=True, comment='% (0-100)'))
+    if 'altitude' not in existing_columns:
+        op.add_column('device_positions', sa.Column('altitude', sa.Float(), nullable=True, comment='meters (canonical)'))
+    if 'rssi' not in existing_columns:
+        op.add_column('device_positions', sa.Column('rssi', sa.Integer(), nullable=True, comment='dBm (signal strength)'))
 
 
 def downgrade():

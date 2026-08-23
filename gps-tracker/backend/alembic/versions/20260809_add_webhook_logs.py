@@ -25,24 +25,35 @@ depends_on = None
 
 
 def upgrade():
-    op.create_table(
-        'webhook_logs',
-        sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
-        sa.Column('source', sa.String(50), nullable=False, index=True),
-        sa.Column('received_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False, index=True),
-        sa.Column('payload', JSON, nullable=False),
-        sa.Column('packet_count', sa.Integer, nullable=False, default=0),
-        sa.Column('device_ids', JSON, nullable=True),
-        sa.Column('status_code', sa.Integer, nullable=False, default=200),
-        sa.Column('error_message', sa.Text, nullable=True),
-    )
+    # Check if table already exists (idempotent migration)
+    connection = op.get_bind()
+    result = connection.execute(sa.text("""
+        SELECT EXISTS (
+            SELECT 1 FROM information_schema.tables 
+            WHERE table_name = 'webhook_logs'
+        )
+    """))
+    table_exists = result.scalar()
     
-    # Create composite index for efficient querying
-    op.create_index(
-        'idx_webhook_logs_source_received',
-        'webhook_logs',
-        ['source', 'received_at']
-    )
+    if not table_exists:
+        op.create_table(
+            'webhook_logs',
+            sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
+            sa.Column('source', sa.String(50), nullable=False, index=True),
+            sa.Column('received_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False, index=True),
+            sa.Column('payload', JSON, nullable=False),
+            sa.Column('packet_count', sa.Integer, nullable=False, default=0),
+            sa.Column('device_ids', JSON, nullable=True),
+            sa.Column('status_code', sa.Integer, nullable=False, default=200),
+            sa.Column('error_message', sa.Text, nullable=True),
+        )
+        
+        # Create composite index for efficient querying
+        op.create_index(
+            'idx_webhook_logs_source_received',
+            'webhook_logs',
+            ['source', 'received_at']
+        )
 
 
 def downgrade():
