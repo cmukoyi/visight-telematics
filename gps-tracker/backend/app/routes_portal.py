@@ -137,6 +137,8 @@ TENANT_FEATURE_TABS: dict = {
     "settings": ["settings"],
     "hive": ["hive"],
     "developers": ["api-tokens"],  # Developers section (API Tokens tab)
+    "temperature-graph": ["temperature-graph"],  # Temperature sensor visualization for Series 5
+    "hubble": ["hubble"],  # Series 5 Hubble Platform integration
 }
 
 
