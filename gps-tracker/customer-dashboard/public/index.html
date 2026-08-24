@@ -33,6 +33,31 @@
          baked into the static markup so the page works even if /api is
          briefly unreachable; the API call upgrades them once it returns. -->
     <script>
+
+    // ══════════════════ TRANSLATION HELPERS ══════════════════
+    // Helper functions for translating JavaScript strings
+    
+    function t(key, fallback) {
+        // Get translation for key, fallback to English if not found
+        if (!window.translations || !window.currentLanguage) return fallback;
+        return window.translations[window.currentLanguage]?.[key] || fallback;
+    }
+    
+    function tAlert(key, fallback) {
+        // Translated alert
+        alert(t(key, fallback));
+    }
+    
+    function tConfirm(key, fallback) {
+        // Translated confirm dialog
+        return confirm(t(key, fallback));
+    }
+    
+    function tPrompt(key, fallback, defaultValue) {
+        // Translated prompt dialog
+        return prompt(t(key, fallback), defaultValue);
+    }
+    
       (function(){
         function _ppApplyBrand(b){
           if (!b) return;
@@ -261,7 +286,7 @@
         <div class="logo-wrap">
             <div class="logo-icon"><i class="fa-solid fa-location-dot"></i></div>
             <div>
-                <span data-brand="name">PinPlot</span>
+                <span data-brand="name" data-i18n="text.pinplot">PinPlot</span>
                 <span class="logo-sub" data-i18n="nav.customer_portal">Customer Portal</span>
             </div>
         </div>
@@ -500,7 +525,7 @@
                     <!-- POI overlay toggle (floating top-right of map) -->
                     <button id="lm-poi-toggle" onclick="lmTogglePOIs()"
                             data-i18n-title="map.show_hide_geofences"
-                            title="Show / hide geofences on the map"
+                            data-i18n-title="tooltips.show_hide_geofences_on_the_map" title="Show / hide geofences on the map"
                             style="position:absolute;top:10px;right:10px;z-index:500;background:var(--bg-2);color:var(--text-1);border:1px solid var(--border);border-radius:6px;padding:6px 12px;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;box-shadow:0 2px 6px rgba(0,0,0,.2)">
                         <i class="fa-solid fa-draw-polygon"></i>
                         <span id="lm-poi-toggle-label" data-i18n="map.show_geofences">Show Geofences</span>
@@ -508,7 +533,7 @@
                     <!-- Clear alert markers button -->
                     <button onclick="lmClearAlertMarkers()"
                             data-i18n-title="map.clear_alert_markers"
-                            title="Clear all plotted alert markers"
+                            data-i18n-title="tooltips.clear_all_plotted_alert_markers" title="Clear all plotted alert markers"
                             style="position:absolute;top:50px;right:10px;z-index:500;background:var(--bg-2);color:var(--text-1);border:1px solid var(--border);border-radius:6px;padding:6px 12px;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;box-shadow:0 2px 6px rgba(0,0,0,.2)">
                         <i class="fa-solid fa-eraser"></i>
                         <span data-i18n="map.clear_markers">Clear Markers</span>
@@ -1744,7 +1769,7 @@ input.hive-range::-moz-range-track {
                       </svg>
                     </div>
                     <div>
-                      <div class="brand-name" data-brand="name">PinPlot Sketch</div>
+                      <div class="brand-name" data-brand="name" data-i18n="text.pinplot_sketch">PinPlot Sketch</div>
                       <div class="brand-sub" data-i18n="floor_plan.floor_plan_builder">Floor Plan Builder</div>
                     </div>
                   </div>
@@ -2012,35 +2037,35 @@ input.hive-range::-moz-range-track {
                         </div>
                       </div>
                       <div class="prop-group" id="propThicknessGroup">
-                        <div class="prop-label">Thickness</div>
+                        <div class="prop-label" data-i18n="text.thickness">Thickness</div>
                         <div class="slider-val-row">
                           <input type="range" id="propThickness" min="1" max="20" value="4" class="range-input">
                           <span class="mono" id="propThicknessVal" style="min-width:28px;font-size:11px;color:var(--text-muted);text-align:right">4px</span>
                         </div>
                       </div>
                       <div class="prop-group" id="propFillGroup">
-                        <div class="prop-label">Fill</div>
+                        <div class="prop-label" data-i18n="text.fill">Fill</div>
                         <div class="color-row" style="margin-bottom:6px">
                           <input type="color" class="color-swatch" id="propFill" value="#1a2a1a">
                           <input type="text" class="prop-input mono" id="propFillHex" placeholder="#1a2a1a" maxlength="7" style="flex:1">
                           <label class="toggle-row sm">
-                            <span>Show</span>
+                            <span data-i18n="text.show">Show</span>
                             <label class="toggle sm"><input type="checkbox" id="propFillToggle"><span class="slider"></span></label>
                           </label>
                         </div>
                         <div class="fill-opacity-row" id="propFillOpacityRow">
-                          <span class="prop-sublabel">Opacity</span>
+                          <span class="prop-sublabel" data-i18n="text.opacity">Opacity</span>
                           <input type="range" id="propFillOpacity" min="1" max="100" value="15" class="range-input" style="flex:1">
                           <span class="mono" id="propFillOpacityVal" style="min-width:36px;font-size:11px;color:var(--text-muted);text-align:right">15%</span>
                         </div>
                       </div>
                       <div class="prop-group" id="propRotationGroup" style="display:none">
-                        <div class="prop-label">Direction</div>
+                        <div class="prop-label" data-i18n="text.direction">Direction</div>
                         <div class="rotation-btns">
-                          <button class="rot-btn" data-rot="0"   title="Right →"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg></button>
-                          <button class="rot-btn" data-rot="90"  title="Down ↓"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="6 13 12 19 18 13"/></svg></button>
-                          <button class="rot-btn" data-rot="180" title="Left ←"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="11 6 5 12 11 18"/></svg></button>
-                          <button class="rot-btn" data-rot="270" title="Up ↑"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="6 11 12 5 18 11"/></svg></button>
+                          <button class="rot-btn" data-rot="0"   data-i18n-title="tooltips.right" title="Right →"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg></button>
+                          <button class="rot-btn" data-rot="90"  data-i18n-title="tooltips.down" title="Down ↓"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="6 13 12 19 18 13"/></svg></button>
+                          <button class="rot-btn" data-rot="180" data-i18n-title="tooltips.left" title="Left ←"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="11 6 5 12 11 18"/></svg></button>
+                          <button class="rot-btn" data-rot="270" data-i18n-title="tooltips.up" title="Up ↑"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="6 11 12 5 18 11"/></svg></button>
                         </div>
                       </div>
                       
@@ -2062,13 +2087,13 @@ input.hive-range::-moz-range-track {
 
                     <!-- Floor list -->
                     <div class="panel-section">
-                      <div class="panel-header sm">Floors</div>
+                      <div class="panel-header sm" data-i18n="text.floors">Floors</div>
                       <div id="floorList" class="floor-list"></div>
                     </div>
 
                     <!-- Element count -->
                     <div class="panel-section">
-                      <div class="panel-header sm">Elements</div>
+                      <div class="panel-header sm" data-i18n="text.elements">Elements</div>
                       <div id="elementStats" class="element-stats"></div>
                     </div>
                   </aside>
@@ -2111,7 +2136,7 @@ input.hive-range::-moz-range-track {
                     <input type="text" class="prop-input" id="renameFloorInput" data-i18n-placeholder="placeholders.floor_name" placeholder="Floor name…">
                     <div class="modal-actions">
                       <button class="btn-ghost" id="renameFloorCancel" data-i18n="common.cancel">Cancel</button>
-                      <button class="btn-primary" id="renameFloorConfirm">Rename</button>
+                      <button class="btn-primary" id="renameFloorConfirm"><span data-i18n="buttons.rename">Rename</span></button>
                     </div>
                   </div>
                 </div>
@@ -2159,27 +2184,27 @@ input.hive-range::-moz-range-track {
                       Register a new ESP32S3 gateway by entering its MAC address.
                     </div>
                     <div style="margin-bottom:16px">
-                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">Gateway Mode</label>
+                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)" data-i18n="labels.gateway_mode">Gateway Mode</label>
                       <select id="sketchGatewayMode" class="prop-input" style="width:100%">
                         <option value="new" data-i18n="options.create_new_gateway">Create New Gateway</option>
                         <option value="existing" data-i18n="options.select_existing_gateway">Select Existing Gateway</option>
                       </select>
                     </div>
                     <div id="sketchNewGatewayFields" style="margin-bottom:16px">
-                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">MAC Address</label>
+                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)" data-i18n="labels.mac_address">MAC Address</label>
                       <input type="text" id="sketchGatewayMac" class="prop-input" data-i18n-placeholder="placeholders.a4cf1245abcd_or_a4cf1245abcd" placeholder="A4:CF:12:45:AB:CD or A4CF1245ABCD" style="width:100%;margin-bottom:8px">
-                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">Gateway Name</label>
+                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)" data-i18n="labels.gateway_name">Gateway Name</label>
                       <input type="text" id="sketchGatewayName" class="prop-input" data-i18n-placeholder="placeholders.eg_living_room_gateway" placeholder="e.g., Living Room Gateway" style="width:100%">
                     </div>
                     <div id="sketchExistingGatewayFields" style="margin-bottom:16px;display:none">
-                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">Gateway</label>
+                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)" data-i18n="labels.gateway">Gateway</label>
                       <select id="sketchGatewaySelect" class="prop-input" style="width:100%">
                         <option value="" data-i18n="users.loading">Loading...</option>
                       </select>
                     </div>
                     <div class="modal-actions">
                       <button class="btn-ghost" id="sketchGatewayCancel" data-i18n="common.cancel">Cancel</button>
-                      <button class="btn-primary" id="sketchGatewaySave">Add Gateway</button>
+                      <button class="btn-primary" id="sketchGatewaySave"><span data-i18n="buttons.add_gateway">Add Gateway</span></button>
                     </div>
                   </div>
                 </div>
@@ -2200,13 +2225,13 @@ input.hive-range::-moz-range-track {
                             </div>
                             <div class="fp-status-grid">
                                 <div class="fp-status-card fp-active" id="fp-sc-all"     onclick="FP.filterByStatus('all',this)">    <div class="fp-count" id="fp-count-total">0</div>   <div class="fp-slabel" data-i18n="floor_plan.total">Total</div></div>
-                                <div class="fp-status-card"           id="fp-sc-online"  onclick="FP.filterByStatus('online',this)"> <div class="fp-count fp-online"  id="fp-count-online">0</div>  <div class="fp-slabel">Online</div></div>
-                                <div class="fp-status-card"           id="fp-sc-idle"    onclick="FP.filterByStatus('idle',this)">   <div class="fp-count fp-idle"    id="fp-count-idle">0</div>    <div class="fp-slabel">Idle</div></div>
-                                <div class="fp-status-card"           id="fp-sc-offline" onclick="FP.filterByStatus('offline',this)"><div class="fp-count fp-offline" id="fp-count-offline">0</div> <div class="fp-slabel">Offline</div></div>
+                                <div class="fp-status-card"           id="fp-sc-online"  onclick="FP.filterByStatus('online',this)"> <div class="fp-count fp-online"  id="fp-count-online">0</div>  <div class="fp-slabel" data-i18n="text.online">Online</div></div>
+                                <div class="fp-status-card"           id="fp-sc-idle"    onclick="FP.filterByStatus('idle',this)">   <div class="fp-count fp-idle"    id="fp-count-idle">0</div>    <div class="fp-slabel" data-i18n="text.idle">Idle</div></div>
+                                <div class="fp-status-card"           id="fp-sc-offline" onclick="FP.filterByStatus('offline',this)"><div class="fp-count fp-offline" id="fp-count-offline">0</div> <div class="fp-slabel" data-i18n="text.offline">Offline</div></div>
                             </div>
                         </div>
                         <div class="fp-floor-selector">
-                            <span class="fp-floor-label">Floor</span>
+                            <span class="fp-floor-label" data-i18n="text.floor">Floor</span>
                             <div class="fp-floor-tabs">
                                 <div class="fp-floor-tab active" onclick="FP.selectFloor(this,'G')">G</div>
                                 <div class="fp-floor-tab"        onclick="FP.selectFloor(this,'1F')">1F</div>
@@ -2274,7 +2299,7 @@ input.hive-range::-moz-range-track {
 
                         <!-- Zone legend -->
                         <div class="fp-zone-legend" id="fp-zone-legend">
-                            <div class="fp-legend-title">Zones</div>
+                            <div class="fp-legend-title" data-i18n="text.zones">Zones</div>
                             <div class="fp-legend-item"><div class="fp-legend-swatch" style="background:rgba(0,100,0,.2);border:1.5px solid rgba(0,100,0,.55)"></div><span data-i18n="floor_plan.active_dispatch">Active / Dispatch</span></div>
                             <div class="fp-legend-item"><div class="fp-legend-swatch" style="background:rgba(239,68,68,.18);border:1.5px solid rgba(239,68,68,.5)"></div>Alert zone</div>
                             <div class="fp-legend-item"><div class="fp-legend-swatch" style="background:rgba(59,130,246,.15);border:1.5px solid rgba(59,130,246,.45)"></div>Restricted</div>
@@ -2294,7 +2319,7 @@ input.hive-range::-moz-range-track {
                         </div>
 
                         <!-- Connection status -->
-                        <div class="fp-conn-status" id="fp-conn-status"><div class="fp-conn-dot"></div><span id="fp-conn-text">Demo mode</span></div>
+                        <div class="fp-conn-status" id="fp-conn-status"><div class="fp-conn-dot"></div><span id="fp-conn-text" data-i18n="text.demo_mode">Demo mode</span></div>
                     </div>
 
                 </div>
@@ -2790,7 +2815,7 @@ input.hive-range::-moz-range-track {
                 <div id="qr-root" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
                     <iframe
                         src="/customer/qr-generator.html"
-                        title="QR / NFC Generator"
+                        data-i18n-title="tooltips.qr_nfc_generator" title="QR / NFC Generator"
                         style="width:100%;height:min(1820px,calc(100vh - 170px));min-height:820px;border:none;background:transparent"
                         loading="lazy">
                     </iframe>
@@ -2933,7 +2958,7 @@ input.hive-range::-moz-range-track {
                         <option value="" data-i18n="options._select_a_tag_">— Select a tag —</option>
                     </select>
                     <div style="display:flex;align-items:center;gap:6px">
-                        <label style="font-size:12px;color:var(--text-3);white-space:nowrap">From</label>
+                        <label style="font-size:12px;color:var(--text-3);white-space:nowrap" data-i18n="labels.from">From</label>
                         <input type="date" id="rpt-trips-from" style="width:145px">
                     </div>
                     <div style="display:flex;align-items:center;gap:6px">
@@ -3114,7 +3139,7 @@ input.hive-range::-moz-range-track {
                 <div class="card" style="margin:0 20px 12px;padding:14px;background:var(--bg-2);border:1px solid var(--border);border-radius:8px">
                     <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
                         <div style="flex:0 0 auto">
-                            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Date Range</label>
+                            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px" data-i18n="labels.date_range">Date Range</label>
                             <select id="rpt-alerts-date-preset" onchange="rptAlertsDatePresetChange()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)">
                                 <option value="today" data-i18n="options.today">Today</option>
                                 <option value="last_7_days" selected data-i18n="options.last_7_days">Last 7 days</option>
@@ -3123,15 +3148,15 @@ input.hive-range::-moz-range-track {
                             </select>
                         </div>
                         <div id="rpt-alerts-start-wrap" style="flex:0 0 auto;display:none">
-                            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Start Date</label>
+                            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px" data-i18n="labels.start_date">Start Date</label>
                             <input type="date" id="rpt-alerts-start-date" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)">
                         </div>
                         <div id="rpt-alerts-end-wrap" style="flex:0 0 auto;display:none">
-                            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">End Date</label>
+                            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px" data-i18n="labels.end_date">End Date</label>
                             <input type="date" id="rpt-alerts-end-date" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)">
                         </div>
                         <div style="flex:0 0 auto">
-                            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Alert Type</label>
+                            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px" data-i18n="labels.alert_type">Alert Type</label>
                             <select id="rpt-alerts-type-filter" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)">
                                 <option value="" data-i18n="options.all_types">All types</option>
                                 <option value="battery_low" data-i18n="options.battery_low">Battery Low</option>
@@ -3144,7 +3169,7 @@ input.hive-range::-moz-range-track {
                             </select>
                         </div>
                         <div style="flex:1 1 160px">
-                            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">IMEI</label>
+                            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px" data-i18n="labels.imei">IMEI</label>
                             <input type="text" id="rpt-alerts-imei-filter" data-i18n-placeholder="placeholders.filter_by_imei" placeholder="Filter by IMEI" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)">
                         </div>
                         <button class="btn btn-primary btn-small" onclick="rptAlertsApplyFilters()" style="margin-bottom:0">
@@ -3711,8 +3736,8 @@ input.hive-range::-moz-range-track {
                     <div class="mha-assets-panel">
                         <div class="mha-ap-head">
                             <i class="fa-solid fa-tags"></i>
-                            <span>Assets</span>
-                            <button class="mha-ap-collapse" onclick="mhaToggleAssetsPanel()" title="Collapse panel">
+                            <span data-i18n="text.assets">Assets</span>
+                            <button class="mha-ap-collapse" onclick="mhaToggleAssetsPanel()" data-i18n-title="tooltips.collapse_panel" title="Collapse panel">
                                 <i class="fa-solid fa-chevron-left"></i>
                             </button>
                         </div>
@@ -3724,10 +3749,10 @@ input.hive-range::-moz-range-track {
                             
                             <!-- Date Range Pills -->
                             <div>
-                                <div class="mha-ap-label">Date range</div>
+                                <div class="mha-ap-label" data-i18n="text.date_range">Date range</div>
                                 <div class="mha-pills">
-                                    <span class="mha-pill" data-range="today" onclick="mhaSetDateRange('today', this)">Today</span>
-                                    <span class="mha-pill" data-range="yesterday" onclick="mhaSetDateRange('yesterday', this)">Yesterday</span>
+                                    <span class="mha-pill" data-range="today" onclick="mhaSetDateRange('today', this)" data-i18n="text.today">Today</span>
+                                    <span class="mha-pill" data-range="yesterday" onclick="mhaSetDateRange('yesterday', this)" data-i18n="text.yesterday">Yesterday</span>
                                     <span class="mha-pill on" data-range="7d" onclick="mhaSetDateRange('7d', this)">Last 7 days</span>
                                     <span class="mha-pill" data-range="30d" onclick="mhaSetDateRange('30d', this)">Last 30 days</span>
                                     <span class="mha-pill" data-range="custom" onclick="mhaSetDateRange('custom', this)" style="color:var(--text-3)"><i class="fa-solid fa-calendar"></i> Custom</span>
@@ -3740,23 +3765,23 @@ input.hive-range::-moz-range-track {
                             </div>
                             
                             <div>
-                                <div class="mha-ap-label">Status</div>
+                                <div class="mha-ap-label" data-i18n="text.status">Status</div>
                                 <div class="mha-ap-stats">
                                     <div class="mha-ap-stat" data-status="total" onclick="mhaFilterByStatus('total', this)">
                                         <div class="n" id="mha-stat-total">0</div>
-                                        <div class="l">Total</div>
+                                        <div class="l" data-i18n="text.total">Total</div>
                                     </div>
                                     <div class="mha-ap-stat act selected" data-status="active" onclick="mhaFilterByStatus('active', this)">
                                         <div class="n" id="mha-stat-active">0</div>
-                                        <div class="l">Active</div>
+                                        <div class="l" data-i18n="text.active">Active</div>
                                     </div>
                                     <div class="mha-ap-stat idl" data-status="idle" onclick="mhaFilterByStatus('idle', this)">
                                         <div class="n" id="mha-stat-idle">0</div>
-                                        <div class="l">Idle</div>
+                                        <div class="l" data-i18n="text.idle">Idle</div>
                                     </div>
                                     <div class="mha-ap-stat off" data-status="offline" onclick="mhaFilterByStatus('offline', this)">
                                         <div class="n" id="mha-stat-offline">0</div>
-                                        <div class="l">Offline</div>
+                                        <div class="l" data-i18n="text.offline">Offline</div>
                                     </div>
                                 </div>
                             </div>
@@ -3964,9 +3989,9 @@ input.hive-range::-moz-range-track {
                         <div id="hive-threshold-label" class="hive-threshold-label" style="display:none"></div>
                         <div id="hive-map-markers"></div>
                         <div class="hive-map-zoom">
-                          <button onclick="hiveMapZoom(1)" title="Zoom in"><i class="fa-solid fa-plus"></i></button>
-                          <button onclick="hiveMapZoom(-1)" title="Zoom out"><i class="fa-solid fa-minus"></i></button>
-                          <button onclick="hiveMapZoom(0)" title="Reset"><i class="fa-solid fa-expand"></i></button>
+                          <button onclick="hiveMapZoom(1)" data-i18n-title="tooltips.zoom_in" title="Zoom in"><i class="fa-solid fa-plus"></i></button>
+                          <button onclick="hiveMapZoom(-1)" data-i18n-title="tooltips.zoom_out" title="Zoom out"><i class="fa-solid fa-minus"></i></button>
+                          <button onclick="hiveMapZoom(0)" data-i18n-title="tooltips.reset" title="Reset"><i class="fa-solid fa-expand"></i></button>
                         </div>
                         <div class="hive-map-legend">
                           <div class="hive-legend-item"><div class="hive-legend-dot" style="background:var(--hive-green)"></div><span data-i18n="hive.fresh">Fresh</span></div>
@@ -3986,7 +4011,7 @@ input.hive-range::-moz-range-track {
                           <div style="margin-top:22px;font-size:11px;color:var(--hive-text3);text-transform:uppercase;letter-spacing:.06em">Group spread · pairwise max distance</div>
                         </div>
                         <div style="text-align:right">
-                          <div style="font-size:11px;color:var(--hive-text3);text-transform:uppercase;letter-spacing:.06em">Status</div>
+                          <div style="font-size:11px;color:var(--hive-text3);text-transform:uppercase;letter-spacing:.06em" data-i18n="text.status">Status</div>
                           <div id="hive-diameter-state" class="hive-diameter-state"></div>
                         </div>
                       </div>
@@ -4038,7 +4063,7 @@ input.hive-range::-moz-range-track {
                       <div class="hive-panel-body">
                         <div class="hive-lifecycle-num">
                           <div id="hive-days-num" class="hive-lifecycle-big">—</div>
-                          <div class="hive-lifecycle-label">Days Remaining</div>
+                          <div class="hive-lifecycle-label" data-i18n="text.days_remaining">Days Remaining</div>
                         </div>
                         <div class="hive-lifecycle-bar"><div id="hive-days-bar" class="hive-lifecycle-bar-fill" style="width:100%"></div></div>
                         <div id="hive-expires-text" style="font-size:13px;color:var(--text-2);line-height:1.5;margin-bottom:14px"></div>
@@ -4067,13 +4092,13 @@ input.hive-range::-moz-range-track {
                   <div id="hive-wiz-err" class="alert" style="display:none;margin-bottom:16px"><span id="hive-wiz-err-text"></span></div>
                   <!-- express card (shown when suggestion confidence is high) -->
                   <div id="hive-express-card" class="hive-express-card" style="display:none">
-                    <div class="hive-express-tag">High Confidence</div>
+                    <div class="hive-express-tag" data-i18n="text.high_confidence">High Confidence</div>
                     <div class="hive-express-title"><i class="fa-solid fa-wand-magic-sparkles"></i> We've picked sensible settings for you</div>
                     <div id="hive-express-desc" class="hive-express-desc"></div>
                     <div id="hive-express-summary" class="hive-express-summary"></div>
                     <div class="hive-btn-row">
                       <button class="hive-btn" onclick="hiveWizUseSuggested()"><i class="fa-solid fa-bolt"></i> Use Suggested Settings</button>
-                      <button class="hive-btn hive-btn-ghost" onclick="hiveWizDismissExpress()">Review Settings</button>
+                      <button class="hive-btn hive-btn-ghost" onclick="hiveWizDismissExpress()"><span data-i18n="buttons.review_settings">Review Settings</span></button>
                     </div>
                   </div>
                   <!-- progress + step content -->
@@ -4126,7 +4151,7 @@ input.hive-range::-moz-range-track {
         </div>
         <div class="modal-body">
             <div style="margin-bottom:18px">
-                <label style="display:block;font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Mobility Profile</label>
+                <label style="display:block;font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px" data-i18n="labels.mobility_profile">Mobility Profile</label>
                 <select id="hive-cfg-profile" class="form-control" style="width:100%">
                     <option value="stationary" data-i18n="options.stationary__items_stay_put">Stationary — items stay put</option>
                     <option value="slow" data-i18n="options.slow__moves_occasionally">Slow — moves occasionally</option>
@@ -4134,7 +4159,7 @@ input.hive-range::-moz-range-track {
                 </select>
             </div>
             <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:baseline">
-                <label style="font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.05em">Distance Threshold</label>
+                <label style="font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.05em" data-i18n="labels.distance_threshold">Distance Threshold</label>
                 <span style="font-size:22px;font-weight:700;color:var(--primary);text-shadow:0 0 12px color-mix(in srgb,var(--primary) 50%,transparent)"><span id="hive-cfg-threshold-val">100</span> <span style="font-size:13px;color:var(--text-3);font-weight:400">m</span></span>
             </div>
             <input type="range" id="hive-cfg-threshold" class="hive-range" min="10" max="2000" step="10" value="100"
@@ -4171,7 +4196,7 @@ input.hive-range::-moz-range-track {
             </div>
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('singleTagModal')" data-i18n="common.cancel">Cancel</button>
-                <button type="submit" class="btn btn-primary">Add Tag</button>
+                <button type="submit" class="btn btn-primary"><span data-i18n="buttons.add_tag">Add Tag</span></button>
             </div>
         </form>
     </div>
@@ -4205,7 +4230,7 @@ input.hive-range::-moz-range-track {
             </div>
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
                 <button class="btn btn-secondary" onclick="closeModal('bulkTagModal')" data-i18n="common.cancel">Cancel</button>
-                <button class="btn btn-primary" onclick="submitBulkTags()">Import Tags</button>
+                <button class="btn btn-primary" onclick="submitBulkTags()"><span data-i18n="buttons.import_tags">Import Tags</span></button>
             </div>
         </div>
     </div>
@@ -4238,7 +4263,7 @@ input.hive-range::-moz-range-track {
             <button class="modal-close" onclick="closeModal('createBuildingModal')">×</button>
         </div>
         <div class="form-group">
-            <label>Building Name</label>
+            <label data-i18n="labels.building_name">Building Name</label>
             <input type="text" id="newBldgName" data-i18n-placeholder="placeholders.eg_head_office__floor_2" placeholder="e.g. Head Office — Floor 2" maxlength="80">
         </div>
         <div class="form-group">
@@ -4252,12 +4277,12 @@ input.hive-range::-moz-range-track {
         </div>
         <p style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray);margin-bottom:10px">Pareto Anywhere / MQTT Settings</p>
         <div class="form-group">
-            <label>Broker WebSocket URL</label>
+            <label data-i18n="labels.broker_websocket_url">Broker WebSocket URL</label>
             <input type="text" id="newBldgMqttUrl" data-i18n-placeholder="placeholders.wsspinplotmemqtt" placeholder="wss://pinplot.me/mqtt">
             <p style="font-size:12px;color:var(--gray);margin-top:4px">Use <code>wss://pinplot.me/mqtt</code> (routed through nginx → Mosquitto).</p>
         </div>
         <div class="form-group">
-            <label>Topic</label>
+            <label data-i18n="labels.topic">Topic</label>
             <input type="text" id="newBldgMqttTopic" value="position/#" data-i18n-placeholder="placeholders.position" placeholder="position/#">
             <p style="font-size:12px;color:var(--gray);margin-top:4px">The pinplot mqtt-bridge publishes on <code>position/#</code> and raw raddecs on <code>raddec/#</code>.</p>
         </div>
@@ -4274,7 +4299,7 @@ input.hive-range::-moz-range-track {
         <p style="font-size:12px;color:var(--gray);margin-bottom:16px">Must match the coordinate space you define for gateway positions in Pareto Anywhere chimps.</p>
         <div style="display:flex;gap:10px;justify-content:flex-end">
             <button class="btn btn-secondary" onclick="closeModal('createBuildingModal')" data-i18n="common.cancel">Cancel</button>
-            <button class="btn btn-primary" onclick="saveNewBuilding()">Create Building</button>
+            <button class="btn btn-primary" onclick="saveNewBuilding()"><span data-i18n="buttons.create_building">Create Building</span></button>
         </div>
     </div>
 </div>
@@ -4284,7 +4309,7 @@ input.hive-range::-moz-range-track {
 <div id="tagMgmtModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
-            <span class="modal-title" id="tagMgmtTitle">Add Tag</span>
+            <span class="modal-title" id="tagMgmtTitle" data-i18n="text.add_tag">Add Tag</span>
             <button class="modal-close" onclick="closeModal('tagMgmtModal')">×</button>
         </div>
         <div id="tagMgmtAlert" class="alert" style="display:none"><span id="tagMgmtAlertText"></span></div>
@@ -4297,11 +4322,11 @@ input.hive-range::-moz-range-track {
                 <div id="tagMgmtImeiStatus" style="display:none;margin-top:4px;font-size:12px"></div>
             </div>
             <div id="tagMgmtDescGroup" class="form-group">
-                <label>Description</label>
+                <label data-i18n="labels.description">Description</label>
                 <input type="text" id="tagMgmtDesc" data-i18n-placeholder="placeholders.eg_johns_vehicle_tracker" placeholder="e.g. John's vehicle tracker">
             </div>
             <div id="tagMgmtTypeGroup" class="form-group">
-                <label>Tag Type</label>
+                <label data-i18n="labels.tag_type">Tag Type</label>
                 <select id="tagMgmtType" onchange="_updateImeiLabelForTagType()">
                     <option value="series1" data-i18n="options.series_1_gps">Series 1 (GPS)</option>
                     <option value="series2" data-i18n="options.series_2_gps">Series 2 (GPS)</option>
@@ -4311,7 +4336,7 @@ input.hive-range::-moz-range-track {
                 </select>
             </div>
             <div id="tagMgmtCategoryGroup" class="form-group">
-                <label>Category</label>
+                <label data-i18n="labels.category">Category</label>
                 <select id="tagMgmtCategory">
                     <option value="" data-i18n="options._none_">— None —</option>
                 </select>
@@ -4319,14 +4344,14 @@ input.hive-range::-moz-range-track {
             <div class="form-group">
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0">
                     <input type="checkbox" id="tagMgmtTripSubscribed" style="cursor:pointer">
-                    <span style="font-weight:600">Enable Advanced Trip Analysis</span>
+                    <span style="font-weight:600" data-i18n="text.enable_advanced_trip_analysis">Enable Advanced Trip Analysis</span>
                 </label>
                 <p style="font-size:12px;color:var(--text-secondary);margin:6px 0 0 24px">
                     Subscribe this device to the Trip Engine for journey detection, stationary tracking, and Movement Analytics features.
                 </p>
             </div>
             <div class="form-group">
-                <label>Assign to User</label>
+                <label data-i18n="labels.assign_to_user">Assign to User</label>
                 <select id="tagMgmtUser">
                     <option value="" data-i18n="common.loading_users">Loading users…</option>
                 </select>
@@ -4359,20 +4384,20 @@ input.hive-range::-moz-range-track {
             <p style="margin:12px 0 6px;font-size:13px">Email: <strong id="newUserEmail"></strong></p>
             <div style="display:flex;align-items:center;gap:8px">
                 <code id="newUserPwd" style="flex:1;padding:8px 12px;background:#f3f4f6;border-radius:6px;font-size:14px;letter-spacing:1px;color:#111"></code>
-                <button class="btn btn-secondary btn-small" id="copyPwdBtn" onclick="navigator.clipboard.writeText(document.getElementById('newUserPwd').textContent).then(()=>{const b=document.getElementById('copyPwdBtn');b.textContent='Copied!';b.style.color='var(--success,#10b981)';setTimeout(()=>{b.textContent='Copy';b.style.color='';},2000)})">Copy</button>
+                <button class="btn btn-secondary btn-small" id="copyPwdBtn" onclick="navigator.clipboard.writeText(document.getElementById('newUserPwd').textContent).then(()=>{const b=document.get<span data-i18n="buttons.elementbyidcopypwdbtnbtextcontentcopiedbstylecolor">ElementById('copyPwdBtn');b.textContent='Copied!';b.style.color='var(--success,#10b981)';setTimeout(()=>{b.textContent='Copy';b.style.color='';},2000)})">Copy</span></button>
             </div>
             <div style="text-align:right;margin-top:16px">
-                <button class="btn btn-primary" onclick="closeModal('addUserModal');loadUsers()">Done</button>
+                <button class="btn btn-primary" onclick="closeModal('addUserModal');loadUsers()"><span data-i18n="buttons.done">Done</span></button>
             </div>
         </div>
         <form id="addUserForm" onsubmit="submitAddUser(event)">
             <div style="display:flex;gap:12px">
                 <div class="form-group" style="flex:1">
-                    <label>First Name</label>
+                    <label data-i18n="labels.first_name">First Name</label>
                     <input type="text" id="auFirst" data-i18n-placeholder="placeholders.jane" placeholder="Jane">
                 </div>
                 <div class="form-group" style="flex:1">
-                    <label>Last Name</label>
+                    <label data-i18n="labels.last_name">Last Name</label>
                     <input type="text" id="auLast" data-i18n-placeholder="placeholders.smith" placeholder="Smith">
                 </div>
             </div>
@@ -4418,7 +4443,7 @@ input.hive-range::-moz-range-track {
             </div>
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('addUserModal')" data-i18n="common.cancel">Cancel</button>
-                <button type="submit" class="btn btn-primary" id="addUserBtn">Create User</button>
+                <button type="submit" class="btn btn-primary" id="addUserBtn"><span data-i18n="buttons.create_user">Create User</span></button>
             </div>
         </form>
     </div>
@@ -4428,7 +4453,7 @@ input.hive-range::-moz-range-track {
 <div id="categoryModal" class="modal">
     <div class="modal-content" style="max-width:440px">
         <div class="modal-header">
-            <span class="modal-title" id="categoryModalTitle">Add Category</span>
+            <span class="modal-title" id="categoryModalTitle" data-i18n="text.add_category">Add Category</span>
             <button class="modal-close" onclick="closeModal('categoryModal')">×</button>
         </div>
         <div id="categoryModalAlert" class="alert" style="display:none"><span id="categoryModalAlertText"></span></div>
@@ -4444,14 +4469,14 @@ input.hive-range::-moz-range-track {
                     <p style="font-size:12px;color:var(--gray);margin-top:4px">e.g. fa-car, fa-truck, fa-box, fa-person</p>
                 </div>
                 <div class="form-group" style="flex:0 0 100px">
-                    <label>Colour</label>
+                    <label data-i18n="labels.colour">Colour</label>
                     <input type="color" id="catColor" value="#3b82f6" style="height:40px;width:100%;padding:4px;border-radius:8px;border:2px solid var(--border);cursor:pointer">
                 </div>
             </div>
             <input type="hidden" id="catId">
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('categoryModal')" data-i18n="common.cancel">Cancel</button>
-                <button type="submit" class="btn btn-primary" id="catSubmitBtn">Add Category</button>
+                <button type="submit" class="btn btn-primary" id="catSubmitBtn"><span data-i18n="buttons.add_category">Add Category</span></button>
             </div>
         </form>
     </div>
@@ -4498,7 +4523,7 @@ input.hive-range::-moz-range-track {
         </div>
         <div class="modal-footer">
             <button class="btn btn-ghost" onclick="closeAmBulk()" data-i18n="common.close">Close</button>
-            <button class="btn btn-primary" id="am-bulk-upload-btn" disabled>Import 0 tags</button>
+            <button class="btn btn-primary" id="am-bulk-upload-btn" disabled><span data-i18n="buttons.import_0_tags">Import 0 tags</span></button>
         </div>
     </div>
 </div>
@@ -4514,7 +4539,7 @@ input.hive-range::-moz-range-track {
         <div id="erAlert" class="alert" style="display:none"><span id="erAlertText"></span></div>
         <input type="hidden" id="erUserId">
         <div class="form-group" style="margin:16px 0 8px">
-            <label>Role</label>
+            <label data-i18n="labels.role">Role</label>
             <select id="erRole" class="form-input" onchange="_erToggleCustom()">
                 <option value="admin" data-i18n="options.admin__full_access_to_all_group_features">Admin — full access to all group features</option>
                 <option value="manager" data-i18n="options.manager__tracking_amp_management_only">Manager — Tracking &amp; Management only</option>
@@ -4563,7 +4588,7 @@ input.hive-range::-moz-range-track {
         </div>
         <p id="userExpiryName" style="color:var(--text-2);font-size:13px;margin-bottom:16px"></p>
         <div class="form-group">
-            <label>Expiry Date</label>
+            <label data-i18n="labels.expiry_date">Expiry Date</label>
             <input type="date" id="userExpiryDate" style="width:100%">
             <p style="font-size:12px;color:var(--text-3);margin-top:4px">Must be a future date. Leave blank to remove any existing expiry.</p>
         </div>
@@ -5650,8 +5675,8 @@ async function loadGroupTags() {
         }
         tb.innerHTML = tags.map(t => {
             const statusBadge = t.is_active
-                ? '<span class="badge badge-success">Active</span>'
-                : '<span class="badge badge-danger">Inactive</span>';
+                ? '<span class="badge badge-success" data-i18n="text.active">Active</span>'
+                : '<span class="badge badge-danger" data-i18n="text.inactive">Inactive</span>';
             const lastSeen  = t.last_seen   ? new Date(t.last_seen).toLocaleString()   : '—';
             const addedAt   = t.added_at    ? new Date(t.added_at).toLocaleDateString() : '—';
             const expiryStr = t.expiry_date ? new Date(t.expiry_date).toLocaleDateString() : '—';
@@ -5669,7 +5694,7 @@ async function loadGroupTags() {
                 ? `<td style="width:36px;text-align:center"><input type="checkbox" class="tag-row-cb" data-tag-id="${esc(String(t.id))}" onchange="updateTagDeleteBtn()" onclick="event.stopPropagation()"></td>`
                 : '';
             const actionsCell = isAdmin
-                ? `<td><button class="btn btn-secondary btn-small" onclick="openAssignTagModal('${esc(String(t.id))}', '${esc(t.owner_email)}')">Reassign</button></td>`
+                ? `<td><button class="btn btn-secondary btn-small" onclick="openAssignTagModal('${esc(String(t.id))}', '${esc(t.owner_email)}')"><span data-i18n="buttons.reassign">Reassign</span></button></td>`
                 : '';
             return `<tr>
                 ${checkCell}
@@ -6379,7 +6404,7 @@ function settingsLogoFileChange(e) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 512 * 1024) {
-        alert('Logo must be under 512 KB.');
+        tAlert('alerts.logo_must_be_under_512_kb', 'Logo must be under 512 KB.');
         return;
     }
     const reader = new FileReader();
@@ -6409,7 +6434,7 @@ function settingsLogoDarkFileChange(e) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 512 * 1024) {
-        alert('Logo must be under 512 KB.');
+        tAlert('alerts.logo_must_be_under_512_kb', 'Logo must be under 512 KB.');
         return;
     }
     const reader = new FileReader();
@@ -6539,7 +6564,7 @@ function applyBranding(theme) {
         } else {
             const _bn = (window.APP_BRANDING && window.APP_BRANDING.name) || 'PinPlot';
             // textContent insertion to avoid injecting brand name as HTML
-            logoWrap.innerHTML = `<div class="logo-icon"><i class="fa-solid fa-location-dot"></i></div><div><span class="brand-name-txt"></span><span class="logo-sub">Customer Portal</span></div>`;
+            logoWrap.innerHTML = `<div class="logo-icon"><i class="fa-solid fa-location-dot"></i></div><div><span class="brand-name-txt"></span><span class="logo-sub" data-i18n="text.customer_portal">Customer Portal</span></div>`;
             const bnEl = logoWrap.querySelector('.brand-name-txt');
             if (bnEl) bnEl.textContent = _bn;
         }
@@ -6666,7 +6691,7 @@ function _renderNotifEmailTags(extras) {
         const chip = document.createElement('span');
         chip.className = 'notif-email-chip';
         chip.dataset.email = email;
-        chip.innerHTML = `<span class="notif-email-chip-text">${_escHtml(email)}</span><button class="notif-email-chip-remove" title="Remove" onclick="notifRemoveEmail(this)" aria-label="Remove ${_escHtml(email)}"><i class="fa-solid fa-xmark"></i></button>`;
+        chip.innerHTML = `<span class="notif-email-chip-text">${_escHtml(email)}</span><button class="notif-email-chip-remove" data-i18n-title="tooltips.remove" title="Remove" onclick="notifRemoveEmail(this)" aria-label="Remove ${_escHtml(email)}"><i class="fa-solid fa-xmark"></i></button>`;
         container.appendChild(chip);
     });
 }
@@ -7115,10 +7140,10 @@ function _rptActRenderRows(rows) {
         return;
     }
     const _ACT_BADGE = {
-        active:  '<span class="rpt-badge rpt-badge-active">Active</span>',
-        idle:    '<span class="rpt-badge rpt-badge-expiring">Idle</span>',
-        offline: '<span class="rpt-badge rpt-badge-expired">Offline</span>',
-        unknown: '<span class="rpt-badge rpt-badge-none">Unknown</span>',
+        active:  '<span class="rpt-badge rpt-badge-active" data-i18n="text.active">Active</span>',
+        idle:    '<span class="rpt-badge rpt-badge-expiring" data-i18n="text.idle">Idle</span>',
+        offline: '<span class="rpt-badge rpt-badge-expired" data-i18n="text.offline">Offline</span>',
+        unknown: '<span class="rpt-badge rpt-badge-none" data-i18n="text.unknown">Unknown</span>',
     };
     tbody.innerHTML = rows.map(t => {
         const hrs    = t.hours_silent;
@@ -7134,7 +7159,7 @@ function _rptActRenderRows(rows) {
             <td>${esc(t.description||t.device_name||t.imei)}<br><span style="font-size:11px;color:var(--text-3);font-family:monospace">${esc(t.imei)}</span></td>
             <td style="font-size:12px">${esc(t.owner_email)}</td>
             <td>${t.category_name ? esc(t.category_name) : '<span style="color:var(--text-3)">—</span>'}</td>
-            <td style="white-space:nowrap;font-size:12px">${t.last_seen ? _rptFmtDate(t.last_seen) : '<span style="color:var(--text-3)">Never</span>'}</td>
+            <td style="white-space:nowrap;font-size:12px">${t.last_seen ? _rptFmtDate(t.last_seen) : '<span style="color:var(--text-3)" data-i18n="text.never">Never</span>'}</td>
             <td style="text-align:center">${hrsCell}</td>
             <td style="text-align:center">${batCell}</td>
             <td style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(t.location_description||'')}">${t.location_description ? esc(t.location_description) : '<span style="color:var(--text-3)">—</span>'}</td>
@@ -7456,15 +7481,15 @@ function _rptBatRenderRows(rows) {
         const isLowBat  = lvl  != null && lvl  <= 20;
         const isOffline = hrs  != null && hrs  >= 48;
         const statusBadge = (isLowBat && isOffline)
-            ? '<span class="rpt-badge rpt-badge-expired">Critical</span>'
+            ? '<span class="rpt-badge rpt-badge-expired" data-i18n="text.critical">Critical</span>'
             : (isLowBat || isOffline)
-            ? '<span class="rpt-badge rpt-badge-expiring">Warning</span>'
-            : '<span class="rpt-badge rpt-badge-none">Monitoring</span>';
+            ? '<span class="rpt-badge rpt-badge-expiring" data-i18n="text.warning">Warning</span>'
+            : '<span class="rpt-badge rpt-badge-none" data-i18n="text.monitoring">Monitoring</span>';
         return `<tr>
             <td>${esc(t.description||t.device_name||t.imei)}<br><span style="font-size:11px;color:var(--text-3);font-family:monospace">${esc(t.imei)}</span></td>
             <td style="font-size:12px">${esc(t.owner_email)}</td>
             <td style="text-align:center"><span style="font-weight:600;color:${batColor}">${batIcon}${lvl != null ? lvl + '%' : '—'}</span></td>
-            <td style="white-space:nowrap;font-size:12px">${t.last_seen ? _rptFmtDate(t.last_seen) : '<span style="color:var(--text-3)">Never</span>'}</td>
+            <td style="white-space:nowrap;font-size:12px">${t.last_seen ? _rptFmtDate(t.last_seen) : '<span style="color:var(--text-3)" data-i18n="text.never">Never</span>'}</td>
             <td style="text-align:center"><span style="font-weight:600;color:${offColor}">${hrs != null ? hrs.toLocaleString() : '—'}</span></td>
             <td>${statusBadge}</td>
         </tr>`;
@@ -7672,7 +7697,7 @@ function rptAlertsApplyFilters() {
         const startVal = document.getElementById('rpt-alerts-start-date').value;
         const endVal = document.getElementById('rpt-alerts-end-date').value;
         if (!startVal || !endVal) {
-            alert('Please select both start and end dates for custom range.');
+            tAlert('alerts.please_select_both_start_and_end_dates_for_custom_', 'Please select both start and end dates for custom range.');
             return;
         }
         startDate = new Date(startVal);
@@ -7773,7 +7798,7 @@ function _rptAlertsRender() {
         const hasGps = a.meta_data?.latitude != null && a.meta_data?.longitude != null;
         const isPlottable = hasGps && (a.alert_type === 'geofence_exit' || a.alert_type === 'geofence_entry' || a.alert_type === 'hive_breach');
         const plotBtn = isPlottable
-            ? `<button class="btn-icon" style="margin-right:8px" title="Show on map" onclick="event.stopPropagation();switchTab('livemap');setTimeout(()=>{if(window.lmCenterOnCoords){lmCenterOnCoords(${a.meta_data.latitude},${a.meta_data.longitude})}},600)"><i class="fa-solid fa-location-dot"></i></button>`
+            ? `<button class="btn-icon" style="margin-right:8px" data-i18n-title="tooltips.show_on_map" title="Show on map" onclick="event.stopPropagation();switchTab('livemap');setTimeout(()=>{if(window.lmCenterOnCoords){lmCenterOnCoords(${a.meta_data.latitude},${a.meta_data.longitude})}},600)"><i class="fa-solid fa-location-dot"></i></button>`
             : '';
         return `<tr class="${isUnread ? 'rpt-row-unread' : ''}" data-alert-id="${esc(a.id)}">
             <td style="padding-left:16px">${dot}</td>
@@ -7783,7 +7808,7 @@ function _rptAlertsRender() {
             <td style="cursor:pointer" onclick="rptAlertMarkRead('${esc(a.id)}',this.closest('tr'))">${esc(subject)}</td>
             <td style="cursor:pointer;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="rptAlertMarkRead('${esc(a.id)}',this.closest('tr'))" title="${esc(a.message||'')}">${esc(detail||'\u2014')}</td>
             <td style="width:160px;white-space:nowrap;color:var(--text-3);font-size:.82rem;cursor:pointer" onclick="rptAlertMarkRead('${esc(a.id)}',this.closest('tr'))">${esc(time)}</td>
-            <td style="white-space:nowrap">${plotBtn}<button class="btn-icon-danger" title="Dismiss alert" onclick="rptAlertDelete('${esc(a.id)}',this.closest('tr'))"><i class="fa-solid fa-xmark"></i></button></td>
+            <td style="white-space:nowrap">${plotBtn}<button class="btn-icon-danger" data-i18n-title="tooltips.dismiss_alert" title="Dismiss alert" onclick="rptAlertDelete('${esc(a.id)}',this.closest('tr'))"><i class="fa-solid fa-xmark"></i></button></td>
         </tr>`;
     }).join('');
 }
@@ -8596,7 +8621,7 @@ function _locRenderSearchResults(results, q){
     const el=document.getElementById('locSearchResults');
     if(!el) return;
     if(!results.length){
-        el.innerHTML=`<div class="loc-sr"><div class="loc-sr-name">No results</div><div class="loc-sr-detail">Try a different address or postcode</div></div>`;
+        el.innerHTML=`<div class="loc-sr"><div class="loc-sr-name" data-i18n="text.no_results">No results</div><div class="loc-sr-detail">Try a different address or postcode</div></div>`;
     } else {
         el.innerHTML=results.map((r,i)=>`<div class="loc-sr" data-locridx="${i}"><div class="loc-sr-name">${_locHtml(r.label)}</div><div class="loc-sr-detail">${_locHtml(r.detail)}</div></div>`).join('');
         el.querySelectorAll('.loc-sr[data-locridx]').forEach(row=>{
@@ -8990,11 +9015,11 @@ function _rptSubSortAndRender() {
 
 // ─── Render rows ─────────────────────────────────────────────────────────────
 const _RPT_STATUS_BADGE = {
-    active:   '<span class="rpt-badge rpt-badge-active">Active</span>',
-    expiring: '<span class="rpt-badge rpt-badge-expiring">Expiring soon</span>',
-    expired:  '<span class="rpt-badge rpt-badge-expired">Expired</span>',
+    active:   '<span class="rpt-badge rpt-badge-active" data-i18n="text.active">Active</span>',
+    expiring: '<span class="rpt-badge rpt-badge-expiring" data-i18n="text.expiring_soon">Expiring soon</span>',
+    expired:  '<span class="rpt-badge rpt-badge-expired" data-i18n="text.expired">Expired</span>',
     new:      '<span class="rpt-badge rpt-badge-new">New</span>',
-    none:     '<span class="rpt-badge rpt-badge-none">No package</span>',
+    none:     '<span class="rpt-badge rpt-badge-none" data-i18n="text.no_package">No package</span>',
 };
 
 function _rptSubRenderRows(rows) {
@@ -9143,8 +9168,8 @@ function renderCategoriesList() {
             </span>
             <span class="cat-chip-name">${esc(c.name)}</span>
             <div class="cat-chip-actions">
-                <button class="btn-icon-xs" title="Edit" onclick="openEditCategoryModal('${esc(c.id)}')"><i class="fa-solid fa-pen"></i></button>
-                <button class="btn-icon-xs danger" title="Delete" onclick="deleteCategory('${esc(c.id)}','${esc(c.name)}')"><i class="fa-solid fa-trash"></i></button>
+                <button class="btn-icon-xs" data-i18n-title="tooltips.edit" title="Edit" onclick="openEditCategoryModal('${esc(c.id)}')"><i class="fa-solid fa-pen"></i></button>
+                <button class="btn-icon-xs danger" data-i18n-title="tooltips.delete" title="Delete" onclick="deleteCategory('${esc(c.id)}','${esc(c.name)}')"><i class="fa-solid fa-trash"></i></button>
             </div>
         </div>`;
     }).join('')}</div>`;
@@ -9651,8 +9676,7 @@ async function renderGPSTags() {
             <span style="font-size:11px">Owner: ${ownerShort}</span><br>
             <span style="font-size:11px">Last seen: ${t.last_seen ? new Date(t.last_seen).toLocaleString() : '—'}</span><br>
             <button onclick="toggleGpsMark('${esc(t.imei)}')" style="margin-top:6px;font-size:12px;padding:3px 8px;border-radius:4px;border:1px solid #ddd;cursor:pointer;background:#f3f4f6" id="popup-mark-${esc(t.imei.replace(/[^a-z0-9]/gi,'_'))}">
-                ${isMarked ? '★ Unmark' : '☆ Mark for tracking'}
-            </button>
+                ${is<span data-i18n="buttons.marked_unmark_mark_for_tracking">Marked ? '★ Unmark' : '☆ Mark for tracking'}</span></button>
         `);
         _gpsMarkers[t.imei] = marker;
     });
@@ -9686,8 +9710,8 @@ async function renderGPSTags() {
         const label     = esc(t.description || t.device_name || '—');
         const safeId    = t.imei.replace(/[^a-z0-9]/gi, '_');
         const zoomBtn   = hasGPS
-            ? `<button onclick="gpsZoomTo('${esc(t.imei)}')" title="Zoom to tag" style="border:none;background:none;cursor:pointer;font-size:15px;padding:0 4px">🎯</button>`
-            : `<span title="No GPS fix" style="font-size:15px;opacity:.35;padding:0 4px">📍</span>`;
+            ? `<button onclick="gpsZoomTo('${esc(t.imei)}')" data-i18n-title="tooltips.zoom_to_tag" title="Zoom to tag" style="border:none;background:none;cursor:pointer;font-size:15px;padding:0 4px">🎯</button>`
+            : `<span data-i18n-title="tooltips.no_gps_fix" title="No GPS fix" style="font-size:15px;opacity:.35;padding:0 4px">📍</span>`;
         return `
         <div class="gps-tag-row ${rowClass}" id="gps-row-${safeId}" onclick="toggleGpsMark('${esc(t.imei)}')">
             <span class="gps-dot ${dotClass}"></span>
@@ -9840,8 +9864,7 @@ async function _gpsSearchDuplicate_doNotCall() {
             <span style="font-size:11px">Owner: ${ownerShort}</span><br>
             <span style="font-size:11px">Last seen: ${t.last_seen ? new Date(t.last_seen).toLocaleString() : '—'}</span><br>
             <button onclick="toggleGpsMark('${esc(t.imei)}')" style="margin-top:6px;font-size:12px;padding:3px 8px;border-radius:4px;border:1px solid #ddd;cursor:pointer;background:#f3f4f6" id="popup-mark-${esc(t.imei.replace(/[^a-z0-9]/gi,'_'))}">
-                ${isMarked ? '★ Unmark' : '☆ Mark for tracking'}
-            </button>
+                ${is<span data-i18n="buttons.marked_unmark_mark_for_tracking">Marked ? '★ Unmark' : '☆ Mark for tracking'}</span></button>
         `);
         _gpsMarkers[t.imei] = marker;
     });
@@ -9875,8 +9898,8 @@ async function _gpsSearchDuplicate_doNotCall() {
         const label     = esc(t.description || t.device_name || '—');
         const safeId    = t.imei.replace(/[^a-z0-9]/gi, '_');
         const zoomBtn   = hasGPS
-            ? `<button onclick="gpsZoomTo('${esc(t.imei)}')" title="Zoom to tag" style="border:none;background:none;cursor:pointer;font-size:15px;padding:0 4px">🎯</button>`
-            : `<span title="No GPS fix" style="font-size:15px;opacity:.35;padding:0 4px">📍</span>`;
+            ? `<button onclick="gpsZoomTo('${esc(t.imei)}')" data-i18n-title="tooltips.zoom_to_tag" title="Zoom to tag" style="border:none;background:none;cursor:pointer;font-size:15px;padding:0 4px">🎯</button>`
+            : `<span data-i18n-title="tooltips.no_gps_fix" title="No GPS fix" style="font-size:15px;opacity:.35;padding:0 4px">📍</span>`;
         return `
         <div class="gps-tag-row ${rowClass}" id="gps-row-${safeId}" onclick="toggleGpsMark('${esc(t.imei)}')">
             <span class="gps-dot ${dotClass}"></span>
@@ -10023,7 +10046,7 @@ async function loadUsers() {
             tb.innerHTML = users.map(u => {
                 const name   = [u.first_name, u.last_name].filter(Boolean).join(' ') || '—';
                 const role   = roleBadge(u.role || (u.is_group_admin ? 'admin' : 'reporter'));
-                const status = u.is_active ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-danger">Inactive</span>';
+                const status = u.is_active ? '<span class="badge badge-success" data-i18n="text.active">Active</span>' : '<span class="badge badge-danger" data-i18n="text.inactive">Inactive</span>';
                 const expiry = u.expires_at ? new Date(u.expires_at).toLocaleDateString() : '—';
                 const isSelf = me && me.id === u.id;
                 const isSystemAdmin = u.role === 'system_admin';
@@ -10031,11 +10054,11 @@ async function loadUsers() {
                 const meIsAdmin = _isAdminLikeUser(me);
                 const meIsSysAdmin = me?.role === 'system_admin';
                 const canModifyAdmin = meIsAdmin || !targetIsAdmin;
-                const resetBtn = (meIsSysAdmin && !isSelf) ? `<button class="btn btn-ghost btn-sm" onclick="sysAdminResetPassword('${esc(u.id)}','${esc(u.email)}','${esc(name)}')" title="Reset this user's password">
+                const resetBtn = (meIsSysAdmin && !isSelf) ? `<button class="btn btn-ghost btn-sm" onclick="sysAdminResetPassword('${esc(u.id)}','${esc(u.email)}','${esc(name)}')" data-i18n-title="tooltips.reset_this_users_password" title="Reset this user's password">
                         <i class="fa-solid fa-key"></i> Reset Pwd
                     </button>` : '';
                 const actions = isSelf ? '<span style="color:var(--text-3);font-size:12px">You</span>' : isSystemAdmin ? `<span style="color:var(--text-3);font-size:12px;margin-right:6px">Built-in</span>${resetBtn}` : `
-                    <button class="btn btn-ghost btn-sm" onclick="openEditRoleModal('${esc(u.id)}','${esc(name)}','${esc(u.role||'admin')}',${esc(JSON.stringify(u.custom_features||[]))})" title="Change role">
+                    <button class="btn btn-ghost btn-sm" onclick="openEditRoleModal('${esc(u.id)}','${esc(name)}','${esc(u.role||'admin')}',${esc(JSON.stringify(u.custom_features||[]))})" data-i18n-title="tooltips.change_role" title="Change role">
                         <i class="fa-solid fa-shield-halved"></i> Role
                     </button>
                     ${canModifyAdmin ? `<button class="btn btn-ghost btn-sm" onclick="toggleUserActive('${esc(u.id)}',${u.is_active},'${esc(name)}')" title="${u.is_active ? 'Deactivate' : 'Activate'} user">
@@ -10121,7 +10144,7 @@ function _euRender(users) {
             </td>
             <td style="font-weight:500">
                 ${esc(name)}
-                ${!isActive ? '<span style="margin-left:6px;font-size:.72rem;background:rgba(107,114,128,.15);color:var(--text-3);padding:1px 6px;border-radius:8px;vertical-align:middle">Deactivated</span>' : ''}
+                ${!isActive ? '<span style="margin-left:6px;font-size:.72rem;background:rgba(107,114,128,.15);color:var(--text-3);padding:1px 6px;border-radius:8px;vertical-align:middle" data-i18n="text.deactivated">Deactivated</span>' : ''}
             </td>
             <td style="color:var(--text-2)">${esc(u.email)}</td>
             <td style="color:var(--text-3);font-size:.84rem;white-space:nowrap">${regDate}</td>
@@ -10133,14 +10156,14 @@ function _euRender(users) {
             </td>
             <td style="text-align:center;white-space:nowrap" onclick="event.stopPropagation()">
                 ${isActive
-                    ? `<button class="btn-sm btn-outline-warn" title="Deactivate user" onclick="_euSetActive('${esc(String(u.id))}',false,'${esc(name)}')">
+                    ? `<button class="btn-sm btn-outline-warn" data-i18n-title="tooltips.deactivate_user" title="Deactivate user" onclick="_euSetActive('${esc(String(u.id))}',false,'${esc(name)}')">
                             <i class="fa-solid fa-ban" style="font-size:.78rem"></i> Deactivate
                        </button>`
-                    : `<button class="btn-sm btn-outline-ok" title="Activate user" onclick="_euSetActive('${esc(String(u.id))}',true,'${esc(name)}')">
+                    : `<button class="btn-sm btn-outline-ok" data-i18n-title="tooltips.activate_user" title="Activate user" onclick="_euSetActive('${esc(String(u.id))}',true,'${esc(name)}')">
                             <i class="fa-solid fa-circle-check" style="font-size:.78rem"></i> Activate
                        </button>`
                 }
-                <button class="btn-sm btn-outline-danger" title="Delete user permanently"
+                <button class="btn-sm btn-outline-danger" data-i18n-title="tooltips.delete_user_permanently" title="Delete user permanently"
                         style="margin-left:4px"
                         onclick="_euDelete('${esc(String(u.id))}','${esc(name)}')">
                     <i class="fa-solid fa-trash" style="font-size:.78rem"></i>
@@ -10168,9 +10191,9 @@ function _euRender(users) {
                                 const expDate = t.expiry_date     ? new Date(t.expiry_date).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—';
                                 const dr = t.days_remaining;
                                 let badge;
-                                if (!t.is_active)                      badge = `<span style="background:rgba(107,114,128,.15);color:var(--text-3);padding:2px 8px;border-radius:10px">Inactive</span>`;
-                                else if (dr === null || dr === undefined) badge = `<span style="background:rgba(59,130,246,.12);color:#3b82f6;padding:2px 8px;border-radius:10px">No package</span>`;
-                                else if (dr < 0)                        badge = `<span style="background:rgba(239,68,68,.12);color:var(--danger);padding:2px 8px;border-radius:10px">Expired</span>`;
+                                if (!t.is_active)                      badge = `<span style="background:rgba(107,114,128,.15);color:var(--text-3);padding:2px 8px;border-radius:10px" data-i18n="text.inactive">Inactive</span>`;
+                                else if (dr === null || dr === undefined) badge = `<span style="background:rgba(59,130,246,.12);color:#3b82f6;padding:2px 8px;border-radius:10px" data-i18n="text.no_package">No package</span>`;
+                                else if (dr < 0)                        badge = `<span style="background:rgba(239,68,68,.12);color:var(--danger);padding:2px 8px;border-radius:10px" data-i18n="text.expired">Expired</span>`;
                                 else if (dr <= 30)                      badge = `<span style="background:rgba(245,158,11,.12);color:#f59e0b;padding:2px 8px;border-radius:10px">${dr}d left</span>`;
                                 else                                    badge = `<span style="background:color-mix(in srgb,var(--primary) 12%,transparent);color:var(--primary);padding:2px 8px;border-radius:10px">${dr}d left</span>`;
                                 return `<tr style="border-top:1px solid var(--border)">
@@ -10603,7 +10626,7 @@ function _lmRenderPOIs() {
             console.warn('[geofence] addTo failed for', gf?.name, e);
             return;
         }
-        const armedTxt = armed ? `<br><span style="color:#10B981;font-weight:600">Armed: ${gf.armed_count} tag${gf.armed_count>1?'s':''}</span>` : '<br><span style="color:var(--text-3)">Not armed</span>';
+        const armedTxt = armed ? `<br><span style="color:#10B981;font-weight:600">Armed: ${gf.armed_count} tag${gf.armed_count>1?'s':''}</span>` : '<br><span style="color:var(--text-3)" data-i18n="text.not_armed">Not armed</span>';
         try {
             layer.bindPopup(`<strong>${esc(gf.name||'Geofence')}</strong>${gf.address?'<br><small>'+esc(gf.address)+'</small>':''}${armedTxt}`);
         } catch (e) { /* non-fatal */ }
@@ -11174,7 +11197,7 @@ function renderLmCategoryFilters() {
     if (_lmCatFilter !== 'all' && !_categoriesCache.find(c => c.id === _lmCatFilter)) {
         _lmCatFilter = 'all';
     }
-    bar.innerHTML = `<button class="cat-btn ${_lmCatFilter === 'all' ? 'active' : ''}" onclick="lmFilterCat('all', this)">All</button>` +
+    bar.innerHTML = `<button class="cat-btn ${_lmCatFilter === 'all' ? 'active' : ''}" onclick="lmFilterCat('all', this)"><span data-i18n="buttons.all">All</span></button>` +
         _categoriesCache.map(c => {
             const icon  = c.icon  ? `<i class="fa-solid ${esc(c.icon)}"></i> ` : '';
             const color = c.color ? ` style="--cat-accent:${esc(c.color)}"` : '';
@@ -11324,13 +11347,13 @@ function _lmRenderDetail(t) {
             </button>
         </div>
         <div class="detail-grid">
-            <div class="detail-item"><label>Status</label><span style="color:${statusColors[status]}">${statusLabel[status]}</span></div>
-            <div class="detail-item"><label>Owner</label><span>${esc((t.owner_email||'').split('@')[0])}</span></div>
-            <div class="detail-item"><label>Package</label>${pkgHtml}</div>
-            <div class="detail-item"><label>Days Left</label><span>${daysLeft}</span></div>
-            <div class="detail-item"><label>Expiry</label><span style="color:${expiryColor}">${expiry}</span></div>
-            <div class="detail-item"><label>Last Seen</label><span>${lastSeen}</span></div>
-            <div class="detail-item detail-full"><label>Type</label><span>${tagTypeDisplay}</span></div>
+            <div class="detail-item"><label data-i18n="labels.status">Status</label><span style="color:${statusColors[status]}">${statusLabel[status]}</span></div>
+            <div class="detail-item"><label data-i18n="labels.owner">Owner</label><span>${esc((t.owner_email||'').split('@')[0])}</span></div>
+            <div class="detail-item"><label data-i18n="labels.package">Package</label>${pkgHtml}</div>
+            <div class="detail-item"><label data-i18n="labels.days_left">Days Left</label><span>${daysLeft}</span></div>
+            <div class="detail-item"><label data-i18n="labels.expiry">Expiry</label><span style="color:${expiryColor}">${expiry}</span></div>
+            <div class="detail-item"><label data-i18n="labels.last_seen">Last Seen</label><span>${lastSeen}</span></div>
+            <div class="detail-item detail-full"><label data-i18n="labels.type">Type</label><span>${tagTypeDisplay}</span></div>
         </div>
         ${(() => {
             const sensorHtml = _lmRenderSensorData(t);
@@ -11517,10 +11540,10 @@ function alRenderTable() {
             <td style="font-size:.78rem">${daysLeft}</td>
             <td>
                 <div class="row-actions">
-                    ${hasGPS ? `<button class="btn-icon-sm" title="View on map" onclick="switchTab('livemap');setTimeout(()=>lmSelectFromList('${esc(t.imei)}'),600)">
+                    ${hasGPS ? `<button class="btn-icon-sm" data-i18n-title="tooltips.view_on_map" title="View on map" onclick="switchTab('livemap');setTimeout(()=>lmSelectFromList('${esc(t.imei)}'),600)">
                         <i class="fa-solid fa-map-pin"></i>
                     </button>` : ''}
-                    <button class="btn-icon-sm" title="Movement History" onclick="lmOpenHistory('${esc(t.imei)}')">
+                    <button class="btn-icon-sm" data-i18n-title="tooltips.movement_history" title="Movement History" onclick="lmOpenHistory('${esc(t.imei)}')">
                         <i class="fa-solid fa-route"></i>
                     </button>
                 </div>
@@ -11998,12 +12021,12 @@ function amRenderCards() {
                 <span class="status-dot status-${status}" style="margin-left:auto" title="${statusLabel[status]}"></span>
             </div>
             <div class="asset-card-body">
-                <div class="card-kv"><span>IMEI</span><span class="mono small">${esc(t.imei)}</span></div>
-                <div class="card-kv"><span>Owner</span><span>${owner}</span></div>
-                <div class="card-kv"><span>Package</span>${pkgHtml}</div>
-                <div class="card-kv"><span>Battery</span>${batHtml}</div>
-                <div class="card-kv"><span>Last Seen</span><span>${lastSeen}</span></div>
-                <div class="card-kv"><span>Expires</span><span style="color:${daysColor}">${expiryDisplay}</span></div>
+                <div class="card-kv"><span data-i18n="text.imei">IMEI</span><span class="mono small">${esc(t.imei)}</span></div>
+                <div class="card-kv"><span data-i18n="text.owner">Owner</span><span>${owner}</span></div>
+                <div class="card-kv"><span data-i18n="text.package">Package</span>${pkgHtml}</div>
+                <div class="card-kv"><span data-i18n="text.battery">Battery</span>${batHtml}</div>
+                <div class="card-kv"><span data-i18n="text.last_seen">Last Seen</span><span>${lastSeen}</span></div>
+                <div class="card-kv"><span data-i18n="text.expires">Expires</span><span style="color:${daysColor}">${expiryDisplay}</span></div>
             </div>
             <div class="asset-card-footer">
                 <button class="btn btn-ghost btn-sm" onclick="openTagMgmtModal('edit','${esc(t.imei)}')">
@@ -12015,7 +12038,7 @@ function amRenderCards() {
                 <button class="btn btn-ghost btn-sm" onclick="lmOpenHistory('${esc(t.imei)}')">
                     <i class="fa-solid fa-route"></i> History
                 </button>
-                <button class="btn btn-ghost btn-sm btn-danger-ghost" onclick="deleteTag('${esc(t.id)}','${esc(t.imei)}')" title="Delete tag">
+                <button class="btn btn-ghost btn-sm btn-danger-ghost" onclick="deleteTag('${esc(t.id)}','${esc(t.imei)}')" data-i18n-title="tooltips.delete_tag" title="Delete tag">
                     <i class="fa-solid fa-trash"></i>
                 </button>
             </div>
@@ -12341,7 +12364,7 @@ async function hiveLoadList() {
     const grid = document.getElementById('hive-card-grid');
     grid.innerHTML = '<div class="hive-empty"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</div>';
     const r = await apiFetch('/api/portal/hive').catch(() => null);
-    if (!r || !r.ok) { grid.innerHTML = '<div class="hive-empty">Failed to load hives</div>'; return; }
+    if (!r || !r.ok) { grid.innerHTML = '<div class="hive-empty" data-i18n="text.failed_to_load_hives">Failed to load hives</div>'; return; }
     const hives = await r.json();
     _hiveAllCards = hives;
     hiveRenderCards(hives);
@@ -12395,11 +12418,11 @@ function hiveCardHTML(h) {
         <div class="hive-status-dot ${dotCls}"></div>
       </div>
       <div class="hive-card-body">
-        <div class="hive-card-row"><span class="hive-row-label">Hive ID</span><span class="hive-row-value hive-muted" style="font-family:monospace;font-size:11px">${hid.substring(0,8)}</span></div>
-        <div class="hive-card-row"><span class="hive-row-label">Diameter</span><span class="hive-row-value ${diamColor}">${diamText}</span></div>
-        <div class="hive-card-row"><span class="hive-row-label">Tags</span><span class="hive-row-value"><div class="hive-tag-pips">${pips}</div></span></div>
-        <div class="hive-card-row"><span class="hive-row-label">Outlier</span>${outlierText}</div>
-        <div class="hive-card-row" style="border-bottom:none"><span class="hive-row-label">Last Update</span><span class="hive-row-value">${lastUpdate}</span></div>
+        <div class="hive-card-row"><span class="hive-row-label" data-i18n="text.hive_id">Hive ID</span><span class="hive-row-value hive-muted" style="font-family:monospace;font-size:11px">${hid.substring(0,8)}</span></div>
+        <div class="hive-card-row"><span class="hive-row-label" data-i18n="text.diameter">Diameter</span><span class="hive-row-value ${diamColor}">${diamText}</span></div>
+        <div class="hive-card-row"><span class="hive-row-label" data-i18n="text.tags">Tags</span><span class="hive-row-value"><div class="hive-tag-pips">${pips}</div></span></div>
+        <div class="hive-card-row"><span class="hive-row-label" data-i18n="text.outlier">Outlier</span>${outlierText}</div>
+        <div class="hive-card-row" style="border-bottom:none"><span class="hive-row-label" data-i18n="text.last_update">Last Update</span><span class="hive-row-value">${lastUpdate}</span></div>
       </div>
       <div class="hive-expiry-block ${expiryUrgent?'hive-urgent':''}">
         <i class="fa-solid fa-hourglass-half"></i>
@@ -12425,10 +12448,10 @@ async function hiveOpenDetail(id) {
     document.getElementById('hive-timeline').innerHTML = '';
     try {
         const r = await apiFetch(`/api/portal/hive/${id}`);
-        if (!r.ok) { alert('Failed to load hive detail'); hiveShowScreen('list'); return; }
+        if (!r.ok) { tAlert('alerts.failed_to_load_hive_detail', 'Failed to load hive detail'); hiveShowScreen('list'); return; }
         const d = await r.json();
         hiveRenderDetail(d);
-    } catch(e) { alert('Network error'); hiveShowScreen('list'); }
+    } catch(e) { tAlert('alerts.network_error', 'Network error'); hiveShowScreen('list'); }
 }
 
 function hiveOpenDetailMap(id) {
@@ -12653,7 +12676,7 @@ function _hiveTimelineRender() {
     const el = document.getElementById('hive-timeline');
     if (!el) return;
     const total = _hiveTimelineEvents.length;
-    if (!total) { el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-3);font-size:12px">No events yet</div>'; return; }
+    if (!total) { el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-3);font-size:12px" data-i18n="text.no_events_yet">No events yet</div>'; return; }
     
     const shown = Math.min(_hiveTimelineShown, total);
     const toShow = _hiveTimelineEvents.slice(0, shown);
@@ -12861,14 +12884,14 @@ function hiveDrawMap(d) {
 // ── manual eval ───────────────────────────────────────────────────────────────
 async function hiveManualEval(id) {
     const r = await apiFetch(`/api/portal/hive/${id}/evaluate`, { method: 'POST' });
-    if (r.ok) { hiveLoadStats(); hiveLoadList(); } else { alert('Evaluation failed'); }
+    if (r.ok) { hiveLoadStats(); hiveLoadList(); } else { tAlert('alerts.evaluation_failed', 'Evaluation failed'); }
 }
 
 // ── archive / delete ──────────────────────────────────────────────────────────
 async function hiveArchive(id, name) {
     if (!confirm(`Archive hive "${name}"? Tags will be released for re-use.`)) return;
     const r = await apiFetch(`/api/portal/hive/${id}`, { method: 'DELETE' });
-    if (r.ok) { hiveLoadStats(); hiveLoadList(); } else { alert('Archive failed'); }
+    if (r.ok) { hiveLoadStats(); hiveLoadList(); } else { tAlert('alerts.archive_failed', 'Archive failed'); }
 }
 
 async function hiveArchiveCurrent() {
@@ -12877,16 +12900,16 @@ async function hiveArchiveCurrent() {
     if (!confirm(`Archive hive "${title}"? Tags will be released for re-use.`)) return;
     const r = await apiFetch(`/api/portal/hive/${_hiveCurrentId}`, { method: 'DELETE' });
     if (r.ok) { _hiveCurrentId = null; hiveShowScreen('list'); hiveLoadStats(); hiveLoadList(); }
-    else { alert('Archive failed'); }
+    else { tAlert('alerts.archive_failed', 'Archive failed'); }
 }
 
 // ── recreate ──────────────────────────────────────────────────────────────────
 async function hiveRecreate() {
     if (!_hiveCurrentId) return;
-    if (!confirm('Recreate this hive? A new 60-day clock will start with the same config and tags.')) return;
+    if (!tConfirm('confirm.recreate_this_hive_a_new_60day_clock_will_start_wi', 'Recreate this hive? A new 60-day clock will start with the same config and tags.')) return;
     const r = await apiFetch(`/api/portal/hive/${_hiveCurrentId}/recreate`, { method: 'POST' });
     if (r.ok) { const d = await r.json(); _hiveCurrentId = d.hive_id; hiveOpenDetail(d.hive_id); hiveLoadStats(); }
-    else { alert('Recreate failed'); }
+    else { tAlert('alerts.recreate_failed', 'Recreate failed'); }
 }
 
 // ── config modal ──────────────────────────────────────────────────────────────
@@ -12978,11 +13001,11 @@ function hiveRenderArchive(hives) {
             <div class="hive-status-dot hive-muted"></div>
           </div>
           <div class="hive-card-body">
-            <div class="hive-card-row"><span class="hive-row-label">Hive ID</span><span class="hive-row-value hive-muted" style="font-family:monospace;font-size:11px">${hid.substring(0,8)}</span></div>
-            <div class="hive-card-row"><span class="hive-row-label">Lifetime</span><span class="hive-row-value">${h.lifetime_days != null ? h.lifetime_days + ' days' : '—'}</span></div>
-            <div class="hive-card-row"><span class="hive-row-label">Total Alerts</span><span class="hive-row-value ${h.total_alerts > 0 ? 'hive-alert' : ''}">${h.total_alerts ?? '—'}</span></div>
-            <div class="hive-card-row"><span class="hive-row-label">Tags</span><span class="hive-row-value">${h.tag_count ?? '—'}</span></div>
-            <div class="hive-card-row" style="border-bottom:none"><span class="hive-row-label">Profile</span><span class="hive-row-value">${HIVE_PROFILE_LABELS[h.mobility_profile]||h.mobility_profile||'—'}</span></div>
+            <div class="hive-card-row"><span class="hive-row-label" data-i18n="text.hive_id">Hive ID</span><span class="hive-row-value hive-muted" style="font-family:monospace;font-size:11px">${hid.substring(0,8)}</span></div>
+            <div class="hive-card-row"><span class="hive-row-label" data-i18n="text.lifetime">Lifetime</span><span class="hive-row-value">${h.lifetime_days != null ? h.lifetime_days + ' days' : '—'}</span></div>
+            <div class="hive-card-row"><span class="hive-row-label" data-i18n="text.total_alerts">Total Alerts</span><span class="hive-row-value ${h.total_alerts > 0 ? 'hive-alert' : ''}">${h.total_alerts ?? '—'}</span></div>
+            <div class="hive-card-row"><span class="hive-row-label" data-i18n="text.tags">Tags</span><span class="hive-row-value">${h.tag_count ?? '—'}</span></div>
+            <div class="hive-card-row" style="border-bottom:none"><span class="hive-row-label" data-i18n="text.profile">Profile</span><span class="hive-row-value">${HIVE_PROFILE_LABELS[h.mobility_profile]||h.mobility_profile||'—'}</span></div>
           </div>
           <div class="hive-expiry-block ${urgent?'hive-urgent':''}">
             <i class="fa-solid fa-trash-can"></i>
@@ -13008,16 +13031,16 @@ function hiveFilterArchive(q) {
 }
 
 async function hiveArchiveRecreate(id) {
-    if (!confirm('Recreate this archived hive? A fresh 60-day clock will start.')) return;
+    if (!tConfirm('confirm.recreate_this_archived_hive_a_fresh_60day_clock_wi', 'Recreate this archived hive? A fresh 60-day clock will start.')) return;
     const r = await apiFetch(`/api/portal/hive/${id}/recreate`, { method: 'POST' });
     if (r.ok) { const d = await r.json(); hiveShowScreen('list'); hiveLoadStats(); hiveLoadList(); hiveOpenDetail(d.hive_id); }
-    else { alert('Recreate failed'); }
+    else { tAlert('alerts.recreate_failed', 'Recreate failed'); }
 }
 
 async function hivePurge(id, name) {
     if (!confirm(`Permanently purge hive "${name}"? All history will be deleted and cannot be recovered.`)) return;
     const r = await apiFetch(`/api/portal/hive/${id}/purge`, { method: 'DELETE' });
-    if (r.ok) { hiveLoadArchive(); } else { alert('Purge failed'); }
+    if (r.ok) { hiveLoadArchive(); } else { tAlert('alerts.purge_failed', 'Purge failed'); }
 }
 
 document.querySelector('[data-hscreen="archive"]')?.addEventListener('click', () => hiveLoadArchive());
@@ -13099,7 +13122,7 @@ function hiveWizRender() {
           <div class="hive-options">${WIZARD_PROFILES.map(p => {
             const sel   = hiveWizState.profile === p.id;
             const showBadge = sug && sug.suggested_profile === p.id && sug.confidence !== 'none';
-            const badge = showBadge ? '<span class="hive-badge">Suggested</span>' : '';
+            const badge = showBadge ? '<span class="hive-badge" data-i18n="text.suggested">Suggested</span>' : '';
             const note  = showBadge && sug.rationale ? ` <em>— ${sug.rationale}.</em>` : '';
             return `<div class="hive-option ${sel?'hive-selected':''}" onclick="hiveWizState.profile='${p.id}';hiveWizRender()">
               <div class="hive-option-radio"></div>
@@ -13153,9 +13176,9 @@ async function hiveWizNext() {
                 document.getElementById('hive-express-desc').textContent =
                     `Based on your recent hive setup, we suggest the following configuration. You can review and adjust, or use these defaults.`;
                 document.getElementById('hive-express-summary').innerHTML = `
-                  <div class="hive-express-item"><div class="hive-express-label">Mobility</div><div class="hive-express-value">${HIVE_PROFILE_LABELS[sug.suggested_profile]||sug.suggested_profile}</div></div>
-                  <div class="hive-express-item"><div class="hive-express-label">Threshold</div><div class="hive-express-value">${sug.suggested_threshold_m}m</div></div>
-                  <div class="hive-express-item"><div class="hive-express-label">Tags</div><div class="hive-express-value">${sug.tag_count} selected</div></div>`;
+                  <div class="hive-express-item"><div class="hive-express-label" data-i18n="text.mobility">Mobility</div><div class="hive-express-value">${HIVE_PROFILE_LABELS[sug.suggested_profile]||sug.suggested_profile}</div></div>
+                  <div class="hive-express-item"><div class="hive-express-label" data-i18n="text.threshold">Threshold</div><div class="hive-express-value">${sug.suggested_threshold_m}m</div></div>
+                  <div class="hive-express-item"><div class="hive-express-label" data-i18n="text.tags">Tags</div><div class="hive-express-value">${sug.tag_count} selected</div></div>`;
                 ec.style.display = '';
             }
             if (sug.suggested_threshold_m && !hiveWizState.threshold_m) {
@@ -13381,7 +13404,7 @@ function mhaOpenHelp() {
       if (buildingVal === 'new') {
         const name = document.getElementById('sketchBuildingName').value.trim();
         const address = document.getElementById('sketchBuildingAddress').value.trim();
-        if (!name) { alert('Please enter a building name'); return; }
+        if (!name) { tAlert('alerts.please_enter_a_building_name', 'Please enter a building name'); return; }
         const res = await apiFetch('/api/portal/buildings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -13396,8 +13419,8 @@ function mhaOpenHelp() {
       if (floorVal === 'new') {
         const floorName = document.getElementById('sketchFloorName').value.trim();
         const floorNumber = parseInt(document.getElementById('sketchFloorNumber').value, 10);
-        if (!floorName) { alert('Please enter a floor name'); return; }
-        if (isNaN(floorNumber)) { alert('Please enter a valid floor number'); return; }
+        if (!floorName) { tAlert('alerts.please_enter_a_floor_name', 'Please enter a floor name'); return; }
+        if (isNaN(floorNumber)) { tAlert('alerts.please_enter_a_valid_floor_number', 'Please enter a valid floor number'); return; }
         const res = await apiFetch(`/api/portal/buildings/${buildingId}/floors`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -13477,7 +13500,7 @@ function mhaOpenHelp() {
         } : null;
 
         if (!floorPlanData || !floorPlanData.elements.length) {
-          alert('No floor plan elements to publish. Draw something first!');
+          tAlert('alerts.no_floor_plan_elements_to_publish_draw_something_f', 'No floor plan elements to publish. Draw something first!');
           return;
         }
 
@@ -13525,7 +13548,7 @@ function mhaOpenHelp() {
         // Check if we have any registered gateways
         const registeredCount = gateways.filter(gw => gw.gateway_id).length;
         if (registeredCount === 0) {
-          alert('⚠️ No gateways registered!\n\nYou need to:\n1. Click on each gateway icon\n2. Enter its MAC address in Properties panel\n3. Then click Publish again');
+          tAlert('alerts.no_gateways_registerednnyou_need_ton1_click_on_eac', '⚠️ No gateways registered!\n\nYou need to:\n1. Click on each gateway icon\n2. Enter its MAC address in Properties panel\n3. Then click Publish again');
           publishBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg> Publish';
           return;
         }
@@ -13556,7 +13579,7 @@ function mhaOpenHelp() {
         console.log('[Floor Plan] Elements:', floorPlanData.elements.length);
         console.log('[Floor Plan] Gateways:', gateways.length);
         
-        alert('✅ Floor plan published successfully!\n\nGo to: Tracking → Floor Plan to view it live.');
+        tAlert('alerts.floor_plan_published_successfullynngo_to_tracking_', '✅ Floor plan published successfully!\n\nGo to: Tracking → Floor Plan to view it live.');
       } catch (err) {
         console.error('Publish error:', err);
         alert('Failed to publish floor plan: ' + err.message);
@@ -13615,24 +13638,24 @@ function mhaOpenHelp() {
         const name = gatewayName.value.trim();
         
         if (!mac) {
-          alert('Please enter a MAC address');
+          tAlert('alerts.please_enter_a_mac_address', 'Please enter a MAC address');
           return;
         }
         
         // Validate MAC format
         const macNormalized = mac.replace(/[:\-]/g, '').toLowerCase();
         if (!/^[0-9a-f]{12}$/i.test(macNormalized)) {
-          alert('Invalid MAC address format. Use format: A4:CF:12:45:AB:CD or A4CF1245ABCD');
+          tAlert('alerts.invalid_mac_address_format_use_format_a4cf1245abcd', 'Invalid MAC address format. Use format: A4:CF:12:45:AB:CD or A4CF1245ABCD');
           return;
         }
         
         if (!name) {
-          alert('Please enter a gateway name');
+          tAlert('alerts.please_enter_a_gateway_name', 'Please enter a gateway name');
           return;
         }
         
         if (!linkedFloorId) {
-          alert('Please setup the building and floor first (click Setup button)');
+          tAlert('alerts.please_setup_the_building_and_floor_first_click_se', 'Please setup the building and floor first (click Setup button)');
           return;
         }
         
@@ -13668,7 +13691,7 @@ function mhaOpenHelp() {
         const gatewayId = gatewaySelect.value;
         
         if (!gatewayId) {
-          alert('Please select a gateway');
+          tAlert('alerts.please_select_a_gateway', 'Please select a gateway');
           return;
         }
         
@@ -13942,19 +13965,19 @@ function mhaOpenHelp() {
 
         const mac = el.mac_address?.trim();
         if (!mac) {
-          alert('Please enter a MAC address first');
+          tAlert('alerts.please_enter_a_mac_address_first', 'Please enter a MAC address first');
           return;
         }
 
         // Validate MAC format
         const macNormalized = mac.replace(/[:\-]/g, '').toLowerCase();
         if (!/^[0-9a-f]{12}$/i.test(macNormalized)) {
-          alert('Invalid MAC address format. Use format: A4:CF:12:45:AB:CD or A4CF1245ABCD');
+          tAlert('alerts.invalid_mac_address_format_use_format_a4cf1245abcd', 'Invalid MAC address format. Use format: A4:CF:12:45:AB:CD or A4CF1245ABCD');
           return;
         }
 
         if (!linkedFloorId) {
-          alert('Please setup the building and floor first (click Setup button)');
+          tAlert('alerts.please_setup_the_building_and_floor_first_click_se', 'Please setup the building and floor first (click Setup button)');
           return;
         }
 
@@ -14862,7 +14885,7 @@ function mhaOpenHelp() {
           <div class="mha-step" onclick="mhaFocusPoint(event, ${startLat}, ${startLng}, 15)">
             <i class="dot sd" style="background:#22c55e;"></i>
             <div>
-              <span class="val">Start</span>
+              <span class="val" data-i18n="text.start">Start</span>
               <span class="lbl"> · ${startTime}${startAddr ? ' · ' + esc(startAddr) : ''}</span>
             </div>
           </div>`;
@@ -15528,7 +15551,7 @@ function mhaOpenHelp() {
         // Add popup
         const armedTxt = armed 
           ? `<br><span style="color:#10B981;font-weight:600">Armed: ${gf.armed_count} tag${gf.armed_count>1?'s':''}</span>` 
-          : '<br><span style="color:var(--text-3)">Not armed</span>';
+          : '<br><span style="color:var(--text-3)" data-i18n="text.not_armed">Not armed</span>';
         layer.bindPopup(`<strong>${esc(gf.name||'Geofence')}</strong>${gf.address?'<br><small>'+esc(gf.address)+'</small>':''}${armedTxt}`);
         
         // Add permanent label
@@ -15775,7 +15798,7 @@ function mhaOpenHelp() {
               <span class="mha-position-time">${time}</span>
               <span class="mha-position-addr">${esc(addr)}</span>
               ${linkHtml}
-              <button class="mha-plot-btn" onclick="mhaPlotPosition(${pos.latitude}, ${pos.longitude}, event)" title="Toggle on map">
+              <button class="mha-plot-btn" onclick="mhaPlotPosition(${pos.latitude}, ${pos.longitude}, event)" data-i18n-title="tooltips.toggle_on_map" title="Toggle on map">
                 <i class="fa-solid fa-location-dot"></i>
               </button>
             </div>`;
@@ -16129,22 +16152,22 @@ function mhaOpenHelp() {
         <div class="temp-graph-header">
             <div class="temp-graph-title">
                 <span class="icon-badge">●</span>
-                <span id="temp-graph-tag-name">Temperature Graph</span>
+                <span id="temp-graph-tag-name" data-i18n="text.temperature_graph">Temperature Graph</span>
             </div>
             <div class="temp-graph-meta" id="temp-graph-meta"></div>
             <div class="temp-graph-spacer"></div>
             <div style="display:flex; gap:5px;" id="temp-graph-presets"></div>
             <label class="temp-graph-smooth">
                 <input type="checkbox" id="temp-graph-smooth-toggle" checked>
-                <span>Smooth</span>
+                <span data-i18n="text.smooth">Smooth</span>
             </label>
             <button class="temp-graph-chip" id="temp-graph-batt-btn">
                 <span class="dot" style="background:var(--primary);"></span>
-                <span>Battery</span>
+                <span data-i18n="text.battery">Battery</span>
             </button>
             <button class="temp-graph-chip alt" id="temp-graph-alt-btn">
                 <span class="dot" style="background:var(--warning);"></span>
-                <span>Altitude</span>
+                <span data-i18n="text.altitude">Altitude</span>
             </button>
             <button class="temp-graph-close" onclick="closeTemperatureGraph()" aria-label="Close">
                 <i class="fa-solid fa-xmark"></i>
@@ -16158,25 +16181,25 @@ function mhaOpenHelp() {
         
         <div id="temp-graph-error" class="temp-graph-error" style="display:none">
             <i class="fa-solid fa-triangle-exclamation" style="font-size:32px;margin-right:12px"></i>
-            <span id="temp-graph-error-msg">Error loading data</span>
+            <span id="temp-graph-error-msg" data-i18n="text.error_loading_data">Error loading data</span>
         </div>
         
         <div class="temp-graph-main" id="temp-graph-main" style="display:none">
             <div class="temp-graph-stats" id="temp-graph-stats">
                 <div class="temp-graph-stat">
-                    <div class="l">Temperature</div>
+                    <div class="l" data-i18n="text.temperature">Temperature</div>
                     <div class="v" id="temp-stat-temp">—</div>
                 </div>
                 <div class="temp-graph-stat">
-                    <div class="l">Range</div>
+                    <div class="l" data-i18n="text.range">Range</div>
                     <div class="v" id="temp-stat-range" style="font-size:14px;">—</div>
                 </div>
                 <div class="temp-graph-stat">
-                    <div class="l">Reports</div>
+                    <div class="l" data-i18n="text.reports">Reports</div>
                     <div class="v" id="temp-stat-count">—</div>
                 </div>
                 <div class="temp-graph-stat">
-                    <div class="l">Coverage</div>
+                    <div class="l" data-i18n="text.coverage">Coverage</div>
                     <div class="v" id="temp-stat-coverage">—</div>
                 </div>
                 <button class="temp-graph-export" id="temp-graph-export">
@@ -16186,7 +16209,7 @@ function mhaOpenHelp() {
                         <path d="M8 7.7v4"/>
                         <path d="M6.4 10.1 8 11.7l1.6-1.6"/>
                     </svg>
-                    <span>Export PDF</span>
+                    <span data-i18n="text.export_pdf">Export PDF</span>
                 </button>
             </div>
             <div class="temp-graph-charts">
@@ -16199,13 +16222,13 @@ function mhaOpenHelp() {
                     </div>
                     <div class="temp-graph-ov-bar">
                         <span class="temp-graph-ov-hint">Drag the window to pan, drag its edges to zoom</span>
-                        <button class="temp-graph-reset" id="temp-graph-reset">Reset zoom</button>
+                        <button class="temp-graph-reset" id="temp-graph-reset"><span data-i18n="buttons.reset_zoom">Reset zoom</span></button>
                     </div>
                 </div>
                 <div class="temp-graph-footer">
                     <span class="temp-graph-legend">
                         <span class="d" style="background:var(--success);"></span>
-                        <span>Temperature</span>
+                        <span data-i18n="text.temperature">Temperature</span>
                     </span>
                     <span class="temp-graph-legend" id="temp-graph-batt-legend" style="display:none;">
                         <span class="d" style="background:var(--primary);"></span>
@@ -16213,11 +16236,11 @@ function mhaOpenHelp() {
                     </span>
                     <span class="temp-graph-legend" id="temp-graph-alt-legend" style="display:none;">
                         <span class="d" style="background:var(--warning);"></span>
-                        <span>Altitude m</span>
+                        <span data-i18n="text.altitude_m">Altitude m</span>
                     </span>
                     <span class="temp-graph-legend gap-legend" id="temp-graph-gap-legend">
                         <span class="sw"></span>
-                        <span>No reports</span>
+                        <span data-i18n="text.no_reports">No reports</span>
                     </span>
                     <span class="temp-graph-gap-note" id="temp-graph-gap-note"></span>
                 </div>
