@@ -4986,7 +4986,7 @@ async function safeJsonDetail(res, fallback) {
 // ══════════════════════════════════════════
 // ── CAPTCHA helpers ────────────────────────────────────────────
 let _captchaAnswer = null;
-function _generateCaptcha() {
+window._generateCaptcha = function() {
     const a = Math.floor(Math.random() * 9) + 1;
     const b = Math.floor(Math.random() * 9) + 1;
     _captchaAnswer = a + b;
@@ -5000,7 +5000,8 @@ function _generateCaptcha() {
     }
     const inp = document.getElementById('loginCaptcha');
     if (inp) inp.value = '';
-}
+};
+const _generateCaptcha = window._generateCaptcha;
 
 // ══════════════════════════════════════════
 // Forgot / Reset password
@@ -10511,8 +10512,19 @@ async function sysAdminResetPassword(userId, userEmail, userName) {
         }
     }
     // Generate captcha on every page load
-    _generateCaptcha();
+    if (typeof window._generateCaptcha === 'function') {
+        window._generateCaptcha();
+    } else {
+        console.error('CAPTCHA function not loaded!');
+    }
 })();
+
+// Also call CAPTCHA generation when DOM is fully ready (backup)
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof window._generateCaptcha === 'function' && document.getElementById('captchaQuestion')) {
+        window._generateCaptcha();
+    }
+});
 
 // ══════════════════════════════════════════
 // LIVE MAP  (GPS tags + Leaflet map)
