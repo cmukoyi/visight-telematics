@@ -4985,23 +4985,31 @@ async function safeJsonDetail(res, fallback) {
 // Login / Logout
 // ══════════════════════════════════════════
 // ── CAPTCHA helpers ────────────────────────────────────────────
+console.log('[CAPTCHA] Script loading - defining function');
 let _captchaAnswer = null;
 window._generateCaptcha = function() {
+    console.log('[CAPTCHA] Function called!');
     const a = Math.floor(Math.random() * 9) + 1;
     const b = Math.floor(Math.random() * 9) + 1;
     _captchaAnswer = a + b;
+    console.log('[CAPTCHA] Generated question:', a, '+', b, '=', _captchaAnswer);
     const el = document.getElementById('captchaQuestion');
+    console.log('[CAPTCHA] Element found:', !!el);
     if (el) {
         el.textContent = `${a} + ${b} = ?`;
+        console.log('[CAPTCHA] Set textContent:', el.textContent);
         // Use theme-aware CSS variable for color (works in both dark and light modes)
         el.style.fontWeight = '600';
         el.style.fontSize = '14px';
         // Don't set color inline - let it inherit from label (var(--text-3)) or add as CSS class
+    } else {
+        console.error('[CAPTCHA] Element captchaQuestion not found!');
     }
     const inp = document.getElementById('loginCaptcha');
     if (inp) inp.value = '';
 };
 const _generateCaptcha = window._generateCaptcha;
+console.log('[CAPTCHA] Function defined, accessible as window._generateCaptcha:', typeof window._generateCaptcha);
 
 // ══════════════════════════════════════════
 // Forgot / Reset password
@@ -10512,17 +10520,24 @@ async function sysAdminResetPassword(userId, userEmail, userName) {
         }
     }
     // Generate captcha on every page load
+    console.log('[CAPTCHA] Init IIFE - checking function:', typeof window._generateCaptcha);
     if (typeof window._generateCaptcha === 'function') {
+        console.log('[CAPTCHA] Calling from IIFE...');
         window._generateCaptcha();
     } else {
-        console.error('CAPTCHA function not loaded!');
+        console.error('[CAPTCHA] Function not loaded in IIFE!');
     }
 })();
 
 // Also call CAPTCHA generation when DOM is fully ready (backup)
+console.log('[CAPTCHA] Adding DOMContentLoaded listener');
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('[CAPTCHA] DOMContentLoaded fired, checking...', typeof window._generateCaptcha, !!document.getElementById('captchaQuestion'));
     if (typeof window._generateCaptcha === 'function' && document.getElementById('captchaQuestion')) {
+        console.log('[CAPTCHA] Calling from DOMContentLoaded...');
         window._generateCaptcha();
+    } else {
+        console.error('[CAPTCHA] Cannot call from DOMContentLoaded - function:', typeof window._generateCaptcha, 'element:', !!document.getElementById('captchaQuestion'));
     }
 });
 
