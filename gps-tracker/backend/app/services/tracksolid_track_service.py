@@ -104,7 +104,11 @@ async def _get_qualifying_devices(db: Session) -> List[DeviceState]:
                 DeviceState.last_tracklist_pull_at == None,  # First pull
                 func.extract('epoch', now - DeviceState.last_tracklist_pull_at) 
                     >= func.coalesce(DeviceState.coalesce_floor_minutes, global_coalesce) * 60
-            )
+            ),
+            
+            # Filter: Exclude Hubble devices (UUID-format IMEIs contain hyphens)
+            # TrackSolid API only accepts numeric IMEIs, not UUIDs
+            ~DeviceState.device_imei.like('%-%')
         )
     )
     

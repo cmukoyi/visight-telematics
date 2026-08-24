@@ -80,7 +80,7 @@ from math import radians, cos, sin, asin, sqrt
 from statistics import median
 from uuid import uuid4
 
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_, or_, delete, func
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
@@ -91,12 +91,19 @@ from app.models import (
     Leg,
     Journey,
     TripConfig,
+    BLETag,
 )
 
 logger = logging.getLogger(__name__)
 
 # ── Engine Version (v2.2.0 - Fix Register) ────────────────────────────────
-ENGINE_VERSION = "2.1.16"  # v2.1.16: D1 state rebuild for late arrivals (incremental path)
+ENGINE_VERSION = "2.1.22"  # v2.1.22: Displacement-aware gap handling for webhook devices (Minew)
+
+# ── Verbose Debug Logging for Specific Devices ────────────────────────────
+VERBOSE_DEBUG_DEVICES = set()  # Disabled - bug found: journey-breaking stationaries didn't open new journey
+
+# ── Late-Arrival Rewind Floor ─────────────────────────────────────────────
+MAX_LIVE_REWIND_HOURS = 48  # v2.1.19 D1-FIX: Cap how far back a live rewind may go
 
 # ── Configuration (defaults from spec validation) ─────────────────────────
 DEFAULT_ANCHOR_RADIUS_M = 100
@@ -120,6 +127,79 @@ DEFAULT_DEDUPE_WINDOW_S = 60  # R5: Deduplication time window
 
 # v2.1.6 B3: Air leg gate parameters
 DEFAULT_AIR_MIN_GAP_MIN = 60  # B3: Minimum gap in minutes for air leg classification
+
+# ═══════════════════════════════════════════════════════════════════════════
+# WEBHOOK DEVICE PROFILE (Minew E9/MST03/MTB02)
+# ═══════════════════════════════════════════════════════════════════════════
+# v2.1.22: Minew/Hubble webhook devices have different characteristics:
+# - GPS-grade accuracy (5-9m median) → keep anchor_radius_m = 100m
+# - Bursty reporting (2-6s bursts, gaps of minutes to hours) → displacement-aware gaps
+# - Large legitimate gaps during transit (201-min Channel crossing) → bridge by displacement
+# - No TrackSolid backfill → positions arrive in real-time via webhook
+
+WEBHOOK_PROFILE = {
+    # Geometry (UNCHANGED from Jimi - positions are GPS-grade accurate)
+    "anchor_radius_m": 100,
+    "min_leg_distance_m": 300,
+    "move_confirm_m": 150,
+    
+    # Speed gates (UNCHANGED)
+    "max_speed_kmh": 200,
+    "air_speed_kmh": 300,
+    "air_min_distance_km": 150,
+    
+    # Gap handling (DISPLACEMENT-BASED, not time-based)
+    "gap_bridge_min_disp_m": 300,  # Bridge if displacement >= 300m (== min_leg_distance)
+    "speed_gate_kmh": 200,  # Don't bridge if implied speed > 200 km/h (teleport protection)
+    
+    # Stationary detection (QUALITY FLOOR to prevent 1-point spam)
+    "stationary_min_dwell_s": 60,  # Must dwell >= 60s
+    "stationary_min_points": 2,  # Must have >= 2 points
+    
+    # Journey breaks (DISPLACEMENT-BASED, not time-based)
+    # A stationary only breaks a journey if it shows ZERO meaningful displacement
+    # (i.e. device stayed in place across the gap)
+    "journey_break_enabled": False,  # Disable time-based journey breaks for webhook devices
+    
+    # Other (same as Jimi)
+    "settle_min_dwell_min": 3,
+    "smoothing_window": 3,
+}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# DEVICE TYPE DETECTION
+# ═══════════════════════════════════════════════════════════════════════════
+
+def is_webhook_device(db: Session, device_imei: str) -> bool:
+    """
+    Detect if device is a webhook/Minew device (vs Jimi PB708 polled device).
+    
+    Webhook devices (Minew E9/MST03/MTB02):
+    - Identified by UUID (not IMEI)
+    - tag_type = 'hubble' or 'series_5'
+    - Fed by real-time webhook push (not polled/buffered)
+    - Characteristics: GPS-grade accuracy, bursty reporting, large legitimate gaps
+    
+    Args:
+        db: Database session
+        device_imei: Device identifier (UUID for webhook, IMEI for Jimi)
+    
+    Returns:
+        True if webhook device, False if Jimi/TrackSolid device
+    """
+    try:
+        device = db.execute(
+            select(BLETag).where(BLETag.imei == device_imei)
+        ).scalar_one_or_none()
+        
+        if device and device.tag_type in ('hubble', 'series_5'):
+            return True
+        
+        return False
+    except Exception as exc:
+        logger.warning(f"Failed to detect device type for {device_imei}: {exc}")
+        return False  # Default to Jimi behavior if detection fails
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -370,6 +450,7 @@ class EngineContext:
     # Last processed
     last_processed_at: Optional[datetime] = None  # Still used for reporting
     last_received_at: Optional[datetime] = None  # v2.1.11 D1: Checkpoint on arrival time
+    last_reconciled_received_at: Optional[datetime] = None  # v2.1.19 D1-FIX: Ingestion-time high-water mark
     last_position_lat: Optional[float] = None
     last_position_lng: Optional[float] = None
     last_position_time: Optional[datetime] = None
@@ -377,6 +458,7 @@ class EngineContext:
     
     # Current journey context
     current_journey_id: Optional[str] = None
+    current_leg: Optional[str] = None  # Track open leg ID (UUID string)
     last_stationary_ended_at: Optional[datetime] = None
     last_stationary_flush: Optional[datetime] = None  # v2.2 R4c: Track last flush time
     journey_just_created: bool = False  # Flag for tracking new journey creation
@@ -413,8 +495,43 @@ class TripEngine:
     def __init__(self, db: Session, device_imei: str):
         self.db = db
         self.device_imei = device_imei
-        self.config = _load_config(db)
+        
+        # v2.1.22: Detect device type and apply appropriate configuration
+        self.is_webhook = is_webhook_device(db, device_imei)
+        
+        if self.is_webhook:
+            # Webhook device (Minew E9/MST03/MTB02) - use displacement-aware profile
+            logger.info(f"🔷 Device {device_imei[:8]} detected as WEBHOOK device (Minew) - using displacement-aware profile")
+            self.config = self._create_webhook_config()
+        else:
+            # Jimi PB708 or other polled device - use existing time-based profile
+            logger.debug(f"📡 Device {device_imei[:8]} detected as POLLED device (Jimi) - using time-based profile")
+            self.config = _load_config(db)
+        
         self.context: Optional[EngineContext] = None
+    
+    def _create_webhook_config(self) -> EngineConfig:
+        """
+        Create configuration for webhook devices (Minew E9/MST03/MTB02).
+        
+        These devices have GPS-grade accuracy but bursty reporting with large
+        legitimate gaps during transit (e.g., 201-min Channel crossing).
+        
+        Returns:
+            EngineConfig with webhook-specific parameters
+        """
+        return EngineConfig(
+            anchor_radius_m=WEBHOOK_PROFILE["anchor_radius_m"],
+            min_leg_distance_m=WEBHOOK_PROFILE["min_leg_distance_m"],
+            move_confirm_m=WEBHOOK_PROFILE["move_confirm_m"],
+            max_speed_kmh=WEBHOOK_PROFILE["max_speed_kmh"],
+            gap_timeout_min=999999,  # Effectively disabled - use displacement instead
+            air_speed_kmh=WEBHOOK_PROFILE["air_speed_kmh"],
+            air_min_distance_km=WEBHOOK_PROFILE["air_min_distance_km"],
+            journey_break_dwell_min=999999,  # Effectively disabled for webhook devices
+            settle_min_dwell_min=WEBHOOK_PROFILE["settle_min_dwell_min"],
+            smoothing_window=WEBHOOK_PROFILE["smoothing_window"],
+        )
     
     def _load_state(self) -> EngineContext:
         """Load engine state from database or create new."""
@@ -433,6 +550,8 @@ class TripEngine:
                 anchor_points=[],  # Reconstructed from anchor
                 leg_buffer=[],  # Reconstructed from open leg if needed
                 last_processed_at=state_row.last_processed_at,
+                last_received_at=state_row.last_received_at,
+                last_reconciled_received_at=state_row.last_reconciled_received_at,
                 current_journey_id=state_row.current_journey_id,
             )
             
@@ -482,6 +601,7 @@ class TripEngine:
             current_journey_id=context.current_journey_id,
             last_processed_at=context.last_processed_at,
             last_received_at=context.last_received_at,  # v2.1.11 D1: Arrival checkpoint
+            last_reconciled_received_at=context.last_reconciled_received_at,  # v2.1.19 D1-FIX: Reconciliation checkpoint
             updated_at=datetime.now(timezone.utc),
         ).on_conflict_do_update(
             index_elements=['device_imei'],
@@ -493,11 +613,35 @@ class TripEngine:
                 'current_journey_id': context.current_journey_id,
                 'last_processed_at': context.last_processed_at,
                 'last_received_at': context.last_received_at,  # v2.1.11 D1: Arrival checkpoint
+                'last_reconciled_received_at': context.last_reconciled_received_at,  # v2.1.19 D1-FIX
                 'updated_at': datetime.now(timezone.utc),
             }
         )
         self.db.execute(stmt)
-        self.db.commit()
+        
+        # Verbose logging for specific devices
+        if context.device_imei in VERBOSE_DEBUG_DEVICES:
+            logger.info(
+                f"🔍 VERBOSE {context.device_imei}: About to COMMIT engine_state - "
+                f"last_processed_at={context.last_processed_at}, "
+                f"last_received_at={context.last_received_at}, "
+                f"current_journey_id={context.current_journey_id}"
+            )
+        
+        try:
+            self.db.commit()
+            
+            # Verbose logging for specific devices
+            if context.device_imei in VERBOSE_DEBUG_DEVICES:
+                logger.info(
+                    f"🔍 VERBOSE {context.device_imei}: COMMIT succeeded"
+                )
+        except Exception as exc:
+            if context.device_imei in VERBOSE_DEBUG_DEVICES:
+                logger.error(
+                    f"🔍 VERBOSE {context.device_imei}: COMMIT FAILED - Error: {exc}"
+                )
+            raise
     
     def _ensure_journey_open(self, timestamp: datetime) -> str:
         """
@@ -944,8 +1088,30 @@ class TripEngine:
         centroid_lat, centroid_lng = calculate_centroid([(p[0], p[1]) for p in points])
         started_at = points[0][2]
         ended_at = points[-1][2]
+        
+        # Verbose logging for specific devices
+        if self.device_imei in VERBOSE_DEBUG_DEVICES:
+            logger.info(
+                f"🔍 VERBOSE {self.device_imei}: _create_stationary() called - "
+                f"started={started_at}, ended={ended_at}, points={len(points)}, reason={reason}, "
+                f"current_journey={self.context.current_journey_id}"
+            )
         duration_seconds = (ended_at - started_at).total_seconds()
         point_count = len(points)
+        
+        # v2.1.22: Webhook device quality floor (min-dwell + min-points)
+        # Prevents 1-point, zero-duration stationary spam from bursty reporting
+        if self.is_webhook:
+            min_dwell_s = WEBHOOK_PROFILE["stationary_min_dwell_s"]
+            min_points = WEBHOOK_PROFILE["stationary_min_points"]
+            
+            if duration_seconds < min_dwell_s or point_count < min_points:
+                logger.debug(
+                    "⏭️  IMEI %s (webhook): Stationary below quality floor (%.0f s < %d s OR %d points < %d) - discarding",
+                    self.device_imei, duration_seconds, min_dwell_s, point_count, min_points
+                )
+                # Don't persist - fold these points into adjacent leg/anchor
+                return None
         
         # Get start/end position IDs (if available)
         start_position_id = points[0][3] if len(points) > 0 and points[0][3] else None
@@ -956,9 +1122,11 @@ class TripEngine:
         # Skip journey-breaking logic if:
         # - called from journey_close (prevents recursive close)
         # - called from R4c flush (duration not final yet)
+        # - v2.1.22: webhook device (displacement-aware, no time-based journey breaks)
         is_flush_operation = (reason == "heartbeat_flush")
         breaks_journey = (
-            duration_seconds > (self.config.journey_break_dwell_min * 60) 
+            not self.is_webhook  # v2.1.22: Disable time-based journey breaks for webhook devices
+            and duration_seconds > (self.config.journey_break_dwell_min * 60) 
             and reason != "journey_close"
             and not is_flush_operation  # B4: Don't evaluate breaks for open stationaries
         )
@@ -1105,6 +1273,14 @@ class TripEngine:
         # v2.1.6 B1: Overlap guard - reject if overlaps existing stationary
         # Route through merge check first - if it qualifies for merge, that's handled above
         # This check catches cases where overlap exists but merge criteria not met
+        
+        # Verbose logging for specific devices
+        if self.device_imei in VERBOSE_DEBUG_DEVICES:
+            logger.info(
+                f"🔍 VERBOSE {self.device_imei}: Checking for overlaps - "
+                f"started={started_at}, ended={ended_at}"
+            )
+        
         overlap_check = self.db.execute(
             select(Stationary).where(
                 and_(
@@ -1124,6 +1300,14 @@ class TripEngine:
                 "🚨 IMEI %s: Overlap violation! Stationary %s → %s overlaps existing %s → %s",
                 self.device_imei, started_at, ended_at, overlap_check.started_at, overlap_check.ended_at
             )
+            
+            # Verbose logging for specific devices
+            if self.device_imei in VERBOSE_DEBUG_DEVICES:
+                logger.error(
+                    f"🔍 VERBOSE {self.device_imei}: OVERLAP DETECTED - "
+                    f"Rejecting stationary due to overlap with {overlap_check.id}"
+                )
+            
             # Log and discard per spec - never insert overlapping rows
             return None
         
@@ -1132,6 +1316,14 @@ class TripEngine:
         from sqlalchemy.dialects.postgresql import insert as pg_insert
         
         stationary_id = uuid4()
+        
+        # Verbose logging for specific devices
+        if self.device_imei in VERBOSE_DEBUG_DEVICES:
+            logger.info(
+                f"🔍 VERBOSE {self.device_imei}: About to INSERT stationary - "
+                f"id={stationary_id}, started={started_at}, ended={ended_at}, "
+                f"journey_id={self.context.current_journey_id}, breaks_journey={breaks_journey}"
+            )
         
         stmt = pg_insert(Stationary).values(
             id=stationary_id,
@@ -1160,8 +1352,23 @@ class TripEngine:
             }
         ).returning(Stationary.id)
         
-        result = self.db.execute(stmt)
-        returned_id = result.scalar_one()
+        try:
+            result = self.db.execute(stmt)
+            returned_id = result.scalar_one()
+            
+            # Verbose logging for specific devices
+            if self.device_imei in VERBOSE_DEBUG_DEVICES:
+                logger.info(
+                    f"🔍 VERBOSE {self.device_imei}: Stationary INSERT succeeded - "
+                    f"returned_id={returned_id}"
+                )
+        except Exception as exc:
+            if self.device_imei in VERBOSE_DEBUG_DEVICES:
+                logger.error(
+                    f"🔍 VERBOSE {self.device_imei}: Stationary INSERT FAILED - "
+                    f"Error: {exc}"
+                )
+            raise
         
         # Fetch the stationary object
         stationary = self.db.query(Stationary).filter(Stationary.id == returned_id).one()
@@ -1231,6 +1438,16 @@ class TripEngine:
                 "🔓 IMEI %s: Detached crossing stationary %s (journey_id = NULL)",
                 self.device_imei, stationary.id
             )
+        
+        # v2.1.21: Open new journey after journey-breaking stationary
+        # The journey-breaking stationary closes the previous journey but must start a new one
+        # Otherwise all subsequent stationaries/legs become orphans
+        if breaks_journey:
+            logger.info(
+                "🆕 IMEI %s: Opening new journey after journey break at %s",
+                self.device_imei, ended_at.isoformat()
+            )
+            self._ensure_journey_open(ended_at)
         
         # Update journey context
         self.context.last_stationary_ended_at = ended_at
@@ -1539,8 +1756,15 @@ class TripEngine:
         """
         Reset engine state to a rebuild point for late-arrival reprocessing.
         
-        Finds the last confirmed stationary before rebuild_from and restores
-        state to that point. Positions from rebuild_from onward will be reprocessed.
+        Implements idempotent D1 rebuild: DELETE-then-INSERT approach.
+        
+        1. Finds the last confirmed stationary before rebuild_from (anchor)
+        2. DELETES all journeys/legs/stationaries from anchor forward
+        3. Restores in-memory state to anchor point
+        4. Positions from rebuild_from onward will be reprocessed and inserted fresh
+        
+        This prevents UniqueViolation on (device_imei, started_at) while maintaining
+        correct trip history when late arrivals change journey boundaries.
         
         Args:
             rebuild_from: Timestamp to rebuild from
@@ -1550,7 +1774,7 @@ class TripEngine:
             rebuild_from.isoformat()
         )
         
-        # Find last confirmed stationary before rebuild point
+        # Find last confirmed stationary before rebuild point (this becomes our anchor)
         anchor_query = select(Stationary).where(
             and_(
                 Stationary.device_imei == self.device_imei,
@@ -1559,6 +1783,78 @@ class TripEngine:
         ).order_by(Stationary.started_at.desc()).limit(1)
         
         anchor_stat = self.db.execute(anchor_query).scalar_one_or_none()
+        
+        # Determine deletion boundary: delete everything AFTER anchor (not including anchor)
+        # If no anchor exists, delete everything for this device
+        delete_from = anchor_stat.started_at if anchor_stat else None
+        
+        # DELETE PHASE: Remove stale trip artifacts from deletion boundary forward
+        # This makes the rebuild idempotent - no duplicate key violations possible
+        # CRITICAL: Use > (not >=) to preserve the anchor stationary and its journey
+        if delete_from:
+            logger.info(
+                "🗑️  D1: Deleting trips AFTER %s (preserving anchor)",
+                delete_from.isoformat()
+            )
+            delete_filter = and_(
+                Stationary.device_imei == self.device_imei,
+                Stationary.started_at > delete_from  # FIXED: > not >= (preserve anchor)
+            )
+        else:
+            logger.info("🗑️  D1: Deleting ALL trips (no anchor found)")
+            delete_filter = Stationary.device_imei == self.device_imei
+        
+        # Delete in correct order: children first, or rely on CASCADE
+        # Count before deletion for logging
+        stat_count = self.db.execute(
+            select(func.count()).select_from(Stationary).where(delete_filter)
+        ).scalar()
+        leg_count = self.db.execute(
+            select(func.count()).select_from(Leg).where(
+                and_(
+                    Leg.device_imei == self.device_imei,
+                    Leg.started_at > delete_from  # FIXED: > not >= (preserve anchor's journey legs)
+                ) if delete_from else Leg.device_imei == self.device_imei
+            )
+        ).scalar()
+        journey_count = self.db.execute(
+            select(func.count()).select_from(Journey).where(
+                and_(
+                    Journey.device_imei == self.device_imei,
+                    Journey.started_at > delete_from  # FIXED: > not >= (preserve anchor's journey)
+                ) if delete_from else Journey.device_imei == self.device_imei
+            )
+        ).scalar()
+        
+        # Execute deletions (assuming foreign keys have ON DELETE CASCADE)
+        self.db.execute(
+            delete(Stationary).where(delete_filter)
+        )
+        self.db.execute(
+            delete(Leg).where(
+                and_(
+                    Leg.device_imei == self.device_imei,
+                    Leg.started_at > delete_from  # FIXED: > not >= (preserve anchor's journey legs)
+                ) if delete_from else Leg.device_imei == self.device_imei
+            )
+        )
+        self.db.execute(
+            delete(Journey).where(
+                and_(
+                    Journey.device_imei == self.device_imei,
+                    Journey.started_at > delete_from  # FIXED: > not >= (preserve anchor's journey)
+                ) if delete_from else Journey.device_imei == self.device_imei
+            )
+        )
+        
+        self.db.flush()  # Ensure deletions complete before reprocessing
+        
+        logger.info(
+            "✅ D1: Deleted %d journeys, %d legs, %d stationaries",
+            journey_count, leg_count, stat_count
+        )
+        
+        # STATE RESET PHASE: Restore in-memory state to anchor point
         
         if anchor_stat:
             # Reset to STATIONARY state at anchor
@@ -1575,6 +1871,9 @@ class TripEngine:
             self.context.leg_buffer = []
             self.context.stop_candidate_since = None
             self.context.stop_candidate_points = []
+            
+            # v2.1.17 D1: Clear re-entrancy flag after state reset
+            self.context.leg_persisted_this_invocation = False
             
             logger.info(
                 "🔄 D1: State reset to anchor stationary at (%.4f, %.4f) ending %s",
@@ -1595,6 +1894,9 @@ class TripEngine:
             self.context.stop_candidate_since = None
             self.context.stop_candidate_points = []
             
+            # v2.1.17 D1: Clear re-entrancy flag after state reset
+            self.context.leg_persisted_this_invocation = False
+            
             logger.info("🔄 D1: State reset to initial (no anchor found before rebuild point)")
     
     def process_positions(self, limit: Optional[int] = None) -> Dict:
@@ -1611,14 +1913,11 @@ class TripEngine:
         self.context = self._load_state()
         
         # FIX 2a: Invalid-state self-correct (recovers already-wedged devices)
-        # A device in MOVE with no leg, or with a current_journey that's ended, is invalid
+        # Check if current_journey is ended (invalid state)
         invalid_state = False
         invalid_reason = None
         
-        if self.context.current_state == "MOVE" and not self.context.current_leg:
-            invalid_state = True
-            invalid_reason = "MOVE with no current_leg"
-        elif self.context.current_journey_id:
+        if self.context.current_journey_id:
             # Check if current journey is ended in the database
             journey = self.db.execute(
                 select(Journey).where(Journey.id == self.context.current_journey_id)
@@ -1685,20 +1984,34 @@ class TripEngine:
             logger.info("✅ IMEI %s: All positions were duplicates", self.device_imei)
             return stats
         
-        # v2.1.16 D1: State rebuild for late-arriving positions
-        # If any position has observed_at < last_processed_at, rebuild state from that point
+        # v2.1.19 D1-FIX: Late-arrival detection with reconciliation watermark + rewind floor
+        # Only check NEW ingestions (received_at > last_reconciled_received_at) to prevent rewind loop
         rebuild_from = None
-        if self.context.last_processed_at:
-            min_observed = min(p.observed_at for p in positions)
-            if min_observed < self.context.last_processed_at:
+        if self.context.last_processed_at and self.context.last_reconciled_received_at:
+            # Find NEW late arrivals - only positions ingested since last reconciliation
+            new_late = [p for p in positions if p.observed_at < self.context.last_processed_at]
+            
+            if new_late:
+                min_observed = min(p.observed_at for p in new_late)
                 logger.warning(
-                    "⚠️  D1 late arrivals: min(observed_at)=%s < last_processed_at=%s",
+                    "⚠️  D1-FIX late arrivals: %d new late positions, min(observed_at)=%s < last_processed_at=%s",
+                    len(new_late),
                     min_observed.isoformat(),
                     self.context.last_processed_at.isoformat()
                 )
                 
-                # Find rebuild anchor point: earlier of (min observed_at, last stationary start)
+                # Apply rewind floor: cap how far back a live rewind may go
                 rebuild_from = min_observed
+                rewind_floor = datetime.now(timezone.utc) - timedelta(hours=MAX_LIVE_REWIND_HOURS)
+                
+                if rebuild_from < rewind_floor:
+                    logger.warning(
+                        "⚠️  D1-FIX rewind floor: late arrival older than %dh floor (%s < %s), capping to floor",
+                        MAX_LIVE_REWIND_HOURS,
+                        rebuild_from.isoformat(),
+                        rewind_floor.isoformat()
+                    )
+                    rebuild_from = rewind_floor
                 
                 # If we have a last stationary, use its start time if earlier
                 last_stat_query = select(Stationary).where(
@@ -1709,12 +2022,12 @@ class TripEngine:
                 if last_stat and last_stat.started_at < rebuild_from:
                     rebuild_from = last_stat.started_at
                     logger.info(
-                        "🔄 D1 rebuild anchor: last stationary start (%s)",
+                        "🔄 D1-FIX rebuild anchor: last stationary start (%s)",
                         rebuild_from.isoformat()
                     )
                 else:
                     logger.info(
-                        "🔄 D1 rebuild anchor: earliest late position (%s)",
+                        "🔄 D1-FIX rebuild anchor: floored late position (%s)",
                         rebuild_from.isoformat()
                     )
                 
@@ -1732,13 +2045,20 @@ class TripEngine:
                 positions = list(self.db.execute(rebuild_query).scalars().all())
                 
                 logger.warning(
-                    "⚠️  D1 state rebuild: reprocessing %d positions from %s",
+                    "⚠️  D1-FIX state rebuild: reprocessing %d positions from %s",
                     len(positions),
                     rebuild_from.isoformat()
                 )
                 
                 # Reset state to rebuild point
                 self._reset_state_to_rebuild_point(rebuild_from)
+        elif self.context.last_processed_at and not self.context.last_reconciled_received_at:
+            # First run after upgrade - detect late arrivals without reconciliation watermark
+            min_observed = min(p.observed_at for p in positions)
+            if min_observed < self.context.last_processed_at:
+                logger.warning(
+                    "⚠️  D1-FIX: First run after upgrade, initializing reconciliation watermark"
+                )
         
         # Apply median smoothing
         smoothed = median_smooth_positions(positions, self.config.smoothing_window)
@@ -1764,13 +2084,20 @@ class TripEngine:
             if result.get('journey_created'):
                 stats['journeys_created'] += 1
         
-        # v2.1.11 D1: Update received_at checkpoint (arrival time, not observation time)
-        # This allows late-arriving buffered positions to be captured
+        # v2.1.19 D1-FIX: Update BOTH watermarks - reconciliation always advances
+        # This breaks the rewind loop: late arrivals are detected exactly once
         if positions:
             self.context.last_received_at = max(p.received_at for p in positions)
+            # CRITICAL: Always advance reconciliation watermark, even after rebuild
+            # This marks old buffered points as "already seen" so they won't re-trigger
+            self.context.last_reconciled_received_at = max(
+                self.context.last_reconciled_received_at or datetime.min.replace(tzinfo=timezone.utc),
+                max(p.received_at for p in positions)
+            )
             logger.debug(
-                "📌 D1 checkpoint: received_at=%s (last observed_at=%s)",
+                "📌 D1-FIX checkpoint: received_at=%s, reconciled_at=%s (last observed_at=%s)",
                 self.context.last_received_at.isoformat(),
+                self.context.last_reconciled_received_at.isoformat(),
                 self.context.last_processed_at.isoformat()
             )
         
@@ -1919,8 +2246,107 @@ class TripEngine:
                 # Let it fall through to be processed as spatial gap
 
         
-        # Step 2: Gap timeout check
-        if self.context.current_state == "MOVE" and time_diff_seconds > self.config.gap_timeout_min * 60:
+        # Step 2: Gap handling (device-type-specific)
+        # v2.1.22: Webhook devices use DISPLACEMENT-aware gap logic
+        #          Jimi devices use TIME-based gap timeout (30 min)
+        
+        if self.is_webhook and self.context.current_state == "MOVE":
+            # WEBHOOK DEVICE: Displacement-aware gap handling
+            # Decision: Bridge vs Break based on DISPLACEMENT across the gap (not time)
+            # 
+            # Rationale: Minew devices have large gaps during normal transit (ferry,
+            # tunnel, sparse coverage). A 201-minute gap with 76km displacement is a
+            # Channel crossing (vehicle moving), NOT a stop.
+            #
+            # Rules:
+            # - Bridge if displacement >= 300m AND speed <= 200 km/h (continue journey)
+            # - Break if displacement < 300m (device stayed in place → genuine stop)
+            
+            gap_displacement_m = distance_m
+            gap_speed_kmh = implied_speed_kmh
+            
+            # Apply displacement-aware decision
+            if gap_displacement_m < WEBHOOK_PROFILE["gap_bridge_min_disp_m"]:
+                # Device did NOT move meaningfully during the gap → genuine stop
+                logger.info(
+                    "🛑 IMEI %s (webhook): Gap BREAK - low displacement (%.0f m < %.0f m) → genuine stop",
+                    self.device_imei, gap_displacement_m, WEBHOOK_PROFILE["gap_bridge_min_disp_m"]
+                )
+                
+                # Close current leg
+                if len(self.context.leg_buffer) >= 2:
+                    leg = self._create_leg(self.context.leg_buffer, is_air_leg=False)
+                    if leg:
+                        result['leg_created'] = True
+                        if self.context.journey_just_created:
+                            result['journey_created'] = True
+                    self.context.leg_buffer = []
+                
+                # Create stationary from last position until now
+                gap_stationary_points = [
+                    (self.context.last_position_lat, self.context.last_position_lng, 
+                     self.context.last_position_time, None),
+                    (lat, lng, observed_at, position_id)
+                ]
+                stationary = self._create_stationary(gap_stationary_points, reason="gap_break_webhook")
+                if stationary:
+                    result['stationary_created'] = True
+                    if self.context.journey_just_created:
+                        result['journey_created'] = True
+                
+                # Return to STATIONARY state (ANCHOR ASSIGNMENT)
+                self.context.current_state = "STATIONARY"
+                self.context.anchor_lat = lat
+                self.context.anchor_lng = lng
+                self.context.anchor_points = [(lat, lng, observed_at, position_id)]
+                self.context.leg_buffer = []
+            
+            elif gap_speed_kmh > WEBHOOK_PROFILE["speed_gate_kmh"]:
+                # Teleport protection: implied speed > 200 km/h suggests bad fix, not real transit
+                logger.warning(
+                    "⚠️  IMEI %s (webhook): Gap BREAK - speed gate exceeded (%.0f km/h > %.0f km/h) → likely teleport",
+                    self.device_imei, gap_speed_kmh, WEBHOOK_PROFILE["speed_gate_kmh"]
+                )
+                
+                # Treat as break (same as low-displacement case above)
+                if len(self.context.leg_buffer) >= 2:
+                    leg = self._create_leg(self.context.leg_buffer, is_air_leg=False)
+                    if leg:
+                        result['leg_created'] = True
+                        if self.context.journey_just_created:
+                            result['journey_created'] = True
+                    self.context.leg_buffer = []
+                
+                gap_stationary_points = [
+                    (self.context.last_position_lat, self.context.last_position_lng, 
+                     self.context.last_position_time, None),
+                    (lat, lng, observed_at, position_id)
+                ]
+                stationary = self._create_stationary(gap_stationary_points, reason="gap_break_webhook_speed_gate")
+                if stationary:
+                    result['stationary_created'] = True
+                    if self.context.journey_just_created:
+                        result['journey_created'] = True
+                
+                self.context.current_state = "STATIONARY"
+                self.context.anchor_lat = lat
+                self.context.anchor_lng = lng
+                self.context.anchor_points = [(lat, lng, observed_at, position_id)]
+                self.context.leg_buffer = []
+            
+            else:
+                # BRIDGE: Device demonstrably travelled during the gap (displacement >= 300m, speed <= 200 km/h)
+                # Continue current leg straight through the gap
+                logger.info(
+                    "🌉 IMEI %s (webhook): Gap BRIDGE - transit detected (%.0f m @ %.0f km/h over %.0f min) → continue leg",
+                    self.device_imei, gap_displacement_m, gap_speed_kmh, time_diff_seconds / 60
+                )
+                # Continue MOVE state - current leg stays open, no stationary created
+                # The gap becomes a segment in the leg (prev_point → current_point)
+                pass
+        
+        elif not self.is_webhook and self.context.current_state == "MOVE" and time_diff_seconds > self.config.gap_timeout_min * 60:
+            # JIMI DEVICE: Time-based gap timeout (existing 30-minute logic)
             logger.info(
                 "⏱️  IMEI %s: Gap timeout (%.0f min) → force close leg",
                 self.device_imei, time_diff_seconds / 60
@@ -2372,8 +2798,10 @@ async def process_all_subscribed_devices(db: Session) -> Dict:
     }
     
     for device_state in subscribed:
+        # Capture device_imei before processing so it's available in exception handler
+        device_imei = device_state.device_imei
         try:
-            stats = await process_device_trips(db, device_state.device_imei)
+            stats = await process_device_trips(db, device_imei)
             total_stats['devices_processed'] += 1
             total_stats['total_positions'] += stats['positions_processed']
             total_stats['total_stationaries'] += stats['stationaries_created']
@@ -2381,7 +2809,7 @@ async def process_all_subscribed_devices(db: Session) -> Dict:
             total_stats['total_journeys'] += stats['journeys_created']
             total_stats['device_results'].append(stats)
         except Exception as exc:
-            logger.error("❌ IMEI %s: Processing failed: %s", device_state.device_imei, exc, exc_info=True)
+            logger.error("❌ IMEI %s: Processing failed: %s", device_imei, exc, exc_info=True)
             # Roll back the poisoned transaction so remaining devices can process
             db.rollback()
             logger.info("🔄 Session rolled back, continuing with next device...")
@@ -2578,12 +3006,15 @@ async def stall_watchdog_sweep(db: Session) -> Dict:
             # Re-enqueue for processing
             try:
                 await process_device_trips(db, device_state.device_imei)
+                db.commit()  # Commit after each successful device to isolate transactions
             except Exception as exc:
                 logger.error(
                     "❌ Watchdog: Failed to re-enqueue device %s: %s",
                     device_state.device_imei, exc, exc_info=True
                 )
                 db.rollback()
+                # Refresh the session to clear tainted state for next device
+                db.expire_all()
     
     if stats['devices_stalled'] > 0:
         logger.info(
@@ -2676,6 +3107,79 @@ def start_stall_watchdog():
         logger.info("✅ Stall watchdog task scheduled")
     else:
         logger.warning("⚠️  Stall watchdog task already running")
+
+
+def get_engine_status() -> Dict:
+    """
+    Get status of all background trip engine tasks.
+    
+    Returns:
+        Dict with status of each background task
+    """
+    from app.services.tracksolid_batch_service import _batch_sweep_task, BATCH_SWEEP_INTERVAL_MINUTES
+    from app.services.tracksolid_track_service import _selective_sweep_task, SELECTIVE_SWEEP_INTERVAL_MINUTES
+    
+    # Check if worker pool is enabled (v2.1.18+)
+    import os
+    worker_pool_enabled = os.getenv("TRIP_ENGINE_WORKER_POOL", "true").lower() == "true"
+    
+    journey_processor_status = {}
+    if worker_pool_enabled:
+        # Worker pool mode - check worker pool status
+        try:
+            from app.services import trip_engine_worker_pool
+            worker_pool = trip_engine_worker_pool.get_worker_pool()
+            # Check the global _worker_pool_task (not an attribute on worker_pool)
+            worker_pool_task = trip_engine_worker_pool._worker_pool_task
+            
+            if worker_pool_task and not worker_pool_task.done():
+                journey_processor_status = {
+                    "running": True,
+                    "mode": "worker_pool",
+                    "num_workers": worker_pool.num_workers if worker_pool else 5,
+                    "interval_seconds": 30,  # scan_interval_sec from worker pool loop
+                    "done": False,
+                }
+            else:
+                journey_processor_status = {
+                    "running": False,
+                    "mode": "worker_pool",
+                    "done": True,
+                }
+        except Exception as e:
+            journey_processor_status = {
+                "running": False,
+                "mode": "worker_pool",
+                "error": str(e),
+                "done": True,
+            }
+    else:
+        # Legacy mode - check old 15-minute task
+        journey_processor_status = {
+            "running": _trip_engine_task is not None and not _trip_engine_task.done(),
+            "mode": "legacy",
+            "interval_minutes": TRIP_ENGINE_INTERVAL_MINUTES,
+            "done": _trip_engine_task.done() if _trip_engine_task else None,
+        }
+    
+    return {
+        "batch_sweep": {
+            "running": _batch_sweep_task is not None and not _batch_sweep_task.done(),
+            "interval_minutes": BATCH_SWEEP_INTERVAL_MINUTES,
+            "done": _batch_sweep_task.done() if _batch_sweep_task else None,
+        },
+        "selective_sweep": {
+            "running": _selective_sweep_task is not None and not _selective_sweep_task.done(),
+            "interval_minutes": SELECTIVE_SWEEP_INTERVAL_MINUTES,
+            "done": _selective_sweep_task.done() if _selective_sweep_task else None,
+        },
+        "journey_processor": journey_processor_status,
+        "stall_watchdog": {
+            "running": _stall_watchdog_task is not None and not _stall_watchdog_task.done(),
+            "interval_minutes": STALL_WATCHDOG_INTERVAL_MINUTES,
+            "done": _stall_watchdog_task.done() if _stall_watchdog_task else None,
+        },
+    }
 
 
 # ═══════════════════════════════════════════════════════════════════════════

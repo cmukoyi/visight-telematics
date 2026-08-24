@@ -34,6 +34,14 @@ gps-tracker/backend/.env
 gps-tracker/**/.env
 *.env.local
 
+# Documentation files — keep local only (never commit)
+*.md
+*.MD
+
+# Security audit reports — NEVER commit (contain vulnerability details)
+SECURITY_AUDIT*.md
+SECURITY_AUDIT*.MD
+
 # Local reference files — not for source control
 dB_schema.md
 
@@ -166,3 +174,22 @@ scripts/monitor-*.sh
 scripts/validate-*.sh
 TRANSLATION_KEYS_DEPLOYMENT.md
 TRANSLATION_KEYS_DEPLOYMENT.md
+
+# ═══════════════════════════════════════════════════════════════════
+# One-time fix scripts - archived after execution
+# ═══════════════════════════════════════════════════════════════════
+ADD_REMAINING_TRANSLATION_KEYS.sh
+add_missing_translation_keys.py
+add_series_4_5_translation_keys.sql
+fix_duplicate_journeys.py
+fix_duplicate_journeys.sql
+fix_overlap_violations.sql
+all_translation_keys.txt
+
+# Manual/documentation files
+HIVE Tracking UI.html
+HIVE_User_Manual.html
+I18N_IMPLEMENTATION_STATUS.md
+
+# Feature development and bug fix documentation
+features_dev/

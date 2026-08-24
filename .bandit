@@ -1,0 +1,28 @@
+# Bandit configuration file
+# https://bandit.readthedocs.io/en/latest/config.html
+
+[bandit]
+# Paths to exclude from scanning
+exclude_dirs = [
+    '/gps-tracker/backend/app/migrations/',
+    '/gps-tracker/backend/venv/',
+    '/gps-tracker/backend/.venv/',
+    '/node_modules/',
+    '/customer/node_modules/',
+    '/admin/node_modules/',
+]
+
+# Tests to skip (use with caution - only skip false positives)
+skips = [
+    # B101: assert_used - we use asserts in test files
+    # B608: hardcoded_sql_expressions - we use SQLAlchemy text() for dynamic queries
+]
+
+# Severity level: low, medium, high
+severity = medium
+
+# Confidence level: low, medium, high  
+confidence = medium
+
+# Maximum number of issues to report (0 = unlimited)
+max_issues = 0

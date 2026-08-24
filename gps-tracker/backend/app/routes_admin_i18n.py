@@ -21,7 +21,12 @@ from app.models_i18n import Language, TranslationKey, Translation
 from app.admin_auth import get_current_admin_user
 from app.models_admin import AdminUser
 
-router = APIRouter(prefix="/api/admin/i18n", tags=["admin-i18n"])
+# SECURITY: All i18n admin endpoints require authentication by default
+router = APIRouter(
+    prefix="/api/admin/i18n",
+    tags=["admin-i18n"],
+    dependencies=[Depends(get_current_admin_user)]  # 🔒 Enforces auth on ALL routes
+)
 logger = logging.getLogger(__name__)
 
 

@@ -260,23 +260,74 @@
             margin-bottom: 0;
         }
 
+        .sidebar-category {
+            margin-bottom: 4px;
+        }
+
+        .sidebar-category-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            margin: 8px 0 4px 0;
+        }
+
+        .sidebar-category-header:hover {
+            color: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .sidebar-category-icon {
+            font-size: 16px;
+            margin-right: 8px;
+        }
+
+        .sidebar-category-toggle {
+            font-size: 12px;
+            transition: transform 0.2s ease;
+        }
+
+        .sidebar-category.expanded .sidebar-category-toggle {
+            transform: rotate(90deg);
+        }
+
+        .sidebar-subcategories {
+            display: none;
+            padding-left: 8px;
+        }
+
+        .sidebar-category.expanded .sidebar-subcategories {
+            display: block;
+        }
+
         .sidebar-link {
             display: flex;
             align-items: center;
-            gap: 16px;
-            padding: 12px 24px;
-            color: rgba(255, 255, 255, 0.9);
+            gap: 12px;
+            padding: 10px 20px 10px 32px;
+            color: rgba(255, 255, 255, 0.85);
             text-decoration: none;
             cursor: pointer;
             transition: all 0.2s ease;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 500;
             border: none;
             background: none;
             width: 100%;
             text-align: left;
             border-left: 3px solid transparent;
-            margin: 2px 0;
+            margin: 1px 0;
         }
 
         .sidebar-link:hover {
@@ -390,6 +441,39 @@
 
         .tab-content.active {
             display: block;
+        }
+
+        /* SUBTABS (for webhook logs) */
+        .subtab-btn {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            color: var(--gray);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+        }
+
+        .subtab-btn:hover {
+            color: var(--dark);
+            background: rgba(0, 0, 0, 0.02);
+        }
+
+        .subtab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            font-weight: 600;
+        }
+
+        .subtab-content {
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
         /* FEATURE TOGGLE ROWS */
@@ -850,137 +934,218 @@
                 </div>
 
                 <ul class="sidebar-menu">
-                    <li class="sidebar-item">
-                        <button class="sidebar-link active" onclick="switchTab('dashboard')">
-                            <span>📊</span>
-                            <span>Dashboard</span>
+                    <!-- OVERVIEW -->
+                    <li class="sidebar-category expanded" id="cat-overview">
+                        <button class="sidebar-category-header" onclick="toggleCategory('overview')">
+                            <span><span class="sidebar-category-icon">📊</span>Overview</span>
+                            <span class="sidebar-category-toggle">▶</span>
                         </button>
+                        <ul class="sidebar-subcategories">
+                            <li class="sidebar-item">
+                                <button class="sidebar-link active" onclick="switchTab('dashboard')">
+                                    <span>📈</span>
+                                    <span>Dashboard</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('health')">
+                                    <span>🩺</span>
+                                    <span>System Health</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('logs')">
+                                    <span>📝</span>
+                                    <span>Application Logs</span>
+                                </button>
+                            </li>
+                        </ul>
                     </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('logs')">
-                            <span>📝</span>
-                            <span>Logs</span>
+
+                    <!-- USERS & TENANTS -->
+                    <li class="sidebar-category" id="cat-users">
+                        <button class="sidebar-category-header" onclick="toggleCategory('users')">
+                            <span><span class="sidebar-category-icon">👥</span>Users & Tenants</span>
+                            <span class="sidebar-category-toggle">▶</span>
                         </button>
+                        <ul class="sidebar-subcategories">
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('usergroups')">
+                                    <span>🏢</span>
+                                    <span>User Groups</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('endusers')">
+                                    <span>👤</span>
+                                    <span>Portal Users</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('flutter-users')">
+                                    <span>📲</span>
+                                    <span>Mobile App Users</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('users')">
+                                    <span>🔑</span>
+                                    <span>Admin Users</span>
+                                </button>
+                            </li>
+                        </ul>
                     </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('billing')">
-                            <span>💰</span>
-                            <span>Billing</span>
+
+                    <!-- ASSETS & DEVICES -->
+                    <li class="sidebar-category" id="cat-assets">
+                        <button class="sidebar-category-header" onclick="toggleCategory('assets')">
+                            <span><span class="sidebar-category-icon">📡</span>Assets & Devices</span>
+                            <span class="sidebar-category-toggle">▶</span>
                         </button>
+                        <ul class="sidebar-subcategories">
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('ble-tags')">
+                                    <span>📡</span>
+                                    <span>BLE Tags</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('imei')">
+                                    <span>📱</span>
+                                    <span>IMEI Lookup</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('device-management')">
+                                    <span>🔧</span>
+                                    <span>Device Management</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('buildings')">
+                                    <span>🏗️</span>
+                                    <span>Buildings & Floors</span>
+                                </button>
+                            </li>
+                        </ul>
                     </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('users')">
-                            <span>👥</span>
-                            <span>Users</span>
+
+                    <!-- CONFIGURATION -->
+                    <li class="sidebar-category" id="cat-config">
+                        <button class="sidebar-category-header" onclick="toggleCategory('config')">
+                            <span><span class="sidebar-category-icon">⚙️</span>Configuration</span>
+                            <span class="sidebar-category-toggle">▶</span>
                         </button>
+                        <ul class="sidebar-subcategories">
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('system-settings')">
+                                    <span>⚙️</span>
+                                    <span>System Settings</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('features')">
+                                    <span>🎛️</span>
+                                    <span>App Features</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('tenant-features')">
+                                    <span>🎯</span>
+                                    <span>Tenant Features</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('packages')">
+                                    <span>📦</span>
+                                    <span>Tag Packages</span>
+                                </button>
+                            </li>
+                        </ul>
                     </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('audit')">
-                            <span>🔐</span>
-                            <span>Audit</span>
+
+                    <!-- ALERTS & NOTIFICATIONS -->
+                    <li class="sidebar-category" id="cat-alerts">
+                        <button class="sidebar-category-header" onclick="toggleCategory('alerts')">
+                            <span><span class="sidebar-category-icon">🔔</span>Alerts & Notifications</span>
+                            <span class="sidebar-category-toggle">▶</span>
                         </button>
+                        <ul class="sidebar-subcategories">
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('critical-alerts')">
+                                    <span>🚨</span>
+                                    <span>Critical Alerts</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('email-alert-stats')">
+                                    <span>📊</span>
+                                    <span>Email Alert Stats</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('sendgrid')">
+                                    <span>📧</span>
+                                    <span>SendGrid Stats</span>
+                                </button>
+                            </li>
+                        </ul>
                     </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('features')">
-                            <span>🎛️</span>
-                            <span>Features</span>
+
+                    <!-- LOCALIZATION -->
+                    <li class="sidebar-category" id="cat-localization">
+                        <button class="sidebar-category-header" onclick="toggleCategory('localization')">
+                            <span><span class="sidebar-category-icon">🌍</span>Localization</span>
+                            <span class="sidebar-category-toggle">▶</span>
                         </button>
+                        <ul class="sidebar-subcategories">
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('translations')">
+                                    <span>🔤</span>
+                                    <span>Translations</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('languages')">
+                                    <span>🗣️</span>
+                                    <span>Languages</span>
+                                </button>
+                            </li>
+                        </ul>
                     </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('usergroups')">
-                            <span>🏢</span>
-                            <span>User Groups</span>
+
+                    <!-- OPERATIONS -->
+                    <li class="sidebar-category" id="cat-operations">
+                        <button class="sidebar-category-header" onclick="toggleCategory('operations')">
+                            <span><span class="sidebar-category-icon">⚡</span>Operations</span>
+                            <span class="sidebar-category-toggle">▶</span>
                         </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('tenant-features')">
-                            <span>🎛️</span>
-                            <span>Tenant Features</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('packages')">
-                            <span>📦</span>
-                            <span>Packages</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('buildings')">
-                            <span>🏗️</span>
-                            <span>Buildings</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('ble-tags')">
-                            <span>📡</span>
-                            <span>BLE Tags</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('health')">
-                            <span>🩺</span>
-                            <span>Health</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('critical-alerts')">
-                            <span>🚨</span>
-                            <span>Critical Alerts</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('sendgrid')">
-                            <span>📧</span>
-                            <span>SendGrid</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('email-alert-stats')">
-                            <span>📊</span>
-                            <span>Email Alert Stats</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('endusers')">
-                            <span>👥</span>
-                            <span>End Users</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('flutter-users')">
-                            <span>📲</span>
-                            <span>Manage Flutter Users</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('imei')">
-                            <span>📱</span>
-                            <span>IMEI</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('translations')">
-                            <span>🌍</span>
-                            <span>Translations</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('languages')">
-                            <span>🗣️</span>
-                            <span>Languages</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('device-management')">
-                            <span>🔧</span>
-                            <span>Device Management</span>
-                        </button>
-                    </li>
-                    <li class="sidebar-item">
-                        <button class="sidebar-link" onclick="switchTab('jobs')">
-                            <span>⚙️</span>
-                            <span>Background Jobs</span>
-                        </button>
+                        <ul class="sidebar-subcategories">
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('jobs')">
+                                    <span>⏱️</span>
+                                    <span>Background Jobs</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('webhook-logs')">
+                                    <span>📨</span>
+                                    <span>Webhook Logs</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('audit')">
+                                    <span>🔐</span>
+                                    <span>Audit Logs</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('billing')">
+                                    <span>💰</span>
+                                    <span>Billing & Usage</span>
+                                </button>
+                            </li>
+                        </ul>
                     </li>
                 </ul>
             </div>
@@ -1484,6 +1649,14 @@
                                                 <input type="checkbox" id="cgTypeSeries3" value="series3">
                                                 <span>Series 3 (QR/NFC)</span>
                                             </label>
+                                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                                                <input type="checkbox" id="cgTypeSeries4" value="series_4">
+                                                <span>Series 4 (BLE Indoor)</span>
+                                            </label>
+                                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                                                <input type="checkbox" id="cgTypeSeries5" value="series_5">
+                                                <span>Series 5 (Hubble)</span>
+                                            </label>
                                         </div>
                                     </div>
                                     <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:8px">
@@ -1577,6 +1750,14 @@
                                             <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
                                                 <input type="checkbox" id="egTypeSeries3" value="series3" checked>
                                                 <span>Series 3 (QR/NFC)</span>
+                                            </label>
+                                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                                                <input type="checkbox" id="egTypeSeries4" value="series_4" checked>
+                                                <span>Series 4 (BLE Indoor)</span>
+                                            </label>
+                                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                                                <input type="checkbox" id="egTypeSeries5" value="series_5" checked>
+                                                <span>Series 5 (Hubble)</span>
                                             </label>
                                         </div>
                                     </div>
@@ -1777,6 +1958,22 @@
                                     <div>
                                         <div class="feature-name">👨‍💻 Developers</div>
                                         <div class="feature-desc">API tokens and developer tools</div>
+                                    </div>
+                                </label>
+
+                                <label class="feature-checkbox-item">
+                                    <input type="checkbox" id="tf_temperature-graph" data-feature="temperature-graph">
+                                    <div>
+                                        <div class="feature-name">🌡️ Temperature Graph</div>
+                                        <div class="feature-desc">Temperature sensor data visualization for Series 5 tags</div>
+                                    </div>
+                                </label>
+
+                                <label class="feature-checkbox-item">
+                                    <input type="checkbox" id="tf_hubble" data-feature="hubble">
+                                    <div>
+                                        <div class="feature-name">📡 Hubble Integration</div>
+                                        <div class="feature-desc">Series 5 Hubble Platform tag management and registration</div>
                                     </div>
                                 </label>
                             </div>
@@ -2199,6 +2396,19 @@
                             </div>
                             <div id="healthContainerGrid" style="padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px">
                                 <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--gray)">Loading containers…</div>
+                            </div>
+                        </div>
+
+                        <!-- Trip Engine Status -->
+                        <div class="card" style="margin-top:16px;padding:0">
+                            <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+                                <h3 style="font-size:15px;font-weight:600;margin:0">Trip Engine Background Tasks</h3>
+                                <span id="healthEngineError" style="display:none;color:var(--danger);font-size:13px"></span>
+                            </div>
+                            <div style="padding:16px">
+                                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px" id="healthEngineGrid">
+                                    <div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--gray)">Loading engine status…</div>
+                                </div>
                             </div>
                         </div>
 
@@ -2828,6 +3038,83 @@
                     </div>
                     <!-- END LANGUAGES TAB -->
 
+                    <!-- SYSTEM SETTINGS TAB -->
+                    <div id="system-settings" class="tab-content">
+                        <div class="page-header">
+                            <h2 class="page-title">⚙️ System Settings</h2>
+                            <p class="page-subtitle">Global configuration for trip engine and automatic processing</p>
+                        </div>
+
+                        <!-- Trip Engine Configuration -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">🔄 Trip Engine Configuration</h3>
+                            </div>
+                            <div id="systemSettingsAlert" class="alert" style="display:none"><span id="systemSettingsAlertText"></span></div>
+                            
+                            <div style="margin-bottom:24px;padding:12px;background:var(--light);border-radius:8px">
+                                <p style="margin:0;font-size:14px;color:var(--text-secondary)">
+                                    <strong>Coalesce Floor</strong> controls how often the system fetches detailed track data from TrackSolid API for subscribed devices. 
+                                    Lower values = fresher trip data but more API calls. Higher values = less API usage but longer delays before trips appear.
+                                </p>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">
+                                    Global Coalesce Floor (minutes)
+                                    <span style="font-weight:normal;color:var(--text-secondary);margin-left:8px">Default: 120 minutes (2 hours)</span>
+                                </label>
+                                <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 12px">
+                                    Minimum time between automatic track data fetches for each subscribed device. 
+                                    This setting applies to all customer groups unless they have a custom override.
+                                </p>
+                                <div style="display:flex;gap:12px;align-items:center">
+                                    <input 
+                                        type="number" 
+                                        id="ssCoalesceFloor" 
+                                        class="form-input" 
+                                        style="max-width:200px"
+                                        min="5" 
+                                        max="1440" 
+                                        step="5"
+                                        placeholder="120"
+                                    >
+                                    <span style="color:var(--text-secondary)">minutes</span>
+                                </div>
+                                <p style="font-size:12px;color:var(--text-secondary);margin:8px 0 0">
+                                    <strong>Recommended ranges:</strong><br>
+                                    • Real-time tracking: 30-60 minutes (higher API usage)<br>
+                                    • Standard tracking: 60-120 minutes (balanced)<br>
+                                    • Historical tracking: 120-240 minutes (lower API usage)
+                                </p>
+                            </div>
+
+                            <div style="margin-top:24px">
+                                <button class="btn btn-primary" onclick="saveTripEngineConfig()">💾 Save Configuration</button>
+                                <button class="btn btn-secondary" onclick="loadTripEngineConfig()" style="margin-left:8px">↻ Reload</button>
+                            </div>
+
+                            <div style="margin-top:32px;padding:16px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px">
+                                <p style="margin:0;font-size:14px;color:#92400e">
+                                    <strong>⚠️ Important:</strong> Changes to coalesce floor affect how quickly trips appear for subscribed devices. 
+                                    Lowering this value increases API calls to TrackSolid. Monitor API usage to avoid rate limits.
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Current Status -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">📊 Background Task Status</h3>
+                            </div>
+                            <div id="engineStatusContainer">
+                                <p style="text-align:center;color:var(--gray);padding:2rem">Click ↻ Refresh to load status</p>
+                            </div>
+                            <button class="btn btn-secondary" onclick="loadEngineStatus()" style="margin-top:16px">↻ Refresh Status</button>
+                        </div>
+                    </div>
+                    <!-- END SYSTEM SETTINGS TAB -->
+
                     <!-- DEVICE MANAGEMENT TAB -->
                     <div id="device-management" class="tab-content">
                         <div class="page-header">
@@ -2986,8 +3273,145 @@
                                 </form>
                             </div>
                         </div>
+
+                        <!-- Diagnostics Modal -->
+                        <div id="diagnosticsModal" class="modal">
+                            <div class="modal-content" style="max-width:700px">
+                                <div class="modal-header">
+                                    <h3 class="modal-title">Device Diagnostics</h3>
+                                    <button class="modal-close" onclick="closeModal('diagnosticsModal')">×</button>
+                                </div>
+                                <div id="diagnosticsContent">
+                                    <p style="text-align:center;color:var(--gray);padding:2rem">Loading...</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <!-- END DEVICE MANAGEMENT TAB -->
+
+                    <!-- WEBHOOK LOGS TAB -->
+                    <div id="webhook-logs" class="tab-content">
+                        <div class="page-header">
+                            <h2 class="page-title">📨 Webhook Logs & Device Locations</h2>
+                            <p class="page-subtitle">Debug webhook deliveries and track Series 5 device positions</p>
+                        </div>
+
+                        <!-- Sub-tabs -->
+                        <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid var(--border-color)">
+                            <button id="webhookSubtab1" class="subtab-btn active" onclick="switchWebhookSubtab('logs')">Webhook Logs</button>
+                            <button id="webhookSubtab2" class="subtab-btn" onclick="switchWebhookSubtab('locations')">Device Locations</button>
+                        </div>
+
+                        <!-- Webhook Logs Subtab -->
+                        <div id="webhookLogsSubtab" class="subtab-content">
+                            <button class="btn btn-secondary" onclick="loadWebhookLogs()" style="margin-bottom:12px">↻ Refresh</button>
+
+                            <!-- Filters -->
+                            <div class="card">
+                                <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+                                    <label class="form-label" style="margin:0">Source:</label>
+                                    <select id="webhookSourceFilter" class="form-input" style="width:auto" onchange="loadWebhookLogs()">
+                                        <option value="">All Sources</option>
+                                        <option value="hubble" selected>Hubble</option>
+                                        <option value="tracksolid">TrackSolid</option>
+                                    </select>
+                                    <label class="form-label" style="margin:0 0 0 12px">Time Range:</label>
+                                    <select id="webhookHoursFilter" class="form-input" style="width:auto" onchange="loadWebhookLogs()">
+                                        <option value="1">Last 1 hour</option>
+                                        <option value="6" selected>Last 6 hours</option>
+                                        <option value="24">Last 24 hours</option>
+                                        <option value="72">Last 3 days</option>
+                                        <option value="168">Last 7 days</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Webhooks List -->
+                            <div class="card">
+                                <div id="webhookAlert" class="alert" style="display:none"><span id="webhookAlertText"></span></div>
+                                <div class="table-wrapper">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Received At</th>
+                                                <th>Source</th>
+                                                <th>Packets</th>
+                                                <th>Device IDs</th>
+                                                <th>Status</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="webhookLogsTableBody">
+                                            <tr><td colspan="6" style="text-align:center;color:var(--gray);padding:2rem">Click ↻ Refresh to load webhook logs</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Device Locations Subtab -->
+                        <div id="webhookLocationsSubtab" class="subtab-content" style="display:none">
+                            <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+                                <label class="form-label" style="margin:0;font-weight:600">Series 5 Device:</label>
+                                <select id="series5DeviceSelect" class="form-input" style="width:300px" onchange="loadDeviceLocations()">
+                                    <option value="">— Select a device —</option>
+                                </select>
+                                <label class="form-label" style="margin:0 0 0 12px">Time Range:</label>
+                                <select id="locationHoursFilter" class="form-input" style="width:auto">
+                                    <option value="1">Last 1 hour</option>
+                                    <option value="6">Last 6 hours</option>
+                                    <option value="24" selected>Last 24 hours</option>
+                                    <option value="72">Last 3 days</option>
+                                    <option value="168">Last 7 days</option>
+                                </select>
+                                <button class="btn btn-secondary" onclick="loadDeviceLocations()">↻ Refresh</button>
+                            </div>
+
+                            <!-- Locations List -->
+                            <div class="card">
+                                <div id="locationAlert" class="alert" style="display:none"><span id="locationAlertText"></span></div>
+                                <div id="locationSummary" style="display:none;padding:12px;background:#f7fafc;border-radius:4px;margin-bottom:16px;font-size:14px">
+                                    <strong>Total Positions:</strong> <span id="locationCount">0</span> | 
+                                    <strong>Oldest:</strong> <span id="locationOldest">—</span> | 
+                                    <strong>Newest:</strong> <span id="locationNewest">—</span>
+                                </div>
+                                <div class="table-wrapper">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Observed At</th>
+                                                <th>Received At</th>
+                                                <th>Latitude</th>
+                                                <th>Longitude</th>
+                                                <th>Speed</th>
+                                                <th>Direction</th>
+                                                <th>Address</th>
+                                                <th>Trip Link</th>
+                                                <th>Source</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="locationTableBody">
+                                            <tr><td colspan="9" style="text-align:center;color:var(--gray);padding:2rem">Select a device to load positions</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Webhook Details Modal -->
+                        <div id="webhookDetailsModal" class="modal">
+                            <div class="modal-content" style="max-width:900px">
+                                <div class="modal-header">
+                                    <h3 class="modal-title">Webhook Payload</h3>
+                                    <button class="modal-close" onclick="closeModal('webhookDetailsModal')">×</button>
+                                </div>
+                                <div id="webhookDetailsContent" style="max-height:70vh;overflow-y:auto">
+                                    <p style="text-align:center;color:var(--gray);padding:2rem">Loading...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END WEBHOOK LOGS TAB -->
 
                     <!-- JOBS TAB -->
                     <div id="jobs" class="tab-content">
@@ -3384,6 +3808,11 @@ dashboard.welcome,Bienvenue</pre>
         }
 
         // TAB SWITCHING
+        function toggleCategory(categoryId) {
+            const category = document.getElementById('cat-' + categoryId);
+            category.classList.toggle('expanded');
+        }
+
         function switchTab(tabName) {
             // Hide all tabs
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -3415,7 +3844,9 @@ dashboard.welcome,Bienvenue</pre>
                 'imei': 'IMEI / Tags',
                 'translations': 'Translation Manager',
                 'languages': 'Language Manager',
+                'system-settings': 'System Settings',
                 'device-management': 'Device Management',
+                'webhook-logs': 'Webhook Logs',
                 'jobs': 'Background Jobs'
             };
             document.getElementById('pageTitle').textContent = titles[tabName];
@@ -3439,7 +3870,13 @@ dashboard.welcome,Bienvenue</pre>
             if (tabName === 'imei') { loadIMEI(); }
             if (tabName === 'translations') { loadTranslations(); }
             if (tabName === 'languages') { loadLanguages(); }
+            if (tabName === 'system-settings') { loadTripEngineConfig(); loadEngineStatus(); }
             if (tabName === 'device-management') { loadTenantOptions(); }
+            if (tabName === 'webhook-logs') { 
+                // Initialize to logs subtab and load data
+                switchWebhookSubtab('logs');
+                loadWebhookLogs(); 
+            }
             if (tabName === 'jobs') { loadJobs(); }
         }
 
@@ -4396,6 +4833,8 @@ dashboard.welcome,Bienvenue</pre>
             if (document.getElementById('cgTypeSeries1').checked) allowedTypes.push('series1');
             if (document.getElementById('cgTypeSeries2').checked) allowedTypes.push('series2');
             if (document.getElementById('cgTypeSeries3').checked) allowedTypes.push('series3');
+            if (document.getElementById('cgTypeSeries4').checked) allowedTypes.push('series_4');
+            if (document.getElementById('cgTypeSeries5').checked) allowedTypes.push('series_5');
             
             // Parse coalesce_floor_minutes (optional Trip Engine config v2.2)
             const coalesceFloorRaw = document.getElementById('cgCoalesceFloor').value.trim();
@@ -4601,10 +5040,12 @@ dashboard.welcome,Bienvenue</pre>
             document.getElementById('egFeatManagement').checked = secs.includes('management');
             document.getElementById('egFeatReports').checked    = secs.includes('reports');
             // Populate tag type checkboxes — null means all allowed
-            const types = allowedTagTypes || ['series1', 'series2', 'series3'];
+            const types = allowedTagTypes || ['series1', 'series2', 'series3', 'series_4', 'series_5'];
             document.getElementById('egTypeSeries1').checked = types.includes('series1');
             document.getElementById('egTypeSeries2').checked = types.includes('series2');
             document.getElementById('egTypeSeries3').checked = types.includes('series3');
+            document.getElementById('egTypeSeries4').checked = types.includes('series_4');
+            document.getElementById('egTypeSeries5').checked = types.includes('series_5');
             // Populate language dropdown
             const langSel = document.getElementById('egLanguage');
             langSel.innerHTML = '<option value="en">Loading...</option>';
@@ -4737,6 +5178,8 @@ dashboard.welcome,Bienvenue</pre>
             if (document.getElementById('egTypeSeries1').checked) allowedTagTypes.push('series1');
             if (document.getElementById('egTypeSeries2').checked) allowedTagTypes.push('series2');
             if (document.getElementById('egTypeSeries3').checked) allowedTagTypes.push('series3');
+            if (document.getElementById('egTypeSeries4').checked) allowedTagTypes.push('series_4');
+            if (document.getElementById('egTypeSeries5').checked) allowedTagTypes.push('series_5');
             try {
                 const res = await fetch(`${API_URL}/api/admin/usergroups/${groupId}`, {
                     method: 'PUT',
@@ -5466,6 +5909,7 @@ dashboard.welcome,Bienvenue</pre>
                                 <td>${device.device_state?.last_tracklist_pull_at || '—'}</td>
                                 <td style="white-space:nowrap">
                                     <span id="subscription-toggle-${device.imei}">${toggleButton}</span>
+                                    <button class="btn btn-secondary btn-small" onclick="showDeviceDiagnostics('${device.imei}')" title="View diagnostics for automatic processing" style="padding:6px 10px;font-size:12px;width:auto;min-width:80px">🔍 Diagnostics</button>
                                     <button class="btn btn-secondary btn-small" onclick="openDeviceBackfillModal('${device.imei}')" ${!isSubscribed ? 'disabled' : ''} style="padding:6px 10px;font-size:12px;width:auto;min-width:80px">⬇️ Backfill</button>
                                     <button class="btn btn-secondary btn-small" onclick="openDeviceReprocessModal('${device.imei}')" ${!isSubscribed ? 'disabled' : ''} style="padding:6px 10px;font-size:12px;width:auto;min-width:80px">🔄 Reprocess</button>
                                 </td>
@@ -5839,6 +6283,423 @@ dashboard.welcome,Bienvenue</pre>
             }
         }
 
+        // ====================================================================
+        // SYSTEM SETTINGS
+        // ====================================================================
+
+        async function loadTripEngineConfig() {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/config/trip-engine`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const config = await response.json();
+                
+                document.getElementById('ssCoalesceFloor').value = config.coalesce_floor_minutes || 120;
+                
+                showAlert('systemSettingsAlert', 'success', 'Configuration loaded successfully');
+            } catch (error) {
+                console.error('Failed to load trip engine config:', error);
+                showAlert('systemSettingsAlert', 'error', 'Failed to load configuration: ' + error.message);
+            }
+        }
+
+        async function saveTripEngineConfig() {
+            const coalesceFloor = parseInt(document.getElementById('ssCoalesceFloor').value);
+            
+            if (!coalesceFloor || coalesceFloor < 5 || coalesceFloor > 1440) {
+                showAlert('systemSettingsAlert', 'error', 'Coalesce floor must be between 5 and 1440 minutes');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/admin/config/trip-engine`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        coalesce_floor_minutes: coalesceFloor
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to save configuration');
+                }
+
+                const result = await response.json();
+                showAlert('systemSettingsAlert', 'success', result.message);
+            } catch (error) {
+                console.error('Failed to save trip engine config:', error);
+                showAlert('systemSettingsAlert', 'error', 'Failed to save: ' + error.message);
+            }
+        }
+
+        async function loadEngineStatus() {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/health/trip-engine`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const status = await response.json();
+                
+                const html = `
+                    <div style="display:grid;gap:16px">
+                        <div style="padding:16px;background:${status.batch_sweep.running ? '#d1fae5' : '#fee2e2'};border-radius:8px">
+                            <div style="display:flex;justify-content:space-between;align-items:center">
+                                <div>
+                                    <strong>Batch Sweep (TrackSolid Tier 1)</strong>
+                                    <p style="margin:4px 0 0;font-size:13px;color:var(--text-secondary)">Fetches latest positions for all devices</p>
+                                </div>
+                                <div style="text-align:right">
+                                    <span style="font-size:24px">${status.batch_sweep.running ? '✅' : '❌'}</span>
+                                    <p style="margin:4px 0 0;font-size:12px">${status.batch_sweep.running ? 'Running' : 'Stopped'}</p>
+                                    <p style="margin:2px 0 0;font-size:12px">Every ${status.batch_sweep.interval_minutes} min</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="padding:16px;background:${status.selective_sweep.running ? '#d1fae5' : '#fee2e2'};border-radius:8px">
+                            <div style="display:flex;justify-content:space-between;align-items:center">
+                                <div>
+                                    <strong>Selective Sweep (TrackSolid Tier 2)</strong>
+                                    <p style="margin:4px 0 0;font-size:13px;color:var(--text-secondary)">Fetches detailed track data for subscribed devices</p>
+                                </div>
+                                <div style="text-align:right">
+                                    <span style="font-size:24px">${status.selective_sweep.running ? '✅' : '❌'}</span>
+                                    <p style="margin:4px 0 0;font-size:12px">${status.selective_sweep.running ? 'Running' : 'Stopped'}</p>
+                                    <p style="margin:2px 0 0;font-size:12px">Every ${status.selective_sweep.interval_minutes} min</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="padding:16px;background:${status.journey_processor.running ? '#d1fae5' : '#fee2e2'};border-radius:8px">
+                            <div style="display:flex;justify-content:space-between;align-items:center">
+                                <div>
+                                    <strong>Journey Processor</strong>
+                                    <p style="margin:4px 0 0;font-size:13px;color:var(--text-secondary)">Processes positions into trips for subscribed devices</p>
+                                </div>
+                                <div style="text-align:right">
+                                    <span style="font-size:24px">${status.journey_processor.running ? '✅' : '❌'}</span>
+                                    <p style="margin:4px 0 0;font-size:12px">${status.journey_processor.running ? 'Running' : 'Stopped'}</p>
+                                    <p style="margin:2px 0 0;font-size:12px">Every ${status.journey_processor.interval_minutes} min</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="padding:16px;background:${status.stall_watchdog.running ? '#d1fae5' : '#fee2e2'};border-radius:8px">
+                            <div style="display:flex;justify-content:space-between;align-items:center">
+                                <div>
+                                    <strong>Stall Watchdog</strong>
+                                    <p style="margin:4px 0 0;font-size:13px;color:var(--text-secondary)">Monitors and fixes stuck journeys</p>
+                                </div>
+                                <div style="text-align:right">
+                                    <span style="font-size:24px">${status.stall_watchdog.running ? '✅' : '❌'}</span>
+                                    <p style="margin:4px 0 0;font-size:12px">${status.stall_watchdog.running ? 'Running' : 'Stopped'}</p>
+                                    <p style="margin:2px 0 0;font-size:12px">Every ${status.stall_watchdog.interval_minutes} min</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('engineStatusContainer').innerHTML = html;
+            } catch (error) {
+                console.error('Failed to load engine status:', error);
+                document.getElementById('engineStatusContainer').innerHTML = `
+                    <p style="text-align:center;color:#f44336;padding:2rem">Failed to load status: ${error.message}</p>
+                `;
+            }
+        }
+
+        async function showDeviceDiagnostics(imei) {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/diagnostics/trip-processing/${imei}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to fetch diagnostics');
+                }
+                
+                const diag = await response.json();
+                
+                const html = `
+                    <div style="padding:1rem;max-height:600px;overflow-y:auto">
+                        <h4 style="margin:0 0 16px">Diagnostics: ${diag.device_name || imei.substring(0, 16)}</h4>
+                        
+                        <!-- Recommendation Banner -->
+                        <div style="padding:16px;background:${diag.selective_sweep_qualification.qualifies_all_checks ? '#d1fae5' : '#fef3c7'};border-radius:8px;margin-bottom:20px">
+                            <p style="margin:0;font-weight:600;font-size:15px">${diag.recommendation}</p>
+                        </div>
+                        
+                        <!-- Qualification Checks -->
+                        <div style="margin-bottom:24px">
+                            <h5 style="margin:0 0 12px;font-size:14px;color:var(--text-secondary)">AUTOMATIC PROCESSING QUALIFICATION</h5>
+                            
+                            <div style="display:grid;gap:12px">
+                                <!-- Subscription Check -->
+                                <div style="padding:12px;background:${diag.subscription.qualifies ? '#d1fae5' : '#fee2e2'};border-radius:6px">
+                                    <div style="display:flex;align-items:center;gap:8px">
+                                        <span style="font-size:20px">${diag.subscription.qualifies ? '✅' : '❌'}</span>
+                                        <div style="flex:1">
+                                            <strong>1. Subscription Check</strong>
+                                            <p style="margin:4px 0 0;font-size:13px">${diag.subscription.message}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- New Data Check -->
+                                <div style="padding:12px;background:${diag.new_data_check.qualifies ? '#d1fae5' : '#fee2e2'};border-radius:6px">
+                                    <div style="display:flex;align-items:center;gap:8px">
+                                        <span style="font-size:20px">${diag.new_data_check.qualifies ? '✅' : '❌'}</span>
+                                        <div style="flex:1">
+                                            <strong>2. New Data Check</strong>
+                                            <p style="margin:4px 0 0;font-size:13px">${diag.new_data_check.message}</p>
+                                            <p style="margin:4px 0 0;font-size:12px;color:var(--text-secondary)">
+                                                Last batch: ${diag.new_data_check.last_batch_ts || 'Never'}<br>
+                                                Last position: ${diag.new_data_check.last_position_ts || 'Never'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Coalesce Check -->
+                                <div style="padding:12px;background:${diag.coalesce_check.qualifies ? '#d1fae5' : '#fee2e2'};border-radius:6px">
+                                    <div style="display:flex;align-items:center;gap:8px">
+                                        <span style="font-size:20px">${diag.coalesce_check.qualifies ? '✅' : '⏳'}</span>
+                                        <div style="flex:1">
+                                            <strong>3. Coalesce Floor Check</strong>
+                                            <p style="margin:4px 0 0;font-size:13px">${diag.coalesce_check.message}</p>
+                                            <p style="margin:4px 0 0;font-size:12px;color:var(--text-secondary)">
+                                                Last pull: ${diag.coalesce_check.last_tracklist_pull_at || 'Never'}<br>
+                                                Minutes since last pull: ${diag.coalesce_check.minutes_since_last_pull ? diag.coalesce_check.minutes_since_last_pull.toFixed(0) : 'N/A'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Data Summary -->
+                        <div style="margin-bottom:20px">
+                            <h5 style="margin:0 0 12px;font-size:14px;color:var(--text-secondary)">DATA SUMMARY</h5>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                                <div style="padding:12px;background:var(--light);border-radius:6px">
+                                    <p style="margin:0;font-size:12px;color:var(--text-secondary)">Positions (24h)</p>
+                                    <p style="margin:4px 0 0;font-size:20px;font-weight:600">${diag.data_summary.positions_last_24h}</p>
+                                </div>
+                                <div style="padding:12px;background:var(--light);border-radius:6px">
+                                    <p style="margin:0;font-size:12px;color:var(--text-secondary)">Journeys (7d)</p>
+                                    <p style="margin:4px 0 0;font-size:20px;font-weight:600">${diag.data_summary.journeys_last_7d}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('diagnosticsContent').innerHTML = html;
+                openModal('diagnosticsModal');
+            } catch (error) {
+                console.error('Failed to load diagnostics:', error);
+                alert('Failed to load diagnostics: ' + error.message);
+            }
+        }
+
+        // WEBHOOK LOGS
+        async function loadWebhookLogs() {
+            const source = document.getElementById('webhookSourceFilter').value;
+            const hours = document.getElementById('webhookHoursFilter').value;
+            const url = `${API_URL}/api/admin/webhook-logs?${source ? 'source=' + source + '&' : ''}hours=${hours}&limit=100`;
+
+            try {
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const logs = await response.json();
+
+                const tbody = document.getElementById('webhookLogsTableBody');
+                if (logs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:2rem">No webhook logs found in this time range</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = logs.map(log => {
+                    const timestamp = new Date(log.received_at).toLocaleString();
+                    const statusColor = log.status_code === 200 ? '#48bb78' : '#f44336';
+                    const deviceList = (log.device_ids || []).join(', ');
+                    const devicePreview = deviceList.length > 50 ? deviceList.substring(0, 50) + '...' : deviceList;
+                    
+                    return `
+                        <tr>
+                            <td>${timestamp}</td>
+                            <td style="font-weight:600">${log.source}</td>
+                            <td style="text-align:center">${log.packet_count}</td>
+                            <td style="font-size:11px;max-width:300px;overflow:hidden;text-overflow:ellipsis" title="${deviceList}">${devicePreview || '—'}</td>
+                            <td><span style="display:inline-block;padding:4px 8px;border-radius:4px;background:${statusColor};color:white;font-size:12px;font-weight:600">${log.status_code}</span></td>
+                            <td><button class="btn btn-secondary btn-small" onclick="viewWebhookDetails('${log.id}')">View Payload</button></td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Failed to load webhook logs:', error);
+                showAlert('webhookAlert', 'error', 'Failed to load webhook logs: ' + error.message);
+            }
+        }
+
+        async function viewWebhookDetails(logId) {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/webhook-logs/${logId}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const log = await response.json();
+
+                const html = `
+                    <div style="padding:1rem">
+                        <h4 style="margin:0 0 16px">Webhook Received: ${new Date(log.received_at).toLocaleString()}</h4>
+                        
+                        <div style="display:grid;grid-template-columns:150px 1fr;gap:12px;font-size:14px;margin-bottom:16px">
+                            <strong>Source:</strong><span>${log.source}</span>
+                            <strong>Packet Count:</strong><span>${log.packet_count}</span>
+                            <strong>Status Code:</strong><span style="color:${log.status_code === 200 ? '#48bb78' : '#f44336'};font-weight:600">${log.status_code}</span>
+                            ${log.error_message ? `<strong>Error:</strong><span style="color:#f44336">${log.error_message}</span>` : ''}
+                        </div>
+
+                        ${log.device_ids && log.device_ids.length > 0 ? `
+                            <div style="margin-bottom:16px">
+                                <h5 style="margin:0 0 8px">Device IDs in this webhook:</h5>
+                                <div style="background:#f7fafc;padding:12px;border-radius:4px">
+                                    ${log.device_ids.map(id => `<div style="font-family:monospace;font-size:12px;padding:4px 0">${id}</div>`).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        <div>
+                            <h5 style="margin:0 0 8px">Full Payload:</h5>
+                            <pre style="background:#f7fafc;padding:12px;border-radius:4px;font-size:11px;overflow-x:auto;max-height:400px;overflow-y:auto">${JSON.stringify(log.payload, null, 2)}</pre>
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('webhookDetailsContent').innerHTML = html;
+                openModal('webhookDetailsModal');
+            } catch (error) {
+                console.error('Failed to load webhook details:', error);
+                alert('Failed to load webhook details: ' + error.message);
+            }
+        }
+
+        // WEBHOOK SUBTAB SWITCHING
+        function switchWebhookSubtab(subtab) {
+            // Update buttons
+            document.querySelectorAll('.subtab-btn').forEach(btn => btn.classList.remove('active'));
+            if (subtab === 'logs') {
+                document.getElementById('webhookSubtab1').classList.add('active');
+                document.getElementById('webhookLogsSubtab').style.display = 'block';
+                document.getElementById('webhookLocationsSubtab').style.display = 'none';
+            } else if (subtab === 'locations') {
+                document.getElementById('webhookSubtab2').classList.add('active');
+                document.getElementById('webhookLogsSubtab').style.display = 'none';
+                document.getElementById('webhookLocationsSubtab').style.display = 'block';
+                // Load Series 5 devices on first access
+                if (document.getElementById('series5DeviceSelect').options.length === 1) {
+                    loadSeries5Devices();
+                }
+            }
+        }
+
+        // SERIES 5 DEVICE LOCATIONS
+        async function loadSeries5Devices() {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/series5-devices`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const devices = await response.json();
+
+                const select = document.getElementById('series5DeviceSelect');
+                const currentValue = select.value;
+                
+                select.innerHTML = '<option value="">— Select a device —</option>' +
+                    devices.map(d => {
+                        const lastSeen = d.last_seen ? new Date(d.last_seen).toLocaleString() : 'Never';
+                        const battery = d.battery_level ? `${d.battery_level}%` : '—';
+                        return `<option value="${d.imei}">${d.device_model} (Battery: ${battery}, Last: ${lastSeen})</option>`;
+                    }).join('');
+                
+                // Restore selection if it still exists
+                if (currentValue && devices.find(d => d.imei === currentValue)) {
+                    select.value = currentValue;
+                }
+            } catch (error) {
+                console.error('Failed to load Series 5 devices:', error);
+                showAlert('locationAlert', 'error', 'Failed to load Series 5 devices: ' + error.message);
+            }
+        }
+
+        async function loadDeviceLocations() {
+            const deviceImei = document.getElementById('series5DeviceSelect').value;
+            const hours = document.getElementById('locationHoursFilter').value;
+
+            if (!deviceImei) {
+                document.getElementById('locationTableBody').innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--gray);padding:2rem">Select a device to load positions</td></tr>';
+                document.getElementById('locationSummary').style.display = 'none';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/admin/device-locations/${deviceImei}?hours=${hours}&limit=200`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const locations = await response.json();
+
+                const tbody = document.getElementById('locationTableBody');
+                
+                if (locations.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--gray);padding:2rem">No positions found in this time range</td></tr>';
+                    document.getElementById('locationSummary').style.display = 'none';
+                    return;
+                }
+
+                // Update summary
+                document.getElementById('locationCount').textContent = locations.length;
+                document.getElementById('locationOldest').textContent = new Date(locations[locations.length - 1].observed_at).toLocaleString();
+                document.getElementById('locationNewest').textContent = new Date(locations[0].observed_at).toLocaleString();
+                document.getElementById('locationSummary').style.display = 'block';
+
+                // Render table
+                tbody.innerHTML = locations.map(loc => {
+                    const observedAt = new Date(loc.observed_at).toLocaleString();
+                    const receivedAt = new Date(loc.received_at).toLocaleString();
+                    const speed = loc.gps_speed !== null ? `${loc.gps_speed.toFixed(1)} km/h` : '—';
+                    const direction = loc.direction !== null ? `${loc.direction}°` : '—';
+                    const address = loc.address || '—';
+                    const tripLink = loc.leg_id ? `<span style="color:#48bb78;font-weight:600">Leg ${loc.leg_id.substring(0, 8)}</span>` : 
+                                   loc.stationary_id ? `<span style="color:#f59e0b;font-weight:600">Stationary</span>` : 
+                                   '<span style="color:#94a3b8">—</span>';
+                    const source = loc.source;
+                    
+                    return `
+                        <tr>
+                            <td style="font-size:13px">${observedAt}</td>
+                            <td style="font-size:13px;color:#6b7280">${receivedAt}</td>
+                            <td style="font-family:monospace;font-size:12px">${loc.lat.toFixed(6)}</td>
+                            <td style="font-family:monospace;font-size:12px">${loc.lng.toFixed(6)}</td>
+                            <td>${speed}</td>
+                            <td>${direction}</td>
+                            <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${address}">${address}</td>
+                            <td>${tripLink}</td>
+                            <td style="font-size:11px;color:#6b7280">${source}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+            } catch (error) {
+                console.error('Failed to load device locations:', error);
+                showAlert('locationAlert', 'error', 'Failed to load device locations: ' + error.message);
+            }
+        }
+
     </script>
 
     <script>
@@ -5856,9 +6717,10 @@ dashboard.welcome,Bienvenue</pre>
         const btn = document.getElementById('healthRefreshBtn');
         if (btn) { btn.disabled = true; btn.textContent = '⏳ Loading…'; }
         try {
-            const [cRes, sRes] = await Promise.all([
+            const [cRes, sRes, eRes] = await Promise.all([
                 fetch(API_URL + '/api/admin/health/containers', { headers: { 'Authorization': 'Bearer ' + authToken } }),
                 fetch(API_URL + '/api/admin/health/system',     { headers: { 'Authorization': 'Bearer ' + authToken } }),
+                fetch(API_URL + '/api/admin/health/trip-engine', { headers: { 'Authorization': 'Bearer ' + authToken } }),
             ]);
             if (cRes.ok) {
                 const containers = await cRes.json();
@@ -5872,6 +6734,15 @@ dashboard.welcome,Bienvenue</pre>
             if (sRes.ok) {
                 const sys = await sRes.json();
                 renderSystem(sys);
+            }
+            if (eRes.ok) {
+                const engine = await eRes.json();
+                renderTripEngine(engine);
+                document.getElementById('healthEngineError').style.display = 'none';
+            } else {
+                const err = await eRes.json().catch(() => ({ detail: 'Unknown error' }));
+                document.getElementById('healthEngineError').textContent = err.detail || 'Failed to load engine status';
+                document.getElementById('healthEngineError').style.display = '';
             }
         } catch (e) {
             document.getElementById('healthContainerError').textContent = e.message;
@@ -5941,6 +6812,39 @@ dashboard.welcome,Bienvenue</pre>
                 ${upImage}
                 <div style="display:flex;gap:12px;flex-wrap:wrap">${statsCpu}${statsMem}</div>
                 <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">${actionBtns}</div>
+            </div>`;
+        }).join('');
+    }
+
+    function renderTripEngine(engine) {
+        const grid = document.getElementById('healthEngineGrid');
+        if (!grid) return;
+        
+        const tasks = [
+            { key: 'batch_sweep', icon: '📦', label: 'Batch Sweep' },
+            { key: 'selective_sweep', icon: '🎯', label: 'Selective Sweep' },
+            { key: 'journey_processor', icon: '🛣️', label: 'Journey Processor' },
+            { key: 'stall_watchdog', icon: '🔍', label: 'Stall Watchdog' },
+        ];
+        
+        grid.innerHTML = tasks.map(({ key, icon, label }) => {
+            const task = engine[key] || {};
+            const isRunning = task.running === true;
+            const statusColor = isRunning ? '#10b981' : '#ef4444';
+            const statusDot = `<span style="width:10px;height:10px;border-radius:50%;background:${statusColor};display:inline-block;flex-shrink:0"></span>`;
+            const statusLabel = isRunning ? 'Running' : 'Stopped';
+            const interval = task.interval_minutes ? `${task.interval_minutes} min` : '—';
+            
+            return `<div style="border:1px solid var(--border);border-radius:8px;padding:14px;background:var(--surface);display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    ${statusDot}
+                    <span style="font-size:20px">${icon}</span>
+                    <span style="font-weight:600;font-size:14px">${label}</span>
+                    <span style="font-size:12px;color:${statusColor}">${statusLabel}</span>
+                </div>
+                <div style="display:flex;gap:12px;flex-wrap:wrap">
+                    <span style="font-size:12px;color:var(--gray)">Interval: ${interval}</span>
+                </div>
             </div>`;
         }).join('');
     }
@@ -7495,7 +8399,7 @@ dashboard.welcome,Bienvenue</pre>
 
         try {
             const features = {};
-            ['livemap', 'history', 'history-advanced', 'alerts', 'geofences', 'reports', 'management', 'floorplan', 'settings', 'hive', 'developers'].forEach(feature => {
+            ['livemap', 'history', 'history-advanced', 'alerts', 'geofences', 'reports', 'management', 'floorplan', 'settings', 'hive', 'developers', 'temperature-graph', 'hubble'].forEach(feature => {
                 const checkbox = document.getElementById(`tf_${feature}`);
                 if (checkbox) {
                     features[feature] = checkbox.checked;

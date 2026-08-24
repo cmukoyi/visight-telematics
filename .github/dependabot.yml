@@ -1,0 +1,84 @@
+version: 2
+updates:
+  # Python backend dependencies
+  - package-ecosystem: "pip"
+    directory: "/gps-tracker/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "security"
+      - "backend"
+    commit-message:
+      prefix: "deps(backend)"
+      include: "scope"
+    # Group minor/patch updates together
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    # Auto-merge security updates (requires GitHub Security)
+    # Commented out - enable after testing
+    # pull-request-branch-name:
+    #   separator: "-"
+    # reviewers:
+    #   - "your-team"
+
+  # Customer portal (Next.js) dependencies
+  - package-ecosystem: "npm"
+    directory: "/customer"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "security"
+      - "frontend"
+    commit-message:
+      prefix: "deps(customer)"
+      include: "scope"
+    groups:
+      react-dependencies:
+        patterns:
+          - "react*"
+          - "next*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Admin portal dependencies
+  - package-ecosystem: "npm"
+    directory: "/admin"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "security"
+      - "admin"
+    commit-message:
+      prefix: "deps(admin)"
+      include: "scope"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci"

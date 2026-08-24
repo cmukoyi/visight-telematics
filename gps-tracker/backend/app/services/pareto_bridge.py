@@ -38,6 +38,9 @@ from app.models import IndoorGateway, Floor, Building, Room, TagIndoorPosition, 
 logger = logging.getLogger(__name__)
 
 # ── Config (env-overridable) ────────────────────────────────────────────────
+# Enable/disable bridge (set to "false" to disable floor plan feature)
+PARETO_ENABLED = os.getenv("PARETO_ENABLED", "true").lower() == "true"
+
 # Per-deployment Pareto — defaults to the docker service name on the
 # pinplot_network. Beacon / new-customer servers override via env.
 PARETO_URL = os.getenv("PARETO_URL", "http://pareto-anywhere:3001")
@@ -313,6 +316,9 @@ async def _offline_loop():
 def start_bridge() -> None:
     """Schedule the bridge tasks on the running event loop."""
     global _reconnect_task, _offline_task
+    if not PARETO_ENABLED:
+        logger.info("pareto_bridge: disabled (PARETO_ENABLED=false)")
+        return
     if _reconnect_task is not None:
         return
     _reconnect_task = asyncio.create_task(_reconnect_loop(), name="pareto_bridge_reconnect")

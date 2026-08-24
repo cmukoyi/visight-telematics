@@ -172,11 +172,39 @@ class TrackSolidTokenManager:
         idx = min(self._failure_streak - 1, len(_FAIL_BACKOFF_SCHEDULE) - 1)
         return _FAIL_BACKOFF_SCHEDULE[max(idx, 0)]
 
-    async def get_token(self) -> str:
-        """Return a valid token, fetching a new one only when necessary."""
+    def invalidate_token(self) -> None:
+        """Invalidate the current token, forcing a fresh fetch on next get_token().
+        
+        Called when we receive 401 Unauthorized from TrackSolid API, indicating
+        the token was revoked/invalidated server-side before timestamp expiry.
+        """
+        logger.warning("🔄 TrackSolid: invalidating cached token (server-side revocation detected)")
+        self._token = None
+        self._expires_at = 0.0
+        # Clear from DB too
+        try:
+            from app.database import SessionLocal
+            from app.models import APIToken
+            db = SessionLocal()
+            try:
+                db.query(APIToken).filter(
+                    APIToken.provider == self._PROVIDER_KEY
+                ).delete()
+                db.commit()
+            finally:
+                db.close()
+        except Exception as exc:
+            logger.warning("⚠️  TrackSolid: could not clear token from DB: %s", exc)
+
+    async def get_token(self, force_refresh: bool = False) -> str:
+        """Return a valid token, fetching a new one only when necessary.
+        
+        Args:
+            force_refresh: If True, fetch a new token even if cached one hasn't expired.
+        """
         async with self._lock:
             now = time.time()
-            if self._token and now < self._expires_at - _TOKEN_REFRESH_BUFFER:
+            if not force_refresh and self._token and now < self._expires_at - _TOKEN_REFRESH_BUFFER:
                 remaining = int(self._expires_at - now)
                 logger.info(
                     "♻️  TrackSolid: reusing cached token (expires in %ds)", remaining
@@ -289,54 +317,124 @@ class TrackSolidTagProvider(DeviceTagProvider):
         return "tracksolid"
 
     async def validate_tag(self, imei: str) -> TagValidationResult:
-        try:
-            token = await _token_manager.get_token()
-        except Exception as exc:
-            logger.error("TrackSolid token fetch failed: %s", exc)
-            return TagValidationResult(
-                is_valid=False,
-                message="Error. Please contact support.",
-            )
-
-        _, _, user_id, org_id = _creds()
-        payload = {
-            "imei": imei.strip(),  # filter to this IMEI avoids pagination issues
-            "startRow": "0",
-            "userType": 8,
-            "userId": user_id,
-            "orgId": org_id,
-            "siftType": "",
-            "sortType": "",
-            "sortRule": "",
-            "isNewMcType": "0",
-            "videoEntry": "",
-            "type": "NORMAL",
-            "searchStatus": "ALL",
-        }
-        headers = {
-            "Authorization": token,
-            "Content-Type": "application/json",
-        }
-
-        try:
-            async with httpx.AsyncClient(timeout=20) as client:
-                response = await client.post(
-                    _EQUIPMENT_URL, json=payload, headers=headers
+        """Validate a Series 2 tag IMEI against TrackSolid equipment list.
+        
+        Auto-refreshes token on 401 Unauthorized (stale token) with one retry.
+        """
+        # Attempt validation with current token, retry once on 401
+        for attempt in range(2):
+            try:
+                force_refresh = (attempt == 1)  # Force refresh on retry
+                token = await _token_manager.get_token(force_refresh=force_refresh)
+            except Exception as exc:
+                logger.error("TrackSolid token fetch failed: %s", exc)
+                return TagValidationResult(
+                    is_valid=False,
+                    message="TrackSolid authentication failed. Please contact support.",
                 )
-                response.raise_for_status()
-                data = response.json()
-        except httpx.HTTPStatusError as exc:
-            logger.error("TrackSolid equipment list HTTP error: %s", exc)
-            return TagValidationResult(
-                is_valid=False,
-                message="Error. Please contact support.",
+
+            _, _, user_id, org_id = _creds()
+            payload = {
+                "imei": imei.strip(),  # filter to this IMEI avoids pagination issues
+                "startRow": "0",
+                "userType": 8,
+                "userId": user_id,
+                "orgId": org_id,
+                "siftType": "",
+                "sortType": "",
+                "sortRule": "",
+                "isNewMcType": "0",
+                "videoEntry": "",
+                "type": "NORMAL",
+                "searchStatus": "ALL",
+            }
+            headers = {
+                "Authorization": token,
+                "Content-Type": "application/json",
+            }
+
+            try:
+                async with httpx.AsyncClient(timeout=20) as client:
+                    response = await client.post(
+                        _EQUIPMENT_URL, json=payload, headers=headers
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                    # Success - break retry loop
+                    break
+            except httpx.HTTPStatusError as exc:
+                # 401 = stale token, invalidate and retry once
+                if exc.response.status_code == 401 and attempt == 0:
+                    logger.warning(
+                        "🔄 TrackSolid 401 Unauthorized - token invalidated server-side, retrying with fresh token..."
+                    )
+                    _token_manager.invalidate_token()
+                    continue  # Retry with fresh token
+                
+                # Other HTTP errors or second 401 - fail
+                logger.error("TrackSolid equipment list HTTP %d: %s", exc.response.status_code, exc)
+                if exc.response.status_code == 401:
+                    return TagValidationResult(
+                        is_valid=False,
+                        message="TrackSolid authentication failed after retry. Please check account credentials.",
+                    )
+                elif exc.response.status_code in (403, 429):
+                    return TagValidationResult(
+                        is_valid=False,
+                        message="TrackSolid rate limit reached. Please try again later.",
+                    )
+                else:
+                    return TagValidationResult(
+                        is_valid=False,
+                        message=f"TrackSolid API error (HTTP {exc.response.status_code}). Please contact support.",
+                    )
+            except Exception as exc:
+                logger.error("TrackSolid equipment list error: %s", exc)
+                return TagValidationResult(
+                    is_valid=False,
+                    message="Network error connecting to TrackSolid. Please try again.",
+                )
+
+        # Parse the device list — handle both wrapped and flat response shapes
+        devices: list = []
+        result_data = data.get("data") or data.get("result") or {}
+        if isinstance(result_data, list):
+            devices = result_data
+        elif isinstance(result_data, dict):
+            devices = (
+                result_data.get("list")
+                or result_data.get("data")
+                or result_data.get("records")
+                or []
             )
-        except Exception as exc:
-            logger.error("TrackSolid equipment list error: %s", exc)
+
+        imei_strip = imei.strip()
+        logger.debug("TrackSolid returned %d device(s) for IMEI query '%s'", len(devices), imei_strip)
+        found_device = None
+        for device in devices:
+            if str(device.get("imei", "")).strip() == imei_strip:
+                found_device = device
+                break
+
+        if found_device is not None:
+            # Parse elecQuantity "98.30%" → int 98
+            battery_level: int | None = None
+            elec = found_device.get("elecQuantity", "") or ""
+            if elec:
+                try:
+                    battery_level = int(float(str(elec).rstrip("%")))
+                except (ValueError, TypeError):
+                    pass
+
             return TagValidationResult(
-                is_valid=False,
-                message="Error. Please contact support.",
+                is_valid=True,
+                message="Series 2 tag verified.",
+                battery_level=battery_level,
             )
+        return TagValidationResult(
+            is_valid=False,
+            message="Tag not supported — IMEI not found in TrackSolid account.",
+        )
 
         # Parse the device list — handle both wrapped and flat response shapes
         devices: list = []

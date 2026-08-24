@@ -4,8 +4,8 @@ Admin API endpoints: authentication, logging, billing, user management
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta, date
-from typing import List, Optional, Dict
+from datetime import datetime, timedelta, date, timezone
+from typing import List, Optional, Dict, Any
 from uuid import UUID
 from pydantic import BaseModel, EmailStr, field_validator
 import logging
@@ -34,16 +34,28 @@ from app.models import (
     PortalAlert,
     TagIndoorPosition,
     DeviceState,
+    DevicePosition,
     TenantFeature,
+    WebhookLog,
 )
 from app.models_i18n import Language
 from app.admin_auth import (
     hash_password, verify_password, create_admin_access_token,
-    decode_admin_token, check_role_permission
+    decode_admin_token, check_role_permission, get_current_admin_user
 )
 from app.services.critical_service_alert_service import CATEGORY_DEFS
+from app.services.device_providers.provider_factory import DeviceProviderFactory
 
-router = APIRouter(prefix="/api/admin", tags=["admin"])
+# SECURITY: All admin endpoints require authentication by default
+# Public endpoints (login, logs) use separate router below
+router = APIRouter(
+    prefix="/api/admin", 
+    tags=["admin"],
+    dependencies=[Depends(get_current_admin_user)]  # 🔒 Enforces auth on ALL routes
+)
+
+# Public endpoints that should NOT require authentication
+public_router = APIRouter(prefix="/api/admin", tags=["admin-public"])
 logger = logging.getLogger(__name__)
 
 
@@ -306,9 +318,9 @@ def log_audit(
 
 
 # AUTHENTICATION ENDPOINTS
-@router.post("/login", response_model=AdminToken)
+@public_router.post("/login", response_model=AdminToken)
 async def admin_login(credentials: AdminLogin, request: Request, db: Session = Depends(get_db)):
-    """Admin login endpoint"""
+    """Admin login endpoint - PUBLIC (no auth required)"""
     admin = db.query(AdminUser).filter(AdminUser.username == credentials.username).first()
     
     if not admin or not verify_password(admin.hashed_password, credentials.password):
@@ -515,9 +527,9 @@ async def update_admin_user(
 
 
 # LOGGING ENDPOINTS
-@router.post("/logs")
+@public_router.post("/logs")
 async def submit_app_log(log_data: AppLogRequest, request: Request, db: Session = Depends(get_db)):
-    """Submit log from mobile app"""
+    """Submit log from mobile app - PUBLIC (no auth required)"""
     # Sanitize the log (remove sensitive data)
     sanitized_message = log_data.message
     sanitized_context = log_data.context or {}
@@ -3240,6 +3252,261 @@ def health_system(request: Request, db: Session = Depends(get_db)):
     return result
 
 
+@router.get("/health/trip-engine")
+def health_trip_engine(request: Request, db: Session = Depends(get_db)):
+    """Return status of all trip engine background tasks."""
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=403, detail="Requires manager role")
+    
+    from app.services.trip_engine import get_engine_status
+    return get_engine_status()
+
+
+@router.get("/diagnostics/trip-processing/{imei}")
+def diagnostics_trip_processing(
+    imei: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Diagnostic endpoint to troubleshoot why automatic trip processing isn't working for a device.
+    
+    Returns comprehensive state including:
+    - Device subscription status
+    - Last batch sweep timestamp
+    - Last selective sweep timestamp
+    - Last trip engine run
+    - Coalesce floor setting
+    - Whether device qualifies for next selective sweep
+    - Recent positions count
+    - Recent journeys count
+    """
+    from app.models import TripConfig, TrackSolidSyncState
+    from sqlalchemy import select, func
+    from datetime import datetime, timezone
+    
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=403, detail="Requires manager role")
+    
+    # Get device state
+    device_state = db.query(DeviceState).filter(DeviceState.device_imei == imei).first()
+    if not device_state:
+        raise HTTPException(status_code=404, detail=f"DeviceState not found for {imei}")
+    
+    # Get device info
+    device = db.query(BLETag).filter(BLETag.imei == imei).first()
+    
+    # Get global trip config
+    global_config = db.execute(
+        select(TripConfig).where(TripConfig.tenant_id == None)
+    ).scalar_one_or_none()
+    
+    # Get sync state
+    sync_state = db.execute(
+        select(TrackSolidSyncState).where(TrackSolidSyncState.id == 1)
+    ).scalar_one_or_none()
+    
+    # Count recent positions (last 24 hours)
+    now = datetime.now(timezone.utc)
+    recent_positions = db.execute(
+        select(func.count(DevicePosition.id))
+        .where(
+            DevicePosition.device_imei == imei,
+            DevicePosition.observed_at >= now - timedelta(hours=24)
+        )
+    ).scalar()
+    
+    # Count recent journeys (last 7 days)
+    from app.models import Journey
+    recent_journeys = db.execute(
+        select(func.count(Journey.id))
+        .where(
+            Journey.device_imei == imei,
+            Journey.started_at >= now - timedelta(days=7)
+        )
+    ).scalar()
+    
+    # Calculate coalesce floor
+    coalesce_floor_minutes = device_state.coalesce_floor_minutes or (global_config.coalesce_floor_minutes if global_config else 120)
+    
+    # Check if device qualifies for next selective sweep
+    qualifies_subscription = device_state.trip_subscribed
+    qualifies_new_data = device_state.last_batch_ts and (
+        device_state.last_position_ts is None or 
+        device_state.last_batch_ts > device_state.last_position_ts
+    )
+    qualifies_coalesce = device_state.last_tracklist_pull_at is None or (
+        (now - device_state.last_tracklist_pull_at).total_seconds() / 60 >= coalesce_floor_minutes
+    )
+    
+    # Calculate time until next selective sweep (if coalesce blocking)
+    minutes_until_next_sweep = None
+    if not qualifies_coalesce and device_state.last_tracklist_pull_at:
+        elapsed_minutes = (now - device_state.last_tracklist_pull_at).total_seconds() / 60
+        minutes_until_next_sweep = max(0, coalesce_floor_minutes - elapsed_minutes)
+    
+    return {
+        "device_imei": imei,
+        "device_name": device.device_name if device else None,
+        "device_model": device.device_model if device else None,
+        "subscription": {
+            "trip_subscribed": device_state.trip_subscribed,
+            "qualifies": qualifies_subscription,
+            "message": "✅ Subscribed" if qualifies_subscription else "❌ NOT SUBSCRIBED - Device will not be automatically processed"
+        },
+        "new_data_check": {
+            "last_batch_ts": device_state.last_batch_ts.isoformat() if device_state.last_batch_ts else None,
+            "last_position_ts": device_state.last_position_ts.isoformat() if device_state.last_position_ts else None,
+            "qualifies": qualifies_new_data,
+            "message": "✅ New data available" if qualifies_new_data else "❌ No new data since last pull"
+        },
+        "coalesce_check": {
+            "coalesce_floor_minutes": coalesce_floor_minutes,
+            "last_tracklist_pull_at": device_state.last_tracklist_pull_at.isoformat() if device_state.last_tracklist_pull_at else None,
+            "minutes_since_last_pull": (now - device_state.last_tracklist_pull_at).total_seconds() / 60 if device_state.last_tracklist_pull_at else None,
+            "qualifies": qualifies_coalesce,
+            "minutes_until_next_sweep": minutes_until_next_sweep,
+            "message": f"✅ Coalesce passed ({coalesce_floor_minutes} min)" if qualifies_coalesce else f"⏳ Waiting {minutes_until_next_sweep:.0f} more minutes (coalesce floor: {coalesce_floor_minutes} min)"
+        },
+        "selective_sweep_qualification": {
+            "qualifies_all_checks": qualifies_subscription and qualifies_new_data and qualifies_coalesce,
+            "will_process_on_next_sweep": qualifies_subscription and qualifies_new_data and qualifies_coalesce,
+            "blocking_reason": None if (qualifies_subscription and qualifies_new_data and qualifies_coalesce) else (
+                "Not subscribed" if not qualifies_subscription else
+                "No new data" if not qualifies_new_data else
+                f"Coalesce floor not passed (wait {minutes_until_next_sweep:.0f} min)"
+            )
+        },
+        "background_tasks": {
+            "last_batch_sweep": sync_state.last_batch_sweep_at.isoformat() if sync_state and sync_state.last_batch_sweep_at else None,
+            "last_selective_sweep": sync_state.last_selective_sweep_at.isoformat() if sync_state and sync_state.last_selective_sweep_at else None,
+            "next_selective_sweep_in_minutes": 12 - ((now - sync_state.last_selective_sweep_at).total_seconds() / 60) if sync_state and sync_state.last_selective_sweep_at else None
+        },
+        "data_summary": {
+            "positions_last_24h": recent_positions,
+            "journeys_last_7d": recent_journeys
+        },
+        "recommendation": (
+            "✅ Device is properly configured and will be processed automatically" 
+            if (qualifies_subscription and qualifies_new_data and qualifies_coalesce) else
+            f"⚠️ Device will NOT be automatically processed: {('Not subscribed - click Subscribe button' if not qualifies_subscription else 'No new data detected by batch sweep' if not qualifies_new_data else f'Coalesce floor blocking - wait {minutes_until_next_sweep:.0f} minutes or reduce coalesce setting')}"
+        )
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Global Trip Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/config/trip-engine")
+def get_trip_engine_config(request: Request, db: Session = Depends(get_db)):
+    """Get global trip engine configuration (manager+)."""
+    from app.models import TripConfig
+    from sqlalchemy import select
+    
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=403, detail="Requires manager role")
+    
+    # Get global config (tenant_id = NULL)
+    global_config = db.execute(
+        select(TripConfig).where(TripConfig.tenant_id == None)
+    ).scalar_one_or_none()
+    
+    if not global_config:
+        # Return defaults if no config exists
+        return {
+            "coalesce_floor_minutes": 120,
+            "batch_sweep_interval_minutes": 10,
+            "engine_anchor_radius_m": 100,
+            "engine_min_leg_distance_m": 300,
+            "engine_journey_break_dwell_min": 30,
+            "message": "Using default values (no global config row exists)"
+        }
+    
+    return {
+        "coalesce_floor_minutes": global_config.coalesce_floor_minutes,
+        "batch_sweep_interval_minutes": global_config.batch_sweep_interval_minutes,
+        "engine_anchor_radius_m": global_config.engine_anchor_radius_m,
+        "engine_min_leg_distance_m": global_config.engine_min_leg_distance_m,
+        "engine_journey_break_dwell_min": global_config.engine_journey_break_dwell_min,
+        "created_at": global_config.created_at.isoformat() if global_config.created_at else None,
+        "updated_at": global_config.updated_at.isoformat() if global_config.updated_at else None
+    }
+
+
+class TripEngineConfigUpdate(BaseModel):
+    coalesce_floor_minutes: Optional[int] = None
+
+
+@router.put("/config/trip-engine")
+def update_trip_engine_config(
+    data: TripEngineConfigUpdate,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Update global trip engine configuration (manager+)."""
+    from app.models import TripConfig
+    from sqlalchemy import select
+    
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=403, detail="Requires manager role")
+    
+    # Validation
+    if data.coalesce_floor_minutes is not None:
+        if data.coalesce_floor_minutes < 5:
+            raise HTTPException(status_code=400, detail="coalesce_floor_minutes must be at least 5 minutes")
+        if data.coalesce_floor_minutes > 1440:
+            raise HTTPException(status_code=400, detail="coalesce_floor_minutes must be at most 1440 minutes (24 hours)")
+    
+    # Get or create global config
+    global_config = db.execute(
+        select(TripConfig).where(TripConfig.tenant_id == None)
+    ).scalar_one_or_none()
+    
+    if not global_config:
+        # Create new global config with defaults
+        global_config = TripConfig(
+            tenant_id=None,
+            coalesce_floor_minutes=data.coalesce_floor_minutes or 120,
+            batch_sweep_interval_minutes=10,
+            engine_anchor_radius_m=100,
+            engine_min_leg_distance_m=300,
+            engine_journey_break_dwell_min=30
+        )
+        db.add(global_config)
+        logger.info("Created global TripConfig with coalesce_floor_minutes=%d", global_config.coalesce_floor_minutes)
+    else:
+        # Update existing config
+        old_value = global_config.coalesce_floor_minutes
+        if data.coalesce_floor_minutes is not None:
+            global_config.coalesce_floor_minutes = data.coalesce_floor_minutes
+            logger.info("Updated global coalesce_floor_minutes: %d → %d", old_value, data.coalesce_floor_minutes)
+    
+    db.commit()
+    
+    # Log audit
+    log_audit(
+        db,
+        str(admin.id),
+        "update_trip_config",
+        "TripConfig",
+        "global",
+        old_value={"coalesce_floor_minutes": old_value} if 'old_value' in locals() else None,
+        new_value={"coalesce_floor_minutes": global_config.coalesce_floor_minutes},
+        description=f"Updated global trip engine config: coalesce_floor_minutes={global_config.coalesce_floor_minutes}",
+        ip_address=request.client.host if request.client else None
+    )
+    
+    return {
+        "coalesce_floor_minutes": global_config.coalesce_floor_minutes,
+        "message": f"Global coalesce floor updated to {global_config.coalesce_floor_minutes} minutes"
+    }
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # SendGrid email statistics
 # ─────────────────────────────────────────────────────────────────────────────
@@ -3964,3 +4231,508 @@ def update_tenant_features(
         "updated_features": updated_features,
         "message": f"Updated {len(updated_features)} feature toggles for {usergroup.name}"
     }
+
+
+@router.get("/hubble/devices")
+async def list_hubble_devices(
+    filter_created_ts: Optional[str] = Query(None, description="Filter by creation timestamp (format: between:{after}:{before})"),
+    filter_most_recent_packet_ts: Optional[str] = Query(None, description="Filter by last packet timestamp (format: between:{after}:{before})"),
+    continuation_token: Optional[str] = Query(None, description="Pagination token from previous response"),
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    """
+    List all devices registered in Hubble Platform (Series 5).
+    
+    Useful for:
+      - Syncing device inventory between Hubble and PinPlot
+      - Auditing device lifecycle and activity
+      - Identifying unused or inactive devices
+    
+    Query parameters:
+      - filter_created_ts: Filter by creation timestamp
+        Example: "between:1722960000:1723046400" (devices registered in last 24h)
+      
+      - filter_most_recent_packet_ts: Filter by last packet timestamp
+        Examples:
+          - "between:0:1" - Devices that have never sent a packet (unused)
+          - "between:1:{timestamp_7days_ago}" - Inactive devices (no packet in 7 days)
+          - "between:{timestamp_1day_ago}:{timestamp_now}" - Recently active devices
+      
+      - continuation_token: Token for pagination (returned in previous response)
+    
+    Response includes:
+      - devices: List of device objects with device_id, name, created_ts, most_recent_packet
+      - continuation_token: Present if more pages available
+    
+    Requires HUBBLE_API_KEY and HUBBLE_ORG_ID in environment variables.
+    """
+    admin = get_admin_from_request(request, db)
+    
+    try:
+        # Get Hubble provider
+        provider = DeviceProviderFactory.get_provider("hubble")
+        
+        # Call list_devices method
+        result = await provider.list_devices(
+            filter_created_ts=filter_created_ts,
+            filter_most_recent_packet_ts=filter_most_recent_packet_ts,
+            continuation_token=continuation_token
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Hubble API error: {result.get('error', 'Unknown error')}"
+            )
+        
+        return {
+            "success": True,
+            "devices": result["devices"],
+            "continuation_token": result.get("continuation_token"),
+            "device_count": len(result["devices"]),
+        }
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error listing Hubble devices: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list Hubble devices: {str(e)}"
+        )
+
+
+@router.get("/hubble/devices/{device_id}")
+async def get_hubble_device(
+    device_id: str,
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Get a specific device by device_id from Hubble Platform (Series 5).
+    
+    Useful for:
+      - Verifying device exists and is registered
+      - Getting device details and last activity
+      - Checking device configuration before adding to PinPlot
+      - Troubleshooting device issues
+    
+    Path parameters:
+      - device_id: Hubble device identifier (returned from registration)
+    
+    Response includes:
+      - device: Device object with device_id, name, created_ts, most_recent_packet
+      - most_recent_packet: May be null if device has never sent a packet
+    
+    Example:
+      GET /api/admin/hubble/devices/abc123def456
+    
+    Returns 404 if device not found in Hubble platform.
+    Requires HUBBLE_API_KEY and HUBBLE_ORG_ID in environment variables.
+    """
+    admin = get_admin_from_request(request, db)
+    
+    try:
+        # Get Hubble provider
+        provider = DeviceProviderFactory.get_provider("hubble")
+        
+        # Call get_device method
+        result = await provider.get_device(device_id)
+        
+        if not result["success"]:
+            error_msg = result.get('error', 'Unknown error')
+            
+            # Return 404 for device not found
+            if "not found" in error_msg.lower():
+                raise HTTPException(status_code=404, detail=error_msg)
+            
+            # Otherwise return 500
+            raise HTTPException(status_code=500, detail=f"Hubble API error: {error_msg}")
+        
+        return {
+            "success": True,
+            "device": result["device"],
+        }
+        
+    except HTTPException:
+        raise  # Re-raise HTTPExceptions
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error getting Hubble device {device_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get Hubble device: {str(e)}"
+        )
+
+
+@router.patch("/hubble/devices/{device_id}")
+async def update_hubble_device(
+    device_id: str,
+    request: Request = None,
+    db: Session = Depends(get_db),
+    set_name: Optional[str] = None,
+    set_tags: Optional[Dict[str, Any]] = None,
+    set_install_location: Optional[Dict[str, Any]] = None,
+    set_destination_org_id: Optional[str] = None,
+):
+    """
+    Update a registered device in Hubble Platform (Series 5).
+    
+    Useful for:
+      - Renaming device after registration
+      - Adding custom tags for filtering/organization
+      - Setting physical installation location
+      - Transferring device to another organization
+    
+    Path parameters:
+      - device_id: Hubble device identifier
+    
+    Body parameters (all optional, but at least one required):
+      - set_name: New device name
+      - set_tags: Custom tags dict (e.g., {"_env": "production", "building": "A"})
+      - set_install_location: Physical location with lat, long, location_name
+      - set_destination_org_id: Target organization UUID for transfer
+    
+    Example:
+      PATCH /api/admin/hubble/devices/abc123def456
+      Body: {
+        "set_name": "warehouse-scanner-updated",
+        "set_tags": {"_env": "production", "floor": "3"}
+      }
+    
+    Returns updated device object or error.
+    Requires HUBBLE_API_KEY and HUBBLE_ORG_ID in environment variables.
+    """
+    admin = get_admin_from_request(request, db)
+    
+    try:
+        # Get Hubble provider
+        provider = DeviceProviderFactory.get_provider("hubble")
+        
+        # Call update_device method
+        result = await provider.update_device(
+            device_id=device_id,
+            set_name=set_name,
+            set_tags=set_tags,
+            set_install_location=set_install_location,
+            set_destination_org_id=set_destination_org_id,
+        )
+        
+        if not result["success"]:
+            error_msg = result.get('error', 'Unknown error')
+            
+            # Return 404 for device not found
+            if "not found" in error_msg.lower():
+                raise HTTPException(status_code=404, detail=error_msg)
+            
+            # Return 400 for validation errors
+            if "at least one" in error_msg.lower() or "missing required" in error_msg.lower():
+                raise HTTPException(status_code=400, detail=error_msg)
+            
+            # Return 413 for payload too large
+            if "too large" in error_msg.lower():
+                raise HTTPException(status_code=413, detail=error_msg)
+            
+            # Otherwise return 500
+            raise HTTPException(status_code=500, detail=f"Hubble API error: {error_msg}")
+        
+        return {
+            "success": True,
+            "device": result["device"],
+        }
+        
+    except HTTPException:
+        raise  # Re-raise HTTPExceptions
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error updating Hubble device {device_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update Hubble device: {str(e)}"
+        )
+
+
+@router.delete("/hubble/devices/{device_id}")
+async def delete_hubble_device(
+    device_id: str,
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Remove a Hubble device from PinPlot tracking (local deletion only).
+    
+    IMPORTANT: This does NOT delete the device from Hubble Platform.
+    The device remains registered on Hubble and can be re-added to PinPlot later.
+    
+    This operation:
+      - Removes device from ble_tags (PinPlot tracking)
+      - Deletes local trip data (positions, journeys, engine state)
+      - Does NOT affect the device on Hubble Platform
+      - Device can be re-added by clicking "Sync Devices" in admin portal
+    
+    Use cases:
+      - Temporarily stop tracking a device in PinPlot
+      - Clean up local data while keeping device registered on Hubble
+      - Re-sync devices after configuration changes
+    
+    Path parameters:
+      - device_id: Hubble device identifier (IMEI/UUID)
+    
+    Example:
+      DELETE /api/admin/hubble/devices/fe95058a-e867-4bac-b19a-bf2806762b71
+    
+    Returns 200 with success message if deleted locally.
+    Returns 404 if device not found in local database.
+    """
+    admin = get_admin_from_request(request, db)
+    
+    try:
+        # Check if device exists locally
+        device = db.query(BLETag).filter(BLETag.imei == device_id).first()
+        
+        if not device:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Device {device_id} not found in PinPlot database"
+            )
+        
+        # POLICY: Never delete from Hubble Platform
+        # Only remove from local PinPlot database
+        # Device remains registered on Hubble and can be re-synced
+        
+        logger.info(f"Removing device {device_id} from PinPlot (local deletion only)")
+        
+        # Use centralized cleanup helper to ensure all related data is deleted
+        from app.routes_portal import _delete_tag_with_cleanup
+        
+        deleted_counts = _delete_tag_with_cleanup(db, device, logger_prefix="ADMIN DELETE")
+        db.commit()
+        
+        logger.info(
+            f"Device {device_id} removed from PinPlot: "
+            f"{deleted_counts['positions']} positions, "
+            f"{deleted_counts['journeys']} journeys, "
+            f"{deleted_counts['legs']} legs, "
+            f"{deleted_counts['stationaries']} stationaries deleted"
+        )
+        
+        return {
+            "success": True,
+            "message": f"Device {device_id} removed from PinPlot tracking (still registered on Hubble)",
+            "deleted_local_data": deleted_counts,
+            "note": "Device remains on Hubble Platform. Click 'Sync Devices' to re-add."
+        }
+        
+    except HTTPException:
+        raise  # Re-raise HTTPExceptions
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error removing device {device_id} from PinPlot: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to remove device from PinPlot: {str(e)}"
+        )
+
+
+# ===== WEBHOOK LOGS =====
+
+class WebhookLogResponse(BaseModel):
+    id: str
+    source: str
+    received_at: datetime
+    packet_count: int
+    device_ids: Optional[List[str]]
+    status_code: int
+    error_message: Optional[str]
+    payload: Dict[str, Any]
+    
+    class Config:
+        from_attributes = True
+
+
+@router.get("/webhook-logs", response_model=List[WebhookLogResponse])
+async def get_webhook_logs(
+    request: Request,
+    source: Optional[str] = Query(None, description="Filter by webhook source (e.g., 'hubble')"),
+    hours: int = Query(24, description="Number of hours to look back"),
+    limit: int = Query(100, description="Maximum number of logs to return"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get webhook logs for debugging.
+    
+    Allows admins to see all webhook payloads received, which devices
+    were included, and any errors that occurred.
+    """
+    admin = get_admin_from_request(request, db)
+    
+    if not check_role_permission(admin.role, "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    
+    cutoff_time = datetime.now() - timedelta(hours=hours)
+    
+    query = db.query(WebhookLog).filter(
+        WebhookLog.received_at >= cutoff_time
+    )
+    
+    if source:
+        query = query.filter(WebhookLog.source == source)
+    
+    logs = query.order_by(WebhookLog.received_at.desc()).limit(limit).all()
+    
+    return [
+        WebhookLogResponse(
+            id=str(log.id),
+            source=log.source,
+            received_at=log.received_at,
+            packet_count=log.packet_count,
+            device_ids=log.device_ids,
+            status_code=log.status_code,
+            error_message=log.error_message,
+            payload=log.payload
+        )
+        for log in logs
+    ]
+
+
+@router.get("/webhook-logs/{log_id}", response_model=WebhookLogResponse)
+async def get_webhook_log_detail(
+    request: Request,
+    log_id: str,
+    db: Session = Depends(get_db)
+):
+    """Get detailed payload for a specific webhook log"""
+    admin = get_admin_from_request(request, db)
+    
+    if not check_role_permission(admin.role, "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    
+    log = db.query(WebhookLog).filter(WebhookLog.id == log_id).first()
+    
+    if not log:
+        raise HTTPException(status_code=404, detail="Webhook log not found")
+    
+    return WebhookLogResponse(
+        id=str(log.id),
+        source=log.source,
+        received_at=log.received_at,
+        packet_count=log.packet_count,
+        device_ids=log.device_ids,
+        status_code=log.status_code,
+        error_message=log.error_message,
+        payload=log.payload
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SERIES 5 DEVICE LOCATIONS (for debugging trip tracking)
+# ═══════════════════════════════════════════════════════════════════════════
+
+class DeviceLocationResponse(BaseModel):
+    id: int
+    device_imei: str
+    lat: float
+    lng: float
+    observed_at: datetime
+    received_at: datetime
+    gps_speed: Optional[float]
+    direction: Optional[int]
+    address: Optional[str]
+    source: str
+    leg_id: Optional[str]
+    stationary_id: Optional[str]
+
+
+@router.get("/series5-devices")
+async def get_series5_devices(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Get list of Series 5 (Hubble) devices for location tracking dropdown.
+    Returns only devices with tag_type='hubble'.
+    """
+    # Check admin authentication
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    
+    devices = db.query(BLETag).filter(
+        BLETag.tag_type == "hubble"
+    ).order_by(BLETag.device_model).all()
+    
+    return [
+        {
+            "imei": device.imei,
+            "device_model": device.device_model or device.imei[:8],
+            "last_seen": device.last_seen,
+            "battery_level": device.battery_level
+        }
+        for device in devices
+    ]
+
+
+@router.get("/device-locations/{device_imei}", response_model=List[DeviceLocationResponse])
+async def get_device_locations(
+    device_imei: str,
+    request: Request,
+    hours: int = Query(default=24, ge=1, le=168),  # 1 hour to 7 days
+    limit: int = Query(default=200, ge=1, le=1000),
+    db: Session = Depends(get_db)
+):
+    """
+    Get device position history for a Series 5 device.
+    Used for debugging trip tracking issues.
+    
+    Args:
+        device_imei: Device IMEI/ID
+        hours: Lookback window (default 24 hours)
+        limit: Max positions to return (default 200)
+    
+    Returns:
+        List of device positions ordered by observed_at DESC
+    """
+    # Check admin authentication
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    
+    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
+    
+    positions = db.query(DevicePosition).filter(
+        DevicePosition.device_imei == device_imei,
+        DevicePosition.observed_at >= cutoff_time
+    ).order_by(DevicePosition.observed_at.desc()).limit(limit).all()
+    
+    return [
+        DeviceLocationResponse(
+            id=pos.id,
+            device_imei=pos.device_imei,
+            lat=pos.lat,
+            lng=pos.lng,
+            observed_at=pos.observed_at,
+            received_at=pos.received_at,
+            gps_speed=pos.gps_speed,
+            direction=pos.direction,
+            address=pos.address,
+            source=pos.source,
+            leg_id=str(pos.leg_id) if pos.leg_id else None,
+            stationary_id=str(pos.stationary_id) if pos.stationary_id else None
+        )
+        for pos in positions
+    ]

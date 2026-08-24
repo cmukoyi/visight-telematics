@@ -11,10 +11,11 @@ from .base_provider import DeviceTagProvider
 from .tracksolid_provider import TrackSolidTagProvider
 from .scope_provider import ScopeTagProvider
 from .ble_provider import BLEIndoorTagProvider
+from .hubble_provider import HubbleTagProvider
 
 # Registry: tag_type key → provider class.
-# Both the canonical vendor names ('scope', 'tracksolid', 'ble') and the
-# user-facing series names ('series1', 'series2', 'series_3', 'series_4') 
+# Both the canonical vendor names ('scope', 'tracksolid', 'ble', 'hubble') and the
+# user-facing series names ('series1', 'series2', 'series_3', 'series_4', 'series_5') 
 # are accepted so that the Flutter app and portal both resolve correctly.
 _PROVIDERS: dict[str, type[DeviceTagProvider]] = {
     "scope":      ScopeTagProvider,         # Series 1
@@ -26,6 +27,9 @@ _PROVIDERS: dict[str, type[DeviceTagProvider]] = {
     "ble":        BLEIndoorTagProvider,     # Series 4 (DX-Smart indoor BLE)
     "series_4":   BLEIndoorTagProvider,     # alias used by portal
     "series4":    BLEIndoorTagProvider,     # alias
+    "hubble":     HubbleTagProvider,        # Series 5 (Hubble Platform BLE)
+    "series_5":   HubbleTagProvider,        # alias used by portal
+    "series5":    HubbleTagProvider,        # alias
 }
 
 

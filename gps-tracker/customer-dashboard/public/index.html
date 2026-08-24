@@ -118,6 +118,11 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
     <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 
+    <!-- Chart.js and jsPDF for temperature graph -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
     <!-- MQTT -->
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
@@ -264,6 +269,14 @@
         <span id="pageTitle" style="font-size:1rem;font-weight:600;color:var(--text);flex:1;padding-left:16px"></span>
 
         <div class="header-right">
+            <!-- Language Selector -->
+            <div style="display:flex;align-items:center;gap:6px;position:relative">
+                <i class="fa-solid fa-globe" style="color:var(--text-3);font-size:0.9rem;pointer-events:none"></i>
+                <select id="header-language-selector" class="form-input" style="max-width:90px;padding:4px 8px;font-size:0.85rem;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--text);cursor:pointer" onchange="settingsSaveLanguage(this.value)" data-i18n-title="settings.interface_language" title="Interface language">
+                    <!-- Options populated by JS -->
+                </select>
+            </div>
+            
             <div class="notif-wrap" id="notifWrap">
                 <button id="notif-btn" data-i18n-title="alerts.alerts_inbox" title="Alerts inbox" onclick="toggleNotifPanel(event)">
                     <i class="fa-solid fa-bell"></i>
@@ -1940,8 +1953,8 @@ input.hive-range::-moz-range-track {
                       <canvas id="interactCanvas"></canvas>
                       <div class="canvas-drop-hint" id="dropHint">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                        <div>Drop floor plan image to use as tracing overlay</div>
-                        <div class="hint-sub">PNG, JPG, PDF, SVG supported</div>
+                        <div data-i18n="floor_plan.drop_image_hint">Drop floor plan image to use as tracing overlay</div>
+                        <div class="hint-sub" data-i18n="floor_plan.supported_formats">PNG, JPG, PDF, SVG supported</div>
                       </div>
                     </div>
                   </main>
@@ -2070,16 +2083,16 @@ input.hive-range::-moz-range-track {
                       <div class="preview-floor-tabs" id="previewFloorTabs"></div>
                       <div class="preview-controls">
                         <label class="toggle-row sm" style="gap:6px">
-                          <span style="color:var(--text-muted);font-size:11px">Gateways</span>
+                          <span style="color:var(--text-muted);font-size:11px" data-i18n="floor_plan.gateways">Gateways</span>
                           <label class="toggle sm"><input type="checkbox" id="previewGatewayToggle" checked><span class="slider"></span></label>
                         </label>
                         <label class="toggle-row sm" style="gap:6px">
-                          <span style="color:var(--text-muted);font-size:11px">Labels</span>
+                          <span style="color:var(--text-muted);font-size:11px" data-i18n="floor_plan.labels">Labels</span>
                           <label class="toggle sm"><input type="checkbox" id="previewLabelToggle" checked><span class="slider"></span></label>
                         </label>
-                        <button class="btn-icon sm" id="previewClose" title="Close preview">
+                        <button class="btn-icon sm" id="previewClose" data-i18n-title="floor_plan.close_preview" title="Close preview">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                          Close
+                          <span data-i18n="common.close">Close</span>
                         </button>
                       </div>
                     </div>
@@ -2107,32 +2120,32 @@ input.hive-range::-moz-range-track {
                 <div class="modal-overlay" id="sketchSetupModal" style="display:none">
                   <div class="modal" style="max-width:500px">
                     <div class="modal-title" data-i18n="general.floor_plan_setup">Floor Plan Setup</div>
-                    <div style="margin-bottom:16px;padding:12px;background:var(--primary-dim);border-radius:6px;font-size:13px;color:var(--text-muted)">
+                    <div style="margin-bottom:16px;padding:12px;background:var(--primary-dim);border-radius:6px;font-size:13px;color:var(--text-muted)" data-i18n="floor_plan.link_to_database">
                       Link this floor plan to a building and floor in your database.
                     </div>
                     <div style="margin-bottom:16px">
-                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">Building</label>
+                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)" data-i18n="floor_plan.building">Building</label>
                       <select id="sketchBuildingSelect" class="prop-input" style="width:100%">
-                        <option value="">Select or create new...</option>
+                        <option value="" data-i18n="floor_plan.select_or_create">Select or create new...</option>
                       </select>
                       <div id="sketchNewBuildingFields" style="display:none;margin-top:8px">
-                        <input type="text" id="sketchBuildingName" class="prop-input" placeholder="Building name" style="width:100%;margin-bottom:8px">
-                        <input type="text" id="sketchBuildingAddress" class="prop-input" placeholder="Address (optional)" style="width:100%">
+                        <input type="text" id="sketchBuildingName" class="prop-input" data-i18n-placeholder="floor_plan.building_name" placeholder="Building name" style="width:100%;margin-bottom:8px">
+                        <input type="text" id="sketchBuildingAddress" class="prop-input" data-i18n-placeholder="floor_plan.address_optional" placeholder="Address (optional)" style="width:100%">
                       </div>
                     </div>
                     <div style="margin-bottom:16px">
-                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">Floor</label>
+                      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)" data-i18n="floor_plan.floor">Floor</label>
                       <select id="sketchFloorSelect" class="prop-input" style="width:100%">
-                        <option value="">Select or create new...</option>
+                        <option value="" data-i18n="floor_plan.select_or_create">Select or create new...</option>
                       </select>
                       <div id="sketchNewFloorFields" style="display:none;margin-top:8px">
-                        <input type="text" id="sketchFloorName" class="prop-input" placeholder="Floor name (e.g., Ground Floor)" style="width:100%;margin-bottom:8px">
-                        <input type="number" id="sketchFloorNumber" class="prop-input" placeholder="Floor number (0 = ground, 1 = first, -1 = basement)" style="width:100%">
+                        <input type="text" id="sketchFloorName" class="prop-input" data-i18n-placeholder="floor_plan.floor_name" placeholder="Floor name (e.g., Ground Floor)" style="width:100%;margin-bottom:8px">
+                        <input type="number" id="sketchFloorNumber" class="prop-input" data-i18n-placeholder="floor_plan.floor_number" placeholder="Floor number (0 = ground, 1 = first, -1 = basement)" style="width:100%">
                       </div>
                     </div>
                     <div class="modal-actions">
                       <button class="btn-ghost" id="sketchSetupCancel" data-i18n="common.cancel">Cancel</button>
-                      <button class="btn-primary" id="sketchSetupSave">Link Floor Plan</button>
+                      <button class="btn-primary" id="sketchSetupSave" data-i18n="floor_plan.link_floor_plan">Link Floor Plan</button>
                     </div>
                   </div>
                 </div>
@@ -2161,7 +2174,7 @@ input.hive-range::-moz-range-track {
                     <div id="sketchExistingGatewayFields" style="margin-bottom:16px;display:none">
                       <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">Gateway</label>
                       <select id="sketchGatewaySelect" class="prop-input" style="width:100%">
-                        <option value="">Loading...</option>
+                        <option value="" data-i18n="users.loading">Loading...</option>
                       </select>
                     </div>
                     <div class="modal-actions">
@@ -2186,7 +2199,7 @@ input.hive-range::-moz-range-track {
                                 <input type="text" id="fp-search-input" placeholder="Search assets or tags…" oninput="_fpFilterAssetsD(this.value)">
                             </div>
                             <div class="fp-status-grid">
-                                <div class="fp-status-card fp-active" id="fp-sc-all"     onclick="FP.filterByStatus('all',this)">    <div class="fp-count" id="fp-count-total">0</div>   <div class="fp-slabel">Total</div></div>
+                                <div class="fp-status-card fp-active" id="fp-sc-all"     onclick="FP.filterByStatus('all',this)">    <div class="fp-count" id="fp-count-total">0</div>   <div class="fp-slabel" data-i18n="floor_plan.total">Total</div></div>
                                 <div class="fp-status-card"           id="fp-sc-online"  onclick="FP.filterByStatus('online',this)"> <div class="fp-count fp-online"  id="fp-count-online">0</div>  <div class="fp-slabel">Online</div></div>
                                 <div class="fp-status-card"           id="fp-sc-idle"    onclick="FP.filterByStatus('idle',this)">   <div class="fp-count fp-idle"    id="fp-count-idle">0</div>    <div class="fp-slabel">Idle</div></div>
                                 <div class="fp-status-card"           id="fp-sc-offline" onclick="FP.filterByStatus('offline',this)"><div class="fp-count fp-offline" id="fp-count-offline">0</div> <div class="fp-slabel">Offline</div></div>
@@ -2211,7 +2224,7 @@ input.hive-range::-moz-range-track {
                         <div class="fp-asset-list" id="fp-asset-list">
                             <div class="fp-empty-state" id="fp-empty-state">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
-                                <p id="fp-empty-msg">Loading assets…</p>
+                                <p id="fp-empty-msg" data-i18n="floor_plan.loading_assets">Loading assets…</p>
                             </div>
                         </div>
                     </div>
@@ -2262,7 +2275,7 @@ input.hive-range::-moz-range-track {
                         <!-- Zone legend -->
                         <div class="fp-zone-legend" id="fp-zone-legend">
                             <div class="fp-legend-title">Zones</div>
-                            <div class="fp-legend-item"><div class="fp-legend-swatch" style="background:rgba(0,100,0,.2);border:1.5px solid rgba(0,100,0,.55)"></div>Active / Dispatch</div>
+                            <div class="fp-legend-item"><div class="fp-legend-swatch" style="background:rgba(0,100,0,.2);border:1.5px solid rgba(0,100,0,.55)"></div><span data-i18n="floor_plan.active_dispatch">Active / Dispatch</span></div>
                             <div class="fp-legend-item"><div class="fp-legend-swatch" style="background:rgba(239,68,68,.18);border:1.5px solid rgba(239,68,68,.5)"></div>Alert zone</div>
                             <div class="fp-legend-item"><div class="fp-legend-swatch" style="background:rgba(59,130,246,.15);border:1.5px solid rgba(59,130,246,.45)"></div>Restricted</div>
                             <div class="fp-legend-item"><div class="fp-legend-swatch" style="background:rgba(245,158,11,.15);border:1.5px solid rgba(245,158,11,.45)"></div>Staging</div>
@@ -2350,26 +2363,6 @@ input.hive-range::-moz-range-track {
                             <select id="pref-units" class="form-input" style="max-width:180px" onchange="settingsSaveUnits(this.value)">
                                 <option value="metric" data-i18n="settings.metric">Metric (km, km/h)</option>
                                 <option value="imperial" data-i18n="settings.imperial">Imperial (mi, mph)</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- ─── Language ─── -->
-                    <div class="card">
-                        <div class="settings-section-header">
-                            <i class="fa-solid fa-language" style="color:var(--primary)"></i>
-                            <div>
-                                <h3 data-i18n="settings.language">Language</h3>
-                                <p data-i18n="settings.language_hint">Choose your preferred language for the portal interface.</p>
-                            </div>
-                        </div>
-                        <div class="settings-row">
-                            <div>
-                                <div class="settings-row-label" data-i18n="settings.interface_language">Interface language</div>
-                                <div class="settings-row-hint" data-i18n="settings.language_stored_locally">Saved locally in this browser.</div>
-                            </div>
-                            <select id="pref-language" class="form-input" style="max-width:180px" onchange="settingsSaveLanguage(this.value)">
-                                <!-- Options populated by JS -->
                             </select>
                         </div>
                     </div>
@@ -2789,8 +2782,8 @@ input.hive-range::-moz-range-track {
             <div id="tab-qr" class="tab-content">
                 <!-- QR/NFC Toolbar with How To button -->
                 <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
-                    <button class="btn btn-secondary btn-small" style="margin-left:auto" onclick="qrOpenHelp()" title="Open the QR/NFC user guide in a new tab">
-                        <i class="fa-solid fa-circle-question"></i> How To
+                    <button class="btn btn-secondary btn-small" style="margin-left:auto" onclick="qrOpenHelp()" data-i18n-title="qr.open_user_guide" title="Open the QR/NFC user guide in a new tab">
+                        <i class="fa-solid fa-circle-question"></i> <span data-i18n="general.how_to">How To</span>
                     </button>
                 </div>
                 
@@ -2981,7 +2974,7 @@ input.hive-range::-moz-range-track {
                             </tr>
                         </thead>
                         <tbody id="rpt-trips-tbody">
-                            <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-3)">Select a tag and date range, then click <strong>Load Journeys</strong>.</td></tr>
+                            <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-3)"><span data-i18n="common.select_tag_and_date">Select a tag and date range, then click <strong>Load Journeys</strong>.</span></td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -3367,6 +3360,268 @@ input.hive-range::-moz-range-track {
             .battery-wrap.low { color:#ef4444; }
             .battery-wrap.good { color:#22c55e; }
             
+            /* ══════════════════ TEMPERATURE GRAPH ══════════════════ */
+            /* Only show in live map tab */
+            #tab-livemap:not(.active) ~ .temp-graph-panel {
+                display: none !important;
+            }
+            
+            /* Ensure map-sidebar stays above graph panel */
+            #tab-livemap .map-sidebar {
+                position: relative;
+                z-index: 10001;
+            }
+            
+            .temp-graph-panel { 
+                position: fixed;
+                /* Align with map content area (after nav + sidebar) */
+                left: calc(340px + 280px); /* Main nav + asset list sidebar */
+                right: 0;
+                bottom: -50%; /* Hidden below */
+                height: 50vh; /* Match typical detail panel height */
+                background: var(--bg-2) !important; /* Solid panel background - force override */
+                border-top: 2px solid var(--border-2);
+                box-shadow: 0 -4px 28px rgba(0,0,0,0.2);
+                z-index: 10000;
+                transition: bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1), left 0.3s ease;
+                overflow: hidden;
+            }
+            .temp-graph-panel.open {
+                bottom: 0;
+            }
+            
+            /* When main sidebar collapses, shift left and stretch */
+            body.sidebar-collapsed .temp-graph-panel {
+                left: calc(60px + 280px) !important; /* Collapsed nav + asset list - force override */
+            }
+            
+            /* Mobile: Full width */
+            @media (max-width: 768px) {
+                .temp-graph-panel {
+                    left: 0;
+                }
+            }
+            
+            .temp-graph-content { 
+                padding:14px 18px; 
+                height:100%; 
+                display:flex; 
+                flex-direction:column;
+                overflow:hidden;
+                background: var(--bg-2) !important; /* Solid background, no transparency - force override */
+            }
+            .temp-graph-header { 
+                display:flex; 
+                align-items:center; 
+                gap:10px;
+                flex-wrap:wrap;
+                margin-bottom:12px;
+                background: var(--bg-2) !important; /* Solid background for header text - force override */
+                padding-bottom: 8px;
+                position: relative;
+                z-index: 1;
+            }
+            .temp-graph-title { 
+                font-size:13px; 
+                font-weight:600; 
+                display:flex; 
+                align-items:center; 
+                gap:9px; 
+            }
+            .temp-graph-title .icon-badge {
+                width:22px; height:22px; border-radius:6px;
+                background:rgba(16, 185, 129, 0.15); color:var(--success);
+                display:flex; align-items:center; justify-content:center;
+                font-size:11px;
+            }
+            .temp-graph-meta {
+                font-size:10px; color:var(--text-3);
+                text-transform:uppercase; letter-spacing:.05em;
+            }
+            .temp-graph-spacer { margin-left:auto; }
+            .temp-graph-close { 
+                background:none; 
+                border:none; 
+                color:var(--text-3); 
+                font-size:20px; 
+                cursor:pointer; 
+                padding:4px 8px; 
+            }
+            .temp-graph-preset { 
+                font-family:inherit; 
+                font-size:11px; 
+                padding:5px 11px; 
+                border-radius:20px; 
+                border:1px solid var(--border-2); 
+                background:transparent; 
+                color:var(--text-2); 
+                cursor:pointer; 
+            }
+            .temp-graph-preset.active { 
+                background:rgba(16, 185, 129, 0.15); 
+                border-color:var(--success); 
+                color:var(--success); 
+                font-weight:600; 
+            }
+            .temp-graph-chip {
+                font-family:inherit; display:flex; align-items:center;
+                gap:6px; font-size:11px; padding:5px 11px;
+                border-radius:20px; border:1px solid var(--border-2);
+                background:transparent; color:var(--text-2); cursor:pointer;
+            }
+            .temp-graph-chip .dot {
+                width:7px; height:7px; border-radius:2px;
+            }
+            .temp-graph-chip.on {
+                background:rgba(59, 130, 246, 0.15); border-color:var(--primary);
+                color:var(--primary);
+            }
+            .temp-graph-chip.alt.on {
+                background:rgba(245, 158, 11, 0.15); border-color:var(--warning);
+                color:var(--warning);
+            }
+            .temp-graph-smooth {
+                display:flex; align-items:center; gap:6px;
+                font-size:11px; color:var(--text-2); cursor:pointer;
+            }
+            .temp-graph-smooth input[type="checkbox"] {
+                width:auto; cursor:pointer;
+            }
+            
+            .temp-graph-main {
+                display:flex; gap:16px; flex:1; min-height:0;
+                background: var(--bg-2) !important; /* Match panel background */
+            }
+            .temp-graph-stats {
+                width:auto; min-width:132px; max-width:190px;
+                flex:none; display:flex; flex-direction:column; gap:8px;
+            }
+            .temp-graph-stat {
+                background: var(--bg-3); /* Grey tile background */
+                border: 1px solid var(--border);
+                border-radius: 9px;
+                padding: 9px 11px;
+            }
+            .temp-graph-stat .l {
+                font-size:9px; color:var(--text-3);
+                text-transform:uppercase; letter-spacing:.04em;
+                margin-bottom:2px; line-height:1.25;
+            }
+            .temp-graph-stat .v {
+                font-size:17px; font-weight:600;
+            }
+            .temp-graph-stat .v-blue { color:var(--primary); }
+            .temp-graph-stat .v-amber { color:var(--warning); }
+            .temp-graph-stat .v-red { color:var(--danger); }
+            .temp-graph-stat .v-green { color:var(--success); }
+            .temp-graph-stats.scoped .temp-graph-stat {
+                box-shadow:inset 2px 0 0 var(--primary);
+            }
+            .temp-graph-export {
+                font-family:inherit; font-size:11px; padding:7px 10px;
+                border-radius:9px; margin-top:2px;
+                display:inline-flex; align-items:center; justify-content:center;
+                gap:6px; width:100%;
+                border:1px solid var(--border-2);
+                background:var(--bg-3); color:var(--text-2); cursor:pointer;
+            }
+            .temp-graph-export:hover:not(:disabled) {
+                border-color:var(--success); color:var(--success);
+            }
+            .temp-graph-export:disabled {
+                opacity:.45; cursor:not-allowed;
+            }
+            .temp-graph-export .ico {
+                width:13px; height:13px; flex:none;
+            }
+            
+            .temp-graph-charts {
+                flex:1; min-width:0; display:flex; flex-direction:column;
+                background: transparent; /* No white background */
+            }
+            .temp-graph-chart-box {
+                position:relative; flex:1; min-height:0;
+                background: transparent; /* No white background behind chart */
+            }
+            .temp-graph-chart-box canvas { 
+                cursor:crosshair; 
+                background: transparent !important; /* Remove any canvas white background */
+            }
+            
+            .temp-graph-overview {
+                margin-top:8px; position:relative;
+            }
+            .temp-graph-ov-wrap {
+                position:relative; height:38px; border-radius:7px;
+                overflow:hidden; background:var(--bg-3);
+                border:1px solid var(--border); cursor:grab;
+            }
+            .temp-graph-ov-wrap:active { cursor:grabbing; }
+            .temp-graph-ov-wrap canvas {
+                display:block; width:100%; height:100%;
+            }
+            .temp-graph-ov-bar {
+                display:flex; align-items:center; gap:10px; margin-top:5px;
+            }
+            .temp-graph-ov-hint {
+                font-size:10px; color:var(--text-3);
+            }
+            .temp-graph-reset {
+                font-family:inherit; font-size:10px; padding:3px 9px;
+                border-radius:20px; border:1px solid var(--border-2);
+                background:transparent; color:var(--text-2); cursor:pointer;
+                display:none;
+            }
+            .temp-graph-reset.show {
+                display:inline-block; border-color:var(--success);
+                color:var(--success);
+            }
+            
+            .temp-graph-footer {
+                display:flex; align-items:center; gap:14px; margin-top:9px;
+                font-size:11px; color:var(--text-2); flex-wrap:wrap;
+            }
+            .temp-graph-legend {
+                display:flex; align-items:center; gap:6px;
+            }
+            .temp-graph-legend .d {
+                width:8px; height:8px; border-radius:50%;
+            }
+            .temp-graph-legend.gap-legend {
+                color:var(--text-3);
+            }
+            .temp-graph-legend .sw {
+                width:15px; height:9px; border-radius:2px;
+                background:rgba(150,134,205,0.20);
+                border:1px dashed rgba(168,152,220,0.60);
+            }
+            .temp-graph-gap-note {
+                font-size:11px; color:var(--warning-text);
+            }
+            
+            .temp-graph-loading { 
+                display:flex; 
+                align-items:center; 
+                justify-content:center; 
+                height:250px; 
+                color:var(--text-3); 
+            }
+            .temp-graph-error { 
+                display:flex; 
+                align-items:center; 
+                justify-content:center; 
+                height:250px; 
+                color:var(--danger); 
+            }
+            
+            @media (max-width:720px) {
+                .temp-graph-main { flex-direction:column; }
+                .temp-graph-stats {
+                    flex-direction:row; max-width:none; width:100%;
+                }
+                .temp-graph-stats .temp-graph-stat { flex:1; }
+            }
+            
             /* Live Map Time Badges (matching Movement Analytics style) */
             .lm-time-badge { font-size:10.5px; font-weight:600; font-variant-numeric:tabular-nums; line-height:1; border:1px solid currentColor; border-radius:5px; padding:2px 6px; text-align:center; min-width:65px; white-space:nowrap; }
             .lm-time-fresh { color:#22c55e; } /* ≤15 min */
@@ -3510,19 +3765,19 @@ input.hive-range::-moz-range-track {
                             <div>
                                 <div class="mha-pills" id="mha-category-pills">
                                     <!-- Dynamic category pills loaded from database -->
-                                    <span class="mha-pill on" data-filter="all" onclick="mhaSetFilter('all', this)">All</span>
+                                    <span class="mha-pill on" data-filter="all" onclick="mhaSetFilter('all', this)" data-i18n="common.all">All</span>
                                 </div>
                             </div>
                             
                             <div style="flex:1;display:flex;flex-direction:column;">
                                 <div class="mha-ap-label" style="display:flex;justify-content:space-between;align-items:center">
-                                    <span>Assets</span>
-                                    <span style="text-transform:none;letter-spacing:0;font-size:10px"><i class="fa-solid fa-arrow-down" style="font-size:10px;margin-right:2px"></i> last reported</span>
+                                    <span data-i18n="assets.title">Assets</span>
+                                    <span style="text-transform:none;letter-spacing:0;font-size:10px"><i class="fa-solid fa-arrow-down" style="font-size:10px;margin-right:2px"></i> <span data-i18n="general.last_reported">last reported</span></span>
                                 </div>
                                 <div class="mha-ap-list" id="mha-asset-list">
                                     <div style="padding:40px 16px;text-align:center;color:var(--text-3);font-size:13px;">
                                         <i class="fa-solid fa-spinner fa-spin" style="font-size:24px;margin-bottom:12px;display:block;"></i>
-                                        Loading assets...
+                                        <span data-i18n="assets.loading_assets">Loading assets...</span>
                                     </div>
                                 </div>
                             </div>
@@ -3532,27 +3787,27 @@ input.hive-range::-moz-range-track {
                     <!-- Map Panel (Phase 5.4) -->
                     <div class="mha-map-panel">
                         <!-- Vertical "Show Assets" button (appears when panel collapsed) -->
-                        <button class="mha-show-assets-btn" onclick="mhaToggleAssetsPanel()" title="Show Assets Panel">
+                        <button class="mha-show-assets-btn" onclick="mhaToggleAssetsPanel()" data-i18n-title="general.show_assets_panel" title="Show Assets Panel">
                             <i class="fa-solid fa-tags"></i>
-                            SHOW ASSETS
+                            <span data-i18n="general.show_assets">SHOW ASSETS</span>
                         </button>
                         
                         <!-- Vertical "Show Journeys" button (appears when panel collapsed) -->
-                        <button class="mha-show-journeys-btn" onclick="mhaTogglePanel()" title="Show Journeys Panel">
+                        <button class="mha-show-journeys-btn" onclick="mhaTogglePanel()" data-i18n-title="general.show_journeys_panel" title="Show Journeys Panel">
                             <i class="fa-solid fa-route"></i>
-                            SHOW JOURNEYS
+                            <span data-i18n="general.show_journeys">SHOW JOURNEYS</span>
                         </button>
                         
                         <div class="mha-map-head">
                             <div style="display:flex;align-items:center;gap:12px;flex:1">
                                 <div class="t">
                                     <i class="fa-solid fa-map"></i>
-                                    <span>Journey Map</span>
+                                    <span data-i18n="general.journey_map">Journey Map</span>
                                 </div>
-                                <div class="meta" id="mha-map-meta">Select an asset to view journeys</div>
+                                <div class="meta" id="mha-map-meta" data-i18n="trips.select_asset_date">Select an asset to view journeys</div>
                             </div>
-                            <button class="btn btn-secondary btn-small" onclick="mhaOpenHelp()" title="Open the Movement Analytics user manual in a new tab">
-                                <i class="fa-solid fa-circle-question"></i> How To
+                            <button class="btn btn-secondary btn-small" onclick="mhaOpenHelp()" data-i18n-title="general.open_user_manual" title="Open the Movement Analytics user manual in a new tab">
+                                <i class="fa-solid fa-circle-question"></i> <span data-i18n="general.how_to">How To</span>
                             </button>
                         </div>
                         <div class="mha-map-container">
@@ -3560,10 +3815,10 @@ input.hive-range::-moz-range-track {
                             
                             <!-- Map Style Switcher -->
                             <div class="map-style-switcher" id="mha-style-switcher">
-                                <button class="map-style-btn active" data-style="streets" onclick="mhaSwitchMapStyle('streets')">
+                                <button class="map-style-btn active" data-style="streets" onclick="mhaSwitchMapStyle('streets')" data-i18n="map.streets">
                                     Streets
                                 </button>
-                                <button class="map-style-btn" data-style="satellite" onclick="mhaSwitchMapStyle('satellite')">
+                                <button class="map-style-btn" data-style="satellite" onclick="mhaSwitchMapStyle('satellite')" data-i18n="map.satellite">
                                     Satellite
                                 </button>
                             </div>
@@ -3571,23 +3826,23 @@ input.hive-range::-moz-range-track {
                             <!-- Map Controls -->
                             <div class="mha-map-controls">
                                 <button class="mha-map-btn" id="mha-reset-view" style="display:none;" onclick="mhaResetView()">
-                                    <i class="fa-solid fa-compress"></i> Reset view
+                                    <i class="fa-solid fa-compress"></i> <span data-i18n="map.reset_view">Reset view</span>
                                 </button>
                                 <button class="mha-map-btn" id="mha-show-geofences" onclick="mhaToggleGeofences()">
-                                    <i class="fa-solid fa-draw-polygon"></i> Show geofences
+                                    <i class="fa-solid fa-draw-polygon"></i> <span data-i18n="geofence.show_geofences">Show geofences</span>
                                 </button>
                                 <button class="mha-map-btn" onclick="mhaClearMarkers()">
-                                    <i class="fa-solid fa-eraser"></i> Clear markers
+                                    <i class="fa-solid fa-eraser"></i> <span data-i18n="map.clear_markers">Clear markers</span>
                                 </button>
                             </div>
                             
                             <!-- Legend -->
                             <div class="mha-legend">
-                                <span><i class="mha-legend-dot" style="background:#22c55e;"></i> Start</span>
-                                <span><i class="mha-legend-line" style="background:#3b82f6;"></i> Leg</span>
-                                <span><i class="mha-legend-dot" style="background:#3b82f6;width:6px;height:6px;"></i> Position</span>
-                                <span><i class="mha-legend-dot" style="background:#f59e0b;"></i> Stationary</span>
-                                <span><i class="mha-legend-dot" style="background:#ef4444;"></i> End</span>
+                                <span><i class="mha-legend-dot" style="background:#22c55e;"></i> <span data-i18n="trips.start">Start</span></span>
+                                <span><i class="mha-legend-line" style="background:#3b82f6;"></i> <span data-i18n="general.leg">Leg</span></span>
+                                <span><i class="mha-legend-dot" style="background:#3b82f6;width:6px;height:6px;"></i> <span data-i18n="general.position">Position</span></span>
+                                <span><i class="mha-legend-dot" style="background:#f59e0b;"></i> <span data-i18n="general.stationary">Stationary</span></span>
+                                <span><i class="mha-legend-dot" style="background:#ef4444;"></i> <span data-i18n="trips.end">End</span></span>
                             </div>
                             
                             <!-- Journey Badge -->
@@ -3602,26 +3857,26 @@ input.hive-range::-moz-range-track {
                         <div class="mha-jp-tabs">
                             <div class="mha-jp-tab active" data-mha-tab="journeys" onclick="mhaSwitchTab('journeys')">
                                 <i class="fa-solid fa-route"></i>
-                                <span>Journeys</span>
+                                <span data-i18n="trips.journeys">Journeys</span>
                             </div>
                             <div class="mha-jp-tab" data-mha-tab="positions" onclick="mhaSwitchTab('positions')">
                                 <i class="fa-solid fa-location-dot"></i>
-                                <span>Positions</span>
+                                <span data-i18n="general.positions">Positions</span>
                             </div>
-                            <button class="mha-jp-collapse" onclick="mhaTogglePanel()" title="Collapse panel">
+                            <button class="mha-jp-collapse" onclick="mhaTogglePanel()" data-i18n-title="general.collapse_panel" title="Collapse panel">
                                 <i class="fa-solid fa-chevron-right"></i>
                             </button>
                         </div>
                         <div class="mha-jp-body" id="mha-journeys-body">
                             <div class="mha-jp-placeholder">
                                 <i class="fa-solid fa-route"></i>
-                                <p>Select an asset to view journeys</p>
+                                <p data-i18n="trips.select_asset_date">Select an asset to view journeys</p>
                             </div>
                         </div>
                         <div class="mha-jp-body" id="mha-positions-body" style="display:none;">
                             <div class="mha-jp-placeholder">
                                 <i class="fa-solid fa-location-dot"></i>
-                                <p>Select an asset to view positions</p>
+                                <p data-i18n="general.select_asset_positions">Select an asset to view positions</p>
                             </div>
                         </div>
                     </div>
@@ -3633,10 +3888,10 @@ input.hive-range::-moz-range-track {
 
               <!-- ── HIVE sub-nav ─────────────────────────────── -->
               <div id="hive-subnav" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-                <button class="hive-btn hive-btn-ghost hive-subnav-btn" data-hscreen="list" onclick="hiveShowScreen('list')"><i class="fa-solid fa-grip"></i> Hive List</button>
-                <button class="hive-btn hive-btn-ghost hive-subnav-btn" data-hscreen="archive" onclick="hiveShowScreen('archive')"><i class="fa-solid fa-box-archive"></i> Archive</button>
-                <button class="hive-btn hive-btn-ghost" style="margin-left:auto" onclick="hiveOpenHelp()" title="Open the HIVE user manual in a new tab"><i class="fa-solid fa-circle-question"></i> How To</button>
-                <button class="hive-btn" onclick="hiveShowWizard()"><i class="fa-solid fa-plus"></i> New Hive</button>
+                <button class="hive-btn hive-btn-ghost hive-subnav-btn" data-hscreen="list" onclick="hiveShowScreen('list')"><i class="fa-solid fa-grip"></i> <span data-i18n="hive.hive_list">Hive List</span></button>
+                <button class="hive-btn hive-btn-ghost hive-subnav-btn" data-hscreen="archive" onclick="hiveShowScreen('archive')"><i class="fa-solid fa-box-archive"></i> <span data-i18n="hive.archive">Archive</span></button>
+                <button class="hive-btn hive-btn-ghost" style="margin-left:auto" onclick="hiveOpenHelp()" data-i18n-title="hive.open_user_manual" title="Open the HIVE user manual in a new tab"><i class="fa-solid fa-circle-question"></i> <span data-i18n="general.how_to">How To</span></button>
+                <button class="hive-btn" onclick="hiveShowWizard()"><i class="fa-solid fa-plus"></i> <span data-i18n="hive.new_hive">New Hive</span></button>
               </div>
 
               <!-- ════════════════════════════════════════
@@ -3644,28 +3899,28 @@ input.hive-range::-moz-range-track {
               ════════════════════════════════════════ -->
               <div id="hive-screen-list">
                 <div class="hive-page-header">
-                  <div class="hive-page-title"><i class="fa-solid fa-shield-halved"></i> HIVE Tracking</div>
+                  <div class="hive-page-title"><i class="fa-solid fa-shield-halved"></i> <span data-i18n="hive.hive_tracking">HIVE Tracking</span></div>
                   <div class="hive-search-box">
                     <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" placeholder="Search hives, tag IDs, names…" oninput="_hiveFilterCardsD(this.value)">
+                    <input type="text" data-i18n-placeholder="hive.search_hives" placeholder="Search hives, tag IDs, names…" oninput="_hiveFilterCardsD(this.value)">
                   </div>
                 </div>
                 <div class="hive-stats-row">
                   <div class="hive-stat-card">
                     <div class="hive-stat-icon hive-green"><i class="fa-solid fa-shield-halved"></i></div>
-                    <div><div id="hive-stat-active" class="hive-stat-num">—</div><div class="hive-stat-label">Active Hives</div></div>
+                    <div><div id="hive-stat-active" class="hive-stat-num">—</div><div class="hive-stat-label" data-i18n="hive.active_hives">Active Hives</div></div>
                   </div>
                   <div class="hive-stat-card">
                     <div class="hive-stat-icon hive-red"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                    <div><div id="hive-stat-breach" class="hive-stat-num">—</div><div class="hive-stat-label">In Breach</div></div>
+                    <div><div id="hive-stat-breach" class="hive-stat-num">—</div><div class="hive-stat-label" data-i18n="hive.in_breach">In Breach</div></div>
                   </div>
                   <div class="hive-stat-card">
                     <div class="hive-stat-icon hive-blue"><i class="fa-solid fa-tag"></i></div>
-                    <div><div id="hive-stat-tags" class="hive-stat-num">—</div><div class="hive-stat-label">Tags Tracked</div></div>
+                    <div><div id="hive-stat-tags" class="hive-stat-num">—</div><div class="hive-stat-label" data-i18n="hive.tags_tracked">Tags Tracked</div></div>
                   </div>
                   <div class="hive-stat-card">
                     <div class="hive-stat-icon hive-amber"><i class="fa-solid fa-clock"></i></div>
-                    <div><div id="hive-stat-stale" class="hive-stat-num">—</div><div class="hive-stat-label">Stale Tags</div></div>
+                    <div><div id="hive-stat-stale" class="hive-stat-num">—</div><div class="hive-stat-label" data-i18n="hive.stale_tags">Stale Tags</div></div>
                   </div>
                 </div>
                 <div id="hive-list-err" class="alert" style="display:none"><span id="hive-list-err-text"></span></div>
@@ -3686,9 +3941,9 @@ input.hive-range::-moz-range-track {
                     <div id="hive-detail-meta" class="hive-detail-head-meta"></div>
                   </div>
                   <div class="hive-btn-row">
-                    <button class="hive-btn hive-btn-ghost" onclick="hiveOpenConfigModal()"><i class="fa-solid fa-pen"></i> Configure</button>
-                    <button class="hive-btn hive-btn-danger" onclick="hiveArchiveCurrent()"><i class="fa-solid fa-trash"></i> Delete</button>
-                    <button class="hive-btn hive-btn-ghost" onclick="hiveShowScreen('list')"><i class="fa-solid fa-arrow-left"></i> Back</button>
+                    <button class="hive-btn hive-btn-ghost" onclick="hiveOpenConfigModal()"><i class="fa-solid fa-pen"></i> <span data-i18n="hive.configure">Configure</span></button>
+                    <button class="hive-btn hive-btn-danger" onclick="hiveArchiveCurrent()"><i class="fa-solid fa-trash"></i> <span data-i18n="common.delete">Delete</span></button>
+                    <button class="hive-btn hive-btn-ghost" onclick="hiveShowScreen('list')"><i class="fa-solid fa-arrow-left"></i> <span data-i18n="common.back">Back</span></button>
                   </div>
                 </div>
 
@@ -3697,7 +3952,7 @@ input.hive-range::-moz-range-track {
                   <div>
                     <div class="hive-panel" style="margin-bottom:16px">
                       <div class="hive-panel-head">
-                        <div class="hive-panel-title"><i class="fa-solid fa-map-location-dot"></i> Live Position</div>
+                        <div class="hive-panel-title"><i class="fa-solid fa-map-location-dot"></i> <span data-i18n="hive.live_position">Live Position</span></div>
                         <div id="hive-detail-updated" class="hive-panel-meta"></div>
                       </div>
                       <!-- map -->
@@ -3714,10 +3969,10 @@ input.hive-range::-moz-range-track {
                           <button onclick="hiveMapZoom(0)" title="Reset"><i class="fa-solid fa-expand"></i></button>
                         </div>
                         <div class="hive-map-legend">
-                          <div class="hive-legend-item"><div class="hive-legend-dot" style="background:var(--hive-green)"></div>Fresh</div>
-                          <div class="hive-legend-item"><div class="hive-legend-dot" style="background:var(--hive-blue)"></div>Recent</div>
-                          <div class="hive-legend-item"><div class="hive-legend-dot" style="background:var(--hive-amber)"></div>Stale</div>
-                          <div class="hive-legend-item"><div class="hive-legend-dot" style="background:var(--hive-red)"></div>Outlier</div>
+                          <div class="hive-legend-item"><div class="hive-legend-dot" style="background:var(--hive-green)"></div><span data-i18n="hive.fresh">Fresh</span></div>
+                          <div class="hive-legend-item"><div class="hive-legend-dot" style="background:var(--hive-blue)"></div><span data-i18n="hive.recent">Recent</span></div>
+                          <div class="hive-legend-item"><div class="hive-legend-dot" style="background:var(--hive-amber)"></div><span data-i18n="hive.stale">Stale</span></div>
+                          <div class="hive-legend-item"><div class="hive-legend-dot" style="background:var(--hive-red)"></div><span data-i18n="hive.outlier">Outlier</span></div>
                         </div>
                       </div>
                       <!-- diameter -->
@@ -3963,7 +4218,7 @@ input.hive-range::-moz-range-track {
             <span class="modal-title" data-i18n="general.upload_floor_plan">Upload Floor Plan</span>
             <button class="modal-close" onclick="closeModal('uploadFloorModal')">×</button>
         </div>
-        <p style="font-size:13px;color:var(--gray);margin-bottom:16px">Upload a PNG or JPEG image of the floor plan. It will be stored in the browser for this building.</p>
+        <p style="font-size:13px;color:var(--gray);margin-bottom:16px" data-i18n="floor_plan.upload_instructions">Upload a PNG or JPEG image of the floor plan. It will be stored in the browser for this building.</p>
         <div class="drop-zone" onclick="document.getElementById('floorFileInput').click()">
             <div class="dz-icon">🏗️</div>
             <p><strong>Click to browse</strong> or drag & drop an image</p>
@@ -4052,6 +4307,7 @@ input.hive-range::-moz-range-track {
                     <option value="series2">Series 2 (GPS)</option>
                     <option value="series3">Series 3 (QR Code)</option>
                     <option value="series_4">Series 4 (BLE Indoor)</option>
+                    <option value="series_5">Series 5 (Hubble)</option>
                 </select>
             </div>
             <div id="tagMgmtCategoryGroup" class="form-group">
@@ -4072,13 +4328,13 @@ input.hive-range::-moz-range-track {
             <div class="form-group">
                 <label>Assign to User</label>
                 <select id="tagMgmtUser">
-                    <option value="">Loading users…</option>
+                    <option value="" data-i18n="common.loading_users">Loading users…</option>
                 </select>
             </div>
             <div id="tagMgmtPackageGroup" class="form-group">
                 <label>Package *</label>
                 <select id="tagMgmtPackage" required>
-                    <option value="">Loading packages…</option>
+                    <option value="" data-i18n="common.loading_packages">Loading packages…</option>
                 </select>
             </div>
             <input type="hidden" id="tagMgmtTagId">
@@ -4212,7 +4468,7 @@ input.hive-range::-moz-range-track {
         <div class="modal-body">
             <div class="loc-dropzone" id="am-dropzone">
                 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                <div class="loc-dropzone-title">Drop your file here, or click to browse</div>
+                <div class="loc-dropzone-title" data-i18n="asset_mgmt.drop_file_hint">Drop your file here, or click to browse</div>
                 <div class="loc-dropzone-sub">.xlsx or .csv — columns: imei, owner_email (optional), description, tag_type</div>
                 <input type="file" id="am-bulk-file" accept=".xlsx,.xls,.csv" style="display:none">
             </div>
@@ -4224,7 +4480,7 @@ input.hive-range::-moz-range-track {
                 <div class="loc-template-banner-icon"><i class="fa-solid fa-table"></i></div>
                 <div class="loc-template-banner-text">
                     <div class="loc-template-banner-title">Need a template?</div>
-                    <div class="loc-template-banner-sub">Download the Excel template with correct column headers and example rows.</div>
+                    <div class="loc-template-banner-sub" data-i18n="asset_mgmt.download_template">Download the Excel template with correct column headers and example rows.</div>
                 </div>
                 <button class="btn btn-ghost btn-sm" id="am-bulk-template-btn"><i class="fa-solid fa-download"></i> Template</button>
             </div>
@@ -4236,7 +4492,7 @@ input.hive-range::-moz-range-track {
             </div>
             <div class="loc-progress-row" id="am-bulk-progress">
                 <div class="loc-progress-bar"><div class="loc-progress-fill" id="am-progress-fill"></div></div>
-                <div class="loc-progress-text"><span id="am-progress-label">Uploading…</span><span id="am-progress-count"></span></div>
+                <div class="loc-progress-text"><span id="am-progress-label" data-i18n="asset_mgmt.uploading">Uploading…</span><span id="am-progress-count"></span></div>
             </div>
             <div id="am-bulk-result" style="display:none;margin-top:12px"></div>
         </div>
@@ -5017,6 +5273,9 @@ function showDashboard(user, group, effectiveFeatures) {
     // Apply developer nav access based on user role
     applyDeveloperNavAccess(user);
 
+    // Populate language selector in header
+    populateLanguageSelector().catch(e => console.warn('Failed to populate language selector:', e));
+
     // Defer map init so the browser has painted the dashboard container
     // and Leaflet can read real pixel dimensions (avoids 0×0 tile issue on login).
     requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -5321,6 +5580,9 @@ function _ppTagTypeLabel(tt) {
         series_4: 'Series 4',
         series4: 'Series 4',
         ble: 'Series 4',
+        series_5: 'Series 5',
+        series5: 'Series 5',
+        hubble: 'Series 5',
     };
     const key = (tt || '').toLowerCase();
     return map[key] || (tt || '—');
@@ -5534,6 +5796,9 @@ function _updateImeiLabelForTagType() {
     if (tagType === 'series_4' || tagType === 'series4') {
         label.textContent = 'MAC Address *';
         input.placeholder = 'e.g. 48872D9DBC66 or AA:BB:CC:DD:EE:FF';
+    } else if (tagType === 'series_5' || tagType === 'series5' || tagType === 'hubble') {
+        label.textContent = 'Hubble Device ID *';
+        input.placeholder = 'e.g. 5f1369f8-9c51-4724-918f-635f746e2ee6 (from Hubble Platform)';
     } else if (tagType === 'series3' || tagType === 'series_3') {
         label.textContent = 'QR / NFC ID *';
         input.placeholder = 'e.g. 4a8b2c3d-1e2f-3g4h-5i6j-7k8l9m0n1o2p';
@@ -5560,10 +5825,17 @@ async function openAddTagModal() {
     imeiInput.setAttribute('required', '');
     document.getElementById('tagMgmtDesc').value = '';
     
-    // Filter tag type options based on usergroup permissions
+    // Filter tag type options based on usergroup permissions AND tenant features
     const _typeSelAdd = document.getElementById('tagMgmtType');
     const session = getSession();
-    const allowedTypes = session.group?.allowed_tag_types || ['series1', 'series2', 'series3', 'series_4'];
+    let allowedTypes = session.group?.allowed_tag_types || ['series1', 'series2', 'series3', 'series_4', 'series_5'];
+    
+    // Check tenant features - hide Series 5 (Hubble) if hubble feature is disabled
+    const features = session && session.features ? new Set(session.features) : new Set();
+    if (!features.has('hubble')) {
+        allowedTypes = allowedTypes.filter(t => t !== 'series_5');
+    }
+    
     // Show/hide options based on allowed types
     Array.from(_typeSelAdd.options).forEach(opt => {
         opt.style.display = allowedTypes.includes(opt.value) ? '' : 'none';
@@ -5637,7 +5909,7 @@ async function openTagMgmtModal(mode, imei) {
     document.getElementById('tagMgmtDesc').value = tag.description || tag.device_name || '';
     document.getElementById('tagMgmtDescGroup').style.display = '';
 
-    // Tag type — normalise canonical DB values (scope/tracksolid/series3/ble) to select option values (series1/series2/series3/series_4)
+    // Tag type — normalise canonical DB values (scope/tracksolid/series3/ble/hubble) to select option values (series1/series2/series3/series_4/series_5)
     const _typeAliasToSelect = {
         scope: 'series1',
         tracksolid: 'series2',
@@ -5647,13 +5919,16 @@ async function openTagMgmtModal(mode, imei) {
         series2: 'series2',
         series_4: 'series_4',
         series4: 'series_4',
-        ble: 'series_4'
+        ble: 'series_4',
+        series_5: 'series_5',
+        series5: 'series_5',
+        hubble: 'series_5'
     };
     const _typeSelect = document.getElementById('tagMgmtType');
     
     // Filter tag type options based on usergroup permissions
     const session = getSession();
-    const allowedTypes = session.group?.allowed_tag_types || ['series1', 'series2', 'series3', 'series_4'];
+    const allowedTypes = session.group?.allowed_tag_types || ['series1', 'series2', 'series3', 'series_4', 'series_5'];
     Array.from(_typeSelect.options).forEach(opt => {
         opt.style.display = allowedTypes.includes(opt.value) ? '' : 'none';
     });
@@ -5741,7 +6016,20 @@ async function _tagImeiValidate(imei, tagType) {
     const statusEl = document.getElementById('tagMgmtImeiStatus');
     statusEl.style.display = 'block';
     statusEl.style.color = 'var(--text-3, #6b7280)';
-    statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking tag on Scope platform…';
+    
+    // Show appropriate validation message based on tag type
+    let checkingMsg = 'Checking tag...';
+    if (tagType === 'series1' || tagType === 'scope') {
+        checkingMsg = '<i class="fa-solid fa-spinner fa-spin"></i> Checking tag on Scope platform…';
+    } else if (tagType === 'series2' || tagType === 'tracksolid') {
+        checkingMsg = '<i class="fa-solid fa-spinner fa-spin"></i> Checking tag on TrackSolid platform…';
+    } else if (tagType === 'series_4' || tagType === 'series4') {
+        checkingMsg = '<i class="fa-solid fa-spinner fa-spin"></i> Validating MAC address…';
+    } else if (tagType === 'series_5' || tagType === 'series5' || tagType === 'hubble') {
+        checkingMsg = '<i class="fa-solid fa-spinner fa-spin"></i> Checking device on Hubble Platform…';
+    }
+    statusEl.innerHTML = checkingMsg;
+    
     try {
         const res = await apiFetch('/api/portal/tags/validate', {
             method: 'POST',
@@ -5778,8 +6066,8 @@ async function _tagImeiValidateOnBlur() {
     const imei = imeiInput.value.trim();
     if (!imei) return;
     
-    // Only validate Series 1/2 (GPS) and Series 4 (BLE) - Series 3 (QR) doesn't need external validation
-    if (tagType === 'series1' || tagType === 'scope' || tagType === 'series2' || tagType === 'tracksolid' || tagType === 'series_4' || tagType === 'series4') {
+    // Only validate Series 1/2 (GPS), Series 4 (BLE), and Series 5 (Hubble) - Series 3 (QR) doesn't need external validation
+    if (tagType === 'series1' || tagType === 'scope' || tagType === 'series2' || tagType === 'tracksolid' || tagType === 'series_4' || tagType === 'series4' || tagType === 'series_5' || tagType === 'series5' || tagType === 'hubble') {
         await _tagImeiValidate(imei, tagType);
     }
 }
@@ -5945,14 +6233,21 @@ async function settingsSaveLanguage(lang) {
 
 async function populateLanguageSelector() {
     const ts = TranslationService.getInstance();
-    const langSel = document.getElementById('pref-language');
+    const langSel = document.getElementById('header-language-selector');
     if (!langSel) return;
     
+    // Ensure languages are loaded before populating
     const languages = ts.getAvailableLanguages();
+    if (!languages || languages.length === 0) {
+        // Languages not loaded yet, wait for them
+        await ts.loadLanguages();
+    }
+    
+    const freshLanguages = ts.getAvailableLanguages();
     const currentLang = ts.getCurrentLanguage();
     
     langSel.innerHTML = '';
-    languages.forEach(lang => {
+    freshLanguages.forEach(lang => {
         const opt = document.createElement('option');
         opt.value = lang.code;
         opt.textContent = lang.name;
@@ -10500,6 +10795,26 @@ function _lmPlaceMarkers() {
         const label = esc(t.description || t.device_name || t.imei);
         const status = _lmStatusClass(t);
         const statusLabels = { active: 'Active', idle: 'Idle', offline: 'Offline' };
+        
+        // Build sensor data snippet for popup (only key fields)
+        console.log('[POPUP] Building sensor snippet for tag:', t.imei, 'attributes:', t.attributes);
+        let sensorSnippet = '';
+        if (t.attributes) {
+            const attrs = t.attributes;
+            const snippets = [];
+            if (attrs.Temperature?.value) snippets.push(`🌡️ ${esc(attrs.Temperature.value)}`);
+            if (attrs.Altitude?.value) snippets.push(`⛰️ ${esc(attrs.Altitude.value)}`);
+            console.log('[POPUP] Sensor snippets:', snippets);
+            if (snippets.length > 0) {
+                sensorSnippet = `<div style="font-size:.75rem;color:var(--text-3);margin-top:4px;padding-top:4px;border-top:1px solid var(--border)">${snippets.join(' • ')}</div>`;
+                console.log('[POPUP] Sensor snippet HTML:', sensorSnippet);
+            } else {
+                console.log('[POPUP] No sensor data to display in popup');
+            }
+        } else {
+            console.log('[POPUP] No attributes found for popup');
+        }
+        
         m.bindPopup(`
             <div class="map-popup">
                 <strong>${label}</strong><br>
@@ -10509,6 +10824,7 @@ function _lmPlaceMarkers() {
                     <span>${statusLabels[status]}</span>
                 </div>
                 ${t.last_seen ? `<div style="font-size:.78rem;color:var(--text-3);margin-bottom:6px">${new Date(t.last_seen).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>` : ''}
+                ${sensorSnippet}
                 <div style="display:flex;gap:5px;margin-top:2px">
                     <button class="btn-popup-hist" onclick="lmOpenHistory('${esc(t.imei)}')">
                         <i class='fa-solid fa-route'></i> History
@@ -10912,6 +11228,69 @@ function _lmSelectTag(imei) {
     if (tag) _lmRenderDetail(tag);
 }
 
+function _lmRenderSensorData(t) {
+    // Render sensor data for Series 5 (Hubble) tags
+    // Data comes from attributes field: { Temperature: {value, show_on_map}, Altitude: {value, show_on_map}, ... }
+    console.log('[SENSOR] _lmRenderSensorData called for tag:', t.imei);
+    console.log('[SENSOR] Tag attributes:', t.attributes);
+    
+    if (!t.attributes) {
+        console.log('[SENSOR] No attributes found, returning empty');
+        return '';
+    }
+    
+    const attrs = t.attributes;
+    const sensorFields = [];
+    console.log('[SENSOR] Processing attributes:', Object.keys(attrs));
+    
+    // Priority sensor fields to display
+    const priorityFields = [
+        { key: 'Temperature', icon: 'fa-temperature-half', color: 'var(--primary)' },
+        { key: 'Altitude', icon: 'fa-mountain', color: 'var(--success)' },
+        { key: 'RSSI', icon: 'fa-signal', color: 'var(--warning)' },
+        { key: 'GPS_Accuracy', icon: 'fa-bullseye', color: 'var(--text-3)' },
+        { key: 'Battery', icon: 'fa-battery-half', color: 'var(--success)' }
+    ];
+    
+    priorityFields.forEach(field => {
+        if (attrs[field.key] && attrs[field.key].value) {
+            sensorFields.push({
+                label: field.key.replace(/_/g, ' '),
+                value: esc(attrs[field.key].value),
+                icon: field.icon,
+                color: field.color
+            });
+        }
+    });
+    
+    // If no sensor data, return empty
+    console.log('[SENSOR] Found', sensorFields.length, 'sensor fields:', sensorFields.map(f => f.label));
+    if (sensorFields.length === 0) {
+        console.log('[SENSOR] No sensor fields to display, returning empty');
+        return '';
+    }
+    
+    // Build sensor data section
+    console.log('[SENSOR] Building sensor HTML section');
+    const sensorHtml = sensorFields.map(f => `
+        <div class="detail-item">
+            <label><i class="fa-solid ${f.icon}" style="color:${f.color};margin-right:4px"></i>${f.label}</label>
+            <span>${f.value}</span>
+        </div>
+    `).join('');
+    
+    return `
+        <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px">
+            <h4 style="font-size:12px;font-weight:600;color:var(--text-2);margin:0 0 8px 0;text-transform:uppercase;letter-spacing:0.5px">
+                <i class="fa-solid fa-microchip" style="margin-right:6px"></i>Sensor Data
+            </h4>
+            <div class="detail-grid">
+                ${sensorHtml}
+            </div>
+        </div>
+    `;
+}
+
 function _lmRenderDetail(t) {
     const panel = document.getElementById('lm-detail-panel');
     if (!panel) return;
@@ -10953,10 +11332,39 @@ function _lmRenderDetail(t) {
             <div class="detail-item"><label>Last Seen</label><span>${lastSeen}</span></div>
             <div class="detail-item detail-full"><label>Type</label><span>${tagTypeDisplay}</span></div>
         </div>
+        ${(() => {
+            const sensorHtml = _lmRenderSensorData(t);
+            console.log('[DETAIL] Sensor HTML output length:', sensorHtml.length, 'chars');
+            return sensorHtml;
+        })()}
         ${_lmMarkers[t.imei] ? `<div class="detail-actions">
             <button class="btn btn-primary btn-sm" onclick="lmSelectFromList('${esc(t.imei)}')">
                 <i class="fa-solid fa-crosshairs"></i> Centre on Map
             </button>
+            ${(() => {
+                const sess = getSession();
+                const features = sess && sess.features ? new Set(sess.features) : new Set();
+                const hasFeature = features.has('temperature-graph');
+                const isSeries5 = t.tag_type && ['series_5', 'series5', 'hubble'].includes(t.tag_type.toLowerCase());
+                const hasTemp = t.attributes && t.attributes.Temperature;
+                
+                console.log('[TEMP-GRAPH-CHECK]', {
+                    imei: t.imei,
+                    tag_type: t.tag_type,
+                    isSeries5,
+                    hasTemp,
+                    temperature: t.attributes?.Temperature,
+                    allFeatures: Array.from(features),
+                    hasFeature,
+                    willShow: hasFeature && isSeries5 && hasTemp
+                });
+                
+                return (hasFeature && isSeries5 && hasTemp) ? `
+                    <button class="btn btn-primary btn-sm" style="background-color: var(--success); border-color: var(--success);" onclick="toggleTemperatureGraph('${esc(t.imei)}', '${esc(t.description || t.device_name || t.imei)}')">
+                        <i class="fa-solid fa-temperature-half"></i> Graph
+                    </button>
+                ` : '';
+            })()}
         </div>` : ''}
     `;
 }
@@ -11153,7 +11561,12 @@ async function initHistoryTab() {
     const sel = document.getElementById('hist-asset-select');
     if (sel && _lmTags.length) {
         const cur = _histPendingImei || sel.value;
-        sel.innerHTML = _lmTags.map(t =>
+        // Filter to ONLY Series 2 (TrackSolid) devices - they have trip/movement history from TrackSolid API
+        // Series 1/3/4/5 do not have TrackSolid trip data, so exclude them from Movement History dropdown
+        const series2Tags = _lmTags.filter(t => 
+            t.tag_type === 'tracksolid' || t.tag_type === 'series2'
+        );
+        sel.innerHTML = series2Tags.map(t =>
             `<option value="${esc(t.imei)}">${esc(t.description || t.device_name || t.imei)}</option>`
         ).join('');
         if (cur) sel.value = cur;
@@ -15707,5 +16120,611 @@ function mhaOpenHelp() {
   };
 
   console.log('[MHA] Movement Analytics module loaded');
+})();
+</script>
+
+<!-- ══════════════════ TEMPERATURE GRAPH PANEL ══════════════════ -->
+<div id="temp-graph-panel" class="temp-graph-panel">
+    <div class="temp-graph-content">
+        <div class="temp-graph-header">
+            <div class="temp-graph-title">
+                <span class="icon-badge">●</span>
+                <span id="temp-graph-tag-name">Temperature Graph</span>
+            </div>
+            <div class="temp-graph-meta" id="temp-graph-meta"></div>
+            <div class="temp-graph-spacer"></div>
+            <div style="display:flex; gap:5px;" id="temp-graph-presets"></div>
+            <label class="temp-graph-smooth">
+                <input type="checkbox" id="temp-graph-smooth-toggle" checked>
+                <span>Smooth</span>
+            </label>
+            <button class="temp-graph-chip" id="temp-graph-batt-btn">
+                <span class="dot" style="background:var(--primary);"></span>
+                <span>Battery</span>
+            </button>
+            <button class="temp-graph-chip alt" id="temp-graph-alt-btn">
+                <span class="dot" style="background:var(--warning);"></span>
+                <span>Altitude</span>
+            </button>
+            <button class="temp-graph-close" onclick="closeTemperatureGraph()" aria-label="Close">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        
+        <div id="temp-graph-loading" class="temp-graph-loading" style="display:none">
+            <i class="fa-solid fa-spinner fa-spin" style="font-size:32px;margin-right:12px"></i>
+            <span>Loading temperature data...</span>
+        </div>
+        
+        <div id="temp-graph-error" class="temp-graph-error" style="display:none">
+            <i class="fa-solid fa-triangle-exclamation" style="font-size:32px;margin-right:12px"></i>
+            <span id="temp-graph-error-msg">Error loading data</span>
+        </div>
+        
+        <div class="temp-graph-main" id="temp-graph-main" style="display:none">
+            <div class="temp-graph-stats" id="temp-graph-stats">
+                <div class="temp-graph-stat">
+                    <div class="l">Temperature</div>
+                    <div class="v" id="temp-stat-temp">—</div>
+                </div>
+                <div class="temp-graph-stat">
+                    <div class="l">Range</div>
+                    <div class="v" id="temp-stat-range" style="font-size:14px;">—</div>
+                </div>
+                <div class="temp-graph-stat">
+                    <div class="l">Reports</div>
+                    <div class="v" id="temp-stat-count">—</div>
+                </div>
+                <div class="temp-graph-stat">
+                    <div class="l">Coverage</div>
+                    <div class="v" id="temp-stat-coverage">—</div>
+                </div>
+                <button class="temp-graph-export" id="temp-graph-export">
+                    <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9.3 1.6H4.3a1.2 1.2 0 0 0-1.2 1.2v10.4a1.2 1.2 0 0 0 1.2 1.2h7.4a1.2 1.2 0 0 0 1.2-1.2V5.3z"/>
+                        <path d="M9.3 1.6v3.7h3.6"/>
+                        <path d="M8 7.7v4"/>
+                        <path d="M6.4 10.1 8 11.7l1.6-1.6"/>
+                    </svg>
+                    <span>Export PDF</span>
+                </button>
+            </div>
+            <div class="temp-graph-charts">
+                <div class="temp-graph-chart-box">
+                    <canvas id="temp-graph-canvas" role="img" aria-label="Temperature over time"></canvas>
+                </div>
+                <div class="temp-graph-overview">
+                    <div class="temp-graph-ov-wrap" id="temp-graph-ov-wrap" tabindex="0">
+                        <canvas id="temp-graph-ov-canvas"></canvas>
+                    </div>
+                    <div class="temp-graph-ov-bar">
+                        <span class="temp-graph-ov-hint">Drag the window to pan, drag its edges to zoom</span>
+                        <button class="temp-graph-reset" id="temp-graph-reset">Reset zoom</button>
+                    </div>
+                </div>
+                <div class="temp-graph-footer">
+                    <span class="temp-graph-legend">
+                        <span class="d" style="background:var(--success);"></span>
+                        <span>Temperature</span>
+                    </span>
+                    <span class="temp-graph-legend" id="temp-graph-batt-legend" style="display:none;">
+                        <span class="d" style="background:var(--primary);"></span>
+                        <span>Battery %</span>
+                    </span>
+                    <span class="temp-graph-legend" id="temp-graph-alt-legend" style="display:none;">
+                        <span class="d" style="background:var(--warning);"></span>
+                        <span>Altitude m</span>
+                    </span>
+                    <span class="temp-graph-legend gap-legend" id="temp-graph-gap-legend">
+                        <span class="sw"></span>
+                        <span>No reports</span>
+                    </span>
+                    <span class="temp-graph-gap-note" id="temp-graph-gap-note"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// TEMPERATURE GRAPH
+// ══════════════════════════════════════════
+(function() {
+    'use strict';
+    
+    // Core state
+    let _tempGraphOpen = false;
+    let _tempGraphImei = null;
+    let _tempGraphTagId = null;
+    let _tempGraphTagName = null;
+    let _tempGraphChart = null;
+    let _tempGraphOverviewChart = null;
+    let _tempGraphDays = 1;
+    let _tempGraphData = null;
+    let _tempGraphGaps = [];
+    let _showBattery = false;
+    let _showAltitude = false;
+    let _zoomView = null;
+    let _dragState = null;
+    
+    const GAP_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 hours
+    const MIN_VIEW_MS = 5 * 60 * 1000; // 5 minutes minimum zoom
+    
+    // Helper: Find gaps in data (periods >2h without reports)
+    function findGaps(points, thresholdMs) {
+        if (points.length < 2) return [];
+        const gaps = [];
+        for (let i = 1; i < points.length; i++) {
+            const ms = points[i].x - points[i-1].x;
+            if (ms > thresholdMs) {
+                gaps.push({
+                    from: points[i-1].x,
+                    to: points[i].x,
+                    ms: ms
+                });
+            }
+        }
+        return gaps;
+    }
+    
+    // Helper: Format duration
+    function formatDuration(ms) {
+        const h = Math.floor(ms / 3600000);
+        const m = Math.round((ms % 3600000) / 60000);
+        if (h === 0) return `${m}m`;
+        if (m === 0) return `${h}h`;
+        return `${h}h ${m}m`;
+    }
+    
+    // Helper: Calculate stats for visible window
+    function calculateStats(points, gaps, viewFrom, viewTo) {
+        const visiblePts = points.filter(p => p.x >= viewFrom && p.x <= viewTo);
+        const temps = visiblePts.map(p => p.temp).filter(t => t != null);
+        
+        let result = {
+            count: visiblePts.length,
+            latest: null,
+            min: null,
+            max: null,
+            coverage: 100
+        };
+        
+        if (temps.length > 0) {
+            result.latest = temps[temps.length - 1];
+            result.min = Math.min(...temps);
+            result.max = Math.max(...temps);
+        }
+        
+        // Calculate coverage (percentage of time with reports)
+        const totalMs = viewTo - viewFrom;
+        const gapMs = gaps.reduce((sum, g) => {
+            const overlapStart = Math.max(g.from, viewFrom);
+            const overlapEnd = Math.min(g.to, viewTo);
+            return sum + Math.max(0, overlapEnd - overlapStart);
+        }, 0);
+        result.coverage = Math.round(100 - (gapMs / Math.max(1, totalMs)) * 100);
+        
+        return result;
+    }
+    
+    // Helper: Update stats sidebar
+    function updateStats(points, gaps) {
+        if (!points || points.length === 0) return;
+        
+        const viewFrom = _zoomView ? _zoomView.from : points[0].x;
+        const viewTo = _zoomView ? _zoomView.to : points[points.length - 1].x;
+        const stats = calculateStats(points, gaps, viewFrom, viewTo);
+        
+        // Temperature
+        const tempEl = document.getElementById('temp-stat-temp');
+        if (stats.latest != null) {
+            tempEl.textContent = `${stats.latest.toFixed(1)}°C`;
+            tempEl.className = 'v ' + (stats.latest < 10 ? 'v-blue' : stats.latest < 20 ? 'v-amber' : 'v-red');
+        } else {
+            tempEl.textContent = '—';
+            tempEl.className = 'v';
+        }
+        
+        // Range
+        document.getElementById('temp-stat-range').textContent = 
+            (stats.min != null && stats.max != null) ? `${stats.min.toFixed(1)}° / ${stats.max.toFixed(1)}°` : '—';
+        
+        // Reports
+        document.getElementById('temp-stat-count').textContent = stats.count;
+        
+        // Coverage
+        const covEl = document.getElementById('temp-stat-coverage');
+        covEl.textContent = `${stats.coverage}%`;
+        covEl.className = 'v ' + (stats.coverage <= 50 ? 'v-amber' : stats.coverage <= 75 ? '' : 'v-green');
+        
+        // Gap note
+        const visibleGaps = gaps.filter(g => {
+            const overlapStart = Math.max(g.from, viewFrom);
+            const overlapEnd = Math.min(g.to, viewTo);
+            return overlapEnd > overlapStart;
+        });
+        
+        const gapNote = document.getElementById('temp-graph-gap-note');
+        if (visibleGaps.length > 0 && gaps.length > 0) {
+            const longest = visibleGaps.reduce((a, g) => g.ms > a.ms ? g : a);
+            const plural = visibleGaps.length > 1 ? 's' : '';
+            gapNote.textContent = `${visibleGaps.length} gap${plural} over 2h · longest ${formatDuration(longest.ms)}`;
+        } else {
+            gapNote.textContent = '';
+        }
+    }
+    
+    // Chart.js plugin: Gap band visualization
+    const gapBandPlugin = {
+        id: 'gapBands',
+        beforeDatasetsDraw(chart, args, opts) {
+            const gaps = opts.gaps || [];
+            if (!gaps.length) return;
+            const {ctx, chartArea, scales} = chart;
+            if (!chartArea || !scales.x) return;
+            
+            ctx.save();
+            gaps.forEach(g => {
+                const x1 = Math.max(chartArea.left, scales.x.getPixelForValue(g.from));
+                const x2 = Math.min(chartArea.right, scales.x.getPixelForValue(g.to));
+                if (x2 <= x1) return;
+                
+                // Fill gap area
+                ctx.fillStyle = 'rgba(150,134,205,0.15)';
+                ctx.fillRect(x1, chartArea.top, x2 - x1, chartArea.bottom - chartArea.top);
+                
+                // Draw dashed edges
+                ctx.strokeStyle = 'rgba(168,152,220,0.50)';
+                ctx.setLineDash([3,3]);
+                ctx.lineWidth = 1;
+                [x1, x2].forEach(x => {
+                    ctx.beginPath();
+                    ctx.moveTo(x, chartArea.top);
+                    ctx.lineTo(x, chartArea.bottom);
+                    ctx.stroke();
+                });
+                ctx.setLineDash([]);
+            });
+            ctx.restore();
+        }
+    };
+    
+    // Initialize preset buttons
+    function initPresets() {
+        const presetsEl = document.getElementById('temp-graph-presets');
+        if (!presetsEl) return;
+        presetsEl.innerHTML = '';
+        
+        [1, 7, 30, 90].forEach(days => {
+            const btn = document.createElement('button');
+            btn.className = 'temp-graph-preset' + (days === 1 ? ' active' : '');
+            btn.dataset.days = days;
+            btn.textContent = days === 1 ? '24h' : days === 7 ? '7d' : days === 30 ? '30d' : 'All';
+            btn.onclick = () => loadTemperatureRange(days);
+            presetsEl.appendChild(btn);
+        });
+    }
+    
+    // Initialize toggle buttons
+    function initToggles() {
+        const smoothToggle = document.getElementById('temp-graph-smooth-toggle');
+        const battBtn = document.getElementById('temp-graph-batt-btn');
+        const altBtn = document.getElementById('temp-graph-alt-btn');
+        
+        if (smoothToggle) smoothToggle.checked = true;
+        if (smoothToggle) smoothToggle.onchange = () => { if (_tempGraphData) buildChart(_tempGraphData); };
+        
+        if (battBtn) battBtn.onclick = () => {
+            _showBattery = !_showBattery;
+            battBtn.classList.toggle('on', _showBattery);
+            document.getElementById('temp-graph-batt-legend').style.display = _showBattery ? 'flex' : 'none';
+            if (_tempGraphChart && _tempGraphChart.data.datasets[1]) {
+                _tempGraphChart.data.datasets[1].hidden = !_showBattery;
+                _tempGraphChart.options.scales.y1.display = _showBattery;
+                _tempGraphChart.update();
+            }
+        };
+        
+        if (altBtn) altBtn.onclick = () => {
+            _showAltitude = !_showAltitude;
+            altBtn.classList.toggle('on', _showAltitude);
+            document.getElementById('temp-graph-alt-legend').style.display = _showAltitude ? 'flex' : 'none';
+            if (_tempGraphChart && _tempGraphChart.data.datasets[2]) {
+                _tempGraphChart.data.datasets[2].hidden = !_showAltitude;
+                _tempGraphChart.options.scales.y2.display = _showAltitude;
+                _tempGraphChart.update();
+            }
+        };
+    }
+    
+    // Toggle temperature graph panel
+    window.toggleTemperatureGraph = function(imei, tagName) {
+        console.log('[TEMP GRAPH] toggleTemperatureGraph called for', imei, tagName);
+        
+        if (_tempGraphOpen && _tempGraphImei === imei) {
+            closeTemperatureGraph();
+            return;
+        }
+        
+        // Find tag to get ID
+        const tag = _lmTags.find(t => t.imei === imei);
+        if (!tag) {
+            console.error('[TEMP GRAPH] Tag not found for IMEI:', imei);
+            return;
+        }
+        
+        _tempGraphImei = imei;
+        _tempGraphTagId = tag.id;
+        _tempGraphTagName = tagName;
+        _tempGraphDays = 1;
+        _zoomView = null;
+        _showBattery = false;
+        _showAltitude = false;
+        
+        // Update UI
+        document.getElementById('temp-graph-tag-name').textContent = tagName || 'Temperature';
+        document.getElementById('temp-graph-meta').textContent = `${tag.tag_type || 'Tag'} · ${imei.substring(0, 8)}`;
+        
+        // Initialize presets and toggles
+        initPresets();
+        initToggles();
+        
+        // Show panel (slides up from bottom)
+        const panel = document.getElementById('temp-graph-panel');
+        panel.classList.add('open');
+        _tempGraphOpen = true;
+        
+        // Adjust map area height to make room for graph (50-50 split)
+        const mapArea = document.querySelector('#tab-livemap .map-area');
+        if (mapArea) {
+            mapArea.style.height = '50vh';
+            if (typeof _liveMap !== 'undefined' && _liveMap) {
+                setTimeout(() => _liveMap.invalidateSize(), 100);
+            }
+        }
+        
+        // Load data
+        loadTemperatureData(_tempGraphTagId, 1);
+    };
+    
+    window.closeTemperatureGraph = function() {
+        console.log('[TEMP GRAPH] closeTemperatureGraph called');
+        const panel = document.getElementById('temp-graph-panel');
+        panel.classList.remove('open');
+        _tempGraphOpen = false;
+        
+        // Restore map area to full height
+        const mapArea = document.querySelector('#tab-livemap .map-area');
+        if (mapArea) {
+            mapArea.style.height = '';
+            if (typeof _liveMap !== 'undefined' && _liveMap) {
+                setTimeout(() => _liveMap.invalidateSize(), 100);
+            }
+        }
+        
+        // Destroy charts
+        if (_tempGraphChart) {
+            _tempGraphChart.destroy();
+            _tempGraphChart = null;
+        }
+        if (_tempGraphOverviewChart) {
+            _tempGraphOverviewChart.destroy();
+            _tempGraphOverviewChart = null;
+        }
+        
+        // Hide content
+        document.getElementById('temp-graph-loading').style.display = 'none';
+        document.getElementById('temp-graph-error').style.display = 'none';
+        document.getElementById('temp-graph-main').style.display = 'none';
+        
+        // Reset state
+        _tempGraphData = null;
+        _tempGraphGaps = [];
+        _zoomView = null;
+    };
+    
+    function loadTemperatureRange(days) {
+        console.log('[TEMP GRAPH] loadTemperatureRange called for', days, 'days');
+        _tempGraphDays = days;
+        _zoomView = null; // Reset zoom
+        
+        // Update preset buttons
+        document.querySelectorAll('.temp-graph-preset').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.days === String(days));
+        });
+        
+        if (_tempGraphTagId) {
+            loadTemperatureData(_tempGraphTagId, days);
+        }
+    }
+    
+    async function loadTemperatureData(tagId, days) {
+        console.log('[TEMP GRAPH] loadTemperatureData called for tag ID:', tagId, 'days:', days);
+        
+        // Show loading
+        document.getElementById('temp-graph-loading').style.display = 'flex';
+        document.getElementById('temp-graph-error').style.display = 'none';
+        document.getElementById('temp-graph-main').style.display = 'none';
+        
+        try {
+            const res = await apiFetch(`/api/portal/tags/${tagId}/temperature?days=${days}`);
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.detail || errData.error || 'Failed to load temperature data');
+            }
+            
+            const data = await res.json();
+            console.log('[TEMP GRAPH] Received data:', data);
+            
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to load temperature data');
+            }
+            
+            if (!data.points || data.points.length === 0) {
+                showError('No temperature data available for this period');
+                return;
+            }
+            
+            // Hide loading, show main
+            document.getElementById('temp-graph-loading').style.display = 'none';
+            document.getElementById('temp-graph-main').style.display = 'flex';
+            
+            // Store data and build chart
+            _tempGraphData = data.points;
+            buildChart(_tempGraphData);
+            
+        } catch (err) {
+            console.error('[TEMP GRAPH] Error loading data:', err);
+            showError(err.message || 'Failed to load temperature data');
+        }
+    }
+    
+    function showError(message) {
+        document.getElementById('temp-graph-loading').style.display = 'none';
+        document.getElementById('temp-graph-error').style.display = 'flex';
+        document.getElementById('temp-graph-error-msg').textContent = message;
+        document.getElementById('temp-graph-main').style.display = 'none';
+    }
+    
+    function buildChart(points) {
+        console.log('[TEMP GRAPH] buildChart called with', points.length, 'points');
+        
+        // Destroy existing
+        if (_tempGraphChart) {
+            _tempGraphChart.destroy();
+            _tempGraphChart = null;
+        }
+        
+        if (typeof Chart === 'undefined') {
+            showError('Chart library not loaded');
+            return;
+        }
+        
+        // Detect gaps
+        _tempGraphGaps = findGaps(points, GAP_THRESHOLD_MS);
+        const showGaps = _tempGraphDays <= 7; // Only show gap bands for 7d or less
+        const visibleGaps = showGaps ? _tempGraphGaps : [];
+        
+        // Register plugin
+        if (!Chart.registry.plugins.get('gapBands')) {
+            Chart.register(gapBandPlugin);
+        }
+        
+        // Prepare datasets
+        const smoothOn = document.getElementById('temp-graph-smooth-toggle')?.checked ?? true;
+        const tension = smoothOn ? 0.4 : 0;
+        
+        const datasets = [
+            {
+                label: 'Temperature (°C)',
+                data: points.map(p => ({x: p.x, y: p.temp})),
+                borderColor: 'rgb(34, 197, 94)',
+                backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                borderWidth: 2,
+                pointRadius: smoothOn ? 0 : 2,
+                tension: tension,
+                yAxisID: 'y',
+                fill: true
+            },
+            {
+                label: 'Battery (%)',
+                data: points.map(p => ({x: p.x, y: p.batt})),
+                borderColor: 'rgb(59, 130, 246)',
+                borderWidth: 1.5,
+                borderDash: [5,3],
+                pointRadius: 0,
+                tension: 0.2,
+                hidden: !_showBattery,
+                yAxisID: 'y1'
+            },
+            {
+                label: 'Altitude (m)',
+                data: points.map(p => ({x: p.x, y: p.alt})),
+                borderColor: 'rgb(245, 158, 11)',
+                borderWidth: 1.5,
+                borderDash: [2,3],
+                pointRadius: 0,
+                tension: 0.2,
+                hidden: !_showAltitude,
+                yAxisID: 'y2'
+            }
+        ];
+        
+        // Build chart
+        const ctx = document.getElementById('temp-graph-canvas').getContext('2d');
+        _tempGraphChart = new Chart(ctx, {
+            type: 'line',
+            data: {datasets},
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {mode: 'index', intersect: false},
+                layout: {
+                    padding: 0
+                },
+                plugins: {
+                    legend: {display: false},
+                    gapBands: {gaps: visibleGaps},
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        callbacks: {
+                            title: ctx => ctx.length ? new Date(ctx[0].parsed.x).toLocaleString() : '',
+                            label: ctx => {
+                                let label = ctx.dataset.label || '';
+                                if (ctx.parsed.y !== null) {
+                                    label += ': ' + ctx.parsed.y.toFixed(1);
+                                    if (ctx.datasetIndex === 0) label += '°C';
+                                    else if (ctx.datasetIndex === 1) label += '%';
+                                    else if (ctx.datasetIndex === 2) label += 'm';
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: _tempGraphDays <= 1 ? 'hour' : _tempGraphDays <= 7 ? 'day' : 'week',
+                            displayFormats: {hour: 'HH:mm', day: 'MMM d', week: 'MMM d'}
+                        },
+                        grid: {color: 'rgba(0,0,0,0.05)'},
+                        ticks: {maxRotation: 0}
+                    },
+                    y: {
+                        position: 'left',
+                        grid: {color: 'rgba(0,0,0,0.05)'},
+                        ticks: {callback: v => v.toFixed(0) + '°'}
+                    },
+                    y1: {
+                        position: 'right',
+                        display: _showBattery,
+                        min: 0,
+                        max: 100,
+                        grid: {drawOnChartArea: false},
+                        ticks: {callback: v => v.toFixed(0) + '%', color: 'rgb(59, 130, 246)'}
+                    },
+                    y2: {
+                        position: 'right',
+                        display: _showAltitude,
+                        grid: {drawOnChartArea: false},
+                        ticks: {callback: v => v.toFixed(0) + 'm', color: 'rgb(245, 158, 11)'}
+                    }
+                }
+            }
+        });
+        
+        // Update stats
+        updateStats(points, _tempGraphGaps);
+        
+        // Show gap legend if needed
+        document.getElementById('temp-graph-gap-legend').style.display = showGaps && _tempGraphGaps.length > 0 ? 'flex' : 'none';
+        
+        console.log('[TEMP GRAPH] Chart created successfully');
+    }
+    
+    console.log('[TEMP GRAPH] Temperature graph module loaded');
 })();
 </script>

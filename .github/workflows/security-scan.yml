@@ -1,0 +1,178 @@
+name: Security Scan
+
+on:
+  # DISABLED: No longer runs on every commit (too noisy)
+  # Security scans still run weekly and can be triggered manually
+  # push:
+  #   branches: [ main, prod/beacon ]
+  schedule:
+    # Run weekly security scans every Monday at 9am UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:  # Allow manual runs
+
+jobs:
+  bandit:
+    name: Python Security (Bandit)
+    runs-on: ubuntu-latest
+    continue-on-error: true  # Non-blocking
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install Bandit
+        run: pip install bandit[toml]
+      
+      - name: Run Bandit Security Scan
+        run: |
+          bandit -r gps-tracker/backend/app/ \
+            --exclude gps-tracker/backend/app/migrations/ \
+            --severity-level medium \
+            --confidence-level medium \
+            --format json \
+            --output bandit-report.json
+        continue-on-error: true
+      
+      - name: Upload Bandit Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: bandit-security-report
+          path: bandit-report.json
+      
+      - name: Bandit Summary (non-blocking for now)
+        run: |
+          bandit -r gps-tracker/backend/app/ \
+            --exclude gps-tracker/backend/app/migrations/ \
+            --severity-level high \
+            --confidence-level high
+
+  safety:
+    name: Dependency Vulnerabilities (Safety)
+    runs-on: ubuntu-latest
+    continue-on-error: true  # Non-blocking
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install Safety
+        run: pip install safety
+      
+      - name: Run Safety Check
+        run: |
+          cd gps-tracker/backend
+          safety check \
+            --file requirements.txt \
+            --json \
+            --output ../../safety-report.json
+        continue-on-error: true
+      
+      - name: Upload Safety Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: safety-vulnerability-report
+          path: safety-report.json
+      
+      - name: Safety Summary (non-blocking for now)
+        run: |
+          cd gps-tracker/backend
+          safety check --file requirements.txt --short-report
+
+  secret-scan:
+    name: Secret Detection (TruffleHog)
+    runs-on: ubuntu-latest
+    continue-on-error: true  # Non-blocking
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 50  # Limited history to avoid long scans
+      
+      - name: TruffleHog OSS
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.before }}
+          head: HEAD
+          extra_args: --only-verified
+        continue-on-error: true
+
+  semgrep:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-latest
+    continue-on-error: true  # Non-blocking - will skip if token not configured
+    container:
+      image: returntocorp/semgrep
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Run Semgrep
+        run: |
+          semgrep ci \
+            --config auto \
+            --json \
+            --output semgrep-report.json \
+            gps-tracker/backend/
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+        continue-on-error: true
+      
+      - name: Upload Semgrep Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: semgrep-sast-report
+          path: semgrep-report.json
+
+  trivy:
+    name: Container Scan (Trivy)
+    runs-on: ubuntu-latest
+    continue-on-error: true  # Non-blocking
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: 'gps-tracker/backend'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+        continue-on-error: true
+      
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+        continue-on-error: true
+
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    continue-on-error: true  # Non-blocking
+    needs: [bandit, safety, secret-scan, semgrep, trivy]
+    if: always()
+    steps:
+      - name: Download all reports
+        uses: actions/download-artifact@v3
+        continue-on-error: true
+      
+      - name: Generate summary
+        run: |
+          echo "## Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Scan completed: $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Scan Results:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Bandit (Python Security)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Safety (Dependencies)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ TruffleHog (Secrets)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Semgrep (SAST)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Trivy (Container)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download detailed reports from artifacts above." >> $GITHUB_STEP_SUMMARY

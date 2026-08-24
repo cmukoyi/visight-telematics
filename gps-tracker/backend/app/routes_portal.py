@@ -7,7 +7,7 @@ Routes are mounted at /api/portal (separate from /api/v1 user routes and
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from time import perf_counter
 from typing import List, Optional
 from uuid import UUID
@@ -34,6 +34,10 @@ _TAG_TYPE_ALIAS = {
     "series_3": "series_3",
     "series4": "ble",       # Series 4 (DX-Smart indoor BLE tags)
     "series_4": "ble",
+    "ble": "ble",           # Allow 'ble' to map to itself
+    "series5": "hubble",    # Series 5 (Hubble Platform BLE tags)
+    "series_5": "hubble",
+    "hubble": "hubble",     # Allow 'hubble' to map to itself
 }
 
 router = APIRouter(prefix="/api/portal", tags=["portal"])
@@ -135,6 +139,13 @@ TENANT_FEATURE_TABS: dict = {
     "developers": ["api-tokens"],  # Developers section (API Tokens tab)
 }
 
+# Standalone tenant features (not navigation tabs, but UI feature flags)
+# These are always included in effective_features when tenant enables them
+STANDALONE_TENANT_FEATURES: set = {
+    "temperature-graph",  # Temperature sensor visualization for Series 5
+    "hubble",  # Series 5 Hubble Platform integration
+}
+
 
 # Tenant-level feature kill-switch (env-driven). Comma-separated list of
 # feature keys that should be hidden from the portal *and* refused at the API
@@ -206,6 +217,10 @@ def _compute_effective_features(user: "PortalUser", group: "UserGroup") -> list:
                 
                 # User sees tab only if BOTH tenant enables it AND user role allows it
                 result = [f for f in result if f in tenant_enabled_tabs]
+                
+                # Add standalone features (not tabs) that tenant enabled
+                standalone_features = tenant_enabled_features & STANDALONE_TENANT_FEATURES
+                result.extend(standalone_features)
     except Exception:
         # If tenant features table doesn't exist yet or query fails,
         # fall back to user features only (backward compatible)
@@ -242,6 +257,88 @@ def _user_can_manage(me, feature: str) -> bool:
         return feature in (getattr(me, "custom_features", None) or [])
     # 'reporter' and unknown roles → no write access
     return False
+
+
+def _delete_tag_with_cleanup(db: Session, tag: BLETag, logger_prefix: str = "TAG DELETE") -> dict:
+    """
+    Properly delete a BLE tag with ALL related data cleanup.
+    
+    This is the SINGLE SOURCE OF TRUTH for tag deletion to prevent orphaned data.
+    
+    Args:
+        db: Database session
+        tag: BLETag object to delete
+        logger_prefix: Logging prefix for identification
+    
+    Returns:
+        dict with deletion counts for each table
+    
+    Raises:
+        Exception if deletion fails (caller should handle rollback)
+    """
+    from app.models import DevicePosition, Journey, Leg, Stationary, EngineState, DeviceState
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    device_imei = tag.imei
+    
+    logger.info(f"{logger_prefix}: Starting cleanup for device {device_imei} (tag_id={tag.id})")
+    
+    try:
+        # Delete in proper order (respecting foreign key dependencies)
+        # Order matters: delete children before parents
+        
+        deleted_counts = {}
+        
+        # 1. Device positions (no foreign key dependencies)
+        deleted_counts['positions'] = db.query(DevicePosition).filter(
+            DevicePosition.device_imei == device_imei
+        ).delete(synchronize_session=False)
+        
+        # 2. Journeys (referenced by legs/stationaries)
+        deleted_counts['journeys'] = db.query(Journey).filter(
+            Journey.device_imei == device_imei
+        ).delete(synchronize_session=False)
+        
+        # 3. Legs (no children)
+        deleted_counts['legs'] = db.query(Leg).filter(
+            Leg.device_imei == device_imei
+        ).delete(synchronize_session=False)
+        
+        # 4. Stationaries (no children)
+        deleted_counts['stationaries'] = db.query(Stationary).filter(
+            Stationary.device_imei == device_imei
+        ).delete(synchronize_session=False)
+        
+        # 5. Engine state (no children)
+        deleted_counts['engine_state'] = db.query(EngineState).filter(
+            EngineState.device_imei == device_imei
+        ).delete(synchronize_session=False)
+        
+        # 6. Device state (no children)
+        deleted_counts['device_state'] = db.query(DeviceState).filter(
+            DeviceState.device_imei == device_imei
+        ).delete(synchronize_session=False)
+        
+        # 7. Finally delete the tag itself
+        db.delete(tag)
+        db.flush()  # Ensure deletion happens before commit
+        
+        logger.info(
+            f"{logger_prefix}: Device {device_imei} cleanup complete - "
+            f"positions={deleted_counts['positions']}, "
+            f"journeys={deleted_counts['journeys']}, "
+            f"legs={deleted_counts['legs']}, "
+            f"stationaries={deleted_counts['stationaries']}, "
+            f"engine_state={deleted_counts['engine_state']}, "
+            f"device_state={deleted_counts['device_state']}"
+        )
+        
+        return deleted_counts
+        
+    except Exception as exc:
+        logger.error(f"{logger_prefix}: Cleanup failed for device {device_imei}: {exc}", exc_info=True)
+        raise  # Let caller handle rollback
 
 
 # ---------------------------------------------------------------------------
@@ -1832,6 +1929,8 @@ class PortalTagOut(BaseModel):
     #   idle    : reported within last 7 days but not within 24 h
     #   offline : older than 7 days, or never reported
     activity_status: Optional[str] = None
+    # Sensor data and metadata (Series 5: Temperature, Battery, RSSI, etc.)
+    attributes: Optional[dict] = None
 
     class Config:
         from_attributes = True
@@ -2004,6 +2103,7 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
             category_name=cat_name,
             trip_subscribed=device_state_map.get(tag.imei, False),
             activity_status=_compute_activity_status(tag.last_seen),
+            attributes=tag.attributes,
         ))
 
     elapsed_ms = (perf_counter() - started_at) * 1000.0
@@ -2067,6 +2167,7 @@ def list_supported_tag_types(request: Request, db: Session = Depends(get_db)):
         {"value": "series2", "label": "Series 2 (GPS)", "description": "TrackSolid GPS tracker"},
         {"value": "series_3", "label": "Series 3 (QR Code)", "description": "QR code asset tracking"},
         {"value": "series_4", "label": "Series 4 (BLE Indoor)", "description": "DX-Smart BLE indoor tracking (CP27/CP28/CP29)"},
+        {"value": "series_5", "label": "Series 5 (Hubble)", "description": "Hubble Platform BLE tracking"},
     ]
     
     # Check if usergroup has restrictions
@@ -2463,27 +2564,33 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
                 raise HTTPException(status_code=404, detail="Package not found or inactive")
             current_pkg_id = str(tag.package_id) if tag.package_id else None
             new_pkg_id = str(data.package_id)
-            # If package was not changed, keep current expiry/activation untouched.
-            # This avoids clearing expiry on edit-save for newly added Series 2 tags.
-            if current_pkg_id != new_pkg_id:
+            
+            # Determine if we should recalculate expiry:
+            # 1. Package changed (different package_id)
+            # 2. Same package but expired/about to expire (renewal/extension use case)
+            package_changed = current_pkg_id != new_pkg_id
+            is_expired = tag.expiry_date is None or tag.expiry_date.replace(tzinfo=None) <= datetime.utcnow()
+            should_recalculate = package_changed or is_expired
+            
+            if should_recalculate:
                 tag.package_id = new_pkg_id
                 # Expiry = base_date + validity_days.
-                # base_date = activation_date if it exists, else now().
-                # But if activation_date is old enough that the calculated expiry would
-                # already be in the past, use now() instead so expiry is always future.
-                if tag.activation_date:
+                # For renewals/extensions, always use NOW as base so expiry extends into the future.
+                # For new assignments or package changes with valid activation_date, use activation_date.
+                if is_expired or not tag.activation_date:
+                    # Renewal or first assignment: extend from now
+                    base = datetime.utcnow()
+                    tag.expiry_date = base + timedelta(days=pkg.validity_days)
+                    # For QR/NFC tags, set activation_date if not already set
+                    if not tag.activation_date and (tag.tag_type or "").lower() in ("series3", "series_3"):
+                        tag.activation_date = base
+                else:
+                    # Package changed but not expired: calculate from activation_date
                     base = tag.activation_date.replace(tzinfo=None)
                     candidate = base + timedelta(days=pkg.validity_days)
                     if candidate <= datetime.utcnow():
                         base = datetime.utcnow()
                     tag.expiry_date = base + timedelta(days=pkg.validity_days)
-                else:
-                    if (tag.tag_type or "").lower() in ("series3", "series_3"):
-                        # QR/NFC tags should show an expiry immediately after package assignment.
-                        tag.activation_date = datetime.utcnow()
-                        tag.expiry_date = tag.activation_date + timedelta(days=pkg.validity_days)
-                    else:
-                        tag.expiry_date = None  # pending first GPS fix
 
     # Handle trip subscription (DeviceState management)
     if data.trip_subscribed is not None:
@@ -2526,13 +2633,21 @@ async def validate_tag_portal(
     if not _user_can_manage(me, "asset-mgmt"):
         raise HTTPException(status_code=403, detail="You don't have permission to validate tags")
 
-    tag_type = _TAG_TYPE_ALIAS.get(data.tag_type.lower(), data.tag_type.lower())
+    # Map user-facing series names to canonical provider keys
+    tag_type_raw = data.tag_type.lower()
+    tag_type = _TAG_TYPE_ALIAS.get(tag_type_raw, tag_type_raw)
+    
+    logger.info(f"Tag validation request: tag_type_raw='{tag_type_raw}' → canonical='{tag_type}', imei='{data.imei}'")
+    
     try:
         provider = DeviceProviderFactory.get_provider(tag_type)
+        logger.info(f"Using provider: {provider.provider_name} for tag_type '{tag_type}'")
     except ValueError as exc:
+        logger.error(f"Unknown tag type '{tag_type}' (raw: '{tag_type_raw}'): {exc}")
         raise HTTPException(status_code=400, detail=str(exc))
 
     result = await provider.validate_tag(data.imei)
+    logger.info(f"Validation result for {tag_type}/{data.imei}: is_valid={result.is_valid}, message='{result.message}'")
     return {"is_valid": result.is_valid, "message": result.message}
 
 
@@ -2562,6 +2677,10 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
         validation = await provider.validate_tag(imei)
         if not validation.is_valid:
             raise HTTPException(status_code=422, detail=validation.message)
+        
+        # For Hubble (Series 5), the imei is already the device_id from Hubble
+        # No need to transform it - validation already confirmed it exists
+                
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     
@@ -2576,6 +2695,10 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
         # Check for duplicate using mac_address field (case-insensitive)
         if db.query(BLETag).filter(BLETag.mac_address == normalized_mac).first():
             raise HTTPException(status_code=409, detail=f"Tag with MAC address '{normalized_mac.upper()}' already exists")
+    elif canonical_type == "hubble":
+        # For Hubble tags, check duplicate using device_id (stored in imei field)
+        if db.query(BLETag).filter(BLETag.imei == imei).first():
+            raise HTTPException(status_code=409, detail=f"Hubble device '{imei}' already registered in PinPlot")
     else:
         # For GPS tags, check duplicate using imei field
         if db.query(BLETag).filter(BLETag.imei == imei).first():
@@ -2606,12 +2729,18 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
     
     # Handle trip subscription (DeviceState management)
     if data.trip_subscribed:
-        # Create DeviceState record for Trip Engine subscription
-        device_state = DeviceState(
-            device_imei=imei,
-            trip_subscribed=True,
-        )
-        db.add(device_state)
+        # Upsert DeviceState (may already exist from webhook/trip engine)
+        device_state = db.query(DeviceState).filter(
+            DeviceState.device_imei == imei
+        ).first()
+        if device_state:
+            device_state.trip_subscribed = True
+        else:
+            device_state = DeviceState(
+                device_imei=imei,
+                trip_subscribed=True,
+            )
+            db.add(device_state)
         db.commit()
     
     return _build_tag_out(tag, target_user.email if target_user else "unknown@unknown", db)
@@ -2654,6 +2783,7 @@ def delete_tags(data: PortalTagDelete, request: Request, db: Session = Depends(g
     group = _get_group_and_assert_domain(me, db)
     all_owner_ids = _get_group_owner_ids(group, db)
 
+    deleted_count = 0
     for tag_id in data.tag_ids:
         tag = (
             db.query(BLETag)
@@ -2661,9 +2791,16 @@ def delete_tags(data: PortalTagDelete, request: Request, db: Session = Depends(g
             .first()
         )
         if tag:
-            db.delete(tag)
+            try:
+                _delete_tag_with_cleanup(db, tag, logger_prefix=f"BULK DELETE [{deleted_count+1}/{len(data.tag_ids)}]")
+                deleted_count += 1
+            except Exception as exc:
+                logger.error(f"Failed to delete tag {tag_id}: {exc}")
+                db.rollback()
+                raise HTTPException(status_code=500, detail=f"Failed to delete tag {tag_id}: {str(exc)}")
 
     db.commit()
+    logger.info(f"Bulk delete completed: {deleted_count}/{len(data.tag_ids)} tags deleted successfully")
 
 
 @router.delete("/tags/{tag_id}", status_code=204)
@@ -2682,8 +2819,14 @@ def delete_tag_single(tag_id: str, request: Request, db: Session = Depends(get_d
     )
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found in your group")
-    db.delete(tag)
-    db.commit()
+    
+    try:
+        _delete_tag_with_cleanup(db, tag, logger_prefix="SINGLE DELETE")
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.error(f"Failed to delete tag {tag_id}: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to delete tag: {str(exc)}")
 
 
 class BulkTagRow(BaseModel):
@@ -2776,6 +2919,137 @@ class PortalTripsRequest(BaseModel):
     vehicleId: str
     startDate: str   # ISO 8601 UTC e.g. "2025-10-01T07:00:00Z"
     endDate: str     # ISO 8601 UTC e.g. "2025-10-01T18:00:59Z"
+
+
+@router.get("/tags/{tag_id}/temperature")
+async def get_tag_temperature_history(
+    tag_id: str,
+    request: Request,
+    days: int = Query(7, ge=1, le=365, description="Number of days of history (1-365)"),
+    db: Session = Depends(get_db),
+):
+    """
+    Get temperature history for a Series 5 (Hubble/Minew) tag.
+    
+    Returns historical temperature, battery, altitude, and RSSI readings from
+    DevicePosition records. Only returns data for tags owned by the authenticated
+    user's tenant.
+    
+    Auth: Portal JWT (PortalUser scoped to a UserGroup)
+    
+    Query Parameters:
+        - days: Number of days of history (default 7, max 365)
+    
+    Returns:
+        {
+            "success": true,
+            "tag_id": "uuid",
+            "imei": "string",
+            "device_name": "string",
+            "tag_type": "series_5",
+            "points": [
+                {
+                    "x": 1724342400000,  # epoch milliseconds
+                    "temp": 23.5,         # °C (canonical)
+                    "batt": 85,           # % (0-100)
+                    "alt": 42.3           # meters (canonical)
+                },
+                ...
+            ],
+            "start": 1724256000000,
+            "end": 1724342400000,
+            "count": 1234
+        }
+    """
+    from app.models import DevicePosition
+    
+    # Authenticate portal user
+    current_user = get_portal_user_from_request(request, db)
+    
+    # Verify tag exists and belongs to user's tenant
+    tag = db.query(BLETag).filter(BLETag.id == tag_id).first()
+    if not tag:
+        raise HTTPException(status_code=404, detail="Tag not found")
+    
+    # Get user's tenant
+    group = db.query(UserGroup).filter(UserGroup.id == current_user.usergroup_id).first()
+    if not group:
+        raise HTTPException(status_code=403, detail="User group not found")
+    
+    # Check if tag belongs to this tenant (domain-matched or manually assigned)
+    domains = _domains(group)
+    
+    # Get all user IDs that belong to this group
+    domain_user_ids = []
+    if domains:
+        domain_user_ids = [str(uid) for (uid,) in db.query(User.id).filter(_domain_filter(domains)).all()]
+    
+    portal_user_ids = [
+        str(uid) for (uid,) in 
+        db.query(User.id)
+        .join(PortalUser, User.email == PortalUser.email)
+        .filter(PortalUser.usergroup_id == current_user.usergroup_id)
+        .all()
+    ]
+    
+    all_owner_ids = list(set(domain_user_ids + portal_user_ids))
+    group_id = str(group.id)
+    
+    # Verify ownership: tag must be owned by a user in this group OR created by this group
+    tag_owner_id = str(tag.user_id) if tag.user_id else None
+    tag_created_by_group = tag.attributes and tag.attributes.get("_created_usergroup_id") == group_id
+    
+    if tag_owner_id not in all_owner_ids and not tag_created_by_group:
+        raise HTTPException(status_code=403, detail="Access denied - tag not owned by your organization")
+    
+    # Only Series 5 tags have temperature data
+    if tag.tag_type not in ['series_5', 'series5', 'hubble']:
+        return {
+            "success": False,
+            "error": "Temperature history only available for Series 5 (Hubble/Minew) tags",
+            "tag_id": str(tag.id),
+            "imei": tag.imei,
+            "device_name": tag.device_name,
+            "tag_type": tag.tag_type,
+            "points": [],
+            "count": 0
+        }
+    
+    # Calculate time window
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(days=days)
+    
+    # Query DevicePosition for temperature history
+    # Filter by: IMEI, time range, has temperature data, order by time ascending
+    positions = db.query(DevicePosition).filter(
+        DevicePosition.device_imei == tag.imei,
+        DevicePosition.observed_at >= start,
+        DevicePosition.observed_at <= now,
+        DevicePosition.temperature.isnot(None)  # Only positions with sensor data
+    ).order_by(DevicePosition.observed_at.asc()).all()
+    
+    # Format response
+    points = []
+    for pos in positions:
+        point = {
+            "x": int(pos.observed_at.timestamp() * 1000),  # epoch milliseconds
+            "temp": round(pos.temperature, 2) if pos.temperature is not None else None,
+            "batt": pos.battery_pct if pos.battery_pct is not None else None,
+            "alt": round(pos.altitude, 1) if pos.altitude is not None else None
+        }
+        points.append(point)
+    
+    return {
+        "success": True,
+        "tag_id": str(tag.id),
+        "imei": tag.imei,
+        "device_name": tag.device_name,
+        "tag_type": tag.tag_type,
+        "points": points,
+        "start": int(start.timestamp() * 1000),
+        "end": int(now.timestamp() * 1000),
+        "count": len(points)
+    }
 
 
 @router.post("/trips")
@@ -4294,6 +4568,7 @@ class PositionListResponse(BaseModel):
 
 @router.get("/positions", response_model=PositionListResponse)
 def list_positions(
+    request: Request,
     device_imei: str = Query(..., description="Device IMEI"),
     start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
@@ -4304,9 +4579,14 @@ def list_positions(
     """
     List raw GPS positions for a device with optional date filtering.
     
+    🔒 REQUIRES AUTHENTICATION - User must be logged in to view position data.
+    
     Returns paginated list of positions ordered by observed_at DESC.
     Used for timeline view and raw data inspection.
     """
+    # SECURITY: Require authentication before returning any position data
+    me = get_portal_user_from_request(request, db)
+    
     from app.models import DevicePosition
     
     # Build query
@@ -4381,14 +4661,20 @@ class DeviceSubscriptionUpdate(BaseModel):
 
 @router.get("/devices/{device_imei}/subscription", response_model=DeviceSubscriptionResponse)
 def get_device_subscription(
+    request: Request,
     device_imei: str,
     db: Session = Depends(get_db),
 ):
     """
     Get trip subscription status for a device.
     
+    🔒 REQUIRES AUTHENTICATION
+    
     Returns whether the device is enrolled in trip processing.
     """
+    # SECURITY: Require authentication
+    me = get_portal_user_from_request(request, db)
+    
     from app.models import DeviceState
     
     state = db.query(DeviceState).filter(DeviceState.device_imei == device_imei).first()
@@ -4410,6 +4696,7 @@ def get_device_subscription(
 
 @router.put("/devices/{device_imei}/subscription", response_model=DeviceSubscriptionResponse)
 def update_device_subscription(
+    request: Request,
     device_imei: str,
     data: DeviceSubscriptionUpdate,
     db: Session = Depends(get_db),
@@ -4417,11 +4704,16 @@ def update_device_subscription(
     """
     Update trip subscription status for a device.
     
+    🔒 REQUIRES AUTHENTICATION
+    
     Enables or disables trip processing for this device. When enabled:
     - Device included in batch sweep (Tier 1)
     - Selective track.list pulls triggered (Tier 2)
     - Positions flow through trip engine
     """
+    # SECURITY: Require authentication
+    me = get_portal_user_from_request(request, db)
+    
     from app.models import DeviceState
     
     # Get or create device state

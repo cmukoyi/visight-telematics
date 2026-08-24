@@ -103,7 +103,7 @@ class BLETag(Base):
     description = Column(String(255))  # Vehicle description from MZone API
     mzone_vehicle_id = Column(String(100), index=True)  # Cached MZone vehicle_Id for faster trips API
     mac_address = Column(String(17))  # Format: XX:XX:XX:XX:XX:XX
-    tag_type = Column(String(50), nullable=True, default='series1')  # 'series1' | 'series2' | 'series_3' | 'series_4' (DX-Smart indoor BLE) | 'scope' | 'ble'
+    tag_type = Column(String(50), nullable=True, default='series1')  # 'series1' | 'series2' | 'series_3' | 'series_4' (DX-Smart indoor BLE) | 'series_5' (Hubble) | 'scope' | 'ble' | 'hubble'
     is_active = Column(Boolean, default=True)
     last_seen = Column(DateTime(timezone=True))
     latitude = Column(String(50))
@@ -894,7 +894,7 @@ class DevicePosition(Base):
     __tablename__ = "device_positions"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    device_imei = Column(String(20), nullable=False, index=True)
+    device_imei = Column(String(100), nullable=False, index=True)
     
     # Core position data
     lat = Column(Float, nullable=False)
@@ -921,6 +921,12 @@ class DevicePosition(Base):
     # Reverse geocoding (Section 3.6 - cached at ingest)
     address = Column(Text, nullable=True)                # Human-readable location
     
+    # Sensor data (Series 5 / Hubble tags only - nullable for TrackSolid positions)
+    temperature = Column(Float, nullable=True)       # °C (canonical, always Celsius)
+    battery_pct = Column(Integer, nullable=True)     # % (0-100)
+    altitude = Column(Float, nullable=True)          # meters (canonical)
+    rssi = Column(Integer, nullable=True)            # dBm (signal strength)
+    
     # Metadata
     source = Column(String(20), nullable=False, default="batch")  # 'batch' or 'tracklist'
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
@@ -937,7 +943,7 @@ class DeviceState(Base):
     """
     __tablename__ = "device_state"
     
-    device_imei = Column(String(20), primary_key=True)
+    device_imei = Column(String(100), primary_key=True)
     
     # Trigger detection timestamps
     last_batch_ts = Column(DateTime(timezone=True), nullable=True)
@@ -985,7 +991,7 @@ class EngineState(Base):
     """
     __tablename__ = "engine_state"
     
-    device_imei = Column(String(20), primary_key=True)
+    device_imei = Column(String(100), primary_key=True)
     
     # State machine
     current_state = Column(String(20), nullable=False, default="STATIONARY")  # STATIONARY or MOVE
@@ -1005,6 +1011,10 @@ class EngineState(Base):
     # v2.1.11 D1: Arrival-time checkpoint (captures late-arriving positions)
     last_received_at = Column(DateTime(timezone=True), nullable=True)
     
+    # v2.1.19 D1-FIX: Reconciliation watermark (prevents late-arrival rewind loop)
+    # Tracks highest received_at seen, so late arrivals are detected exactly once
+    last_reconciled_received_at = Column(DateTime(timezone=True), nullable=True)
+    
     # Metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -1019,7 +1029,7 @@ class Stationary(Base):
     __tablename__ = "stationaries"
     
     id = get_uuid_column()
-    device_imei = Column(String(20), nullable=False, index=True)
+    device_imei = Column(String(100), nullable=False, index=True)
     journey_id = get_uuid_nullable()  # NULL if ungrouped
     
     # Position references (nullable for reconstructed state)
@@ -1055,7 +1065,7 @@ class Leg(Base):
     __tablename__ = "legs"
     
     id = get_uuid_column()
-    device_imei = Column(String(20), nullable=False, index=True)
+    device_imei = Column(String(100), nullable=False, index=True)
     journey_id = get_uuid_nullable()  # NULL if ungrouped
     
     # Position references
@@ -1097,7 +1107,7 @@ class Journey(Base):
     __tablename__ = "journeys"
     
     id = get_uuid_column()
-    device_imei = Column(String(20), nullable=False, index=True)
+    device_imei = Column(String(100), nullable=False, index=True)
     
     # Time window
     started_at = Column(DateTime(timezone=True), nullable=False, index=True)
@@ -1163,3 +1173,21 @@ class TripConfig(Base):
     # Metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class WebhookLog(Base):
+    """Log all incoming webhook requests for debugging and audit"""
+    __tablename__ = "webhook_logs"
+    
+    id = get_uuid_column()
+    source = Column(String(50), nullable=False, index=True)  # 'hubble', 'tracksolid', etc.
+    received_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    payload = Column(JSON, nullable=False)  # Full webhook payload
+    packet_count = Column(Integer, nullable=False, default=0)  # Number of packets in batch
+    device_ids = Column(JSON, nullable=True)  # List of device IDs in this webhook
+    status_code = Column(Integer, nullable=False, default=200)  # Response status
+    error_message = Column(Text, nullable=True)  # Error details if any
+    
+    __table_args__ = (
+        Index('idx_webhook_logs_source_received', 'source', 'received_at'),
+    )

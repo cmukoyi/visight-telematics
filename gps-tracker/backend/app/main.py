@@ -25,7 +25,7 @@ from app.services.mzone_service import mzone_service
 from app.services.geofence_service import GeofenceService
 from app.services.location_poller_service import location_poller
 from app.services.critical_service_alert_service import critical_service_alerts
-from app.routes_admin import router as admin_router
+from app.routes_admin import router as admin_router, public_router as admin_public_router
 from app.services.device_providers import DeviceProviderFactory
 import asyncio
 from app.schemas.poi import (
@@ -34,6 +34,10 @@ from app.schemas.poi import (
     GeofenceAlertResponse, AlertsListResponse,
     PostcodeSearchRequest, PostcodeSearchResponse
 )
+
+# Worker pool configuration
+_WORKER_POOL_ENABLED = os.getenv("TRIP_ENGINE_WORKER_POOL", "true").lower() == "true"
+_WORKER_POOL_NUM_WORKERS = int(os.getenv("TRIP_ENGINE_NUM_WORKERS", "5"))
 
 # Pydantic models
 class UserCreate(BaseModel):
@@ -230,11 +234,18 @@ app.include_router(auth_router)
 from app.routes_api_v2 import router as api_v2_router  # noqa: E402
 app.include_router(api_v2_router)
 
+# Webhooks (external service integrations - hidden from docs)
+from app.routes_webhooks import router as webhooks_router  # noqa: E402
+app.include_router(webhooks_router, include_in_schema=False)
+
 # ==============================================================================
 # INTERNAL APIS - Hidden from /docs (dashboard/admin use only)
 # ==============================================================================
 
-# Include admin router (hidden from public API docs)
+# Include admin PUBLIC router (login, logs - no auth required)
+app.include_router(admin_public_router, include_in_schema=False)
+
+# Include admin router (hidden from public API docs, AUTH REQUIRED)
 app.include_router(admin_router, include_in_schema=False)
 
 # Include portal router (dashboard internal endpoints - hidden)
@@ -445,8 +456,14 @@ async def startup_event():
         tracksolid_track_service.start_selective_sweep()
         print("📍 Trip Engine: Selective sweep started (12-minute interval)")
         
-        trip_engine.start_trip_engine()
-        print("🛣️  Trip Engine: Journey processor started (15-minute interval)")
+        # Choose between legacy sequential or worker pool architecture
+        if _WORKER_POOL_ENABLED:
+            from app.services import trip_engine_worker_pool
+            trip_engine_worker_pool.start_worker_pool(num_workers=_WORKER_POOL_NUM_WORKERS)
+            print(f"🛣️  Trip Engine: Worker pool started ({_WORKER_POOL_NUM_WORKERS} workers)")
+        else:
+            trip_engine.start_trip_engine()
+            print("🛣️  Trip Engine: Journey processor started (15-minute interval) [LEGACY MODE]")
         
         trip_engine.start_stall_watchdog()
         print("🔍 Trip Engine: Stall watchdog started (30-minute interval)")
@@ -459,6 +476,8 @@ async def shutdown_event():
     location_poller.stop()
     from app.services import hive_service as _hive_svc
     _hive_svc.stop_sweeper()
+    
+    # Stop Pareto bridge if enabled
     if _FLOORPLAN_BRIDGE_ENABLED:
         try:
             from app.services import pareto_bridge as _pareto
@@ -468,6 +487,16 @@ async def shutdown_event():
             logger.exception("pareto_bridge: shutdown encountered an error")
     else:
         print("⏭️ Pareto bridge stop skipped (disabled by FLOORPLAN_BRIDGE_ENABLED)")
+    
+    # Gracefully stop worker pool if enabled
+    if _WORKER_POOL_ENABLED:
+        try:
+            from app.services import trip_engine_worker_pool
+            await trip_engine_worker_pool.stop_worker_pool()
+            print("🛑 Trip Engine worker pool stopped")
+        except Exception as e:
+            logger.exception("Error stopping worker pool: %s", e)
+    
     critical_service_alerts.stop()
     print("🛑 Location Poller Service stopped")
     print("🛑 HIVE sweeper stopped")
@@ -533,6 +562,8 @@ async def _gdpr_cleanup_loop():
                 for tag in tags_to_delete:
                     tag_id  = tag.id
                     tag_imei = tag.imei
+                    
+                    # ── GDPR-specific cleanup (not in standard deletion) ────
                     # 1. Beacon sightings (keyed by IMEI string)
                     db.query(BeaconSighting).filter(
                         BeaconSighting.tag_id == tag_imei
@@ -549,8 +580,12 @@ async def _gdpr_cleanup_loop():
                     db.query(PortalAlert).filter(
                         PortalAlert.tag_id == tag_id
                     ).delete(synchronize_session=False)
-                    # 5. Delete the tag itself
-                    db.delete(tag)
+                    
+                    # ── Standard trip engine cleanup (positions, journeys, etc) ────
+                    # Use centralized helper to ensure all trip data is deleted
+                    from app.routes_portal import _delete_tag_with_cleanup
+                    _delete_tag_with_cleanup(db, tag, logger_prefix=f"GDPR DELETE")
+                    
                     deleted_count += 1
                     print(f"[GDPR] Hard-deleted tag {tag_imei} (expired {tag.expiry_date})")
                 if deleted_count:
@@ -652,6 +687,82 @@ def api_health_check():
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat()
     }
+
+@app.get("/api/trip-engine/metrics", include_in_schema=False)
+def get_trip_engine_metrics():
+    """Get trip engine metrics (worker pool stats if enabled)."""
+    if not _WORKER_POOL_ENABLED:
+        return {
+            "mode": "legacy",
+            "message": "Worker pool not enabled. Set TRIP_ENGINE_WORKER_POOL=true to enable.",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    
+    try:
+        from app.services import trip_engine_worker_pool
+        worker_pool = trip_engine_worker_pool.get_worker_pool()
+        
+        if not worker_pool:
+            return {
+                "mode": "worker_pool",
+                "status": "not_started",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        
+        metrics = worker_pool.get_metrics()
+        if not metrics:
+            return {
+                "mode": "worker_pool",
+                "status": "no_metrics",
+                "num_workers": worker_pool.num_workers,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        
+        # Calculate utilization
+        total_time = (metrics.sweep_end or datetime.now(timezone.utc) - metrics.sweep_start).total_seconds()
+        worker_time = metrics.worker_busy_time_sec + metrics.worker_idle_time_sec
+        utilization = (metrics.worker_busy_time_sec / worker_time * 100) if worker_time > 0 else 0
+        
+        return {
+            "mode": "worker_pool",
+            "status": "running",
+            "num_workers": worker_pool.num_workers,
+            "sweep": {
+                "start": metrics.sweep_start.isoformat(),
+                "end": metrics.sweep_end.isoformat() if metrics.sweep_end else None,
+                "duration_sec": total_time,
+            },
+            "devices": {
+                "queued": metrics.devices_queued,
+                "processed": metrics.devices_processed,
+                "failed": metrics.devices_failed,
+                "success_rate": f"{metrics.devices_processed / max(metrics.devices_queued, 1) * 100:.1f}%"
+            },
+            "output": {
+                "positions": metrics.total_positions,
+                "journeys": metrics.total_journeys,
+                "legs": metrics.total_legs,
+                "stationaries": metrics.total_stationaries,
+            },
+            "performance": {
+                "worker_busy_time_sec": round(metrics.worker_busy_time_sec, 2),
+                "worker_idle_time_sec": round(metrics.worker_idle_time_sec, 2),
+                "utilization_percent": round(utilization, 2),
+            },
+            "queue": {
+                "size": worker_pool.work_queue.qsize(),
+                "processing": list(worker_pool.processing_devices),
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        logger.exception("Error fetching trip engine metrics: %s", e)
+        return {
+            "mode": "worker_pool",
+            "status": "error",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
 
 @app.get("/api/branding", include_in_schema=False)
 def branding():
