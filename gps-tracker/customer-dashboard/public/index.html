@@ -2108,7 +2108,7 @@ input.hive-range::-moz-range-track {
                 <div class="modal-overlay" id="renameFloorModal" style="display:none">
                   <div class="modal">
                     <div class="modal-title" data-i18n="general.rename_floor">Rename Floor</div>
-                    <input type="text" class="prop-input" id="renameFloorInput" placeholder="Floor name…">
+                    <input type="text" class="prop-input" id="renameFloorInput" data-i18n-placeholder="placeholders.floor_name" placeholder="Floor name…">
                     <div class="modal-actions">
                       <button class="btn-ghost" id="renameFloorCancel" data-i18n="common.cancel">Cancel</button>
                       <button class="btn-primary" id="renameFloorConfirm">Rename</button>
@@ -2161,15 +2161,15 @@ input.hive-range::-moz-range-track {
                     <div style="margin-bottom:16px">
                       <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">Gateway Mode</label>
                       <select id="sketchGatewayMode" class="prop-input" style="width:100%">
-                        <option value="new">Create New Gateway</option>
-                        <option value="existing">Select Existing Gateway</option>
+                        <option value="new" data-i18n="options.create_new_gateway">Create New Gateway</option>
+                        <option value="existing" data-i18n="options.select_existing_gateway">Select Existing Gateway</option>
                       </select>
                     </div>
                     <div id="sketchNewGatewayFields" style="margin-bottom:16px">
                       <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">MAC Address</label>
-                      <input type="text" id="sketchGatewayMac" class="prop-input" placeholder="A4:CF:12:45:AB:CD or A4CF1245ABCD" style="width:100%;margin-bottom:8px">
+                      <input type="text" id="sketchGatewayMac" class="prop-input" data-i18n-placeholder="placeholders.a4cf1245abcd_or_a4cf1245abcd" placeholder="A4:CF:12:45:AB:CD or A4CF1245ABCD" style="width:100%;margin-bottom:8px">
                       <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">Gateway Name</label>
-                      <input type="text" id="sketchGatewayName" class="prop-input" placeholder="e.g., Living Room Gateway" style="width:100%">
+                      <input type="text" id="sketchGatewayName" class="prop-input" data-i18n-placeholder="placeholders.eg_living_room_gateway" placeholder="e.g., Living Room Gateway" style="width:100%">
                     </div>
                     <div id="sketchExistingGatewayFields" style="margin-bottom:16px;display:none">
                       <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)">Gateway</label>
@@ -2196,7 +2196,7 @@ input.hive-range::-moz-range-track {
                         <div class="fp-panel-header">
                             <div class="fp-search-bar">
                                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6.5" cy="6.5" r="4.5"/><path d="M10 10L14 14"/></svg>
-                                <input type="text" id="fp-search-input" placeholder="Search assets or tags…" oninput="_fpFilterAssetsD(this.value)">
+                                <input type="text" id="fp-search-input" data-i18n-placeholder="placeholders.search_assets_or_tags" placeholder="Search assets or tags…" oninput="_fpFilterAssetsD(this.value)">
                             </div>
                             <div class="fp-status-grid">
                                 <div class="fp-status-card fp-active" id="fp-sc-all"     onclick="FP.filterByStatus('all',this)">    <div class="fp-count" id="fp-count-total">0</div>   <div class="fp-slabel" data-i18n="floor_plan.total">Total</div></div>
@@ -2802,19 +2802,19 @@ input.hive-range::-moz-range-track {
                 <div class="rpt-toolbar">
                     <div class="search-input-wrap" style="flex:1;max-width:280px">
                         <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                        <input type="text" class="search-input" id="rpt-sub-search" placeholder="Search tag, user or package…"
+                        <input type="text" class="search-input" id="rpt-sub-search" data-i18n-placeholder="placeholders.search_tag_user_or_package" placeholder="Search tag, user or package…"
                                oninput="_rptSubFilterD()">
                     </div>
                     <select id="rpt-sub-pkg-filter" onchange="rptSubFilter()" style="min-width:160px">
-                        <option value="">All packages</option>
+                        <option value="" data-i18n="options.all_packages">All packages</option>
                     </select>
                     <select id="rpt-sub-status-filter" onchange="rptSubFilter()" style="min-width:150px">
-                        <option value="">All statuses</option>
-                        <option value="active">Active</option>
-                        <option value="expiring">Expiring soon (&lt;30 days)</option>
-                        <option value="expired">Expired</option>
-                        <option value="new">New (awaiting first fix)</option>
-                        <option value="none">No package</option>
+                        <option value="" data-i18n="options.all_statuses">All statuses</option>
+                        <option value="active" data-i18n="options.active">Active</option>
+                        <option value="expiring" data-i18n="options.expiring_soon_lt30_days">Expiring soon (&lt;30 days)</option>
+                        <option value="expired" data-i18n="options.expired">Expired</option>
+                        <option value="new" data-i18n="options.new_awaiting_first_fix">New (awaiting first fix)</option>
+                        <option value="none" data-i18n="options.no_package">No package</option>
                     </select>
                     <button class="btn btn-secondary btn-small" onclick="rptSubRefresh()">
                         <i class="fa-solid fa-rotate-right"></i> Refresh
@@ -2849,12 +2849,12 @@ input.hive-range::-moz-range-track {
                     <table class="rpt-table" id="rpt-sub-table">
                         <thead>
                             <tr>
-                                <th class="sortable" onclick="rptSubSort('description')">Tag / Device <span class="sort-arrow" data-col="description"></span></th>
-                                <th class="sortable" onclick="rptSubSort('owner_email')">Assigned User <span class="sort-arrow" data-col="owner_email"></span></th>
-                                <th class="sortable" onclick="rptSubSort('package_name')">Package <span class="sort-arrow" data-col="package_name"></span></th>
-                                <th class="sortable" onclick="rptSubSort('added_at')">Date Added <span class="sort-arrow" data-col="added_at"></span></th>
-                                <th class="sortable" onclick="rptSubSort('expiry_date')">Expiry Date <span class="sort-arrow" data-col="expiry_date"></span></th>
-                                <th class="sortable" onclick="rptSubSort('days_remaining')">Days Left <span class="sort-arrow" data-col="days_remaining"></span></th>
+                                <th class="sortable" onclick="rptSubSort('description')" data-i18n="table.tag__device">Tag / Device <span class="sort-arrow" data-col="description"></span></th>
+                                <th class="sortable" onclick="rptSubSort('owner_email')" data-i18n="table.assigned_user">Assigned User <span class="sort-arrow" data-col="owner_email"></span></th>
+                                <th class="sortable" onclick="rptSubSort('package_name')" data-i18n="table.package">Package <span class="sort-arrow" data-col="package_name"></span></th>
+                                <th class="sortable" onclick="rptSubSort('added_at')" data-i18n="table.date_added">Date Added <span class="sort-arrow" data-col="added_at"></span></th>
+                                <th class="sortable" onclick="rptSubSort('expiry_date')" data-i18n="table.expiry_date">Expiry Date <span class="sort-arrow" data-col="expiry_date"></span></th>
+                                <th class="sortable" onclick="rptSubSort('days_remaining')" data-i18n="table.days_left">Days Left <span class="sort-arrow" data-col="days_remaining"></span></th>
                                 <th data-i18n="common.status">Status</th>
                             </tr>
                         </thead>
@@ -2872,16 +2872,16 @@ input.hive-range::-moz-range-track {
                 <div class="rpt-toolbar">
                     <div class="search-input-wrap" style="flex:1;max-width:280px">
                         <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                        <input type="text" class="search-input" id="rpt-act-search" placeholder="Search tag, user, category…" oninput="_rptActFilterD()">
+                        <input type="text" class="search-input" id="rpt-act-search" data-i18n-placeholder="placeholders.search_tag_user_category" placeholder="Search tag, user, category…" oninput="_rptActFilterD()">
                     </div>
                     <select id="rpt-act-cat-filter" onchange="rptActFilter()" style="min-width:160px">
-                        <option value="">All categories</option>
+                        <option value="" data-i18n="options.all_categories">All categories</option>
                     </select>
                     <select id="rpt-act-status-filter" onchange="rptActFilter()" style="min-width:150px">
-                        <option value="">All assets</option>
-                        <option value="active">Seen ≤ 24 h</option>
-                        <option value="idle">Seen 1–7 days</option>
-                        <option value="offline">Seen &gt; 7 days</option>
+                        <option value="" data-i18n="options.all_assets">All assets</option>
+                        <option value="active" data-i18n="options.seen__24_h">Seen ≤ 24 h</option>
+                        <option value="idle" data-i18n="options.seen_17_days">Seen 1–7 days</option>
+                        <option value="offline" data-i18n="options.seen_gt_7_days">Seen &gt; 7 days</option>
                     </select>
                     <button class="btn btn-secondary btn-small" onclick="rptActRefresh()">
                         <i class="fa-solid fa-rotate-right"></i> Refresh
@@ -2909,12 +2909,12 @@ input.hive-range::-moz-range-track {
                     <table class="rpt-table" id="rpt-act-table">
                         <thead>
                             <tr>
-                                <th class="sortable" onclick="rptActSort('description')">Tag / Device <span class="sort-arrow" data-col="description"></span></th>
-                                <th class="sortable" onclick="rptActSort('owner_email')">User <span class="sort-arrow" data-col="owner_email"></span></th>
-                                <th class="sortable" onclick="rptActSort('category_name')">Category <span class="sort-arrow" data-col="category_name"></span></th>
-                                <th class="sortable" onclick="rptActSort('last_seen')">Last Seen <span class="sort-arrow" data-col="last_seen"></span></th>
-                                <th class="sortable" onclick="rptActSort('hours_silent')">Hrs Silent <span class="sort-arrow" data-col="hours_silent"></span></th>
-                                <th class="sortable" onclick="rptActSort('battery_level')">Battery <span class="sort-arrow" data-col="battery_level"></span></th>
+                                <th class="sortable" onclick="rptActSort('description')" data-i18n="table.tag__device">Tag / Device <span class="sort-arrow" data-col="description"></span></th>
+                                <th class="sortable" onclick="rptActSort('owner_email')" data-i18n="table.user">User <span class="sort-arrow" data-col="owner_email"></span></th>
+                                <th class="sortable" onclick="rptActSort('category_name')" data-i18n="table.category">Category <span class="sort-arrow" data-col="category_name"></span></th>
+                                <th class="sortable" onclick="rptActSort('last_seen')" data-i18n="table.last_seen">Last Seen <span class="sort-arrow" data-col="last_seen"></span></th>
+                                <th class="sortable" onclick="rptActSort('hours_silent')" data-i18n="table.hrs_silent">Hrs Silent <span class="sort-arrow" data-col="hours_silent"></span></th>
+                                <th class="sortable" onclick="rptActSort('battery_level')" data-i18n="table.battery">Battery <span class="sort-arrow" data-col="battery_level"></span></th>
                                 <th data-i18n="common.location">Location</th>
                                 <th data-i18n="common.status">Status</th>
                             </tr>
@@ -2930,7 +2930,7 @@ input.hive-range::-moz-range-track {
             <div id="tab-reports-trips" class="tab-content">
                 <div class="rpt-toolbar" style="flex-wrap:wrap">
                     <select id="rpt-trips-tag" style="min-width:220px;max-width:320px">
-                        <option value="">— Select a tag —</option>
+                        <option value="" data-i18n="options._select_a_tag_">— Select a tag —</option>
                     </select>
                     <div style="display:flex;align-items:center;gap:6px">
                         <label style="font-size:12px;color:var(--text-3);white-space:nowrap">From</label>
@@ -2984,21 +2984,21 @@ input.hive-range::-moz-range-track {
             <div id="tab-reports-geofence" class="tab-content">
                 <div class="rpt-toolbar">
                     <select id="rpt-geo-days" onchange="rptGeoLoad()" style="min-width:130px">
-                        <option value="7">Last 7 days</option>
-                        <option value="30" selected>Last 30 days</option>
-                        <option value="60">Last 60 days</option>
-                        <option value="90">Last 90 days</option>
+                        <option value="7" data-i18n="options.last_7_days">Last 7 days</option>
+                        <option value="30" selected data-i18n="options.last_30_days">Last 30 days</option>
+                        <option value="60" data-i18n="options.last_60_days">Last 60 days</option>
+                        <option value="90" data-i18n="options.last_90_days">Last 90 days</option>
                     </select>
                     <select id="rpt-geo-tag-filter" onchange="rptGeoFilter()" style="min-width:180px">
-                        <option value="">All tags</option>
+                        <option value="" data-i18n="options.all_tags">All tags</option>
                     </select>
                     <select id="rpt-geo-zone-filter" onchange="rptGeoFilter()" style="min-width:180px">
-                        <option value="">All zones</option>
+                        <option value="" data-i18n="options.all_zones">All zones</option>
                     </select>
                     <select id="rpt-geo-type-filter" onchange="rptGeoFilter()" style="min-width:140px">
-                        <option value="">Entry &amp; Exit</option>
-                        <option value="entry">Entry only</option>
-                        <option value="exit">Exit only</option>
+                        <option value="" data-i18n="options.entry_amp_exit">Entry &amp; Exit</option>
+                        <option value="entry" data-i18n="options.entry_only">Entry only</option>
+                        <option value="exit" data-i18n="options.exit_only">Exit only</option>
                     </select>
                     <button class="btn btn-secondary btn-small" onclick="rptGeoRefresh()">
                         <i class="fa-solid fa-rotate-right"></i> Refresh
@@ -3024,10 +3024,10 @@ input.hive-range::-moz-range-track {
                     <table class="rpt-table" id="rpt-geo-table">
                         <thead>
                             <tr>
-                                <th class="sortable" onclick="rptGeoSort('created_at')">Date / Time <span class="sort-arrow" data-col="created_at"></span></th>
-                                <th class="sortable" onclick="rptGeoSort('tag_label')">Tag <span class="sort-arrow" data-col="tag_label"></span></th>
-                                <th class="sortable" onclick="rptGeoSort('poi_name')">Zone <span class="sort-arrow" data-col="poi_name"></span></th>
-                                <th class="sortable" onclick="rptGeoSort('event_type')">Event <span class="sort-arrow" data-col="event_type"></span></th>
+                                <th class="sortable" onclick="rptGeoSort('created_at')" data-i18n="table.date__time">Date / Time <span class="sort-arrow" data-col="created_at"></span></th>
+                                <th class="sortable" onclick="rptGeoSort('tag_label')" data-i18n="table.tag">Tag <span class="sort-arrow" data-col="tag_label"></span></th>
+                                <th class="sortable" onclick="rptGeoSort('poi_name')" data-i18n="table.zone">Zone <span class="sort-arrow" data-col="poi_name"></span></th>
+                                <th class="sortable" onclick="rptGeoSort('event_type')" data-i18n="table.event">Event <span class="sort-arrow" data-col="event_type"></span></th>
                             </tr>
                         </thead>
                         <tbody id="rpt-geo-tbody">
@@ -3043,21 +3043,21 @@ input.hive-range::-moz-range-track {
                     <div style="display:flex;align-items:center;gap:8px">
                         <label style="font-size:12px;color:var(--text-3);white-space:nowrap">Battery ≤</label>
                         <select id="rpt-bat-threshold" onchange="rptBatFilter()" style="width:auto">
-                            <option value="10">10%</option>
-                            <option value="20" selected>20%</option>
-                            <option value="30">30%</option>
-                            <option value="50">50%</option>
-                            <option value="100">All levels</option>
+                            <option value="10" data-i18n="options.10">10%</option>
+                            <option value="20" selected data-i18n="options.20">20%</option>
+                            <option value="30" data-i18n="options.30">30%</option>
+                            <option value="50" data-i18n="options.50">50%</option>
+                            <option value="100" data-i18n="options.all_levels">All levels</option>
                         </select>
                     </div>
                     <div style="display:flex;align-items:center;gap:8px">
                         <label style="font-size:12px;color:var(--text-3);white-space:nowrap">Silent ≥</label>
                         <select id="rpt-bat-offline-hrs" onchange="rptBatFilter()" style="width:auto">
-                            <option value="0">Any duration</option>
-                            <option value="24">24 hours</option>
-                            <option value="48" selected>48 hours</option>
-                            <option value="168">7 days</option>
-                            <option value="720">30 days</option>
+                            <option value="0" data-i18n="options.any_duration">Any duration</option>
+                            <option value="24" data-i18n="options.24_hours">24 hours</option>
+                            <option value="48" selected data-i18n="options.48_hours">48 hours</option>
+                            <option value="168" data-i18n="options.7_days">7 days</option>
+                            <option value="720" data-i18n="options.30_days">30 days</option>
                         </select>
                     </div>
                     <button class="btn btn-secondary btn-small" onclick="rptBatRefresh()">
@@ -3084,11 +3084,11 @@ input.hive-range::-moz-range-track {
                     <table class="rpt-table" id="rpt-bat-table">
                         <thead>
                             <tr>
-                                <th class="sortable" onclick="rptBatSort('description')">Tag / Device <span class="sort-arrow" data-col="description"></span></th>
-                                <th class="sortable" onclick="rptBatSort('owner_email')">User <span class="sort-arrow" data-col="owner_email"></span></th>
-                                <th class="sortable" onclick="rptBatSort('battery_level')">Battery <span class="sort-arrow" data-col="battery_level"></span></th>
-                                <th class="sortable" onclick="rptBatSort('last_seen')">Last Seen <span class="sort-arrow" data-col="last_seen"></span></th>
-                                <th class="sortable" onclick="rptBatSort('hours_silent')">Hrs Silent <span class="sort-arrow" data-col="hours_silent"></span></th>
+                                <th class="sortable" onclick="rptBatSort('description')" data-i18n="table.tag__device">Tag / Device <span class="sort-arrow" data-col="description"></span></th>
+                                <th class="sortable" onclick="rptBatSort('owner_email')" data-i18n="table.user">User <span class="sort-arrow" data-col="owner_email"></span></th>
+                                <th class="sortable" onclick="rptBatSort('battery_level')" data-i18n="table.battery">Battery <span class="sort-arrow" data-col="battery_level"></span></th>
+                                <th class="sortable" onclick="rptBatSort('last_seen')" data-i18n="table.last_seen">Last Seen <span class="sort-arrow" data-col="last_seen"></span></th>
+                                <th class="sortable" onclick="rptBatSort('hours_silent')" data-i18n="table.hrs_silent">Hrs Silent <span class="sort-arrow" data-col="hours_silent"></span></th>
                                 <th data-i18n="common.status">Status</th>
                             </tr>
                         </thead>
@@ -3116,10 +3116,10 @@ input.hive-range::-moz-range-track {
                         <div style="flex:0 0 auto">
                             <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Date Range</label>
                             <select id="rpt-alerts-date-preset" onchange="rptAlertsDatePresetChange()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)">
-                                <option value="today">Today</option>
-                                <option value="last_7_days" selected>Last 7 days</option>
-                                <option value="last_30_days">Last 30 days</option>
-                                <option value="custom">Custom</option>
+                                <option value="today" data-i18n="options.today">Today</option>
+                                <option value="last_7_days" selected data-i18n="options.last_7_days">Last 7 days</option>
+                                <option value="last_30_days" data-i18n="options.last_30_days">Last 30 days</option>
+                                <option value="custom" data-i18n="options.custom">Custom</option>
                             </select>
                         </div>
                         <div id="rpt-alerts-start-wrap" style="flex:0 0 auto;display:none">
@@ -3133,19 +3133,19 @@ input.hive-range::-moz-range-track {
                         <div style="flex:0 0 auto">
                             <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Alert Type</label>
                             <select id="rpt-alerts-type-filter" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)">
-                                <option value="">All types</option>
-                                <option value="battery_low">Battery Low</option>
-                                <option value="tag_offline">Tag Offline</option>
-                                <option value="geofence_entry">Geofence Entry</option>
-                                <option value="geofence_exit">Geofence Exit</option>
-                                <option value="hive_breach">Hive Breach</option>
-                                <option value="hive_breach_cleared">Hive Cleared</option>
-                                <option value="gdpr_deletion_warning">GDPR Warning</option>
+                                <option value="" data-i18n="options.all_types">All types</option>
+                                <option value="battery_low" data-i18n="options.battery_low">Battery Low</option>
+                                <option value="tag_offline" data-i18n="options.tag_offline">Tag Offline</option>
+                                <option value="geofence_entry" data-i18n="options.geofence_entry">Geofence Entry</option>
+                                <option value="geofence_exit" data-i18n="options.geofence_exit">Geofence Exit</option>
+                                <option value="hive_breach" data-i18n="options.hive_breach">Hive Breach</option>
+                                <option value="hive_breach_cleared" data-i18n="options.hive_cleared">Hive Cleared</option>
+                                <option value="gdpr_deletion_warning" data-i18n="options.gdpr_warning">GDPR Warning</option>
                             </select>
                         </div>
                         <div style="flex:1 1 160px">
                             <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">IMEI</label>
-                            <input type="text" id="rpt-alerts-imei-filter" placeholder="Filter by IMEI" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)">
+                            <input type="text" id="rpt-alerts-imei-filter" data-i18n-placeholder="placeholders.filter_by_imei" placeholder="Filter by IMEI" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)">
                         </div>
                         <button class="btn btn-primary btn-small" onclick="rptAlertsApplyFilters()" style="margin-bottom:0">
                             <i class="fa-solid fa-filter"></i> Apply
@@ -3719,7 +3719,7 @@ input.hive-range::-moz-range-track {
                         <div class="mha-ap-body">
                             <div class="mha-ap-search">
                                 <i class="fa-solid fa-search"></i>
-                                <input type="text" id="mha-search-input" placeholder="Search assets..." oninput="mhaFilterAssets()">
+                                <input type="text" id="mha-search-input" data-i18n-placeholder="placeholders.search_assets" placeholder="Search assets..." oninput="mhaFilterAssets()">
                             </div>
                             
                             <!-- Date Range Pills -->
@@ -4095,7 +4095,7 @@ input.hive-range::-moz-range-track {
                   <div class="hive-page-title"><i class="fa-solid fa-box-archive"></i> Archive</div>
                   <div class="hive-search-box">
                     <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" placeholder="Search archived hives…" oninput="_hiveFilterArchiveD(this.value)">
+                    <input type="text" data-i18n-placeholder="placeholders.search_archived_hives" placeholder="Search archived hives…" oninput="_hiveFilterArchiveD(this.value)">
                   </div>
                 </div>
                 <div class="hive-info-strip">
@@ -4128,9 +4128,9 @@ input.hive-range::-moz-range-track {
             <div style="margin-bottom:18px">
                 <label style="display:block;font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Mobility Profile</label>
                 <select id="hive-cfg-profile" class="form-control" style="width:100%">
-                    <option value="stationary">Stationary — items stay put</option>
-                    <option value="slow">Slow — moves occasionally</option>
-                    <option value="mobile">Mobile — moves regularly or in transit</option>
+                    <option value="stationary" data-i18n="options.stationary__items_stay_put">Stationary — items stay put</option>
+                    <option value="slow" data-i18n="options.slow__moves_occasionally">Slow — moves occasionally</option>
+                    <option value="mobile" data-i18n="options.mobile__moves_regularly_or_in_transit">Mobile — moves regularly or in transit</option>
                 </select>
             </div>
             <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:baseline">
@@ -4163,11 +4163,11 @@ input.hive-range::-moz-range-track {
         <form onsubmit="submitSingleTag(event)">
             <div class="form-group">
                 <label>IMEI / Tag ID *</label>
-                <input type="text" id="stImei" placeholder="e.g. 867747079036032" required>
+                <input type="text" id="stImei" data-i18n-placeholder="placeholders.eg_867747079036032" placeholder="e.g. 867747079036032" required>
             </div>
             <div class="form-group">
                 <label>Label / Name</label>
-                <input type="text" id="stLabel" placeholder="e.g. Company Van">
+                <input type="text" id="stLabel" data-i18n-placeholder="placeholders.eg_company_van" placeholder="e.g. Company Van">
             </div>
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('singleTagModal')" data-i18n="common.cancel">Cancel</button>
@@ -4200,7 +4200,7 @@ input.hive-range::-moz-range-track {
         <div id="csvPreview" style="display:none;margin-top:16px">
             <p style="font-size:13px;font-weight:600;margin-bottom:8px" id="csvPreviewLabel"></p>
             <div class="table-wrapper" style="max-height:200px;overflow-y:auto">
-                <table><thead><tr><th>IMEI</th><th>Label</th></tr></thead>
+                <table><thead><tr><th data-i18n="table.imei">IMEI</th><th data-i18n="table.label">Label</th></tr></thead>
                 <tbody id="csvPreviewBody"></tbody></table>
             </div>
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
@@ -4239,7 +4239,7 @@ input.hive-range::-moz-range-track {
         </div>
         <div class="form-group">
             <label>Building Name</label>
-            <input type="text" id="newBldgName" placeholder="e.g. Head Office — Floor 2" maxlength="80">
+            <input type="text" id="newBldgName" data-i18n-placeholder="placeholders.eg_head_office__floor_2" placeholder="e.g. Head Office — Floor 2" maxlength="80">
         </div>
         <div class="form-group">
             <label>Floor Plan Image <span style="color:var(--gray);font-weight:400">(optional — upload later via map)</span></label>
@@ -4253,12 +4253,12 @@ input.hive-range::-moz-range-track {
         <p style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray);margin-bottom:10px">Pareto Anywhere / MQTT Settings</p>
         <div class="form-group">
             <label>Broker WebSocket URL</label>
-            <input type="text" id="newBldgMqttUrl" placeholder="wss://pinplot.me/mqtt">
+            <input type="text" id="newBldgMqttUrl" data-i18n-placeholder="placeholders.wsspinplotmemqtt" placeholder="wss://pinplot.me/mqtt">
             <p style="font-size:12px;color:var(--gray);margin-top:4px">Use <code>wss://pinplot.me/mqtt</code> (routed through nginx → Mosquitto).</p>
         </div>
         <div class="form-group">
             <label>Topic</label>
-            <input type="text" id="newBldgMqttTopic" value="position/#" placeholder="position/#">
+            <input type="text" id="newBldgMqttTopic" value="position/#" data-i18n-placeholder="placeholders.position" placeholder="position/#">
             <p style="font-size:12px;color:var(--gray);margin-top:4px">The pinplot mqtt-bridge publishes on <code>position/#</code> and raw raddecs on <code>raddec/#</code>.</p>
         </div>
         <div style="display:flex;gap:10px;margin-bottom:6px">
@@ -4291,29 +4291,29 @@ input.hive-range::-moz-range-track {
         <form id="tagMgmtForm" onsubmit="submitTagForm(event)">
             <div id="tagMgmtImeiGroup" class="form-group">
                 <label id="tagMgmtImeiLabel">IMEI / MAC Address *</label>
-                <input type="text" id="tagMgmtImei" placeholder="e.g. 867747079036032 or 48872D9DBC66" required
+                <input type="text" id="tagMgmtImei" data-i18n-placeholder="placeholders.eg_867747079036032_or_48872d9dbc66" placeholder="e.g. 867747079036032 or 48872D9DBC66" required
                        oninput="_tagImeiResetValidation()"
                        onblur="_tagImeiValidateOnBlur()">
                 <div id="tagMgmtImeiStatus" style="display:none;margin-top:4px;font-size:12px"></div>
             </div>
             <div id="tagMgmtDescGroup" class="form-group">
                 <label>Description</label>
-                <input type="text" id="tagMgmtDesc" placeholder="e.g. John's vehicle tracker">
+                <input type="text" id="tagMgmtDesc" data-i18n-placeholder="placeholders.eg_johns_vehicle_tracker" placeholder="e.g. John's vehicle tracker">
             </div>
             <div id="tagMgmtTypeGroup" class="form-group">
                 <label>Tag Type</label>
                 <select id="tagMgmtType" onchange="_updateImeiLabelForTagType()">
-                    <option value="series1">Series 1 (GPS)</option>
-                    <option value="series2">Series 2 (GPS)</option>
-                    <option value="series3">Series 3 (QR Code)</option>
-                    <option value="series_4">Series 4 (BLE Indoor)</option>
-                    <option value="series_5">Series 5 (Hubble)</option>
+                    <option value="series1" data-i18n="options.series_1_gps">Series 1 (GPS)</option>
+                    <option value="series2" data-i18n="options.series_2_gps">Series 2 (GPS)</option>
+                    <option value="series3" data-i18n="options.series_3_qr_code">Series 3 (QR Code)</option>
+                    <option value="series_4" data-i18n="options.series_4_ble_indoor">Series 4 (BLE Indoor)</option>
+                    <option value="series_5" data-i18n="options.series_5_hubble">Series 5 (Hubble)</option>
                 </select>
             </div>
             <div id="tagMgmtCategoryGroup" class="form-group">
                 <label>Category</label>
                 <select id="tagMgmtCategory">
-                    <option value="">— None —</option>
+                    <option value="" data-i18n="options._none_">— None —</option>
                 </select>
             </div>
             <div class="form-group">
@@ -4369,24 +4369,24 @@ input.hive-range::-moz-range-track {
             <div style="display:flex;gap:12px">
                 <div class="form-group" style="flex:1">
                     <label>First Name</label>
-                    <input type="text" id="auFirst" placeholder="Jane">
+                    <input type="text" id="auFirst" data-i18n-placeholder="placeholders.jane" placeholder="Jane">
                 </div>
                 <div class="form-group" style="flex:1">
                     <label>Last Name</label>
-                    <input type="text" id="auLast" placeholder="Smith">
+                    <input type="text" id="auLast" data-i18n-placeholder="placeholders.smith" placeholder="Smith">
                 </div>
             </div>
             <div class="form-group">
                 <label>Email *</label>
-                <input type="email" id="auEmail" placeholder="jane@company.com" required>
+                <input type="email" id="auEmail" data-i18n-placeholder="placeholders.janecompanycom" placeholder="jane@company.com" required>
             </div>
             <div class="form-group">
                 <label>Role *</label>
                 <select id="auRole" class="form-input" onchange="_auToggleCustomFeatures()">
-                    <option value="admin">Admin — full access to all group features</option>
-                    <option value="manager">Manager — Tracking &amp; Management only</option>
-                    <option value="reporter">Reporter — Reports only</option>
-                    <option value="custom">Custom — choose features below</option>
+                    <option value="admin" data-i18n="options.admin__full_access_to_all_group_features">Admin — full access to all group features</option>
+                    <option value="manager" data-i18n="options.manager__tracking_amp_management_only">Manager — Tracking &amp; Management only</option>
+                    <option value="reporter" data-i18n="options.reporter__reports_only">Reporter — Reports only</option>
+                    <option value="custom" data-i18n="options.custom__choose_features_below">Custom — choose features below</option>
                 </select>
             </div>
             <!-- Custom features panel — shown only when role=custom -->
@@ -4435,12 +4435,12 @@ input.hive-range::-moz-range-track {
         <form id="categoryForm" onsubmit="submitCategoryForm(event)">
             <div class="form-group">
                 <label>Category Name *</label>
-                <input type="text" id="catName" placeholder="e.g. Vehicles" required maxlength="100">
+                <input type="text" id="catName" data-i18n-placeholder="placeholders.eg_vehicles" placeholder="e.g. Vehicles" required maxlength="100">
             </div>
             <div style="display:flex;gap:12px">
                 <div class="form-group" style="flex:1">
                     <label>Icon <span style="color:var(--gray);font-weight:400">(FA class)</span></label>
-                    <input type="text" id="catIcon" placeholder="fa-car">
+                    <input type="text" id="catIcon" data-i18n-placeholder="placeholders.facar" placeholder="fa-car">
                     <p style="font-size:12px;color:var(--gray);margin-top:4px">e.g. fa-car, fa-truck, fa-box, fa-person</p>
                 </div>
                 <div class="form-group" style="flex:0 0 100px">
@@ -4486,7 +4486,7 @@ input.hive-range::-moz-range-track {
             </div>
             <div class="loc-preview-wrap" id="am-preview-wrap">
                 <table class="loc-preview-table">
-                    <thead><tr><th>#</th><th>IMEI</th><th>Owner Email</th><th>Description</th><th>Type</th><th>Status</th></tr></thead>
+                    <thead><tr><th>#</th><th data-i18n="table.imei">IMEI</th><th data-i18n="table.owner_email">Owner Email</th><th data-i18n="table.description">Description</th><th data-i18n="table.type">Type</th><th data-i18n="table.status">Status</th></tr></thead>
                     <tbody id="am-preview-body"></tbody>
                 </table>
             </div>
@@ -4516,10 +4516,10 @@ input.hive-range::-moz-range-track {
         <div class="form-group" style="margin:16px 0 8px">
             <label>Role</label>
             <select id="erRole" class="form-input" onchange="_erToggleCustom()">
-                <option value="admin">Admin — full access to all group features</option>
-                <option value="manager">Manager — Tracking &amp; Management only</option>
-                <option value="reporter">Reporter — Reports only</option>
-                <option value="custom">Custom — choose features below</option>
+                <option value="admin" data-i18n="options.admin__full_access_to_all_group_features">Admin — full access to all group features</option>
+                <option value="manager" data-i18n="options.manager__tracking_amp_management_only">Manager — Tracking &amp; Management only</option>
+                <option value="reporter" data-i18n="options.reporter__reports_only">Reporter — Reports only</option>
+                <option value="custom" data-i18n="options.custom__choose_features_below">Custom — choose features below</option>
             </select>
         </div>
         <div id="erCustomPanel" style="display:none;margin-bottom:12px;padding:12px;background:var(--bg-card);border:1px solid var(--border-color);border-radius:8px">
@@ -5751,40 +5751,40 @@ let _mobileUsersCache = null;
 
 async function _loadMobileUsersIntoSelect() {
     const sel = document.getElementById('tagMgmtUser');
-    sel.innerHTML = '<option value="">Loading users…</option>';
+    sel.innerHTML = '<option value="" data-i18n="options.loading_users">Loading users…</option>';
     try {
         const res = await apiFetch('/api/portal/mobile-users');
         if (!res.ok) throw new Error('Failed to load users');
         _mobileUsersCache = await res.json();
-        sel.innerHTML = '<option value="">— Optional: assign later —</option>' +
+        sel.innerHTML = '<option value="" data-i18n="options._optional_assign_later_">— Optional: assign later —</option>' +
             _mobileUsersCache.map(u => {
                 const name = [u.first_name, u.last_name].filter(Boolean).join(' ');
                 return `<option value="${esc(String(u.id))}">${esc(u.email)}${name ? ' (' + esc(name) + ')' : ''}</option>`;
             }).join('');
     } catch (err) {
-        sel.innerHTML = `<option value="">Error: ${esc(err.message)}</option>`;
+        sel.innerHTML = `<option value="" data-i18n="options.error_escerrmessage">Error: ${esc(err.message)}</option>`;
     }
 }
 
 async function _loadPackagesIntoSelect() {
     const sel = document.getElementById('tagMgmtPackage');
     if (!sel) return;
-    sel.innerHTML = '<option value="">Loading packages…</option>';
+    sel.innerHTML = '<option value="" data-i18n="options.loading_packages">Loading packages…</option>';
     try {
         const res = await apiFetch('/api/portal/packages');
         if (!res.ok) throw new Error('Failed to load packages');
         const pkgs = await res.json();
         if (!pkgs.length) {
-            sel.innerHTML = '<option value="">No packages available — ask your admin</option>';
+            sel.innerHTML = '<option value="" data-i18n="options.no_packages_available__ask_your_admin">No packages available — ask your admin</option>';
             return;
         }
-        sel.innerHTML = '<option value="">— Select package —</option>' +
+        sel.innerHTML = '<option value="" data-i18n="options._select_package_">— Select package —</option>' +
             pkgs.map(p => {
                 const label = `${p.name} (${p.validity_days} days)${p.is_default ? ' ✓ default' : ''}`;
                 return `<option value="${esc(String(p.id))}"${p.is_default ? ' selected' : ''}>${esc(label)}</option>`;
             }).join('');
     } catch (err) {
-        sel.innerHTML = `<option value="">Error: ${esc(err.message)}</option>`;
+        sel.innerHTML = `<option value="" data-i18n="options.error_escerrmessage">Error: ${esc(err.message)}</option>`;
     }
 }
 
@@ -7074,7 +7074,7 @@ function rptActRefresh() {
 function _rptActBuildCatFilter(tags) {
     const sel   = document.getElementById('rpt-act-cat-filter');
     const names = [...new Set(tags.map(t => t.category_name).filter(Boolean))].sort();
-    sel.innerHTML = '<option value="">All categories</option>' +
+    sel.innerHTML = '<option value="" data-i18n="options.all_categories">All categories</option>' +
         names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
 }
 
@@ -7178,7 +7178,7 @@ async function loadReportsTrips() {
     const cur = sel.value;
     try {
         const tags = await _rptEnsureTags();
-        sel.innerHTML = '<option value="">— Select a tag —</option>' +
+        sel.innerHTML = '<option value="" data-i18n="options._select_a_tag_">— Select a tag —</option>' +
             tags.map(t => `<option value="${esc(String(t.id))}">${esc(t.description||t.device_name||t.imei)}</option>`).join('');
         if (cur) sel.value = cur;
     } catch (_) {}
@@ -7315,8 +7315,8 @@ function _rptGeoBuildFilters() {
     const zoneSel = document.getElementById('rpt-geo-zone-filter');
     const tags  = [...new Set(_rptGeoData.map(e => e.tag_label))].sort();
     const zones = [...new Set(_rptGeoData.map(e => e.poi_name))].sort();
-    tagSel.innerHTML  = '<option value="">All tags</option>'  + tags.map(n  => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
-    zoneSel.innerHTML = '<option value="">All zones</option>' + zones.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    tagSel.innerHTML  = '<option value="" data-i18n="options.all_tags">All tags</option>'  + tags.map(n  => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    zoneSel.innerHTML = '<option value="" data-i18n="options.all_zones">All zones</option>' + zones.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
 }
 
 function rptGeoFilter() {
@@ -8920,7 +8920,7 @@ function _rptSubBuildPkgFilter() {
     const sel   = document.getElementById('rpt-sub-pkg-filter');
     const names = [...new Set(_rptSubData.map(t => t.package_name).filter(Boolean))].sort();
     // keep first "All packages" option, replace rest
-    sel.innerHTML = '<option value="">All packages</option>' +
+    sel.innerHTML = '<option value="" data-i18n="options.all_packages">All packages</option>' +
         names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
 }
 
@@ -9229,7 +9229,7 @@ async function _loadCategoriesIntoSelect() {
             if (res.ok) _categoriesCache = await res.json();
         }
         const current = sel.value;
-        sel.innerHTML = '<option value="">— None —</option>' +
+        sel.innerHTML = '<option value="" data-i18n="options._none_">— None —</option>' +
             _categoriesCache.map(c =>
                 `<option value="${esc(c.id)}">${esc(c.name)}</option>`
             ).join('');
@@ -9258,12 +9258,12 @@ let _mqttRateTimer  = null;
 
 async function loadBuildings() {
     const sel = document.getElementById('buildingSelect');
-    sel.innerHTML = '<option value="">— Loading… —</option>';
+    sel.innerHTML = '<option value="" data-i18n="options._loading_">— Loading… —</option>';
     try {
         const res = await apiFetch('/api/portal/buildings');
         if (!res.ok) throw new Error('HTTP ' + res.status);
         _buildings = await res.json();
-        sel.innerHTML = '<option value="">— Select a building —</option>';
+        sel.innerHTML = '<option value="" data-i18n="options._select_a_building_">— Select a building —</option>';
         _buildings.forEach(b => {
             const opt = document.createElement('option');
             opt.value = b.id; opt.textContent = b.name;
@@ -9277,7 +9277,7 @@ async function loadBuildings() {
             })
         ));
     } catch (e) {
-        sel.innerHTML = '<option value="">— Error loading buildings —</option>';
+        sel.innerHTML = '<option value="" data-i18n="options._error_loading_buildings_">— Error loading buildings —</option>';
         showTabAlert('building', 'Could not load buildings: ' + e.message, 'error');
     }
 }
@@ -10154,12 +10154,12 @@ function _euRender(users) {
                     <table style="width:100%;border-collapse:collapse;background:var(--bg-2,var(--bg));font-size:.83rem">
                         <thead>
                             <tr style="background:var(--bg-3,var(--bg-2))">
-                                <th style="padding:8px 12px 8px 40px;font-weight:500;color:var(--text-3);text-align:left">IMEI</th>
-                                <th style="padding:8px 12px;font-weight:500;color:var(--text-3);text-align:left">Description</th>
-                                <th style="padding:8px 12px;font-weight:500;color:var(--text-3);text-align:left">Package</th>
-                                <th style="padding:8px 12px;font-weight:500;color:var(--text-3);text-align:left">Activated</th>
-                                <th style="padding:8px 12px;font-weight:500;color:var(--text-3);text-align:left">Expires</th>
-                                <th style="padding:8px 12px;font-weight:500;color:var(--text-3);text-align:center">Status</th>
+                                <th style="padding:8px 12px 8px 40px;font-weight:500;color:var(--text-3);text-align:left" data-i18n="table.imei">IMEI</th>
+                                <th style="padding:8px 12px;font-weight:500;color:var(--text-3);text-align:left" data-i18n="table.description">Description</th>
+                                <th style="padding:8px 12px;font-weight:500;color:var(--text-3);text-align:left" data-i18n="table.package">Package</th>
+                                <th style="padding:8px 12px;font-weight:500;color:var(--text-3);text-align:left" data-i18n="table.activated">Activated</th>
+                                <th style="padding:8px 12px;font-weight:500;color:var(--text-3);text-align:left" data-i18n="table.expires">Expires</th>
+                                <th style="padding:8px 12px;font-weight:500;color:var(--text-3);text-align:center" data-i18n="table.status">Status</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -13116,11 +13116,11 @@ function hiveWizRender() {
           <div class="hive-wizard-help">Give this group a descriptive name. The distance threshold is the maximum allowed spread before an alert is raised.</div>
           <div class="hive-form-group">
             <label class="hive-form-label">Hive Name *</label>
-            <input type="text" class="hive-form-input" placeholder="e.g. Travel Kit" value="${hiveEsc(hiveWizState.name)}" oninput="hiveWizState.name=this.value">
+            <input type="text" class="hive-form-input" data-i18n-placeholder="placeholders.eg_travel_kit" placeholder="e.g. Travel Kit" value="${hiveEsc(hiveWizState.name)}" oninput="hiveWizState.name=this.value">
           </div>
           <div class="hive-form-group">
             <label class="hive-form-label">Distance Threshold (metres) *</label>
-            <input type="number" class="hive-form-input" placeholder="e.g. 100" min="1" max="50000" value="${hiveWizState.threshold_m||''}" oninput="hiveWizState.threshold_m=parseFloat(this.value)">
+            <input type="number" class="hive-form-input" data-i18n-placeholder="placeholders.eg_100" placeholder="e.g. 100" min="1" max="50000" value="${hiveWizState.threshold_m||''}" oninput="hiveWizState.threshold_m=parseFloat(this.value)">
           </div>
           <div class="hive-form-group">
             <label class="hive-form-label">Validity (days)</label>
@@ -13343,7 +13343,7 @@ function mhaOpenHelp() {
       const val = e.target.value;
       if (val === 'new') {
         newBuildingFields.style.display = 'block';
-        floorSelect.innerHTML = '<option value="new">Create new floor</option>';
+        floorSelect.innerHTML = '<option value="new" data-i18n="options.create_new_floor">Create new floor</option>';
         newFloorFields.style.display = 'block';
       } else if (val) {
         newBuildingFields.style.display = 'none';
@@ -13351,7 +13351,7 @@ function mhaOpenHelp() {
         await loadFloorsForBuilding(val);
       } else {
         newBuildingFields.style.display = 'none';
-        floorSelect.innerHTML = '<option value="">Select building first...</option>';
+        floorSelect.innerHTML = '<option value="" data-i18n="options.select_building_first">Select building first...</option>';
         newFloorFields.style.display = 'none';
       }
     });
@@ -13723,7 +13723,7 @@ function mhaOpenHelp() {
       sketchBuildings = await res.json();
       console.log('[Floor Plan] ✅ Loaded', sketchBuildings.length, 'buildings');
 
-      buildingSelect.innerHTML = '<option value="">Select existing building...</option>';
+      buildingSelect.innerHTML = '<option value="" data-i18n="options.select_existing_building">Select existing building...</option>';
       sketchBuildings.forEach(b => {
         const opt = document.createElement('option');
         opt.value = b.id;
@@ -13735,7 +13735,7 @@ function mhaOpenHelp() {
       newOpt.textContent = '+ Create New Building';
       buildingSelect.appendChild(newOpt);
 
-      floorSelect.innerHTML = '<option value="">Select building first...</option>';
+      floorSelect.innerHTML = '<option value="" data-i18n="options.select_building_first">Select building first...</option>';
     } catch (err) {
       console.error('[Floor Plan] ❌ loadBuildingsAndFloors error:', err);
       alert('Failed to load buildings from database: ' + err.message);
@@ -13749,7 +13749,7 @@ function mhaOpenHelp() {
       if (!res.ok) throw new Error('Failed to load floors');
       sketchFloors = await res.json();
 
-      floorSelect.innerHTML = '<option value="">Select existing floor...</option>';
+      floorSelect.innerHTML = '<option value="" data-i18n="options.select_existing_floor">Select existing floor...</option>';
       sketchFloors.forEach(f => {
         const opt = document.createElement('option');
         opt.value = f.id;
@@ -13773,12 +13773,12 @@ function mhaOpenHelp() {
         // Gracefully handle no gateways
         console.warn('No gateways found or API error');
         sketchGateways = [];
-        gatewaySelect.innerHTML = '<option value="">No existing gateways</option>';
+        gatewaySelect.innerHTML = '<option value="" data-i18n="options.no_existing_gateways">No existing gateways</option>';
         return;
       }
       sketchGateways = await res.json();
 
-      gatewaySelect.innerHTML = '<option value="">Select gateway...</option>';
+      gatewaySelect.innerHTML = '<option value="" data-i18n="options.select_gateway">Select gateway...</option>';
       sketchGateways.forEach(gw => {
         const opt = document.createElement('option');
         opt.value = gw.id;
@@ -13791,7 +13791,7 @@ function mhaOpenHelp() {
     } catch (err) {
       console.error('Failed to load gateways:', err);
       sketchGateways = [];
-      gatewaySelect.innerHTML = '<option value="">No existing gateways</option>';
+      gatewaySelect.innerHTML = '<option value="" data-i18n="options.no_existing_gateways">No existing gateways</option>';
     }
   }
 
