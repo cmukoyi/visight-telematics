@@ -9685,7 +9685,7 @@ async function renderGPSTags() {
             <span style="font-size:11px">Owner: ${ownerShort}</span><br>
             <span style="font-size:11px">Last seen: ${t.last_seen ? new Date(t.last_seen).toLocaleString() : '—'}</span><br>
             <button onclick="toggleGpsMark('${esc(t.imei)}')" style="margin-top:6px;font-size:12px;padding:3px 8px;border-radius:4px;border:1px solid #ddd;cursor:pointer;background:#f3f4f6" id="popup-mark-${esc(t.imei.replace(/[^a-z0-9]/gi,'_'))}">
-                ${is<span data-i18n="buttons.marked_unmark_mark_for_tracking">Marked ? '★ Unmark' : '☆ Mark for tracking'}</span></button>
+                <span data-i18n="${isMarked ? 'buttons.unmark' : 'buttons.mark_for_tracking'}">${isMarked ? '★ Unmark' : '☆ Mark for tracking'}</span></button>
         `);
         _gpsMarkers[t.imei] = marker;
     });
@@ -9873,7 +9873,7 @@ async function _gpsSearchDuplicate_doNotCall() {
             <span style="font-size:11px">Owner: ${ownerShort}</span><br>
             <span style="font-size:11px">Last seen: ${t.last_seen ? new Date(t.last_seen).toLocaleString() : '—'}</span><br>
             <button onclick="toggleGpsMark('${esc(t.imei)}')" style="margin-top:6px;font-size:12px;padding:3px 8px;border-radius:4px;border:1px solid #ddd;cursor:pointer;background:#f3f4f6" id="popup-mark-${esc(t.imei.replace(/[^a-z0-9]/gi,'_'))}">
-                ${is<span data-i18n="buttons.marked_unmark_mark_for_tracking">Marked ? '★ Unmark' : '☆ Mark for tracking'}</span></button>
+                <span data-i18n="${isMarked ? 'buttons.unmark' : 'buttons.mark_for_tracking'}">${isMarked ? '★ Unmark' : '☆ Mark for tracking'}</span></button>
         `);
         _gpsMarkers[t.imei] = marker;
     });
