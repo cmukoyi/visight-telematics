@@ -905,12 +905,12 @@
             <form id="loginForm" onsubmit="handleLogin(event)">
                 <div class="form-group">
                     <label for="username">Username</label>
-                    <input type="text" id="username" name="username" required placeholder="Enter your username">
+                    <input type="text" id="username" name="username" required data-i18n-placeholder="placeholders.enter_your_username" placeholder="Enter your username">
                 </div>
 
                 <div class="form-group">
                     <label for="password">Password</label>
-                    <input type="password" id="password" name="password" required placeholder="Enter your password">
+                    <input type="password" id="password" name="password" required data-i18n-placeholder="placeholders.enter_your_password" placeholder="Enter your password">
                 </div>
 
                 <div id="loginError" class="error" style="text-align: center; display: none;"></div>
@@ -1236,33 +1236,33 @@
                                 <div class="filter-group">
                                     <label>Level</label>
                                     <select id="logLevelFilter" onchange="loadLogs()">
-                                        <option value="">All Levels</option>
-                                        <option value="DEBUG">Debug</option>
-                                        <option value="INFO">Info</option>
-                                        <option value="WARNING">Warning</option>
-                                        <option value="ERROR">Error</option>
-                                        <option value="CRITICAL">Critical</option>
+                                        <option value="" data-i18n="options.all_levels">All Levels</option>
+                                        <option value="DEBUG" data-i18n="options.debug">Debug</option>
+                                        <option value="INFO" data-i18n="options.info">Info</option>
+                                        <option value="WARNING" data-i18n="options.warning">Warning</option>
+                                        <option value="ERROR" data-i18n="options.error">Error</option>
+                                        <option value="CRITICAL" data-i18n="options.critical">Critical</option>
                                     </select>
                                 </div>
                                 <div class="filter-group">
                                     <label>Category</label>
                                     <select id="logCategoryFilter" onchange="loadLogs()">
-                                        <option value="">All Categories</option>
-                                        <option value="auth">Auth</option>
-                                        <option value="location">Location</option>
-                                        <option value="api">API</option>
-                                        <option value="http">HTTP</option>
-                                        <option value="backend">Backend</option>
-                                        <option value="device">Device</option>
+                                        <option value="" data-i18n="options.all_categories">All Categories</option>
+                                        <option value="auth" data-i18n="options.auth">Auth</option>
+                                        <option value="location" data-i18n="options.location">Location</option>
+                                        <option value="api" data-i18n="options.api">API</option>
+                                        <option value="http" data-i18n="options.http">HTTP</option>
+                                        <option value="backend" data-i18n="options.backend">Backend</option>
+                                        <option value="device" data-i18n="options.device">Device</option>
                                     </select>
                                 </div>
                                 <div class="filter-group">
                                     <label>Days</label>
                                     <select id="logDaysFilter" onchange="loadLogs()">
-                                        <option value="1">Last 24h</option>
-                                        <option value="7" selected>Last 7 days</option>
-                                        <option value="30">Last 30 days</option>
-                                        <option value="90">Last 90 days</option>
+                                        <option value="1" data-i18n="options.last_24h">Last 24h</option>
+                                        <option value="7" selected data-i18n="options.last_7_days">Last 7 days</option>
+                                        <option value="30" data-i18n="options.last_30_days">Last 30 days</option>
+                                        <option value="90" data-i18n="options.last_90_days">Last 90 days</option>
                                     </select>
                                 </div>
                                 <div class="filter-group">
@@ -1272,7 +1272,7 @@
                             <div class="table-wrapper">
                                 <table>
                                     <thead>
-                                        <tr><th>Time</th><th>Level</th><th>Category</th><th>Message</th><th>Source</th></tr>
+                                        <tr><th data-i18n="table.time">Time</th><th data-i18n="table.level">Level</th><th data-i18n="table.category">Category</th><th data-i18n="table.message">Message</th><th data-i18n="table.source">Source</th></tr>
                                     </thead>
                                     <tbody id="logsTableBody">
                                         <tr><td colspan="5" style="text-align:center;padding:40px;"><span class="spinner"></span></td></tr>
@@ -1292,15 +1292,15 @@
                                 <div class="filter-group">
                                     <label>Lines</label>
                                     <select id="containerLinesFilter" onchange="loadContainerLogs()">
-                                        <option value="100">Last 100</option>
-                                        <option value="300" selected>Last 300</option>
-                                        <option value="500">Last 500</option>
-                                        <option value="1000">Last 1000</option>
+                                        <option value="100" data-i18n="options.last_100">Last 100</option>
+                                        <option value="300" selected data-i18n="options.last_300">Last 300</option>
+                                        <option value="500" data-i18n="options.last_500">Last 500</option>
+                                        <option value="1000" data-i18n="options.last_1000">Last 1000</option>
                                     </select>
                                 </div>
                                 <div class="filter-group" style="flex:1;">
                                     <label>Search</label>
-                                    <input type="text" id="containerSearchInput" placeholder="Filter lines (e.g. ERROR, 500, imei, tracksolid)" style="width:100%;max-width:400px;" oninput="debounceContainerSearch()">
+                                    <input type="text" id="containerSearchInput" data-i18n-placeholder="placeholders.filter_lines_eg_error_500_imei_tracksoli" placeholder="Filter lines (e.g. ERROR, 500, imei, tracksolid)" style="width:100%;max-width:400px;" oninput="debounceContainerSearch()">
                                 </div>
                                 <div class="filter-group">
                                     <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
@@ -1329,12 +1329,12 @@
                                     <div class="filter-group">
                                         <label>Time Range</label>
                                         <select id="hiveDaysFilter">
-                                            <option value="1">Last 24 hours</option>
-                                            <option value="3">Last 3 days</option>
-                                            <option value="7" selected>Last 7 days</option>
-                                            <option value="14">Last 14 days</option>
-                                            <option value="30">Last 30 days</option>
-                                            <option value="90">Last 90 days</option>
+                                            <option value="1" data-i18n="options.last_24_hours">Last 24 hours</option>
+                                            <option value="3" data-i18n="options.last_3_days">Last 3 days</option>
+                                            <option value="7" selected data-i18n="options.last_7_days">Last 7 days</option>
+                                            <option value="14" data-i18n="options.last_14_days">Last 14 days</option>
+                                            <option value="30" data-i18n="options.last_30_days">Last 30 days</option>
+                                            <option value="90" data-i18n="options.last_90_days">Last 90 days</option>
                                         </select>
                                     </div>
                                     <div class="filter-group">
@@ -1369,12 +1369,12 @@
                                     <div class="filter-group">
                                         <label>Time Range</label>
                                         <select id="tripDaysFilter">
-                                            <option value="1">Last 24 hours</option>
-                                            <option value="3">Last 3 days</option>
-                                            <option value="7" selected>Last 7 days</option>
-                                            <option value="14">Last 14 days</option>
-                                            <option value="30">Last 30 days</option>
-                                            <option value="90">Last 90 days</option>
+                                            <option value="1" data-i18n="options.last_24_hours">Last 24 hours</option>
+                                            <option value="3" data-i18n="options.last_3_days">Last 3 days</option>
+                                            <option value="7" selected data-i18n="options.last_7_days">Last 7 days</option>
+                                            <option value="14" data-i18n="options.last_14_days">Last 14 days</option>
+                                            <option value="30" data-i18n="options.last_30_days">Last 30 days</option>
+                                            <option value="90" data-i18n="options.last_90_days">Last 90 days</option>
                                         </select>
                                     </div>
                                     <div class="filter-group">
@@ -1431,9 +1431,9 @@
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>User ID</th>
-                                            <th>Device Count</th>
-                                            <th>IMEIs</th>
+                                            <th data-i18n="table.user_id">User ID</th>
+                                            <th data-i18n="table.device_count">Device Count</th>
+                                            <th data-i18n="table.imeis">IMEIs</th>
                                         </tr>
                                     </thead>
                                     <tbody id="billingTableBody">
@@ -1476,13 +1476,13 @@
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>Username</th>
-                                            <th>Email</th>
-                                            <th>Full Name</th>
-                                            <th>Role</th>
-                                            <th>Last Login</th>
-                                            <th>Status</th>
-                                            <th>Actions</th>
+                                            <th data-i18n="table.username">Username</th>
+                                            <th data-i18n="table.email">Email</th>
+                                            <th data-i18n="table.full_name">Full Name</th>
+                                            <th data-i18n="table.role">Role</th>
+                                            <th data-i18n="table.last_login">Last Login</th>
+                                            <th data-i18n="table.status">Status</th>
+                                            <th data-i18n="table.actions">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="usersTableBody">
@@ -1564,14 +1564,14 @@
                                 <table class="data-table">
                                     <thead>
                                         <tr>
-                                            <th>Company Name</th>
-                                            <th>Slug</th>
-                                            <th>Email Domain</th>
-                                            <th>Default Package</th>
-                                            <th>Portal Users</th>
-                                            <th>Status</th>
-                                            <th>Created</th>
-                                            <th>Actions</th>
+                                            <th data-i18n="table.company_name">Company Name</th>
+                                            <th data-i18n="table.slug">Slug</th>
+                                            <th data-i18n="table.email_domain">Email Domain</th>
+                                            <th data-i18n="table.default_package">Default Package</th>
+                                            <th data-i18n="table.portal_users">Portal Users</th>
+                                            <th data-i18n="table.status">Status</th>
+                                            <th data-i18n="table.created">Created</th>
+                                            <th data-i18n="table.actions">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="ugTableBody">
@@ -1592,45 +1592,45 @@
                                 <form id="createGroupForm" onsubmit="submitCreateGroup(event)">
                                     <div class="form-group">
                                         <label class="form-label">Company Name *</label>
-                                        <input type="text" id="cgName" class="form-input" placeholder="e.g. Acme Corp" required>
+                                        <input type="text" id="cgName" class="form-input" data-i18n-placeholder="placeholders.eg_acme_corp" placeholder="e.g. Acme Corp" required>
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">Portal Admin Email *</label>
-                                        <input type="email" id="cgEmail" class="form-input" placeholder="admin@acmecorp.com" required>
+                                        <input type="email" id="cgEmail" class="form-input" data-i18n-placeholder="placeholders.adminacmecorpcom" placeholder="admin@acmecorp.com" required>
                                     </div>
                                     <div style="display:flex;gap:12px">
                                         <div class="form-group" style="flex:1">
                                             <label class="form-label">First Name</label>
-                                            <input type="text" id="cgFirst" class="form-input" placeholder="Jane">
+                                            <input type="text" id="cgFirst" class="form-input" data-i18n-placeholder="placeholders.jane" placeholder="Jane">
                                         </div>
                                         <div class="form-group" style="flex:1">
                                             <label class="form-label">Last Name</label>
-                                            <input type="text" id="cgLast" class="form-input" placeholder="Smith">
+                                            <input type="text" id="cgLast" class="form-input" data-i18n-placeholder="placeholders.smith" placeholder="Smith">
                                         </div>
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">Email Domain Auto-Assignment</label>
                                         <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 10px">Mobile-app users with matching email domains are auto-linked to this group. Separate multiple domains with a comma. Example: <code>acme.com, acme.co.za</code></p>
-                                        <input type="text" id="cgDomain" class="form-input" placeholder="e.g. acme.com or acme.com, acme.co.za">
+                                        <input type="text" id="cgDomain" class="form-input" data-i18n-placeholder="placeholders.eg_acmecom_or_acmecom_acmecoza" placeholder="e.g. acme.com or acme.com, acme.co.za">
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">Default Package <span style="font-weight:normal;color:var(--text-secondary)">(optional)</span></label>
                                         <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 10px">Auto-applied when tags are imported. Can be changed after creation.</p>
                                         <select id="cgPackage" class="form-input">
-                                            <option value="">— No package —</option>
+                                            <option value="" data-i18n="options._no_package_">— No package —</option>
                                         </select>
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">Default Language <span style="font-weight:normal;color:var(--text-secondary)">(optional)</span></label>
                                         <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 10px">Portal users in this group will see the platform in this language. Defaults to English.</p>
                                         <select id="cgLanguage" class="form-input">
-                                            <option value="en">Loading...</option>
+                                            <option value="en" data-i18n="options.loading">Loading...</option>
                                         </select>
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">Trip Data Refresh Rate (minutes) <span style="font-weight:normal;color:var(--text-secondary)">(optional)</span></label>
                                         <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 10px">Min interval between TrackSolid pulls per device. Lower = fresher data but more API calls. Leave empty for global default (120 min).</p>
-                                        <input type="number" id="cgCoalesceFloor" class="form-input" placeholder="120" min="5" max="1440">
+                                        <input type="number" id="cgCoalesceFloor" class="form-input" data-i18n-placeholder="placeholders.120" placeholder="120" min="5" max="1440">
                                         <p style="font-size:12px;color:var(--text-secondary);margin:6px 0 0">Recommended: 60-240 minutes. Applies to all subscribed devices in this group.</p>
                                     </div>
                                     <div class="form-group">
@@ -1698,14 +1698,14 @@
                                         <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 10px">All mobile-app users who register with an email matching this domain will automatically have their tags visible in this group's portal. Example: <code>acmecorp.com</code></p>
                                         <div style="display:flex;gap:8px;align-items:center">
                                             <span style="font-size:14px;color:var(--text-secondary)">@</span>
-                                            <input type="text" id="egDomain" class="form-input" placeholder="e.g. acmecorp.com" style="flex:1">
+                                            <input type="text" id="egDomain" class="form-input" data-i18n-placeholder="placeholders.eg_acmecorpcom" placeholder="e.g. acmecorp.com" style="flex:1">
                                         </div>
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">Default Language</label>
                                         <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 10px">Portal users in this group will see the platform in this language.</p>
                                         <select id="egLanguage" class="form-input">
-                                            <option value="en">Loading...</option>
+                                            <option value="en" data-i18n="options.loading">Loading...</option>
                                         </select>
                                     </div>
                                     <!-- Portal Feature Access -->
@@ -1768,9 +1768,9 @@
                                         <table id="egPackagesTable" style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:10px">
                                             <thead>
                                                 <tr style="background:var(--bg-secondary);text-align:left">
-                                                    <th style="padding:6px 10px">Package</th>
-                                                    <th style="padding:6px 10px">Days</th>
-                                                    <th style="padding:6px 10px">Default</th>
+                                                    <th style="padding:6px 10px" data-i18n="table.package">Package</th>
+                                                    <th style="padding:6px 10px" data-i18n="table.days">Days</th>
+                                                    <th style="padding:6px 10px" data-i18n="table.default">Default</th>
                                                     <th style="padding:6px 10px"></th>
                                                 </tr>
                                             </thead>
@@ -1780,7 +1780,7 @@
                                         </table>
                                         <div style="display:flex;gap:8px;align-items:center">
                                             <select id="egAddPkgSelect" class="form-input" style="flex:1">
-                                                <option value="">— Add a package —</option>
+                                                <option value="" data-i18n="options._add_a_package_">— Add a package —</option>
                                             </select>
                                             <button type="button" class="btn btn-secondary" onclick="egAddPackage()">Add</button>
                                         </div>
@@ -1810,9 +1810,9 @@
                                 <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:18px">
                                     <thead>
                                         <tr style="background:var(--bg-secondary);text-align:left">
-                                            <th style="padding:8px 10px">Email</th>
-                                            <th style="padding:8px 10px">Name</th>
-                                            <th style="padding:8px 10px">Status</th>
+                                            <th style="padding:8px 10px" data-i18n="table.email">Email</th>
+                                            <th style="padding:8px 10px" data-i18n="table.name">Name</th>
+                                            <th style="padding:8px 10px" data-i18n="table.status">Status</th>
                                             <th style="padding:8px 10px"></th>
                                         </tr>
                                     </thead>
@@ -1822,10 +1822,10 @@
                                 <h4 style="margin:6px 0 8px;font-size:14px">Add New System Admin</h4>
                                 <form id="saCreateForm" onsubmit="submitCreateSysAdmin(event)" style="display:flex;flex-direction:column;gap:10px">
                                     <input type="hidden" id="saGroupId">
-                                    <input type="email" id="saNewEmail" class="form-input" placeholder="email@company.com" required>
+                                    <input type="email" id="saNewEmail" class="form-input" data-i18n-placeholder="placeholders.emailcompanycom" placeholder="email@company.com" required>
                                     <div style="display:flex;gap:10px">
-                                        <input type="text" id="saNewFirst" class="form-input" placeholder="First name" style="flex:1">
-                                        <input type="text" id="saNewLast"  class="form-input" placeholder="Last name"  style="flex:1">
+                                        <input type="text" id="saNewFirst" class="form-input" data-i18n-placeholder="placeholders.first_name" placeholder="First name" style="flex:1">
+                                        <input type="text" id="saNewLast"  class="form-input" data-i18n-placeholder="placeholders.last_name" placeholder="Last name"  style="flex:1">
                                     </div>
                                     <div style="text-align:right">
                                         <button type="submit" class="btn btn-primary" id="saCreateBtn">Create System Admin</button>
@@ -1859,7 +1859,7 @@
                             <h3 class="card-title">Select Tenant</h3>
                             <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">Choose a tenant (user group) to manage their customer dashboard features:</p>
                             <select id="tfTenantSelect" class="form-input" onchange="loadTenantFeatures()" style="max-width:400px">
-                                <option value="">— Select a tenant —</option>
+                                <option value="" data-i18n="options._select_a_tenant_">— Select a tenant —</option>
                             </select>
                         </div>
 
@@ -2005,15 +2005,15 @@
                                 <table class="data-table">
                                     <thead>
                                         <tr>
-                                            <th>Name</th>
-                                            <th>Description</th>
-                                            <th>Validity (days)</th>
-                                            <th>Auto-Delete (days)</th>
-                                            <th>Default</th>
-                                            <th>SMS Add-on</th>
-                                            <th>Status</th>
-                                            <th>Created</th>
-                                            <th>Actions</th>
+                                            <th data-i18n="table.name">Name</th>
+                                            <th data-i18n="table.description">Description</th>
+                                            <th data-i18n="table.validity_days">Validity (days)</th>
+                                            <th data-i18n="table.autodelete_days">Auto-Delete (days)</th>
+                                            <th data-i18n="table.default">Default</th>
+                                            <th data-i18n="table.sms_addon">SMS Add-on</th>
+                                            <th data-i18n="table.status">Status</th>
+                                            <th data-i18n="table.created">Created</th>
+                                            <th data-i18n="table.actions">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="pkgTableBody">
@@ -2035,19 +2035,19 @@
                                     <input type="hidden" id="pkgEditId">
                                     <div class="form-group">
                                         <label class="form-label">Package Name *</label>
-                                        <input type="text" id="pkgName" class="form-input" placeholder="e.g. Basic 80" required>
+                                        <input type="text" id="pkgName" class="form-input" data-i18n-placeholder="placeholders.eg_basic_80" placeholder="e.g. Basic 80" required>
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">Description</label>
-                                        <input type="text" id="pkgDesc" class="form-input" placeholder="Optional description">
+                                        <input type="text" id="pkgDesc" class="form-input" data-i18n-placeholder="placeholders.optional_description" placeholder="Optional description">
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">Validity (days) *</label>
-                                        <input type="number" id="pkgDays" class="form-input" placeholder="e.g. 80" min="1" required>
+                                        <input type="number" id="pkgDays" class="form-input" data-i18n-placeholder="placeholders.eg_80" placeholder="e.g. 80" min="1" required>
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">Auto-delete (days after expiry)</label>
-                                        <input type="number" id="pkgAutoDelete" class="form-input" placeholder="e.g. 30 — leave blank to never auto-delete" min="1">
+                                        <input type="number" id="pkgAutoDelete" class="form-input" data-i18n-placeholder="placeholders.eg_30__leave_blank_to_never_autodelete" placeholder="e.g. 30 — leave blank to never auto-delete" min="1">
                                     </div>
                                     <div class="form-group" style="display:flex;align-items:center;gap:10px">
                                         <input type="checkbox" id="pkgIsDefault" style="width:18px;height:18px;cursor:pointer">
@@ -2084,7 +2084,7 @@
                                 <div id="bldgTableWrap">
                                     <table class="data-table">
                                         <thead><tr>
-                                            <th>Building</th><th>Tenant</th><th>MQTT Topic</th><th>Floors</th><th>Actions</th>
+                                            <th data-i18n="table.building">Building</th><th data-i18n="table.tenant">Tenant</th><th data-i18n="table.mqtt_topic">MQTT Topic</th><th data-i18n="table.floors">Floors</th><th data-i18n="table.actions">Actions</th>
                                         </tr></thead>
                                         <tbody id="bldgTableBody">
                                             <tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-secondary)">Loading…</td></tr>
@@ -2104,7 +2104,7 @@
                             <div class="card">
                                 <div id="floorListWrap">
                                     <table class="data-table">
-                                        <thead><tr><th>Order</th><th>Label</th><th>Gateways</th><th>Rooms</th><th>Actions</th></tr></thead>
+                                        <thead><tr><th data-i18n="table.order">Order</th><th data-i18n="table.label">Label</th><th data-i18n="table.gateways">Gateways</th><th data-i18n="table.rooms">Rooms</th><th data-i18n="table.actions">Actions</th></tr></thead>
                                         <tbody id="floorTableBody"></tbody>
                                     </table>
                                 </div>
@@ -2118,9 +2118,9 @@
                                 <h3 id="editorFloorTitle" style="margin:0;font-size:18px;flex:1"></h3>
                                 <span style="font-size:13px;color:var(--text-secondary)">Mode:</span>
                                 <select id="editorMode" onchange="updateEditorMode()" style="padding:6px 10px;border:1px solid var(--border-color);border-radius:6px;font-size:13px">
-                                    <option value="pan">Pan / View</option>
-                                    <option value="gateway">Place Gateway</option>
-                                    <option value="room">Draw Room</option>
+                                    <option value="pan" data-i18n="options.pan__view">Pan / View</option>
+                                    <option value="gateway" data-i18n="options.place_gateway">Place Gateway</option>
+                                    <option value="room" data-i18n="options.draw_room">Draw Room</option>
                                 </select>
                                 <button class="btn btn-secondary btn-small" onclick="openUploadFloorPlan()">📁 Upload Plan</button>
                                 <input type="file" id="floorPlanFileInput" accept="image/*" onchange="handleFloorPlanUpload(event)" style="display:none">
@@ -2157,7 +2157,7 @@
                                 <div id="cbAlert" class="alert" style="display:none"><span id="cbAlertText"></span></div>
                                 <div class="form-group">
                                     <label class="form-label">Building Name *</label>
-                                    <input type="text" id="cbName" class="form-input" placeholder="e.g. Head Office">
+                                    <input type="text" id="cbName" class="form-input" data-i18n-placeholder="placeholders.eg_head_office" placeholder="e.g. Head Office">
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Assign to Tenant *</label>
@@ -2165,7 +2165,7 @@
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">MQTT Broker URL</label>
-                                    <input type="text" id="cbMqttUrl" class="form-input" placeholder="wss://pinplot.me/mqtt">
+                                    <input type="text" id="cbMqttUrl" class="form-input" data-i18n-placeholder="placeholders.wsspinplotmemqtt" placeholder="wss://pinplot.me/mqtt">
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">MQTT Topic</label>
@@ -2187,7 +2187,7 @@
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Floor Label *</label>
-                                    <input type="text" id="afLabel" class="form-input" placeholder="e.g. Ground Floor">
+                                    <input type="text" id="afLabel" class="form-input" data-i18n-placeholder="placeholders.eg_ground_floor" placeholder="e.g. Ground Floor">
                                 </div>
                                 <div style="display:flex;gap:12px">
                                     <div class="form-group" style="flex:1">
@@ -2215,11 +2215,11 @@
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Receiver ID (MAC, no colons) *</label>
-                                    <input type="text" id="pgReceiverId" class="form-input" placeholder="aabbccddeeff">
+                                    <input type="text" id="pgReceiverId" class="form-input" data-i18n-placeholder="placeholders.aabbccddeeff" placeholder="aabbccddeeff">
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Label</label>
-                                    <input type="text" id="pgLabel" class="form-input" placeholder="e.g. GW-North">
+                                    <input type="text" id="pgLabel" class="form-input" data-i18n-placeholder="placeholders.eg_gwnorth" placeholder="e.g. GW-North">
                                 </div>
                                 <input type="hidden" id="pgX"><input type="hidden" id="pgY">
                                 <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
@@ -2238,7 +2238,7 @@
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Room Name *</label>
-                                    <input type="text" id="nrName" class="form-input" placeholder="e.g. Server Room">
+                                    <input type="text" id="nrName" class="form-input" data-i18n-placeholder="placeholders.eg_server_room" placeholder="e.g. Server Room">
                                 </div>
                                 <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
                                     <button class="btn btn-secondary" onclick="cancelRoomDraw()">Cancel</button>
@@ -2277,11 +2277,11 @@
                                 <div id="bleDiscoverTableWrap">
                                     <table class="data-table">
                                         <thead><tr>
-                                            <th>MAC Address</th>
-                                            <th>Zone</th>
-                                            <th>RSSI (dBm)</th>
-                                            <th>Last Seen</th>
-                                            <th>Action</th>
+                                            <th data-i18n="table.mac_address">MAC Address</th>
+                                            <th data-i18n="table.zone">Zone</th>
+                                            <th data-i18n="table.rssi_dbm">RSSI (dBm)</th>
+                                            <th data-i18n="table.last_seen">Last Seen</th>
+                                            <th data-i18n="table.action">Action</th>
                                         </tr></thead>
                                         <tbody id="bleDiscoverBody"></tbody>
                                     </table>
@@ -2294,14 +2294,14 @@
                             <div id="bleTagTableWrap" class="table-wrapper">
                                 <table class="data-table">
                                     <thead><tr>
-                                        <th>MAC Address</th>
-                                        <th>Name</th>
-                                        <th>Description</th>
-                                        <th>Status</th>
-                                        <th>Zone</th>
-                                        <th>RSSI</th>
-                                        <th>Last Seen (indoor)</th>
-                                        <th>Actions</th>
+                                        <th data-i18n="table.mac_address">MAC Address</th>
+                                        <th data-i18n="table.name">Name</th>
+                                        <th data-i18n="table.description">Description</th>
+                                        <th data-i18n="table.status">Status</th>
+                                        <th data-i18n="table.zone">Zone</th>
+                                        <th data-i18n="table.rssi">RSSI</th>
+                                        <th data-i18n="table.last_seen_indoor">Last Seen (indoor)</th>
+                                        <th data-i18n="table.actions">Actions</th>
                                     </tr></thead>
                                     <tbody id="bleTagTableBody">
                                         <tr><td colspan="8" style="text-align:center;color:var(--gray);padding:24px">Loading…</td></tr>
@@ -2317,13 +2317,13 @@
                                 <h3 id="bleTagModalTitle" style="margin-bottom:20px">Register BLE Tag</h3>
 
                                 <label class="form-label">MAC Address *</label>
-                                <input id="bleTagMac" class="form-input" placeholder="e.g. 27:13:C8:6C:41:15 or 2713c86c4115" />
+                                <input id="bleTagMac" class="form-input" data-i18n-placeholder="placeholders.eg_2713c86c4115_or_2713c86c4115" placeholder="e.g. 27:13:C8:6C:41:15 or 2713c86c4115" />
 
                                 <label class="form-label" style="margin-top:12px">Device Name</label>
-                                <input id="bleTagName" class="form-input" placeholder="e.g. Badge-001" />
+                                <input id="bleTagName" class="form-input" data-i18n-placeholder="placeholders.eg_badge001" placeholder="e.g. Badge-001" />
 
                                 <label class="form-label" style="margin-top:12px">Description</label>
-                                <input id="bleTagDesc" class="form-input" placeholder="e.g. Staff badge – floor 2" />
+                                <input id="bleTagDesc" class="form-input" data-i18n-placeholder="placeholders.eg_staff_badge__floor_2" placeholder="e.g. Staff badge – floor 2" />
 
                                 <div style="display:flex;align-items:center;gap:8px;margin-top:14px">
                                     <input type="checkbox" id="bleTagActive" checked style="width:16px;height:16px">
@@ -2419,8 +2419,8 @@
                                 <table id="healthDbTable">
                                     <thead>
                                         <tr>
-                                            <th>Table</th>
-                                            <th style="text-align:right">Rows</th>
+                                            <th data-i18n="table.table">Table</th>
+                                            <th style="text-align:right" data-i18n="table.rows">Rows</th>
                                         </tr>
                                     </thead>
                                     <tbody id="healthDbTableBody">
@@ -2449,14 +2449,14 @@
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>Category</th>
-                                            <th>Enabled</th>
-                                            <th>Threshold</th>
-                                            <th>Window (min)</th>
-                                            <th>Cooldown (min)</th>
-                                            <th>Recipients</th>
-                                            <th>Last Sent</th>
-                                            <th>Action</th>
+                                            <th data-i18n="table.category">Category</th>
+                                            <th data-i18n="table.enabled">Enabled</th>
+                                            <th data-i18n="table.threshold">Threshold</th>
+                                            <th data-i18n="table.window_min">Window (min)</th>
+                                            <th data-i18n="table.cooldown_min">Cooldown (min)</th>
+                                            <th data-i18n="table.recipients">Recipients</th>
+                                            <th data-i18n="table.last_sent">Last Sent</th>
+                                            <th data-i18n="table.action">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody id="criticalAlertsBody">
@@ -2483,10 +2483,10 @@
                                 <div class="filter-group">
                                     <label>Date range</label>
                                     <select id="emailStatsPreset" onchange="onEmailStatsPresetChange()" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);color:var(--text)">
-                                        <option value="today">Today</option>
-                                        <option value="last_7_days">Last 7 days</option>
-                                        <option value="current_month" selected>Current month</option>
-                                        <option value="custom">Custom</option>
+                                        <option value="today" data-i18n="options.today">Today</option>
+                                        <option value="last_7_days" data-i18n="options.last_7_days">Last 7 days</option>
+                                        <option value="current_month" selected data-i18n="options.current_month">Current month</option>
+                                        <option value="custom" data-i18n="options.custom">Custom</option>
                                     </select>
                                 </div>
                                 <div class="filter-group" id="emailStatsStartWrap" style="display:none">
@@ -2500,20 +2500,20 @@
                                 <div class="filter-group">
                                     <label>Alert type</label>
                                     <select id="emailStatsAlertType" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);color:var(--text)">
-                                        <option value="">All alert types</option>
-                                        <option value="battery_low">battery_low</option>
-                                        <option value="tag_offline">tag_offline</option>
-                                        <option value="geofence_entry">geofence_entry</option>
-                                        <option value="geofence_exit">geofence_exit</option>
-                                        <option value="gdpr_deletion_warning">gdpr_deletion_warning</option>
-                                        <option value="hive_breach">hive_breach</option>
-                                        <option value="hive_breach_cleared">hive_breach_cleared</option>
-                                        <option value="critical_service_failure">critical_service_failure</option>
+                                        <option value="" data-i18n="options.all_alert_types">All alert types</option>
+                                        <option value="battery_low" data-i18n="options.battery_low">battery_low</option>
+                                        <option value="tag_offline" data-i18n="options.tag_offline">tag_offline</option>
+                                        <option value="geofence_entry" data-i18n="options.geofence_entry">geofence_entry</option>
+                                        <option value="geofence_exit" data-i18n="options.geofence_exit">geofence_exit</option>
+                                        <option value="gdpr_deletion_warning" data-i18n="options.gdpr_deletion_warning">gdpr_deletion_warning</option>
+                                        <option value="hive_breach" data-i18n="options.hive_breach">hive_breach</option>
+                                        <option value="hive_breach_cleared" data-i18n="options.hive_breach_cleared">hive_breach_cleared</option>
+                                        <option value="critical_service_failure" data-i18n="options.critical_service_failure">critical_service_failure</option>
                                     </select>
                                 </div>
                                 <div class="filter-group">
                                     <label>Device IMEI</label>
-                                    <input type="text" id="emailStatsDeviceImei" placeholder="contains IMEI" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);color:var(--text)">
+                                    <input type="text" id="emailStatsDeviceImei" data-i18n-placeholder="placeholders.contains_imei" placeholder="contains IMEI" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);color:var(--text)">
                                 </div>
                                 <button class="btn btn-primary btn-small" onclick="loadEmailAlertStats()">Apply</button>
                             </div>
@@ -2528,14 +2528,14 @@
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>Alert Type</th>
-                                            <th>Device</th>
-                                            <th>IMEI</th>
-                                            <th>User Group</th>
-                                            <th style="text-align:right">Alerts</th>
-                                            <th style="text-align:right">Recipients</th>
-                                            <th style="text-align:right">Generated Emails</th>
-                                            <th>To Who</th>
+                                            <th data-i18n="table.alert_type">Alert Type</th>
+                                            <th data-i18n="table.device">Device</th>
+                                            <th data-i18n="table.imei">IMEI</th>
+                                            <th data-i18n="table.user_group">User Group</th>
+                                            <th style="text-align:right" data-i18n="table.alerts">Alerts</th>
+                                            <th style="text-align:right" data-i18n="table.recipients">Recipients</th>
+                                            <th style="text-align:right" data-i18n="table.generated_emails">Generated Emails</th>
+                                            <th data-i18n="table.to_who">To Who</th>
                                         </tr>
                                     </thead>
                                     <tbody id="emailAlertStatsBody">
@@ -2558,20 +2558,20 @@
                                 <div class="filter-group">
                                     <label>Action</label>
                                     <select id="auditActionFilter" onchange="loadAuditLogs()">
-                                        <option value="">All Actions</option>
-                                        <option value="login">Login</option>
-                                        <option value="logout">Logout</option>
-                                        <option value="create_admin">Create Admin</option>
-                                        <option value="update_admin">Update Admin</option>
-                                        <option value="delete_logs">Delete Logs</option>
+                                        <option value="" data-i18n="options.all_actions">All Actions</option>
+                                        <option value="login" data-i18n="options.login">Login</option>
+                                        <option value="logout" data-i18n="options.logout">Logout</option>
+                                        <option value="create_admin" data-i18n="options.create_admin">Create Admin</option>
+                                        <option value="update_admin" data-i18n="options.update_admin">Update Admin</option>
+                                        <option value="delete_logs" data-i18n="options.delete_logs">Delete Logs</option>
                                     </select>
                                 </div>
                                 <div class="filter-group">
                                     <label>Days</label>
                                     <select id="auditDaysFilter" onchange="loadAuditLogs()">
-                                        <option value="1">Last 24 hours</option>
-                                        <option value="7" selected>Last 7 days</option>
-                                        <option value="30">Last 30 days</option>
+                                        <option value="1" data-i18n="options.last_24_hours">Last 24 hours</option>
+                                        <option value="7" selected data-i18n="options.last_7_days">Last 7 days</option>
+                                        <option value="30" data-i18n="options.last_30_days">Last 30 days</option>
                                     </select>
                                 </div>
                             </div>
@@ -2580,11 +2580,11 @@
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>Time</th>
-                                            <th>Admin</th>
-                                            <th>Action</th>
-                                            <th>Resource Type</th>
-                                            <th>Description</th>
+                                            <th data-i18n="table.time">Time</th>
+                                            <th data-i18n="table.admin">Admin</th>
+                                            <th data-i18n="table.action">Action</th>
+                                            <th data-i18n="table.resource_type">Resource Type</th>
+                                            <th data-i18n="table.description">Description</th>
                                         </tr>
                                     </thead>
                                     <tbody id="auditTableBody">
@@ -2622,9 +2622,9 @@
                                 <div class="filter-group">
                                     <label>Group by</label>
                                     <select id="sgGroupBy" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);color:var(--text)">
-                                        <option value="month">Month</option>
-                                        <option value="week">Week</option>
-                                        <option value="day">Day</option>
+                                        <option value="month" data-i18n="options.month">Month</option>
+                                        <option value="week" data-i18n="options.week">Week</option>
+                                        <option value="day" data-i18n="options.day">Day</option>
                                     </select>
                                 </div>
                                 <button class="btn btn-primary btn-small" onclick="loadSendgridStats()">↻ Refresh</button>
@@ -2680,16 +2680,16 @@
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>Period</th>
-                                            <th style="text-align:right">Requests</th>
-                                            <th style="text-align:right">Delivered</th>
-                                            <th style="text-align:right">Del. Rate</th>
-                                            <th style="text-align:right">Opens</th>
-                                            <th style="text-align:right">Open Rate</th>
-                                            <th style="text-align:right">Bounces</th>
-                                            <th style="text-align:right">Bounce %</th>
-                                            <th style="text-align:right">Deferred</th>
-                                            <th style="text-align:right">Blocks</th>
+                                            <th data-i18n="table.period">Period</th>
+                                            <th style="text-align:right" data-i18n="table.requests">Requests</th>
+                                            <th style="text-align:right" data-i18n="table.delivered">Delivered</th>
+                                            <th style="text-align:right" data-i18n="table.del_rate">Del. Rate</th>
+                                            <th style="text-align:right" data-i18n="table.opens">Opens</th>
+                                            <th style="text-align:right" data-i18n="table.open_rate">Open Rate</th>
+                                            <th style="text-align:right" data-i18n="table.bounces">Bounces</th>
+                                            <th style="text-align:right" data-i18n="table.bounce_">Bounce %</th>
+                                            <th style="text-align:right" data-i18n="table.deferred">Deferred</th>
+                                            <th style="text-align:right" data-i18n="table.blocks">Blocks</th>
                                         </tr>
                                     </thead>
                                     <tbody id="sgTableBody">
@@ -2722,16 +2722,16 @@
                                     <thead>
                                         <tr>
                                             <th style="width: 30px;"></th>
-                                            <th>Name</th>
-                                            <th>Email</th>
-                                            <th>Type</th>
-                                            <th>Phone</th>
-                                            <th>Usergroups</th>
-                                            <th>Status</th>
-                                            <th>Admin</th>
-                                            <th>Tags</th>
-                                            <th>Created</th>
-                                            <th>Actions</th>
+                                            <th data-i18n="table.name">Name</th>
+                                            <th data-i18n="table.email">Email</th>
+                                            <th data-i18n="table.type">Type</th>
+                                            <th data-i18n="table.phone">Phone</th>
+                                            <th data-i18n="table.usergroups">Usergroups</th>
+                                            <th data-i18n="table.status">Status</th>
+                                            <th data-i18n="table.admin">Admin</th>
+                                            <th data-i18n="table.tags">Tags</th>
+                                            <th data-i18n="table.created">Created</th>
+                                            <th data-i18n="table.actions">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="endUsersTableBody">
@@ -2758,21 +2758,21 @@
                                 <div style="display:flex;gap:12px">
                                     <div class="form-group" style="flex:1">
                                         <label class="form-label">First Name</label>
-                                        <input type="text" id="euFirstName" class="form-input" placeholder="First name">
+                                        <input type="text" id="euFirstName" class="form-input" data-i18n-placeholder="placeholders.first_name" placeholder="First name">
                                     </div>
                                     <div class="form-group" style="flex:1">
                                         <label class="form-label">Last Name</label>
-                                        <input type="text" id="euLastName" class="form-input" placeholder="Last name">
+                                        <input type="text" id="euLastName" class="form-input" data-i18n-placeholder="placeholders.last_name" placeholder="Last name">
                                     </div>
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Phone</label>
-                                    <input type="text" id="euPhone" class="form-input" placeholder="Phone number">
+                                    <input type="text" id="euPhone" class="form-input" data-i18n-placeholder="placeholders.phone_number" placeholder="Phone number">
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Assign User Group <span style="font-weight:normal;color:var(--text-secondary)">(optional)</span></label>
                                     <select id="euUsergroup" class="form-input">
-                                        <option value="__keep__">Keep current group</option>
+                                        <option value="__keep__" data-i18n="options.keep_current_group">Keep current group</option>
                                     </select>
                                     <p id="euUsergroupHelp" style="font-size:12px;color:var(--text-secondary);margin-top:6px">Choose a group only if you want to link this user to a customer tenant.</p>
                                 </div>
@@ -2852,7 +2852,7 @@
                                         <input 
                                             type="email" 
                                             id="pin-gen-email" 
-                                            placeholder="user@example.com" 
+                                            data-i18n-placeholder="placeholders.userexamplecom" placeholder="user@example.com" 
                                             style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;font-size:14px"
                                         />
                                     </div>
@@ -2922,16 +2922,16 @@
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>IMEI</th>
-                                            <th>Device Name</th>
-                                            <th>Type</th>
-                                            <th>User</th>
-                                            <th>Usergroup</th>
-                                            <th>Package</th>
-                                            <th>Activated</th>
-                                            <th>Expiry</th>
-                                            <th>Status</th>
-                                            <th>Last Seen</th>
+                                            <th data-i18n="table.imei">IMEI</th>
+                                            <th data-i18n="table.device_name">Device Name</th>
+                                            <th data-i18n="table.type">Type</th>
+                                            <th data-i18n="table.user">User</th>
+                                            <th data-i18n="table.usergroup">Usergroup</th>
+                                            <th data-i18n="table.package">Package</th>
+                                            <th data-i18n="table.activated">Activated</th>
+                                            <th data-i18n="table.expiry">Expiry</th>
+                                            <th data-i18n="table.status">Status</th>
+                                            <th data-i18n="table.last_seen">Last Seen</th>
                                         </tr>
                                     </thead>
                                     <tbody id="imeiTableBody">
@@ -2955,21 +2955,21 @@
                                 <h3 class="card-title">Translation Keys</h3>
                                 <div style="display:flex;gap:8px;align-items:center;">
                                     <select id="translationCategoryFilter" onchange="loadTranslations()" style="padding:8px;border-radius:6px;border:1px solid var(--border);">
-                                        <option value="">All Categories</option>
-                                        <option value="common">Common</option>
-                                        <option value="dashboard">Dashboard</option>
-                                        <option value="fleet">Fleet</option>
-                                        <option value="geofences">Geofences</option>
-                                        <option value="trips">Trips</option>
-                                        <option value="alerts">Alerts</option>
-                                        <option value="settings">Settings</option>
-                                        <option value="auth">Auth</option>
+                                        <option value="" data-i18n="options.all_categories">All Categories</option>
+                                        <option value="common" data-i18n="options.common">Common</option>
+                                        <option value="dashboard" data-i18n="options.dashboard">Dashboard</option>
+                                        <option value="fleet" data-i18n="options.fleet">Fleet</option>
+                                        <option value="geofences" data-i18n="options.geofences">Geofences</option>
+                                        <option value="trips" data-i18n="options.trips">Trips</option>
+                                        <option value="alerts" data-i18n="options.alerts">Alerts</option>
+                                        <option value="settings" data-i18n="options.settings">Settings</option>
+                                        <option value="auth" data-i18n="options.auth">Auth</option>
                                     </select>
                                     <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
                                         <input type="checkbox" id="translationMissingOnly" onchange="loadTranslations()">
                                         Show missing only
                                     </label>
-                                    <input type="text" id="translationSearchInput" placeholder="Search keys..." style="padding:8px;border-radius:6px;border:1px solid var(--border);min-width:200px;" oninput="debounceTranslationSearch()">
+                                    <input type="text" id="translationSearchInput" data-i18n-placeholder="placeholders.search_keys" placeholder="Search keys..." style="padding:8px;border-radius:6px;border:1px solid var(--border);min-width:200px;" oninput="debounceTranslationSearch()">
                                     <button class="btn btn-success btn-small" onclick="autoTranslateAll()" title="Auto-translate all missing translations using Google Translate API">🤖 Auto-Translate All</button>
                                     <button class="btn btn-primary btn-small" onclick="openAddTranslationKeyModal()">+ Add Key</button>
                                     <button class="btn btn-primary btn-small" onclick="loadTranslations()">↻ Refresh</button>
@@ -2987,9 +2987,9 @@
                                 <table id="translationsTable">
                                     <thead id="translationsTableHead">
                                         <tr>
-                                            <th style="width:180px;position:sticky;left:0;background:var(--surface);z-index:2;">Key</th>
-                                            <th style="width:100px;">Category</th>
-                                            <th style="width:220px;">English (Default)</th>
+                                            <th style="width:180px;position:sticky;left:0;background:var(--surface);z-index:2;" data-i18n="table.key">Key</th>
+                                            <th style="width:100px;" data-i18n="table.category">Category</th>
+                                            <th style="width:220px;" data-i18n="table.english_default">English (Default)</th>
                                             <!-- Language columns populated by JS -->
                                         </tr>
                                     </thead>
@@ -3021,12 +3021,12 @@
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>Code</th>
-                                            <th>Language Name</th>
-                                            <th>Status</th>
-                                            <th>Translated Keys</th>
-                                            <th>Completion</th>
-                                            <th>Actions</th>
+                                            <th data-i18n="table.code">Code</th>
+                                            <th data-i18n="table.language_name">Language Name</th>
+                                            <th data-i18n="table.status">Status</th>
+                                            <th data-i18n="table.translated_keys">Translated Keys</th>
+                                            <th data-i18n="table.completion">Completion</th>
+                                            <th data-i18n="table.actions">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="languagesTableBody">
@@ -3077,7 +3077,7 @@
                                         min="5" 
                                         max="1440" 
                                         step="5"
-                                        placeholder="120"
+                                        data-i18n-placeholder="placeholders.120" placeholder="120"
                                     >
                                     <span style="color:var(--text-secondary)">minutes</span>
                                 </div>
@@ -3130,7 +3130,7 @@
                             <div class="form-group">
                                 <label class="form-label">User Group (Tenant)</label>
                                 <select id="dmTenantSelect" class="form-input" onchange="loadDevicesForTenant()">
-                                    <option value="">— Select a tenant —</option>
+                                    <option value="" data-i18n="options._select_a_tenant_">— Select a tenant —</option>
                                 </select>
                             </div>
                         </div>
@@ -3150,12 +3150,12 @@
                                     <table>
                                         <thead>
                                             <tr>
-                                                <th>IMEI</th>
-                                                <th>Name</th>
-                                                <th>Subscription Status</th>
-                                                <th>Last Position</th>
-                                                <th>Last Pull</th>
-                                                <th>Actions</th>
+                                                <th data-i18n="table.imei">IMEI</th>
+                                                <th data-i18n="table.name">Name</th>
+                                                <th data-i18n="table.subscription_status">Subscription Status</th>
+                                                <th data-i18n="table.last_position">Last Position</th>
+                                                <th data-i18n="table.last_pull">Last Pull</th>
+                                                <th data-i18n="table.actions">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody id="dmDevicesTableBody">
@@ -3182,10 +3182,10 @@
                                     <div class="form-group">
                                         <label class="form-label">Time Window</label>
                                         <select id="dbPreset" class="form-input" required>
-                                            <option value="today">Today</option>
-                                            <option value="yesterday">Yesterday</option>
-                                            <option value="last_7_days" selected>Last 7 Days</option>
-                                            <option value="last_30_days">Last 30 Days</option>
+                                            <option value="today" data-i18n="options.today">Today</option>
+                                            <option value="yesterday" data-i18n="options.yesterday">Yesterday</option>
+                                            <option value="last_7_days" selected data-i18n="options.last_7_days">Last 7 Days</option>
+                                            <option value="last_30_days" data-i18n="options.last_30_days">Last 30 Days</option>
                                         </select>
                                         <p style="font-size:12px;color:var(--gray);margin-top:6px">Fetches historical positions from TrackSolid and reprocesses trips.</p>
                                     </div>
@@ -3236,10 +3236,10 @@
                                     <div class="form-group">
                                         <label class="form-label">Time Window</label>
                                         <select id="bbPreset" class="form-input" required>
-                                            <option value="today">Today</option>
-                                            <option value="yesterday">Yesterday</option>
-                                            <option value="last_7_days" selected>Last 7 Days</option>
-                                            <option value="last_30_days">Last 30 Days</option>
+                                            <option value="today" data-i18n="options.today">Today</option>
+                                            <option value="yesterday" data-i18n="options.yesterday">Yesterday</option>
+                                            <option value="last_7_days" selected data-i18n="options.last_7_days">Last 7 Days</option>
+                                            <option value="last_30_days" data-i18n="options.last_30_days">Last 30 Days</option>
                                         </select>
                                         <p style="font-size:12px;color:var(--gray);margin-top:6px">Backfills all subscribed devices in this tenant. Runs as background job.</p>
                                     </div>
@@ -3311,17 +3311,17 @@
                                 <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
                                     <label class="form-label" style="margin:0">Source:</label>
                                     <select id="webhookSourceFilter" class="form-input" style="width:auto" onchange="loadWebhookLogs()">
-                                        <option value="">All Sources</option>
-                                        <option value="hubble" selected>Hubble</option>
-                                        <option value="tracksolid">TrackSolid</option>
+                                        <option value="" data-i18n="options.all_sources">All Sources</option>
+                                        <option value="hubble" selected data-i18n="options.hubble">Hubble</option>
+                                        <option value="tracksolid" data-i18n="options.tracksolid">TrackSolid</option>
                                     </select>
                                     <label class="form-label" style="margin:0 0 0 12px">Time Range:</label>
                                     <select id="webhookHoursFilter" class="form-input" style="width:auto" onchange="loadWebhookLogs()">
-                                        <option value="1">Last 1 hour</option>
-                                        <option value="6" selected>Last 6 hours</option>
-                                        <option value="24">Last 24 hours</option>
-                                        <option value="72">Last 3 days</option>
-                                        <option value="168">Last 7 days</option>
+                                        <option value="1" data-i18n="options.last_1_hour">Last 1 hour</option>
+                                        <option value="6" selected data-i18n="options.last_6_hours">Last 6 hours</option>
+                                        <option value="24" data-i18n="options.last_24_hours">Last 24 hours</option>
+                                        <option value="72" data-i18n="options.last_3_days">Last 3 days</option>
+                                        <option value="168" data-i18n="options.last_7_days">Last 7 days</option>
                                     </select>
                                 </div>
                             </div>
@@ -3333,12 +3333,12 @@
                                     <table>
                                         <thead>
                                             <tr>
-                                                <th>Received At</th>
-                                                <th>Source</th>
-                                                <th>Packets</th>
-                                                <th>Device IDs</th>
-                                                <th>Status</th>
-                                                <th>Actions</th>
+                                                <th data-i18n="table.received_at">Received At</th>
+                                                <th data-i18n="table.source">Source</th>
+                                                <th data-i18n="table.packets">Packets</th>
+                                                <th data-i18n="table.device_ids">Device IDs</th>
+                                                <th data-i18n="table.status">Status</th>
+                                                <th data-i18n="table.actions">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody id="webhookLogsTableBody">
@@ -3354,15 +3354,15 @@
                             <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
                                 <label class="form-label" style="margin:0;font-weight:600">Series 5 Device:</label>
                                 <select id="series5DeviceSelect" class="form-input" style="width:300px" onchange="loadDeviceLocations()">
-                                    <option value="">— Select a device —</option>
+                                    <option value="" data-i18n="options._select_a_device_">— Select a device —</option>
                                 </select>
                                 <label class="form-label" style="margin:0 0 0 12px">Time Range:</label>
                                 <select id="locationHoursFilter" class="form-input" style="width:auto">
-                                    <option value="1">Last 1 hour</option>
-                                    <option value="6">Last 6 hours</option>
-                                    <option value="24" selected>Last 24 hours</option>
-                                    <option value="72">Last 3 days</option>
-                                    <option value="168">Last 7 days</option>
+                                    <option value="1" data-i18n="options.last_1_hour">Last 1 hour</option>
+                                    <option value="6" data-i18n="options.last_6_hours">Last 6 hours</option>
+                                    <option value="24" selected data-i18n="options.last_24_hours">Last 24 hours</option>
+                                    <option value="72" data-i18n="options.last_3_days">Last 3 days</option>
+                                    <option value="168" data-i18n="options.last_7_days">Last 7 days</option>
                                 </select>
                                 <button class="btn btn-secondary" onclick="loadDeviceLocations()">↻ Refresh</button>
                             </div>
@@ -3379,15 +3379,15 @@
                                     <table>
                                         <thead>
                                             <tr>
-                                                <th>Observed At</th>
-                                                <th>Received At</th>
-                                                <th>Latitude</th>
-                                                <th>Longitude</th>
-                                                <th>Speed</th>
-                                                <th>Direction</th>
-                                                <th>Address</th>
-                                                <th>Trip Link</th>
-                                                <th>Source</th>
+                                                <th data-i18n="table.observed_at">Observed At</th>
+                                                <th data-i18n="table.received_at">Received At</th>
+                                                <th data-i18n="table.latitude">Latitude</th>
+                                                <th data-i18n="table.longitude">Longitude</th>
+                                                <th data-i18n="table.speed">Speed</th>
+                                                <th data-i18n="table.direction">Direction</th>
+                                                <th data-i18n="table.address">Address</th>
+                                                <th data-i18n="table.trip_link">Trip Link</th>
+                                                <th data-i18n="table.source">Source</th>
                                             </tr>
                                         </thead>
                                         <tbody id="locationTableBody">
@@ -3426,11 +3426,11 @@
                             <div style="display:flex;gap:12px;align-items:center">
                                 <label class="form-label" style="margin:0">Filter by Status:</label>
                                 <select id="jobStatusFilter" class="form-input" style="width:auto" onchange="loadJobs()">
-                                    <option value="">All Statuses</option>
-                                    <option value="pending">Pending</option>
-                                    <option value="running" selected>Running</option>
-                                    <option value="completed">Completed</option>
-                                    <option value="failed">Failed</option>
+                                    <option value="" data-i18n="options.all_statuses">All Statuses</option>
+                                    <option value="pending" data-i18n="options.pending">Pending</option>
+                                    <option value="running" selected data-i18n="options.running">Running</option>
+                                    <option value="completed" data-i18n="options.completed">Completed</option>
+                                    <option value="failed" data-i18n="options.failed">Failed</option>
                                 </select>
                             </div>
                         </div>
@@ -3442,14 +3442,14 @@
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>Job ID</th>
-                                            <th>Type</th>
-                                            <th>Status</th>
-                                            <th>Progress</th>
-                                            <th>Created By</th>
-                                            <th>Started</th>
-                                            <th>Completed</th>
-                                            <th>Actions</th>
+                                            <th data-i18n="table.job_id">Job ID</th>
+                                            <th data-i18n="table.type">Type</th>
+                                            <th data-i18n="table.status">Status</th>
+                                            <th data-i18n="table.progress">Progress</th>
+                                            <th data-i18n="table.created_by">Created By</th>
+                                            <th data-i18n="table.started">Started</th>
+                                            <th data-i18n="table.completed">Completed</th>
+                                            <th data-i18n="table.actions">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="jobsTableBody">
@@ -3492,30 +3492,30 @@
             <form id="addUserForm" onsubmit="handleAddUser(event)">
                 <div class="form-group">
                     <label>Username</label>
-                    <input type="text" id="addUsername" required placeholder="Enter username">
+                    <input type="text" id="addUsername" required data-i18n-placeholder="placeholders.enter_username" placeholder="Enter username">
                 </div>
 
                 <div class="form-group">
                     <label>Email</label>
-                    <input type="email" id="addEmail" required placeholder="Enter email">
+                    <input type="email" id="addEmail" required data-i18n-placeholder="placeholders.enter_email" placeholder="Enter email">
                 </div>
 
                 <div class="form-group">
                     <label>Full Name</label>
-                    <input type="text" id="addFullName" placeholder="Enter full name">
+                    <input type="text" id="addFullName" data-i18n-placeholder="placeholders.enter_full_name" placeholder="Enter full name">
                 </div>
 
                 <div class="form-group">
                     <label>Password</label>
-                    <input type="password" id="addPassword" required placeholder="Enter password">
+                    <input type="password" id="addPassword" required data-i18n-placeholder="placeholders.enter_password" placeholder="Enter password">
                 </div>
 
                 <div class="form-group">
                     <label>Role</label>
                     <select id="addRole" required>
-                        <option value="viewer">Viewer (Read-only)</option>
-                        <option value="manager">Manager (Logs, Billing)</option>
-                        <option value="admin">Administrator (Full Access)</option>
+                        <option value="viewer" data-i18n="options.viewer_readonly">Viewer (Read-only)</option>
+                        <option value="manager" data-i18n="options.manager_logs_billing">Manager (Logs, Billing)</option>
+                        <option value="admin" data-i18n="options.administrator_full_access">Administrator (Full Access)</option>
                     </select>
                 </div>
 
@@ -3542,35 +3542,35 @@
             <form id="addTranslationKeyForm" onsubmit="handleAddTranslationKey(event)">
                 <div class="form-group">
                     <label>Key <span style="color:var(--danger)">*</span></label>
-                    <input type="text" id="addKeyName" required placeholder="e.g. dashboard.welcome" pattern="^[a-z0-9._-]+$">
+                    <input type="text" id="addKeyName" required data-i18n-placeholder="placeholders.eg_dashboardwelcome" placeholder="e.g. dashboard.welcome" pattern="^[a-z0-9._-]+$">
                     <small style="color:var(--gray);">Lowercase, dots for namespacing (e.g. category.subcategory.key)</small>
                 </div>
 
                 <div class="form-group">
                     <label>Category</label>
                     <select id="addKeyCategory">
-                        <option value="">None</option>
-                        <option value="common">Common</option>
-                        <option value="dashboard">Dashboard</option>
-                        <option value="fleet">Fleet</option>
-                        <option value="geofences">Geofences</option>
-                        <option value="trips">Trips</option>
-                        <option value="alerts">Alerts</option>
-                        <option value="settings">Settings</option>
-                        <option value="auth">Auth</option>
-                        <option value="reports">Reports</option>
-                        <option value="notifications">Notifications</option>
+                        <option value="" data-i18n="options.none">None</option>
+                        <option value="common" data-i18n="options.common">Common</option>
+                        <option value="dashboard" data-i18n="options.dashboard">Dashboard</option>
+                        <option value="fleet" data-i18n="options.fleet">Fleet</option>
+                        <option value="geofences" data-i18n="options.geofences">Geofences</option>
+                        <option value="trips" data-i18n="options.trips">Trips</option>
+                        <option value="alerts" data-i18n="options.alerts">Alerts</option>
+                        <option value="settings" data-i18n="options.settings">Settings</option>
+                        <option value="auth" data-i18n="options.auth">Auth</option>
+                        <option value="reports" data-i18n="options.reports">Reports</option>
+                        <option value="notifications" data-i18n="options.notifications">Notifications</option>
                     </select>
                 </div>
 
                 <div class="form-group">
                     <label>Default Text (English) <span style="color:var(--danger)">*</span></label>
-                    <textarea id="addKeyDefaultText" required placeholder="Enter the English text" rows="3"></textarea>
+                    <textarea id="addKeyDefaultText" required data-i18n-placeholder="placeholders.enter_the_english_text" placeholder="Enter the English text" rows="3"></textarea>
                 </div>
 
                 <div class="form-group">
                     <label>Context (for translators)</label>
-                    <textarea id="addKeyContext" placeholder="Optional: describe where this text appears or how it's used" rows="2"></textarea>
+                    <textarea id="addKeyContext" data-i18n-placeholder="placeholders.optional_describe_where_this_text_appear" placeholder="Optional: describe where this text appears or how it's used" rows="2"></textarea>
                 </div>
 
                 <div id="addTranslationKeyError" class="error" style="display: none;"></div>
@@ -3616,7 +3616,7 @@
 
                 <div class="form-group">
                     <label>Translated Text <span style="color:var(--danger)">*</span></label>
-                    <textarea id="editTranslationText" required placeholder="Enter the translated text" rows="3"></textarea>
+                    <textarea id="editTranslationText" required data-i18n-placeholder="placeholders.enter_the_translated_text" placeholder="Enter the translated text" rows="3"></textarea>
                 </div>
 
                 <div class="form-group" id="editTranslationContextGroup" style="display:none;">
@@ -3647,13 +3647,13 @@
             <form id="addLanguageForm" onsubmit="handleAddLanguage(event)">
                 <div class="form-group">
                     <label>Language Code <span style="color:var(--danger)">*</span></label>
-                    <input type="text" id="addLanguageCode" required placeholder="e.g. fr, es, de" pattern="^[a-z]{2,5}$" maxlength="5">
+                    <input type="text" id="addLanguageCode" required data-i18n-placeholder="placeholders.eg_fr_es_de" placeholder="e.g. fr, es, de" pattern="^[a-z]{2,5}$" maxlength="5">
                     <small style="color:var(--gray);">2-5 lowercase letters (ISO 639-1 or similar)</small>
                 </div>
 
                 <div class="form-group">
                     <label>Language Name <span style="color:var(--danger)">*</span></label>
-                    <input type="text" id="addLanguageName" required placeholder="e.g. Français, Español">
+                    <input type="text" id="addLanguageName" required data-i18n-placeholder="placeholders.eg_français_español" placeholder="e.g. Français, Español">
                 </div>
 
                 <div class="form-group">
@@ -4099,7 +4099,7 @@ dashboard.welcome,Bienvenue</pre>
                                 <input type="number" min="1" id="ca_cooldown_${key}" value="${row.cooldown_minutes}" style="width:86px;padding:6px;border:1px solid var(--border-color);border-radius:6px;">
                             </td>
                             <td>
-                                <input type="text" id="ca_recipients_${key}" value="${recipients}" placeholder="dev@visightsolutions.co.za, ops@company.com" style="min-width:280px;padding:6px;border:1px solid var(--border-color);border-radius:6px;">
+                                <input type="text" id="ca_recipients_${key}" value="${recipients}" data-i18n-placeholder="placeholders.devvisightsolutionscoza_opscompanycom" placeholder="dev@visightsolutions.co.za, ops@company.com" style="min-width:280px;padding:6px;border:1px solid var(--border-color);border-radius:6px;">
                             </td>
                             <td style="font-size:12px;color:var(--text-secondary)">${_esc(_fmtDate(row.last_alert_sent_at))}</td>
                             <td>
@@ -4277,7 +4277,7 @@ dashboard.welcome,Bienvenue</pre>
                     }).join('');
                     if (document.getElementById('recentLogsContainer')) {
                         document.getElementById('recentLogsContainer').innerHTML
-                            = '<table><thead><tr><th>Time</th><th>Level</th><th>Category</th><th>Message</th></tr></thead><tbody>'
+                            = '<table><thead><tr><th data-i18n="table.time">Time</th><th data-i18n="table.level">Level</th><th data-i18n="table.category">Category</th><th data-i18n="table.message">Message</th></tr></thead><tbody>'
                             + recent + '</tbody></table>';
                     }
                     document.getElementById('logsTableBody').innerHTML = tableHtml;
@@ -4789,7 +4789,7 @@ dashboard.welcome,Bienvenue</pre>
             document.getElementById('createGroupModal').classList.add('active');
             // Populate package dropdown
             const sel = document.getElementById('cgPackage');
-            sel.innerHTML = '<option value="">— No package —</option>';
+            sel.innerHTML = '<option value="" data-i18n="options._no_package_">— No package —</option>';
             try {
                 const res = await fetch(`${API_URL}/api/admin/packages`, { headers: { 'Authorization': `Bearer ${authToken}` } });
                 if (res.ok) {
@@ -4804,7 +4804,7 @@ dashboard.welcome,Bienvenue</pre>
             } catch (_) {}
             // Populate language dropdown
             const langSel = document.getElementById('cgLanguage');
-            langSel.innerHTML = '<option value="en">English (default)</option>';
+            langSel.innerHTML = '<option value="en" data-i18n="options.english_default">English (default)</option>';
             try {
                 const res = await fetch(`${API_URL}/api/admin/i18n/languages`, { headers: { 'Authorization': `Bearer ${authToken}` } });
                 if (res.ok) {
@@ -5048,7 +5048,7 @@ dashboard.welcome,Bienvenue</pre>
             document.getElementById('egTypeSeries5').checked = types.includes('series_5');
             // Populate language dropdown
             const langSel = document.getElementById('egLanguage');
-            langSel.innerHTML = '<option value="en">Loading...</option>';
+            langSel.innerHTML = '<option value="en" data-i18n="options.loading">Loading...</option>';
             try {
                 const res = await fetch(`${API_URL}/api/admin/i18n/languages`, { headers: { 'Authorization': `Bearer ${authToken}` } });
                 if (res.ok) {
@@ -5063,7 +5063,7 @@ dashboard.welcome,Bienvenue</pre>
                     });
                 }
             } catch (_) {
-                langSel.innerHTML = '<option value="en">English</option>';
+                langSel.innerHTML = '<option value="en" data-i18n="options.english">English</option>';
             }
             document.getElementById('editGroupModal').classList.add('active');
             // Load all packages + this group's assigned packages in parallel
@@ -5102,7 +5102,7 @@ dashboard.welcome,Bienvenue</pre>
                 }
                 // Populate "Add" dropdown with unassigned active packages
                 const sel = document.getElementById('egAddPkgSelect');
-                sel.innerHTML = '<option value="">— Add a package —</option>';
+                sel.innerHTML = '<option value="" data-i18n="options._add_a_package_">— Add a package —</option>';
                 _egAllPackages.forEach(p => {
                     if (!assignedIds.has(p.id)) {
                         const opt = document.createElement('option');
@@ -5432,7 +5432,7 @@ dashboard.welcome,Bienvenue</pre>
             // populate tenant dropdown
             const sel = document.getElementById('cbGroupSel');
             sel.innerHTML = _allGroups.map(g => `<option value="${g.id}">${escHtml(g.name)}</option>`).join('');
-            if (!sel.innerHTML) sel.innerHTML = '<option value="">— no tenants —</option>';
+            if (!sel.innerHTML) sel.innerHTML = '<option value="" data-i18n="options._no_tenants_">— no tenants —</option>';
             document.getElementById('createBuildingModal').classList.add('active');
         }
 
@@ -5858,7 +5858,7 @@ dashboard.welcome,Bienvenue</pre>
                 const tenants = await response.json();
                 
                 const select = document.getElementById('dmTenantSelect');
-                select.innerHTML = '<option value="">— Select a tenant —</option>' + 
+                select.innerHTML = '<option value="" data-i18n="options._select_a_tenant_">— Select a tenant —</option>' + 
                     tenants.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
             } catch (error) {
                 console.error('Failed to load tenants:', error);
@@ -6620,7 +6620,7 @@ dashboard.welcome,Bienvenue</pre>
                 const select = document.getElementById('series5DeviceSelect');
                 const currentValue = select.value;
                 
-                select.innerHTML = '<option value="">— Select a device —</option>' +
+                select.innerHTML = '<option value="" data-i18n="options._select_a_device_">— Select a device —</option>' +
                     devices.map(d => {
                         const lastSeen = d.last_seen ? new Date(d.last_seen).toLocaleString() : 'Never';
                         const battery = d.battery_level ? `${d.battery_level}%` : '—';
@@ -7201,13 +7201,13 @@ dashboard.welcome,Bienvenue</pre>
                     tagsRow += `<table style="width:100%;margin:0;background:white;border-radius:6px;overflow:hidden">
                         <thead>
                             <tr style="background:#e8eaf6">
-                                <th style="padding:8px;font-size:12px">IMEI</th>
-                                <th style="padding:8px;font-size:12px">Device Name</th>
-                                <th style="padding:8px;font-size:12px">Type</th>
-                                <th style="padding:8px;font-size:12px">Package</th>
-                                <th style="padding:8px;font-size:12px">Activated</th>
-                                <th style="padding:8px;font-size:12px">Expiry</th>
-                                <th style="padding:8px;font-size:12px">Status</th>
+                                <th style="padding:8px;font-size:12px" data-i18n="table.imei">IMEI</th>
+                                <th style="padding:8px;font-size:12px" data-i18n="table.device_name">Device Name</th>
+                                <th style="padding:8px;font-size:12px" data-i18n="table.type">Type</th>
+                                <th style="padding:8px;font-size:12px" data-i18n="table.package">Package</th>
+                                <th style="padding:8px;font-size:12px" data-i18n="table.activated">Activated</th>
+                                <th style="padding:8px;font-size:12px" data-i18n="table.expiry">Expiry</th>
+                                <th style="padding:8px;font-size:12px" data-i18n="table.status">Status</th>
                             </tr>
                         </thead>
                         <tbody>`;
@@ -7250,7 +7250,7 @@ dashboard.welcome,Bienvenue</pre>
         document.getElementById('euFirstName').value = '';
         document.getElementById('euLastName').value = '';
         document.getElementById('euPhone').value = '';
-        document.getElementById('euUsergroup').innerHTML = '<option value="__keep__">Loading groups…</option>';
+        document.getElementById('euUsergroup').innerHTML = '<option value="__keep__" data-i18n="options.loading_groups">Loading groups…</option>';
         document.getElementById('euTag').innerHTML = '';
         openModal('editEndUserModal');
 
@@ -7268,9 +7268,9 @@ dashboard.welcome,Bienvenue</pre>
             document.getElementById('euPhone').value = data.user.phone || '';
 
             const currentGroupName = data.user.selected_usergroup_name || 'No group assigned';
-            const groupOptions = [`<option value="__keep__">Keep current: ${escH(currentGroupName)}</option>`];
+            const groupOptions = [`<option value="__keep__" data-i18n="options.keep_current_eschcurrentgroupname">Keep current: ${escH(currentGroupName)}</option>`];
             if (data.user.selected_usergroup_id && data.user.can_clear_usergroup) {
-                groupOptions.push('<option value="__clear__">Clear current group</option>');
+                groupOptions.push('<option value="__clear__" data-i18n="options.clear_current_group">Clear current group</option>');
             }
             (data.usergroups || []).forEach(group => {
                 groupOptions.push(`<option value="${escH(group.id)}">${escH(group.name)}</option>`);
@@ -7285,7 +7285,7 @@ dashboard.welcome,Bienvenue</pre>
                 tagOptions.push(`<option value="${escH(tag.id)}">${escH(tag.imei)}${tag.label && tag.label !== tag.imei ? ' - ' + escH(tag.label) : ''}</option>`);
             });
             if ((data.unassigned_tags || []).length === 0) {
-                tagOptions.push('<option value="" disabled>No unassigned IMEIs available</option>');
+                tagOptions.push('<option value="" disabled data-i18n="options.no_unassigned_imeis_available">No unassigned IMEIs available</option>');
             }
             document.getElementById('euTag').innerHTML = tagOptions.join('');
         } catch (err) {
@@ -7631,9 +7631,9 @@ dashboard.welcome,Bienvenue</pre>
             ).join('');
             thead.innerHTML = `
                 <tr>
-                    <th style="width:180px;position:sticky;left:0;background:var(--surface);z-index:2;">Key</th>
-                    <th style="width:100px;">Category</th>
-                    <th style="width:220px;">English (Default)</th>
+                    <th style="width:180px;position:sticky;left:0;background:var(--surface);z-index:2;" data-i18n="table.key">Key</th>
+                    <th style="width:100px;" data-i18n="table.category">Category</th>
+                    <th style="width:220px;" data-i18n="table.english_default">English (Default)</th>
                     ${langColumns}
                 </tr>
             `;
@@ -8207,7 +8207,7 @@ dashboard.welcome,Bienvenue</pre>
             // Also populate the translation language filter (if it exists - only on Translations tab)
             const langFilter = document.getElementById('translationLanguageFilter');
             if (langFilter) {
-                langFilter.innerHTML = '<option value="">All Languages</option>' + 
+                langFilter.innerHTML = '<option value="" data-i18n="options.all_languages">All Languages</option>' + 
                     languages.filter(l => l.is_active).map(l => 
                         `<option value="${l.code}">${l.name}</option>`
                     ).join('');
@@ -8325,7 +8325,7 @@ dashboard.welcome,Bienvenue</pre>
     async function loadTenantFeaturesTab() {
         // Populate tenant selector
         const selectEl = document.getElementById('tfTenantSelect');
-        selectEl.innerHTML = '<option value="">— Select a tenant —</option>';
+        selectEl.innerHTML = '<option value="" data-i18n="options._select_a_tenant_">— Select a tenant —</option>';
 
         try {
             const response = await fetch('/api/admin/usergroups', {
