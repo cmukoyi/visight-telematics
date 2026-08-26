@@ -100,7 +100,7 @@ logger = logging.getLogger(__name__)
 ENGINE_VERSION = "2.1.22"  # v2.1.22: Displacement-aware gap handling for webhook devices (Minew)
 
 # ── Verbose Debug Logging for Specific Devices ────────────────────────────
-VERBOSE_DEBUG_DEVICES = set()  # Disabled - bug found: journey-breaking stationaries didn't open new journey
+VERBOSE_DEBUG_DEVICES = {"3ca14097-50c3-4642-b594-0b490c308f5e"}  # Andy E9 - debug webhook device with no journeys since Aug 20
 
 # ── Late-Arrival Rewind Floor ─────────────────────────────────────────────
 MAX_LIVE_REWIND_HOURS = 48  # v2.1.19 D1-FIX: Cap how far back a live rewind may go
