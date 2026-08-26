@@ -941,6 +941,8 @@ async def fetch_all_tracksolid_locations_open_api(
     
     Also updates ble_tags table for backwards compatibility with existing app logic.
     
+    Auto-refreshes token on 401 Unauthorized (stale token) with one retry.
+    
     Args:
         imeis: Optional list of IMEIs to filter in the returned dict
         db_session: SQLAlchemy session for DB operations
@@ -954,30 +956,61 @@ async def fetch_all_tracksolid_locations_open_api(
     account, password, app_key, app_secret = _open_api_creds()
     timeout = httpx.Timeout(_READ_TIMEOUT_SECONDS, connect=_CONNECT_TIMEOUT_SECONDS)
     
-    # Step 1: Get OAuth access_token (memory+DB cache with backoff)
-    try:
-        access_token = await _get_open_api_token(db_session)
-    except Exception as exc:
-        logger.error("🚫 TrackSolid Open API token fetch failed: %s", exc)
-        return {}
+    device_metadata = {}
+    locations = []
     
-    # Step 2: Fetch device metadata via jimi.user.device.list
-    try:
-        device_metadata = await _fetch_device_list(access_token, app_key, app_secret, account, timeout)
-        if db_session:
-            await _save_device_metadata(db_session, device_metadata)
-    except Exception as exc:
-        logger.error("🚫 TrackSolid device.list failed: %s", exc)
-        device_metadata = {}
-    
-    # Step 3: Fetch device locations via jimi.user.device.location.list
-    try:
-        locations = await _fetch_device_locations(access_token, app_key, app_secret, account, timeout)
-        if db_session:
-            await _save_device_locations(db_session, locations)
-    except Exception as exc:
-        logger.error("🚫 TrackSolid location.list failed: %s", exc)
-        return {}
+    # Retry loop: attempt once, retry on 401 with fresh token
+    for attempt in range(2):
+        try:
+            # Step 1: Get OAuth access_token (memory+DB cache with backoff)
+            try:
+                access_token = await _get_open_api_token(db_session)
+            except Exception as exc:
+                logger.error("🚫 TrackSolid Open API token fetch failed: %s", exc)
+                return {}
+            
+            # Step 2: Fetch device metadata via jimi.user.device.list
+            device_metadata = await _fetch_device_list(access_token, app_key, app_secret, account, timeout)
+            if db_session:
+                await _save_device_metadata(db_session, device_metadata)
+            
+            # Step 3: Fetch device locations via jimi.user.device.location.list
+            locations = await _fetch_device_locations(access_token, app_key, app_secret, account, timeout)
+            if db_session:
+                await _save_device_locations(db_session, locations)
+            
+            # Success - break retry loop
+            break
+            
+        except httpx.HTTPStatusError as exc:
+            # 401 = stale token, invalidate and retry once
+            if exc.response.status_code == 401 and attempt == 0:
+                logger.warning(
+                    "🔄 TrackSolid 401 Unauthorized - token invalidated server-side, retrying with fresh token..."
+                )
+                # Invalidate the cached token by clearing globals
+                global _open_api_token, _open_api_expires_at
+                _open_api_token = None
+                _open_api_expires_at = 0.0
+                # Also clear from DB
+                if db_session:
+                    try:
+                        from app.models import APIToken
+                        db_session.query(APIToken).filter(
+                            APIToken.provider == "tracksolid_open_api"
+                        ).delete()
+                        db_session.commit()
+                    except Exception:
+                        pass
+                continue  # Retry with fresh token
+            
+            # Other HTTP errors or second 401 - fail
+            logger.error("🚫 TrackSolid API HTTP %d: %s", exc.response.status_code, exc)
+            return {}
+            
+        except Exception as exc:
+            logger.error("🚫 TrackSolid API failed: %s", exc)
+            return {}
     
     # Step 4: Parse into TrackSolidLocationInfo objects (filtered by imeis)
     result_map: dict[str, TrackSolidLocationInfo] = {}
