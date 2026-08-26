@@ -97,10 +97,13 @@ from app.models import (
 logger = logging.getLogger(__name__)
 
 # ── Engine Version (v2.2.0 - Fix Register) ────────────────────────────────
-ENGINE_VERSION = "2.1.22"  # v2.1.22: Displacement-aware gap handling for webhook devices (Minew)
+ENGINE_VERSION = "2.1.23"  # v2.1.23: Fix anchor_count stuck at 1 for polling devices (commit after every batch)
 
 # ── Verbose Debug Logging for Specific Devices ────────────────────────────
-VERBOSE_DEBUG_DEVICES = {"3ca14097-50c3-4642-b594-0b490c308f5e"}  # Andy E9 - debug webhook device with no journeys since Aug 20
+VERBOSE_DEBUG_DEVICES = {
+    "3ca14097-50c3-4642-b594-0b490c308f5e",  # Andy E9 - debug webhook device with no journeys since Aug 20
+    "780901807706560"  # PB708-560 - TrackSolid device with anchor_count stuck at 1
+}
 
 # ── Late-Arrival Rewind Floor ─────────────────────────────────────────────
 MAX_LIVE_REWIND_HOURS = 48  # v2.1.19 D1-FIX: Cap how far back a live rewind may go
@@ -589,6 +592,15 @@ class TripEngine:
         if context.anchor_points:
             anchor_lat, anchor_lng = calculate_centroid(
                 [(p[0], p[1]) for p in context.anchor_points]
+            )
+        
+        # VERBOSE DEBUG
+        if context.device_imei in VERBOSE_DEBUG_DEVICES:
+            logger.info(
+                f"🔍 VERBOSE {context.device_imei}: About to SAVE state - "
+                f"anchor_points length: {len(context.anchor_points)}, "
+                f"anchor_count to save: {len(context.anchor_points)}, "
+                f"current_state: {context.current_state}"
             )
         
         stmt = insert(EngineState).values(
@@ -2382,6 +2394,13 @@ class TripEngine:
         
         # Step 3: State-specific logic
         if self.context.current_state == "STATIONARY":
+            # VERBOSE DEBUG
+            if self.device_imei in VERBOSE_DEBUG_DEVICES:
+                logger.info(
+                    f"🔍 VERBOSE {self.device_imei}: STATIONARY state - "
+                    f"anchor_points length BEFORE append: {len(self.context.anchor_points)}"
+                )
+            
             # Check if within anchor radius
             anchor_dist = haversine_distance(
                 self.context.anchor_lat, self.context.anchor_lng,
@@ -2395,6 +2414,14 @@ class TripEngine:
                 # New (CORRECT): anchor += (point - anchor) / count  ← O(1) and preserves count
                 self.context.anchor_points.append((lat, lng, observed_at, position_id))
                 anchor_count = len(self.context.anchor_points)
+                
+                # VERBOSE DEBUG
+                if self.device_imei in VERBOSE_DEBUG_DEVICES:
+                    logger.info(
+                        f"🔍 VERBOSE {self.device_imei}: Within anchor radius {anchor_dist:.1f}m - "
+                        f"anchor_points length AFTER append: {anchor_count}, "
+                        f"anchor=({self.context.anchor_lat:.6f}, {self.context.anchor_lng:.6f})"
+                    )
                 
                 # Incremental centroid formula (spec Section 1)
                 self.context.anchor_lat += (lat - self.context.anchor_lat) / anchor_count

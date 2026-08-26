@@ -446,9 +446,16 @@ class TripEngineWorkerPool:
                     total_stationaries += stats['stationaries_created']
                     batches_processed += 1
                     
-                    # Incremental checkpoint every N positions
+                    # CRITICAL FIX (v2.1.23): Commit after EVERY batch
+                    # Because we create fresh TripEngine per batch (af7d1ba fix), each instance
+                    # must commit its state changes immediately so the next batch sees updated
+                    # anchor_count, watermarks, etc. Without this, single-position batches from
+                    # polling devices (TrackSolid) never accumulate anchor_count and can't create
+                    # stationaries/journeys.
+                    db.commit()
+                    
+                    # Checkpoint logging at intervals
                     if total_positions % self.checkpoint_interval == 0:
-                        db.commit()
                         logger.debug(
                             f"{device_imei}: Checkpoint at {total_positions} positions"
                         )
