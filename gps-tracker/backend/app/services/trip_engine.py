@@ -97,7 +97,7 @@ from app.models import (
 logger = logging.getLogger(__name__)
 
 # ── Engine Version (v2.2.0 - Fix Register) ────────────────────────────────
-ENGINE_VERSION = "2.1.24"  # v2.1.24: Query orphaned positions within 7-day window (fixes straight-line trips)
+ENGINE_VERSION = "2.1.25"  # v2.1.25: Fix rebuild loop - only query orphaned positions AFTER last_processed_at
 
 # ── Verbose Debug Logging for Specific Devices ────────────────────────────
 VERBOSE_DEBUG_DEVICES = {
@@ -1961,17 +1961,18 @@ class TripEngine:
         # Filter to unprocessed only (checkpoint on arrival time) OR orphaned positions (v2.1.24)
         # CRITICAL: Orphaned positions (leg_id IS NULL) can exist BEFORE watermark if they
         # failed to create journeys on first processing. Reprocess recent orphaned positions
-        # within 7-day window to give them another chance to form journeys.
+        # BUT ONLY those AFTER last_processed_at to avoid triggering late-arrival rebuild loop.
         if self.context.last_received_at:
+            orphaned_cutoff = self.context.last_processed_at or (datetime.now(timezone.utc) - timedelta(days=7))
             query = query.where(
                 or_(
                     # New positions after watermark (normal case)
                     DevicePosition.received_at > self.context.last_received_at,
-                    # OR orphaned positions from last 7 days (recovery case)
+                    # OR orphaned positions AFTER last_processed_at (avoids rebuild loop)
                     and_(
                         DevicePosition.leg_id.is_(None),
                         DevicePosition.stationary_id.is_(None),
-                        DevicePosition.observed_at > datetime.now(timezone.utc) - timedelta(days=7)
+                        DevicePosition.observed_at > orphaned_cutoff
                     )
                 )
             )
