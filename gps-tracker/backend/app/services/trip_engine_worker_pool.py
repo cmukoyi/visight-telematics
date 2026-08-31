@@ -225,10 +225,14 @@ class TripEngineWorkerPool:
         """
         Query database for devices needing processing.
         
+        Finds devices with EITHER:
+        1. Orphaned positions (leg_id IS NULL) - must be processed regardless of watermark
+        2. New positions after watermark
+        
         Returns:
             List of WorkItem objects, prioritized
         """
-        # Find devices with unprocessed positions
+        # Find devices with orphaned OR new unprocessed positions
         query = text("""
         SELECT 
             ds.device_imei,
@@ -239,7 +243,12 @@ class TripEngineWorkerPool:
         FROM device_state ds
         LEFT JOIN engine_state es ON es.device_imei = ds.device_imei
         LEFT JOIN device_positions dp ON dp.device_imei = ds.device_imei
-            AND dp.received_at > COALESCE(es.last_received_at, '1970-01-01'::timestamp)
+            AND (
+                -- Orphaned positions (CRITICAL: must process regardless of watermark)
+                (dp.leg_id IS NULL AND dp.stationary_id IS NULL)
+                -- OR new positions after watermark
+                OR dp.received_at > COALESCE(es.last_received_at, '1970-01-01'::timestamp)
+            )
         WHERE ds.trip_subscribed = true
         GROUP BY ds.device_imei, es.last_received_at
         HAVING COUNT(dp.id) > 0
