@@ -244,10 +244,15 @@ class TripEngineWorkerPool:
         LEFT JOIN engine_state es ON es.device_imei = ds.device_imei
         LEFT JOIN device_positions dp ON dp.device_imei = ds.device_imei
             AND (
-                -- Orphaned positions (CRITICAL: must process regardless of watermark)
-                (dp.leg_id IS NULL AND dp.stationary_id IS NULL)
-                -- OR new positions after watermark
-                OR dp.received_at > COALESCE(es.last_received_at, '1970-01-01'::timestamp)
+                -- New positions after watermark (normal case)
+                dp.received_at > COALESCE(es.last_received_at, '1970-01-01'::timestamp)
+                -- OR orphaned positions AFTER last_processed_at (v2.1.25: avoid rebuild loop)
+                -- Only recent orphaned positions to prevent infinite re-enqueuing of devices
+                OR (
+                    dp.leg_id IS NULL 
+                    AND dp.stationary_id IS NULL
+                    AND dp.observed_at > COALESCE(es.last_processed_at, NOW() - INTERVAL '7 days')
+                )
             )
         WHERE ds.trip_subscribed = true
         GROUP BY ds.device_imei, es.last_received_at
