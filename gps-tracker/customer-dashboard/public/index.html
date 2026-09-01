@@ -4171,7 +4171,7 @@ input.hive-range::-moz-range-track {
             <div class="alert" id="hive-cfg-err" style="display:none;margin-bottom:12px"><span id="hive-cfg-err-text"></span></div>
             <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
                 <button class="btn btn-secondary" onclick="hiveCloseConfigModal()" data-i18n="common.cancel">Cancel</button>
-                <button class="btn btn-primary" onclick="hiveSaveConfigModal()"><i class="fa-solid fa-check"></i> Save</button>
+                <button class="btn btn-primary" onclick="hiveSaveConfigModal()"><i class="fa-solid fa-check"></i> <span data-i18n="common.save">Save</span></button>
             </div>
         </div>
     </div>
@@ -4187,11 +4187,11 @@ input.hive-range::-moz-range-track {
         <div id="singleTagAlert" class="alert" style="display:none"><span id="singleTagAlertText"></span></div>
         <form onsubmit="submitSingleTag(event)">
             <div class="form-group">
-                <label>IMEI / Tag ID *</label>
+                <label data-i18n="assets.imei_tag_id_">IMEI / Tag ID *</label>
                 <input type="text" id="stImei" data-i18n-placeholder="placeholders.eg_867747079036032" placeholder="e.g. 867747079036032" required>
             </div>
             <div class="form-group">
-                <label>Label / Name</label>
+                <label data-i18n="assets.label_name">Label / Name</label>
                 <input type="text" id="stLabel" data-i18n-placeholder="placeholders.eg_company_van" placeholder="e.g. Company Van">
             </div>
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
@@ -4219,7 +4219,7 @@ input.hive-range::-moz-range-track {
              ondragleave="this.classList.remove('dragover')"
              ondrop="handleCSVDrop(event)">
             <div class="dz-icon">📄</div>
-            <p><strong>Click to browse</strong> or drag & drop a CSV file</p>
+            <p><strong data-i18n="common.click_to_browse">Click to browse</strong><span data-i18n="assets.drag_drop_csv_file"> or drag &amp; drop a CSV file</span></p>
         </div>
         <input type="file" id="csvFileInput" accept=".csv,text/csv" style="display:none" onchange="handleCSVFile(this.files[0])">
         <div id="csvPreview" style="display:none;margin-top:16px">
@@ -4246,7 +4246,7 @@ input.hive-range::-moz-range-track {
         <p style="font-size:13px;color:var(--gray);margin-bottom:16px" data-i18n="floor_plan.upload_instructions">Upload a PNG or JPEG image of the floor plan. It will be stored in the browser for this building.</p>
         <div class="drop-zone" onclick="document.getElementById('floorFileInput').click()">
             <div class="dz-icon">🏗️</div>
-            <p><strong>Click to browse</strong> or drag & drop an image</p>
+            <p><strong data-i18n="common.click_to_browse">Click to browse</strong><span data-i18n="floor_plan.drag_drop_image"> or drag &amp; drop an image</span></p>
         </div>
         <input type="file" id="floorFileInput" accept="image/*" style="display:none" onchange="handleFloorPlan(this.files[0])">
         <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
@@ -4267,15 +4267,15 @@ input.hive-range::-moz-range-track {
             <input type="text" id="newBldgName" data-i18n-placeholder="placeholders.eg_head_office__floor_2" placeholder="e.g. Head Office — Floor 2" maxlength="80">
         </div>
         <div class="form-group">
-            <label>Floor Plan Image <span style="color:var(--gray);font-weight:400">(optional — upload later via map)</span></label>
+            <label><span data-i18n="floor_plan.image">Floor Plan Image</span> <span style="color:var(--gray);font-weight:400" data-i18n="floor_plan.image_optional_upload_later">(optional — upload later via map)</span></label>
             <div class="drop-zone" onclick="document.getElementById('newBldgFile').click()" style="padding:20px">
                 <div class="dz-icon" style="font-size:28px">🖼️</div>
-                <p id="newBldgFileName"><strong>Click to browse</strong> or drag & drop</p>
+                <p id="newBldgFileName"><strong data-i18n="common.click_to_browse">Click to browse</strong><span data-i18n="common.or_drag_drop"> or drag &amp; drop</span></p>
             </div>
             <input type="file" id="newBldgFile" accept="image/*" style="display:none"
                 onchange="document.getElementById('newBldgFileName').innerHTML='<strong>'+this.files[0].name+'</strong>'">
         </div>
-        <p style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray);margin-bottom:10px">Pareto Anywhere / MQTT Settings</p>
+        <p style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray);margin-bottom:10px" data-i18n="settings.pareto_anywhere_mqtt_settings">Pareto Anywhere / MQTT Settings</p>
         <div class="form-group">
             <label data-i18n="labels.broker_websocket_url">Broker WebSocket URL</label>
             <input type="text" id="newBldgMqttUrl" data-i18n-placeholder="placeholders.wsspinplotmemqtt" placeholder="wss://pinplot.me/mqtt">
@@ -4416,23 +4416,23 @@ input.hive-range::-moz-range-track {
             </div>
             <!-- Custom features panel — shown only when role=custom -->
             <div id="auCustomPanel" style="display:none;margin-bottom:12px;padding:12px;background:var(--bg-card);border:1px solid var(--border-color);border-radius:8px">
-                <p style="font-size:12px;font-weight:600;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary)">Custom Feature Access</p>
+                <p style="font-size:12px;font-weight:600;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary)" data-i18n="auth.custom_feature_access">Custom Feature Access</p>
                 <div style="display:flex;flex-direction:column;gap:6px;font-size:13px">
-                    <p style="margin:0 0 4px;font-size:12px;color:var(--text-secondary)">Tracking</p>
+                    <p style="margin:0 0 4px;font-size:12px;color:var(--text-secondary)" data-i18n="nav.tracking">Tracking</p>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="livemap" class="au-feat"> Live Map</label>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="floorplan" class="au-feat"> Floor Plan</label>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="assets" class="au-feat"> Asset List</label>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="history" class="au-feat"> Movement History</label>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="history-advanced" class="au-feat"> Movement Analytics</label>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="hive" class="au-feat"> Hive Tracking</label>
-                    <p style="margin:4px 0 4px;font-size:12px;color:var(--text-secondary)">Management</p>
+                    <p style="margin:4px 0 4px;font-size:12px;color:var(--text-secondary)" data-i18n="general.management">Management</p>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="asset-mgmt" class="au-feat"> Asset Management</label>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="users" class="au-feat"> User Accounts</label>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="qr" class="au-feat"> QR / NFC Tags</label>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="building" class="au-feat"> Floor Plan Sketch</label>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="locations" class="au-feat"> Geofences</label>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="settings" class="au-feat"> Settings</label>
-                    <p style="margin:4px 0 4px;font-size:12px;color:var(--text-secondary)">Reports</p>
+                    <p style="margin:4px 0 4px;font-size:12px;color:var(--text-secondary)" data-i18n="reports.reports">Reports</p>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="reports-subscriptions" class="au-feat"> Tag Subscriptions</label>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="reports-activity" class="au-feat"> Asset Activity</label>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="reports-trips" class="au-feat"> Journey Log</label>
@@ -4548,23 +4548,23 @@ input.hive-range::-moz-range-track {
             </select>
         </div>
         <div id="erCustomPanel" style="display:none;margin-bottom:12px;padding:12px;background:var(--bg-card);border:1px solid var(--border-color);border-radius:8px">
-            <p style="font-size:12px;font-weight:600;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary)">Custom Feature Access</p>
+            <p style="font-size:12px;font-weight:600;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary)" data-i18n="auth.custom_feature_access">Custom Feature Access</p>
             <div style="display:flex;flex-direction:column;gap:6px;font-size:13px">
-                <p style="margin:0 0 4px;font-size:12px;color:var(--text-secondary)">Tracking</p>
+                <p style="margin:0 0 4px;font-size:12px;color:var(--text-secondary)" data-i18n="nav.tracking">Tracking</p>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="livemap" class="er-feat"> Live Map</label>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="floorplan" class="er-feat"> Floor Plan</label>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="assets" class="er-feat"> Asset List</label>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="history" class="er-feat"> Movement History</label>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="history-advanced" class="er-feat"> Movement Analytics</label>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="hive" class="er-feat"> Hive Tracking</label>
-                <p style="margin:4px 0 4px;font-size:12px;color:var(--text-secondary)">Management</p>
+                <p style="margin:4px 0 4px;font-size:12px;color:var(--text-secondary)" data-i18n="general.management">Management</p>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="asset-mgmt" class="er-feat"> Asset Management</label>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="users" class="er-feat"> User Accounts</label>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="qr" class="er-feat"> QR / NFC Tags</label>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="building" class="er-feat"> Floor Plan Sketch</label>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="locations" class="er-feat"> Geofences</label>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="settings" class="er-feat"> Settings</label>
-                <p style="margin:4px 0 4px;font-size:12px;color:var(--text-secondary)">Reports</p>
+                <p style="margin:4px 0 4px;font-size:12px;color:var(--text-secondary)" data-i18n="reports.reports">Reports</p>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="reports-subscriptions" class="er-feat"> Tag Subscriptions</label>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="reports-activity" class="er-feat"> Asset Activity</label>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="reports-trips" class="er-feat"> Journey Log</label>
@@ -11020,14 +11020,14 @@ function _lmBuildAssetPopup(asset) {
             <b style="font-size:14px">${esc(asset.name || asset.id)}</b>
             <div style="font-size:11px;color:#888;font-family:monospace;margin:4px 0 8px">${esc(asset.id)}</div>
             <table style="font-size:12px;width:100%">
-                <tr><td style="color:#888">Type</td><td style="text-align:right">${type}</td></tr>
-                <tr><td style="color:#888">GPS accuracy</td><td style="text-align:right">${acc}</td></tr>
-                <tr><td style="color:#888">Total scans</td><td style="text-align:right">${asset.scan_count || '-'}</td></tr>
-                <tr><td style="color:#888">Last seen</td><td style="text-align:right">${seen}</td></tr>
+                <tr><td style="color:#888">${t('common.type', 'Type')}</td><td style="text-align:right">${type}</td></tr>
+                <tr><td style="color:#888">${t('assets.gps_accuracy', 'GPS accuracy')}</td><td style="text-align:right">${acc}</td></tr>
+                <tr><td style="color:#888">${t('assets.total_scans', 'Total scans')}</td><td style="text-align:right">${asset.scan_count || '-'}</td></tr>
+                <tr><td style="color:#888">${t('assets.last_seen', 'Last seen')}</td><td style="text-align:right">${seen}</td></tr>
             </table>
             <a href="/api/assets/${esc(asset.id)}/history" 
                style="display:block;margin-top:10px;font-size:12px;color:#006400;text-align:center;padding:5px;background:#e6f2e6;border-radius:5px;text-decoration:none"
-               target="_blank">View scan history</a>
+               target="_blank">${t('trips.view_scan_history', 'View scan history')}</a>
         </div>
     `;
 }
@@ -11195,7 +11195,7 @@ function _lmRenderList(query) {
     });
     const container = document.getElementById('lm-asset-list');
     if (!list.length) {
-        container.innerHTML = `<div class="empty-list"><i class="fa-solid fa-magnifying-glass"></i><p>No assets found</p></div>`;
+        container.innerHTML = `<div class="empty-list"><i class="fa-solid fa-magnifying-glass"></i><p>${t('assets.no_assets_found', 'No assets found')}</p></div>`;
         return;
     }
     container.innerHTML = list.map(t => {
@@ -12063,13 +12063,13 @@ function amRenderCards() {
         const hasPkg   = !!t.package_id;
         const pkgHtml  = hasPkg
             ? `<span>${esc(t.package_name || 'Unknown')}</span>`
-            : `<span style="color:var(--danger);font-weight:600"><i class="fa-solid fa-circle-exclamation" style="margin-right:3px"></i>No Package</span>`;
+            : `<span style="color:var(--danger);font-weight:600"><i class="fa-solid fa-circle-exclamation" style="margin-right:3px"></i>${t('assets.no_package', 'No Package')}</span>`;
         const tagType  = _tagTypeLabel(t.tag_type);
         const tagTypeColor = tagType === 'Series 1' ? 'var(--primary)' : tagType === 'Series 2' ? 'var(--warning,#f59e0b)' : 'var(--text-3)';
         const lastSeen = t.last_seen ? new Date(t.last_seen).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
         const expiryDate = t.expiry_date ? new Date(t.expiry_date).toLocaleDateString([], {day:'2-digit',month:'short',year:'numeric'}) : null;
         const daysLeft = t.days_remaining != null
-            ? (t.days_remaining > 0 ? `${t.days_remaining} days left` : t.days_remaining === 0 ? 'Expires today' : 'Expired')
+            ? (t.days_remaining > 0 ? `${t.days_remaining} ${t('common.days', 'days')} ${t('common.left', 'left')}` : t.days_remaining === 0 ? t('assets.expires_today', 'Expires today') : t('assets.expired', 'Expired'))
             : null;
         const daysColor= t.days_remaining != null
             ? (t.days_remaining > 30 ? 'var(--success)' : t.days_remaining > 7 ? 'var(--warning)' : 'var(--danger)')
@@ -12107,13 +12107,13 @@ function amRenderCards() {
             </div>
             <div class="asset-card-footer">
                 <button class="btn btn-ghost btn-sm" onclick="openTagMgmtModal('edit','${esc(t.imei)}')">
-                    <i class="fa-solid fa-pen"></i> Edit
+                    <i class="fa-solid fa-pen"></i> ${t('common.edit', 'Edit')}
                 </button>
                 ${t.latitude && t.longitude ? `<button class="btn btn-ghost btn-sm" onclick="switchTab('livemap');setTimeout(()=>lmSelectFromList('${esc(t.imei)}'),600)">
-                    <i class="fa-solid fa-map-pin"></i> Map
+                    <i class="fa-solid fa-map-pin"></i> ${t('map.map', 'Map')}
                 </button>` : ''}
                 <button class="btn btn-ghost btn-sm" onclick="lmOpenHistory('${esc(t.imei)}')">
-                    <i class="fa-solid fa-route"></i> History
+                    <i class="fa-solid fa-route"></i> ${t('trips.history', 'History')}
                 </button>
                 <button class="btn btn-ghost btn-sm btn-danger-ghost" onclick="deleteTag('${esc(t.id)}','${esc(t.imei)}')" data-i18n-title="tooltips.delete_tag" title="Delete tag">
                     <i class="fa-solid fa-trash"></i>
@@ -12155,7 +12155,7 @@ function openAmBulk() {
     document.getElementById('am-bulk-progress').classList.remove('open');
     document.getElementById('am-bulk-result').style.display = 'none';
     document.getElementById('am-bulk-upload-btn').disabled = true;
-    document.getElementById('am-bulk-upload-btn').textContent = 'Import 0 tags';
+    document.getElementById('am-bulk-upload-btn').textContent = t('assets.import_0_tags', 'Import 0 tags');
     document.getElementById('am-dropzone').classList.remove('drag');
     _amBulkPreview = []; _bulkRows = [];
     m.style.display = 'flex';
@@ -12439,7 +12439,7 @@ async function hiveLoadStats() {
 // ── list ──────────────────────────────────────────────────────────────────────
 async function hiveLoadList() {
     const grid = document.getElementById('hive-card-grid');
-    grid.innerHTML = '<div class="hive-empty"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</div>';
+    grid.innerHTML = `<div class="hive-empty"><i class="fa-solid fa-spinner fa-spin"></i> ${t('common.loading', 'Loading...')}</div>`;
     const r = await apiFetch('/api/portal/hive').catch(() => null);
     if (!r || !r.ok) { grid.innerHTML = '<div class="hive-empty" data-i18n="text.failed_to_load_hives">Failed to load hives</div>'; return; }
     const hives = await r.json();
@@ -13059,7 +13059,7 @@ async function hiveLoadArchive() {
 function hiveRenderArchive(hives) {
     const grid = document.getElementById('hive-archive-grid');
     if (!hives.length) {
-        grid.innerHTML = '<div class="hive-empty"><i class="fa-solid fa-box-archive" style="font-size:32px;display:block;margin-bottom:12px;opacity:.3"></i>No archived hives</div>';
+        grid.innerHTML = `<div class="hive-empty"><i class="fa-solid fa-box-archive" style="font-size:32px;display:block;margin-bottom:12px;opacity:.3"></i>${t('hive.no_archived_hives', 'No archived hives')}</div>`;
         return;
     }
     grid.innerHTML = hives.map(h => {
@@ -13094,8 +13094,8 @@ function hiveRenderArchive(hives) {
                and require too many cross-checks to repopulate safely. Users
                should recreate from an active hive (Lifecycle panel) instead. -->
           <div class="hive-card-actions" style="grid-template-columns:1fr 1fr">
-            <button onclick="hiveOpenDetail('${hid}')"><i class="fa-solid fa-clock-rotate-left"></i> History</button>
-            <button class="hive-delete" onclick="hivePurge('${hid}','${hiveEsc(h.name)}')"><i class="fa-solid fa-trash"></i> Purge</button>
+            <button onclick="hiveOpenDetail('${hid}')"><i class="fa-solid fa-clock-rotate-left"></i> ${t('trips.history', 'History')}</button>
+            <button class="hive-delete" onclick="hivePurge('${hid}','${hiveEsc(h.name)}')"><i class="fa-solid fa-trash"></i> ${t('hive.purge', 'Purge')}</button>
           </div>
         </div>`;
     }).join('');
@@ -14660,8 +14660,8 @@ function mhaOpenHelp() {
     
     // Update UI
     mhaRenderAssetList();
-    document.getElementById('mha-map-meta').textContent = 
-      `${esc(asset.description || asset.device_name || imei)} - Loading journeys...`;
+        document.getElementById('mha-map-meta').textContent =
+            `${esc(asset.description || asset.device_name || imei)} - ${t('trips.loading_journeys', 'Loading journeys...')}`;
     
     // Phase 5.5: Load journeys
     await mhaLoadJourneys(imei);
@@ -14678,7 +14678,7 @@ function mhaOpenHelp() {
     journeysBody.innerHTML = `
       <div style="text-align:center;padding:40px 16px;color:var(--text-3);">
         <i class="fa-solid fa-spinner fa-spin" style="font-size:32px;margin-bottom:12px;display:block;"></i>
-        Loading journeys...
+        ${t('trips.loading_journeys', 'Loading journeys...')}
       </div>`;
     
     try {
@@ -14717,15 +14717,15 @@ function mhaOpenHelp() {
         journeysBody.innerHTML = `
           <div class="mha-jp-placeholder">
             <i class="fa-solid fa-route"></i>
-            <p>No journeys found<br><small>${rangeLabel}</small></p>
+            <p>${t('trips.no_journeys_found', 'No journeys found')}<br><small>${rangeLabel}</small></p>
           </div>`;
-        document.getElementById('mha-map-meta').textContent = `No journeys (${rangeLabel})`;
+        document.getElementById('mha-map-meta').textContent = `${t('trips.no_journeys_found', 'No journeys found')} (${rangeLabel})`;
         return;
       }
       
       mhaRenderJourneys(data.journeys);
       document.getElementById('mha-map-meta').textContent = 
-        `${data.total} journey${data.total !== 1 ? 's' : ''} (${rangeLabel})`;
+        `${data.total} ${data.total === 1 ? t('trips.journey', 'journey') : t('trips.journeys', 'journeys')} (${rangeLabel})`;
     } catch (err) {
       console.error('[MHA] Error loading journeys:', err);
       journeysBody.innerHTML = `
@@ -15206,7 +15206,7 @@ function mhaOpenHelp() {
           zIndexOffset: 1000
         }).addTo(_mhaMap);
         
-        startMarker.bindPopup(`<b>Start</b><br>${new Date(firstLeg.started_at).toLocaleString()}`);
+        startMarker.bindPopup(`<b>${t('trips.start', 'Start')}</b><br>${new Date(firstLeg.started_at).toLocaleString()}`);
         _mhaJourneyLayers.push(startMarker);
         bounds.push([startLat, startLng]);
       }
@@ -15255,7 +15255,7 @@ function mhaOpenHelp() {
               }
             ).addTo(_mhaMap);
             
-            airLegLine.bindPopup(`<b>Air Leg</b><br>Distance: ${fmtDistance(leg.distance_m)}<br>Duration: ${mhaFormatDuration(leg.duration_seconds)}<br>✈ Flight<br>Great-circle path (path unknown)`);
+            airLegLine.bindPopup(`<b>${t('trips.air_leg', 'Air Leg')}</b><br>${t('trips.distance', 'Distance')}: ${fmtDistance(leg.distance_m)}<br>${t('trips.duration', 'Duration')}: ${mhaFormatDuration(leg.duration_seconds)}<br>✈ ${t('trips.flight', 'Flight')}<br>${t('trips.path_unknown', 'Great-circle path (path unknown)')}`);
             _mhaJourneyLayers.push(airLegLine);
             
             // Add Flight pill at great-circle midpoint
@@ -15270,7 +15270,7 @@ function mhaOpenHelp() {
               zIndexOffset: 1000
             }).addTo(_mhaMap);
             
-            flightPill.bindPopup(`<b>Air Leg</b><br>Distance: ${fmtDistance(leg.distance_m)}<br>Duration: ${mhaFormatDuration(leg.duration_seconds)}<br>Great-circle path (path unknown)`);
+            flightPill.bindPopup(`<b>${t('trips.air_leg', 'Air Leg')}</b><br>${t('trips.distance', 'Distance')}: ${fmtDistance(leg.distance_m)}<br>${t('trips.duration', 'Duration')}: ${mhaFormatDuration(leg.duration_seconds)}<br>${t('trips.path_unknown', 'Great-circle path (path unknown)')}`);
             _mhaJourneyLayers.push(flightPill);
             
             // Add arc endpoints to bounds
@@ -15336,7 +15336,7 @@ function mhaOpenHelp() {
           }
         ).addTo(_mhaMap);
         
-        journeyLine.bindPopup(`<b>Journey Path</b><br>Total Distance: ${fmtDistance(totalDistance)}<br>Positions: ${allJourneyCoordinates.length}`);
+        journeyLine.bindPopup(`<b>${t('trips.journey_path', 'Journey Path')}</b><br>${t('trips.total_distance', 'Total Distance')}: ${fmtDistance(totalDistance)}<br>${t('trips.positions', 'Positions')}: ${allJourneyCoordinates.length}`);
         _mhaJourneyLayers.push(journeyLine);
         
         console.log(`[MHA] Drew continuous journey line with ${allJourneyCoordinates.length} total positions`);
