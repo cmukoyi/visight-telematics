@@ -4117,7 +4117,7 @@ input.hive-range::-moz-range-track {
               ════════════════════════════════════════ -->
               <div id="hive-screen-archive" style="display:none">
                 <div class="hive-page-header">
-                  <div class="hive-page-title"><i class="fa-solid fa-box-archive"></i> Archive</div>
+                  <div class="hive-page-title"><i class="fa-solid fa-box-archive"></i> <span data-i18n="hive.archive">Archive</span></div>
                   <div class="hive-search-box">
                     <i class="fa-solid fa-magnifying-glass"></i>
                     <input type="text" data-i18n-placeholder="placeholders.search_archived_hives" placeholder="Search archived hives…" oninput="_hiveFilterArchiveD(this.value)">
@@ -4125,7 +4125,7 @@ input.hive-range::-moz-range-track {
                 </div>
                 <div class="hive-info-strip">
                   <i class="fa-solid fa-circle-info"></i>
-                  <div>Archived hives are <strong>read-only</strong>. Tags have been released and are available for new hives. Permanently purge to remove all data.</div>
+                  <div data-i18n="hive.archived_hives_read_only">Archived hives are read-only. Tags have been released and are available for new hives. Permanently purge to remove all data.</div>
                 </div>
                 <div id="hive-archive-err" class="alert" style="display:none"><span id="hive-archive-err-text"></span></div>
                 <div id="hive-archive-grid" class="hive-grid">
@@ -4146,7 +4146,7 @@ input.hive-range::-moz-range-track {
 <div id="hiveConfigModal" class="modal">
     <div class="modal-content" style="max-width:520px">
         <div class="modal-header">
-            <h3><i class="fa-solid fa-sliders" style="margin-right:8px;color:var(--primary)"></i>Hive Configuration</h3>
+            <h3><i class="fa-solid fa-sliders" style="margin-right:8px;color:var(--primary)"></i><span data-i18n="hive.configuration">Hive Configuration</span></h3>
             <button class="modal-close" onclick="hiveCloseConfigModal()">&times;</button>
         </div>
         <div class="modal-body">
@@ -4459,12 +4459,12 @@ input.hive-range::-moz-range-track {
         <div id="categoryModalAlert" class="alert" style="display:none"><span id="categoryModalAlertText"></span></div>
         <form id="categoryForm" onsubmit="submitCategoryForm(event)">
             <div class="form-group">
-                <label>Category Name *</label>
+                <label data-i18n="assets.category_name_required">Category Name *</label>
                 <input type="text" id="catName" data-i18n-placeholder="placeholders.eg_vehicles" placeholder="e.g. Vehicles" required maxlength="100">
             </div>
             <div style="display:flex;gap:12px">
                 <div class="form-group" style="flex:1">
-                    <label>Icon <span style="color:var(--gray);font-weight:400">(FA class)</span></label>
+                    <label><span data-i18n="assets.icon">Icon</span> <span style="color:var(--gray);font-weight:400" data-i18n="assets.fa_class">(FA class)</span></label>
                     <input type="text" id="catIcon" data-i18n-placeholder="placeholders.facar" placeholder="fa-car">
                     <p style="font-size:12px;color:var(--gray);margin-top:4px">e.g. fa-car, fa-truck, fa-box, fa-person</p>
                 </div>
@@ -7438,8 +7438,8 @@ function _rptGeoRenderRows(rows) {
     }
     tbody.innerHTML = rows.map(e => {
         const evBadge = e.event_type === 'entry'
-            ? '<span class="rpt-badge rpt-badge-active"><i class="fa-solid fa-arrow-right-to-bracket" style="margin-right:4px;font-size:10px"></i>Entry</span>'
-            : '<span class="rpt-badge rpt-badge-expiring"><i class="fa-solid fa-arrow-right-from-bracket" style="margin-right:4px;font-size:10px"></i>Exit</span>';
+            ? `<span class="rpt-badge rpt-badge-active"><i class="fa-solid fa-arrow-right-to-bracket" style="margin-right:4px;font-size:10px"></i>${t('reports.entry_event', 'Entry')}</span>`
+            : `<span class="rpt-badge rpt-badge-expiring"><i class="fa-solid fa-arrow-right-from-bracket" style="margin-right:4px;font-size:10px"></i>${t('reports.exit_event', 'Exit')}</span>`;
         return `<tr>
             <td style="white-space:nowrap;font-size:12px">${e.created_at ? _rptFmtDateTime(e.created_at) : '—'}</td>
             <td>${esc(e.tag_label)}<br><span style="font-size:11px;color:var(--text-3);font-family:monospace">${esc(e.tag_imei)}</span></td>
@@ -9215,7 +9215,7 @@ function renderCategoriesList() {
     if (!_categoriesCache.length) {
         el.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text-3)">
             <i class="fa-solid fa-layer-group" style="font-size:40px;opacity:.2;display:block;margin-bottom:12px"></i>
-            <p>No categories yet. Click <strong>Add Category</strong> to get started.</p></div>`;
+            <p>${t('assets.no_categories_yet', 'No categories yet.')} ${t('assets.click_add_category_to_start', 'Click Add Category to get started.')}</p></div>`;
         return;
     }
     el.innerHTML = `<div class="cat-grid">${_categoriesCache.map(c => {
