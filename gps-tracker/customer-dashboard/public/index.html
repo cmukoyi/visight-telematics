@@ -2721,11 +2721,11 @@ input.hive-range::-moz-range-track {
                         <div class="settings-section-header">
                             <i class="fa-solid fa-layer-group" style="color:var(--primary)"></i>
                             <div>
-                                <h3>Asset Categories</h3>
-                                <p>Define categories (e.g. Vehicles, Equipment, Containers) that can be assigned to assets when adding or editing tags.</p>
+                                <h3 data-i18n="assets.asset_categories">Asset Categories</h3>
+                                <p data-i18n="assets.define_categories_eg_vehicles_equipment_containers">Define categories (e.g. Vehicles, Equipment, Containers) that can be assigned to assets when adding or editing tags.</p>
                             </div>
                             <button class="btn btn-primary btn-small header-action" onclick="openAddCategoryModal()">
-                                <i class="fa-solid fa-plus"></i> Add Category
+                                <i class="fa-solid fa-plus"></i> <span data-i18n="buttons.add_category">Add Category</span>
                             </button>
                         </div>
                         <div id="categoriesAlert" class="alert" style="display:none"><span id="categoriesAlertText"></span></div>
@@ -4067,7 +4067,7 @@ input.hive-range::-moz-range-track {
                         </div>
                         <div class="hive-lifecycle-bar"><div id="hive-days-bar" class="hive-lifecycle-bar-fill" style="width:100%"></div></div>
                         <div id="hive-expires-text" style="font-size:13px;color:var(--text-2);line-height:1.5;margin-bottom:14px"></div>
-                        <button class="hive-btn" style="width:100%;justify-content:center" onclick="hiveRecreate()"><i class="fa-solid fa-rotate-right"></i> Recreate Hive</button>
+                        <button class="hive-btn" style="width:100%;justify-content:center" onclick="hiveRecreate()"><i class="fa-solid fa-rotate-right"></i> <span data-i18n="buttons.recreate_hive">Recreate Hive</span></button>
                       </div>
                     </div>
                     <div class="hive-panel">
@@ -4093,11 +4093,11 @@ input.hive-range::-moz-range-track {
                   <!-- express card (shown when suggestion confidence is high) -->
                   <div id="hive-express-card" class="hive-express-card" style="display:none">
                     <div class="hive-express-tag" data-i18n="text.high_confidence">High Confidence</div>
-                    <div class="hive-express-title"><i class="fa-solid fa-wand-magic-sparkles"></i> We've picked sensible settings for you</div>
+                    <div class="hive-express-title"><i class="fa-solid fa-wand-magic-sparkles"></i> <span data-i18n="hive.suggested_settings_message">We've picked sensible settings for you</span></div>
                     <div id="hive-express-desc" class="hive-express-desc"></div>
                     <div id="hive-express-summary" class="hive-express-summary"></div>
                     <div class="hive-btn-row">
-                      <button class="hive-btn" onclick="hiveWizUseSuggested()"><i class="fa-solid fa-bolt"></i> Use Suggested Settings</button>
+                      <button class="hive-btn" onclick="hiveWizUseSuggested()"><i class="fa-solid fa-bolt"></i> <span data-i18n="buttons.use_suggested_settings">Use Suggested Settings</span></button>
                       <button class="hive-btn hive-btn-ghost" onclick="hiveWizDismissExpress()"><span data-i18n="buttons.review_settings">Review Settings</span></button>
                     </div>
                   </div>
@@ -4106,8 +4106,8 @@ input.hive-range::-moz-range-track {
                   <div id="hive-wiz-stepmeta" class="hive-wizard-step-meta"></div>
                   <div id="hive-wiz-step-content"></div>
                   <div class="hive-wizard-foot">
-                    <button class="hive-btn hive-btn-ghost" id="hive-wiz-back-btn" onclick="hiveWizStep(hiveWizState.step-1)"><i class="fa-solid fa-arrow-left"></i> Back</button>
-                    <button class="hive-btn" id="hive-wiz-next-btn" onclick="hiveWizNext()">Continue <i class="fa-solid fa-arrow-right"></i></button>
+                    <button class="hive-btn hive-btn-ghost" id="hive-wiz-back-btn" onclick="hiveWizStep(hiveWizState.step-1)"><i class="fa-solid fa-arrow-left"></i> <span data-i18n="common.back">Back</span></button>
+                    <button class="hive-btn" id="hive-wiz-next-btn" onclick="hiveWizNext()"><span data-i18n="common.continue">Continue</span> <i class="fa-solid fa-arrow-right"></i></button>
                   </div>
                 </div>
               </div>
@@ -4494,20 +4494,20 @@ input.hive-range::-moz-range-track {
             <div class="loc-dropzone" id="am-dropzone">
                 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 <div class="loc-dropzone-title" data-i18n="asset_mgmt.drop_file_hint">Drop your file here, or click to browse</div>
-                <div class="loc-dropzone-sub">.xlsx or .csv — columns: imei, owner_email (optional), description, tag_type</div>
+                <div class="loc-dropzone-sub" data-i18n="asset_mgmt.bulk_upload_columns">.xlsx or .csv — columns: imei, owner_email (optional), description, tag_type</div>
                 <input type="file" id="am-bulk-file" accept=".xlsx,.xls,.csv" style="display:none">
             </div>
             <div style="margin-top:10px;padding:8px 12px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:var(--radius);font-size:12px;color:var(--text-2)">
                 <i class="fa-solid fa-triangle-exclamation" style="color:var(--warning,#f59e0b);margin-right:6px"></i>
-                <strong>Use the Excel template</strong> — plain CSV may corrupt long IMEI numbers (15+ digits).
+                <strong data-i18n="asset_mgmt.use_excel_template">Use the Excel template</strong><span data-i18n="asset_mgmt.csv_imei_warning"> — plain CSV may corrupt long IMEI numbers (15+ digits).</span>
             </div>
             <div class="loc-template-banner" style="margin-top:10px">
                 <div class="loc-template-banner-icon"><i class="fa-solid fa-table"></i></div>
                 <div class="loc-template-banner-text">
-                    <div class="loc-template-banner-title">Need a template?</div>
+                    <div class="loc-template-banner-title" data-i18n="geofences.need_template">Need a template?</div>
                     <div class="loc-template-banner-sub" data-i18n="asset_mgmt.download_template">Download the Excel template with correct column headers and example rows.</div>
                 </div>
-                <button class="btn btn-ghost btn-sm" id="am-bulk-template-btn"><i class="fa-solid fa-download"></i> Template</button>
+                <button class="btn btn-ghost btn-sm" id="am-bulk-template-btn"><i class="fa-solid fa-download"></i> <span data-i18n="common.template">Template</span></button>
             </div>
             <div class="loc-preview-wrap" id="am-preview-wrap">
                 <table class="loc-preview-table">
@@ -5217,7 +5217,7 @@ function handleLogout() {
     // modal was either invisible or off-screen on some viewports and the
     // logout button silently did nothing.
     const brandName = (window.APP_BRANDING && window.APP_BRANDING.name) || 'PinPlot';
-    if (!window.confirm(`Are you sure you want to sign out of ${brandName}?`)) return;
+    if (!tConfirm('confirm.sign_out_of_brand', `Are you sure you want to sign out of ${brandName}?`)) return;
     try { closeAvatarMenu(); } catch (_) {}
     try { _stopBackgroundPollers(); } catch (_) {}
     try { clearSession(); } catch (_) {}
@@ -5803,7 +5803,7 @@ async function deleteSelectedTags() {
     const checked = [...document.querySelectorAll('.tag-row-cb:checked')];
     if (!checked.length) return;
     const tagIds = checked.map(cb => cb.dataset.tagId);
-    if (!confirm(`Permanently delete ${tagIds.length} tag(s)? This cannot be undone.`)) return;
+    if (!tConfirm('confirm.delete_selected_tags', `Permanently delete ${tagIds.length} tag(s)? This cannot be undone.`)) return;
 
     const alertEl  = document.getElementById('tagsAlert');
     const alertTxt = document.getElementById('tagsAlertText');
@@ -10479,23 +10479,23 @@ async function submitEditRole() {
         document.getElementById('erAlertText').textContent = err.message;
         al.className = 'alert alert-error'; al.style.display = 'flex';
     } finally {
-        btn.disabled = false; btn.textContent = 'Save Role';
+        btn.disabled = false; btn.textContent = t('auth.save_role', 'Save Role');
     }
 }
 
 // ── System Admin: reset another user's password ───────────────────────────
 async function sysAdminResetPassword(userId, userEmail, userName) {
-    if (!confirm(`Reset password for ${userName} (${userEmail})?\n\nA new temporary password will be generated and shown once.`)) return;
+    if (!tConfirm('confirm.reset_password_for_user', `Reset password for ${userName} (${userEmail})?\n\nA new temporary password will be generated and shown once.`)) return;
     try {
         const res = await apiFetch(`/api/portal/users/${userId}/reset-password`, { method: 'POST' });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.detail || 'Failed to reset password');
         // Show the temp password in a copyable prompt-style modal-less alert
-        const msg = `Password reset for ${data.email}\n\nTemporary password:\n\n    ${data.temp_password}\n\nCopy and share with the user — it will not be shown again.`;
+        const msg = t('auth.password_reset_share_message', `Password reset for ${data.email}\n\nTemporary password:\n\n    ${data.temp_password}\n\nCopy and share with the user — it will not be shown again.`);
         // Use a simple textarea prompt so it's selectable
         window.prompt(msg, data.temp_password);
     } catch (err) {
-        alert('Reset failed: ' + err.message);
+        tAlert('alerts.reset_failed', `${t('common.error', 'Error')}: ${err.message}`);
     }
 }
 
@@ -12124,7 +12124,7 @@ function amRenderCards() {
 }
 
 async function deleteTag(tagId, imei) {
-    if (!confirm(`Delete tag ${imei}? This cannot be undone.`)) return;
+    if (!tConfirm('confirm.delete_tag', `Delete tag ${imei}? This cannot be undone.`)) return;
     try {
         const res = await apiFetch(`/api/portal/tags/${tagId}`, { method: 'DELETE' });
         if (res.status === 204 || res.ok) {
@@ -12133,10 +12133,10 @@ async function deleteTag(tagId, imei) {
             alRenderTable();
         } else {
             const d = await res.json().catch(() => ({}));
-            alert(d.detail || 'Failed to delete tag');
+            tAlert('alerts.delete_tag_failed', d.detail || t('alerts.delete_tag_failed', 'Failed to delete tag'));
         }
     } catch (err) {
-        alert('Error: ' + err.message);
+        tAlert('common.error', `${t('common.error', 'Error')}: ${err.message}`);
     }
 }
 

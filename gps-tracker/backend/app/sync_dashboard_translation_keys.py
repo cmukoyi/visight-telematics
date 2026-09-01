@@ -21,16 +21,26 @@ MARKER_PATTERN = re.compile(
     r'<(?P<tag>[a-zA-Z][^>]*?)\sdata-i18n(?P<kind>-placeholder|-title)?="(?P<key>[^"]+)"(?P<tail>[^>]*)>(?P<text>.*?)</[^>]+>',
     re.DOTALL,
 )
+RUNTIME_CALL_PATTERN = re.compile(
+    r"\bt(?:Alert|Confirm|Prompt)?\(\s*['\"](?P<key>[a-z][a-z0-9_.]+)['\"]\s*,\s*['\"](?P<text>(?:\\.|[^'\"])*)['\"]"
+)
 ATTRIBUTE_PATTERN = re.compile(r'\b(?P<name>placeholder|title)="(?P<value>[^"]*)"')
 TAG_PATTERN = re.compile(r"<[^>]+>")
 EXPLICIT_DEFAULTS = {
+    "alerts.delete_tag_failed": ("Failed to delete tag", "Customer dashboard alert"),
+    "alerts.reset_failed": ("Reset failed", "Customer dashboard alert"),
     "common.beta": ("Beta", "Customer dashboard UI"),
+    "confirm.delete_selected_tags": ("Permanently delete selected tags? This cannot be undone.", "Customer dashboard confirmation"),
+    "confirm.delete_tag": ("Delete tag? This cannot be undone.", "Customer dashboard confirmation"),
+    "confirm.reset_password_for_user": ("Reset password for user? A new temporary password will be generated and shown once.", "Customer dashboard confirmation"),
+    "confirm.sign_out_of_brand": ("Are you sure you want to sign out?", "Customer dashboard confirmation"),
     "floor_plan.address_optional": ("Address (optional)", "Customer dashboard placeholder"),
     "floor_plan.esp32_gateway_hint": ("ESP32S3 gateway MAC address", "Customer dashboard UI"),
     "floor_plan.floor_number": ("Floor number (0 = ground, 1 = first, -1 = basement)", "Customer dashboard placeholder"),
     "labels.gateway_name": ("Gateway Name", "Customer dashboard UI"),
     "tooltips.clear_all_plotted_alert_markers": ("Clear all plotted alert markers", "Customer dashboard title"),
     "tooltips.show_hide_geofences_on_the_map": ("Show / hide geofences on the map", "Customer dashboard title"),
+    "auth.password_reset_share_message": ("Password reset details", "Customer dashboard prompt"),
 }
 
 
@@ -55,6 +65,10 @@ def extract_defaults(content: str) -> dict[str, tuple[str, str]]:
 
         if text and not text.startswith("${"):
             defaults.setdefault(key, (text, context))
+    for match in RUNTIME_CALL_PATTERN.finditer(content):
+        text = match.group("text").replace("\\n", "\n")
+        if text:
+            defaults.setdefault(match.group("key"), (text, "Customer dashboard runtime message"))
     defaults.update({key: value for key, value in EXPLICIT_DEFAULTS.items() if key not in defaults})
     return defaults
 
@@ -63,7 +77,8 @@ def main() -> None:
     content = dashboard_path().read_text(encoding="utf-8")
     defaults = extract_defaults(content)
     marker_keys = set(re.findall(r'data-i18n(?:-placeholder|-title)?="([^"]+)"', content))
-    missing_defaults = sorted(marker_keys - set(defaults))
+    runtime_keys = set(match.group("key") for match in RUNTIME_CALL_PATTERN.finditer(content))
+    missing_defaults = sorted(marker_keys | runtime_keys - set(defaults))
     if missing_defaults:
         raise RuntimeError(
             "Missing English defaults for dashboard i18n keys: " + ", ".join(missing_defaults)
