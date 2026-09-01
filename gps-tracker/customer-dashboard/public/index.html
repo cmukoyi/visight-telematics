@@ -5588,6 +5588,9 @@ function switchTab(name) {
         // Fall back to the first allowed tab, or livemap as default.
         name = _sf.includes('livemap') ? 'livemap' : (_sf[0] || 'livemap');
     }
+    if (name !== 'livemap' && typeof window.closeTemperatureGraph === 'function') {
+        window.closeTemperatureGraph();
+    }
     document.querySelectorAll('.tab-content').forEach(el => {
         el.classList.remove('active');
         el.style.display = 'none';
@@ -11344,6 +11347,10 @@ function lmClearAlertMarkers() {
 }
 
 function _lmSelectTag(imei) {
+    if (typeof window.closeTemperatureGraph === 'function' &&
+        window.isTemperatureGraphOpen?.() && window.getTemperatureGraphImei?.() !== imei) {
+        window.closeTemperatureGraph();
+    }
     _lmSelected = imei;
     document.querySelectorAll('#lm-asset-list .asset-row').forEach(r => r.classList.remove('selected'));
     const row = document.querySelector(`#lm-asset-list .asset-row[data-imei="${imei}"]`);
@@ -16674,6 +16681,17 @@ function mhaOpenHelp() {
         _tempGraphGaps = [];
         _zoomView = null;
     };
+
+    window.isTemperatureGraphOpen = () => _tempGraphOpen;
+    window.getTemperatureGraphImei = () => _tempGraphImei;
+
+    document.addEventListener('pointerdown', event => {
+        if (!_tempGraphOpen) return;
+        const panel = document.getElementById('temp-graph-panel');
+        if (panel && !panel.contains(event.target)) {
+            window.closeTemperatureGraph();
+        }
+    });
     
     function loadTemperatureRange(days) {
         console.log('[TEMP GRAPH] loadTemperatureRange called for', days, 'days');
