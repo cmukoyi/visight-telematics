@@ -9751,13 +9751,13 @@ async function renderGPSTags() {
 
     // ── Render tag list panel ──────────────────────────
     if (!tags.length) {
-        listEl.innerHTML = '<div class="alert alert-info">No tags in this group yet. Configure a domain in Settings and add tags.</div>';
+        listEl.innerHTML = `<div class="alert alert-info">${t('assets.no_tags_in_group', 'No tags in this group yet. Configure a domain in Settings and add tags.')}</div>`;
         return;
     }
 
     const legend = `<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:12px;font-size:12px;color:var(--gray)">
-        <span><span class="gps-dot gps-dot-normal" style="display:inline-block;margin-right:4px"></span>Normal</span>
-        <span><span class="gps-dot gps-dot-marked" style="display:inline-block;margin-right:4px"></span>Marked / Tracked</span>
+        <span><span class="gps-dot gps-dot-normal" style="display:inline-block;margin-right:4px"></span>${t('common.normal', 'Normal')}</span>
+        <span><span class="gps-dot gps-dot-marked" style="display:inline-block;margin-right:4px"></span>${t('assets.marked_tracked', 'Marked / Tracked')}</span>
         <span style="margin-left:auto;color:var(--gray)">${located.length} on map · ${unlocated.length} no GPS fix</span>
     </div>`;
 
@@ -9944,8 +9944,8 @@ async function _gpsSearchDuplicate_doNotCall() {
     }
 
     const legend = `<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:12px;font-size:12px;color:var(--gray)">
-        <span><span class="gps-dot gps-dot-normal" style="display:inline-block;margin-right:4px"></span>Normal</span>
-        <span><span class="gps-dot gps-dot-marked" style="display:inline-block;margin-right:4px"></span>Marked / Tracked</span>
+        <span><span class="gps-dot gps-dot-normal" style="display:inline-block;margin-right:4px"></span>${t('common.normal', 'Normal')}</span>
+        <span><span class="gps-dot gps-dot-marked" style="display:inline-block;margin-right:4px"></span>${t('assets.marked_tracked', 'Marked / Tracked')}</span>
         <span style="margin-left:auto;color:var(--gray)">${located.length} on map · ${unlocated.length} no GPS fix</span>
     </div>`;
 
@@ -11403,12 +11403,12 @@ function _lmRenderDetail(t) {
     const expiry    = t.expiry_date ? new Date(t.expiry_date).toLocaleDateString() : '—';
     const daysLeft  = t.package_id
         ? (t.days_remaining != null
-            ? (t.days_remaining > 0 ? `${t.days_remaining}d left` : t.days_remaining === 0 ? 'Today' : 'Expired')
+            ? (t.days_remaining > 0 ? `${t.days_remaining}d ${t('common.left', 'left')}` : t.days_remaining === 0 ? t('common.today', 'Today') : t('assets.expired', 'Expired'))
             : '—')
         : '—';
     const pkgHtml = t.package_id
         ? `<span>${esc(t.package_name || 'Unknown')}</span>`
-        : `<span style="color:var(--danger);font-weight:600"><i class="fa-solid fa-circle-exclamation" style="margin-right:3px"></i>No Package</span>`;
+        : `<span style="color:var(--danger);font-weight:600"><i class="fa-solid fa-circle-exclamation" style="margin-right:3px"></i>${t('assets.no_package', 'No Package')}</span>`;
     const expiryColor = !t.package_id ? 'var(--text-3)' : (t.days_remaining > 7 ? 'var(--success)' : 'var(--danger)');
     panel.innerHTML = `
         <div class="detail-header">
@@ -11579,14 +11579,14 @@ function alRenderTable() {
         const lastSeen = t.last_seen ? new Date(t.last_seen).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
         const pkgHtml = t.package_id
             ? `<span style="font-size:.78rem">${esc(t.package_name || 'Unknown')}</span>`
-            : `<span style="font-size:.78rem;color:var(--danger);font-weight:600"><i class="fa-solid fa-circle-exclamation" style="margin-right:3px"></i>No Package</span>`;
+            : `<span style="font-size:.78rem;color:var(--danger);font-weight:600"><i class="fa-solid fa-circle-exclamation" style="margin-right:3px"></i>${t('assets.no_package', 'No Package')}</span>`;
         const expiryDate = t.expiry_date ? new Date(t.expiry_date).toLocaleDateString([], {day:'2-digit',month:'short',year:'numeric'}) : null;
         const daysLeft = t.package_id
             ? (t.days_remaining != null
                 ? (t.days_remaining > 30 ? `<span style="color:var(--success);font-size:.78rem">${t.days_remaining}d<br><small style="color:var(--text-3)">${expiryDate}</small></span>`
                  : t.days_remaining > 7  ? `<span style="color:var(--warning);font-size:.78rem">${t.days_remaining}d<br><small style="color:var(--text-3)">${expiryDate}</small></span>`
                  : t.days_remaining >= 0 ? `<span style="color:var(--danger);font-size:.78rem">${t.days_remaining}d<br><small>${expiryDate}</small></span>`
-                 : `<span style="color:var(--danger);font-size:.78rem">Expired<br><small>${expiryDate}</small></span>`)
+                 : `<span style="color:var(--danger);font-size:.78rem">${t('assets.expired', 'Expired')}<br><small>${expiryDate}</small></span>`)
                 : '—')
             : `<span style="color:var(--danger);font-size:.78rem">—</span>`;
         return `<tr>
@@ -12244,7 +12244,7 @@ function _amHandleBulkFile(file) {
             if (!rows.length) throw new Error('No rows with an IMEI value found. Expected column header: imei (lowercase). Download the template for a correct example.');
             _amValidateBulkPreview(rows);
         } catch (err) {
-            resultEl.innerHTML = `<div class="alert alert-error"><strong>Could not parse file</strong><br><small>${esc(err.message)}</small></div>`;
+            resultEl.innerHTML = `<div class="alert alert-error"><strong>${t('errors.could_not_parse_file', 'Could not parse file')}</strong><br><small>${esc(err.message)}</small></div>`;
             resultEl.style.display = '';
         }
     };
@@ -12507,10 +12507,10 @@ function hiveCardHTML(h) {
         <span class="hive-expiry-days">${h.days_remaining != null ? h.days_remaining + ' days left' : ''}</span>
       </div>
       <div class="hive-card-actions">
-        <button onclick="event.stopPropagation();hiveOpenDetail('${hid}')"><i class="fa-solid fa-circle-info"></i> Detail</button>
-        <button onclick="event.stopPropagation();hiveOpenDetailMap('${hid}')"><i class="fa-solid fa-map-location-dot"></i> Map</button>
-        <button onclick="event.stopPropagation();hiveManualEval('${hid}')"><i class="fa-solid fa-rotate"></i> Eval</button>
-        <button class="hive-delete" onclick="event.stopPropagation();hiveArchive('${hid}','${hiveEsc(h.name)}')"><i class="fa-solid fa-trash"></i> Delete</button>
+        <button onclick="event.stopPropagation();hiveOpenDetail('${hid}')"><i class="fa-solid fa-circle-info"></i> ${t('common.details', 'Detail')}</button>
+        <button onclick="event.stopPropagation();hiveOpenDetailMap('${hid}')"><i class="fa-solid fa-map-location-dot"></i> ${t('map.map', 'Map')}</button>
+        <button onclick="event.stopPropagation();hiveManualEval('${hid}')"><i class="fa-solid fa-rotate"></i> ${t('hive.evaluate', 'Evaluate')}</button>
+        <button class="hive-delete" onclick="event.stopPropagation();hiveArchive('${hid}','${hiveEsc(h.name)}')"><i class="fa-solid fa-trash"></i> ${t('common.delete', 'Delete')}</button>
       </div>
     </div>`;
 }
@@ -12604,7 +12604,7 @@ function hiveRenderDetail(d) {
           <td class="hive-text-right"${isOut ? ' style="color:var(--hive-red);font-weight:600"' : ''}>${distText}</td>
           <td class="hive-text-right"><span class="hive-role-tag${isOut ? ' hive-outlier' : ''}">${isOut ? '<i class="fa-solid fa-triangle-exclamation"></i> outlier' : 'core'}</span></td>
         </tr>`;
-    }).join('') || '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-3)">No members</td></tr>';
+    }).join('') || `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-3)">${t('hive.no_members', 'No members')}</td></tr>`;
 
     // diameter
     const diam = d.current_diameter_m != null ? d.current_diameter_m : d.diameter_m;
@@ -12780,9 +12780,9 @@ function _hiveTimelineRender() {
     
     const remaining = total - shown;
     const more = remaining > 0
-        ? `<button type="button" onclick="hiveTimelineShowMore()" style="margin:10px auto 4px;padding:7px 14px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-2);font-size:12px;cursor:pointer;align-self:center">Show ${Math.min(HIVE_TIMELINE_PAGE_SIZE, remaining)} more <span style="color:var(--text-3);font-weight:400">(${remaining} remaining)</span></button>`
+        ? `<button type="button" onclick="hiveTimelineShowMore()" style="margin:10px auto 4px;padding:7px 14px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-2);font-size:12px;cursor:pointer;align-self:center">${t('hive.show_more', 'Show')} ${Math.min(HIVE_TIMELINE_PAGE_SIZE, remaining)} ${t('hive.more', 'more')} <span style="color:var(--text-3);font-weight:400">(${remaining} ${t('hive.remaining', 'remaining')})</span></button>`
         : (total > HIVE_TIMELINE_PAGE_SIZE
-            ? `<div style="text-align:center;font-size:11px;color:var(--text-3);padding:8px 0 2px">Showing all ${total} events</div>` : '');
+            ? `<div style="text-align:center;font-size:11px;color:var(--text-3);padding:8px 0 2px">${t('hive.showing_all', 'Showing all')} ${total} ${t('hive.events', 'events')}</div>` : '');
     el.innerHTML = rows + more;
 }
 
