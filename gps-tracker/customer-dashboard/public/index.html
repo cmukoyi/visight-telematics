@@ -16391,6 +16391,20 @@ function mhaOpenHelp() {
         }
         return gaps;
     }
+
+    // Insert null points at report gaps. Chart.js will not draw a phantom line
+    // through a null value when spanGaps is false.
+    function segmentPoints(points, thresholdMs, valueKey) {
+        const segmented = [];
+        for (let index = 0; index < points.length; index++) {
+            const point = points[index];
+            if (index > 0 && point.x - points[index - 1].x > thresholdMs) {
+                segmented.push({ x: points[index - 1].x + 1, y: null });
+            }
+            segmented.push({ x: point.x, y: point[valueKey] });
+        }
+        return segmented;
+    }
     
     // Helper: Format duration
     function formatDuration(ms) {
@@ -16509,6 +16523,18 @@ function mhaOpenHelp() {
                     ctx.stroke();
                 });
                 ctx.setLineDash([]);
+
+                const label = `No reports ${formatDuration(g.ms)}`;
+                ctx.font = '600 11px Inter, sans-serif';
+                const labelWidth = ctx.measureText(label).width + 12;
+                if (x2 - x1 >= labelWidth) {
+                    const labelX = (x1 + x2 - labelWidth) / 2;
+                    const labelY = chartArea.top + 8;
+                    ctx.fillStyle = 'rgba(15, 17, 23, 0.92)';
+                    ctx.fillRect(labelX, labelY, labelWidth, 21);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillText(label, labelX + 6, labelY + 14);
+                }
             });
             ctx.restore();
         }
@@ -16587,8 +16613,9 @@ function mhaOpenHelp() {
         _showAltitude = false;
         
         // Update UI
-        document.getElementById('temp-graph-tag-name').textContent = tagName || 'Temperature';
-        document.getElementById('temp-graph-meta').textContent = `${tag.tag_type || 'Tag'} · ${imei.substring(0, 8)}`;
+        const shortId = (tag.id || imei).toString().substring(0, 8);
+        document.getElementById('temp-graph-tag-name').textContent = `Last Known Temperature - ${tagName || 'Tag'} · ${shortId}`;
+        document.getElementById('temp-graph-meta').textContent = '';
         
         // Initialize presets and toggles
         initPresets();
@@ -16742,34 +16769,37 @@ function mhaOpenHelp() {
         const datasets = [
             {
                 label: 'Temperature (°C)',
-                data: points.map(p => ({x: p.x, y: p.temp})),
+                data: segmentPoints(points, GAP_THRESHOLD_MS, 'temp'),
                 borderColor: 'rgb(34, 197, 94)',
                 backgroundColor: 'rgba(34, 197, 94, 0.1)',
                 borderWidth: 2,
                 pointRadius: smoothOn ? 0 : 2,
                 tension: tension,
+                spanGaps: false,
                 yAxisID: 'y',
                 fill: true
             },
             {
                 label: 'Battery (%)',
-                data: points.map(p => ({x: p.x, y: p.batt})),
+                data: segmentPoints(points, GAP_THRESHOLD_MS, 'batt'),
                 borderColor: 'rgb(59, 130, 246)',
                 borderWidth: 1.5,
                 borderDash: [5,3],
                 pointRadius: 0,
                 tension: 0.2,
+                spanGaps: false,
                 hidden: !_showBattery,
                 yAxisID: 'y1'
             },
             {
                 label: 'Altitude (m)',
-                data: points.map(p => ({x: p.x, y: p.alt})),
+                data: segmentPoints(points, GAP_THRESHOLD_MS, 'alt'),
                 borderColor: 'rgb(245, 158, 11)',
                 borderWidth: 1.5,
                 borderDash: [2,3],
                 pointRadius: 0,
                 tension: 0.2,
+                spanGaps: false,
                 hidden: !_showAltitude,
                 yAxisID: 'y2'
             }
@@ -16809,13 +16839,16 @@ function mhaOpenHelp() {
                 },
                 scales: {
                     x: {
-                        type: 'time',
-                        time: {
-                            unit: _tempGraphDays <= 1 ? 'hour' : _tempGraphDays <= 7 ? 'day' : 'week',
-                            displayFormats: {hour: 'HH:mm', day: 'MMM d', week: 'MMM d'}
-                        },
+                        type: 'linear',
+                        min: points[0].x,
+                        max: points[points.length - 1].x,
                         grid: {color: 'rgba(0,0,0,0.05)'},
-                        ticks: {maxRotation: 0}
+                        ticks: {
+                            maxRotation: 0,
+                            callback: value => new Date(value).toLocaleString([], _tempGraphDays <= 1
+                                ? { hour: '2-digit', minute: '2-digit' }
+                                : { month: 'short', day: 'numeric' })
+                        }
                     },
                     y: {
                         position: 'left',
