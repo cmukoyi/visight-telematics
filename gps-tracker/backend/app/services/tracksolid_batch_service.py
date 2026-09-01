@@ -404,10 +404,9 @@ async def _update_device_states(db: Session, locations: list[dict]):
     # CRITICAL: Only create device_state for IMEIs that exist in ble_tags
     # This prevents creating 2000+ orphaned records for devices users never added
     valid_imeis = set(
-        db.query(BLETag.imei)
-        .filter(BLETag.imei.in_(imeis))
-        .scalar_subquery()
-        .all()
+        db.execute(
+            select(BLETag.imei).where(BLETag.imei.in_(imeis))
+        ).scalars().all()
     )
     
     skipped = len(imeis) - len(valid_imeis)
