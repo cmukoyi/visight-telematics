@@ -626,8 +626,69 @@ const QR_TRANSLATIONS = {
   "qr.single_nfc_tag": "Single NFC tag"
 };
 
+const QR_FRENCH_TRANSLATIONS = {
+  "qr.generator_title": "Générateur de codes QR",
+  "qr.create_scannable_codes": "Créez des codes scannables pour vos actifs",
+  "qr.content": "Contenu",
+  "qr.appearance": "Apparence",
+  "qr.preview": "Aperçu",
+  "qr.asset_qr": "QR actif",
+  "qr.nfc_tag": "Étiquette NFC",
+  "qr.quantity": "Quantité",
+  "qr.generated_asset_url": "URL d'actif générée",
+  "qr.generated_nfc_url": "URL d'étiquette NFC générée",
+  "qr.new_id": "Nouvel ID",
+  "qr.module_style": "Style des modules",
+  "qr.error_correction": "Correction d'erreur",
+  "qr.export_size": "Taille d'export",
+  "qr.centre_icon": "Icône centrale",
+  "qr.built_in": "Intégrée",
+  "qr.upload": "Importer",
+  "qr.icon_colour": "Couleur de l'icône",
+  "qr.icon_size": "Taille de l'icône",
+  "qr.qr_settings": "Paramètres QR",
+  "qr.colours": "Couleurs",
+  "qr.qr_colours": "Couleurs du QR",
+  "qr.foreground": "Premier plan",
+  "qr.background": "Arrière-plan",
+  "qr.corner_colours": "Couleurs des coins",
+  "qr.outer_ring": "Anneau extérieur",
+  "qr.inner_dot": "Point intérieur",
+  "qr.colour_presets": "Préréglages de couleurs",
+  "qr.frame": "Cadre",
+  "qr.label_text": "Texte de l'étiquette",
+  "qr.download_history": "Historique des téléchargements",
+  "qr.clear": "Effacer",
+  "qr.no_downloads": "Aucun téléchargement pour cette session",
+  "qr.register_asset": "Enregistrer cet actif ?",
+  "qr.asset_id": "ID de l'actif :",
+  "qr.type": "Type :",
+  "qr.cancel": "Annuler",
+  "qr.confirm_download": "Confirmer et télécharger",
+  "qr.square": "Carré",
+  "qr.rounded": "Arrondi",
+  "qr.dots": "Points",
+  "qr.none": "Aucun",
+  "qr.reset": "Réinitialiser",
+  "qr.copy_nfc_url": "Copier l'URL NFC",
+  "qr.generating": "Génération...",
+  "qr.single_qr_code": "Un seul code QR",
+  "qr.single_nfc_tag": "Une seule étiquette NFC",
+  "qr.pick_content": "Choisissez le type de contenu et générez un ID",
+  "qr.style_frame_icon": "Personnalisez les couleurs, le cadre et l'icône",
+  "qr.preview_download": "Prévisualisez et téléchargez",
+  "qr.content_description": "Choisissez le contenu du code. Le QR actif et NFC créent des liens de suivi ; IMEI/MAC encode un identifiant d'appareil en texte brut.",
+  "qr.asset_qr_description": "Une URL de suivi unique est générée automatiquement. Imprimez ce QR et collez-le sur un actif. Lorsqu'il est scanné avec un téléphone, il enregistre la position de l'actif sur votre carte.",
+  "qr.optional_logo": "logo facultatif au centre",
+  "qr.style_description": "Facultatif : les réglages par défaut (noir sur blanc, sans cadre) se scannent partout de manière fiable. Personnalisez seulement pour votre marque.",
+  "qr.live_preview": "L'aperçu se met à jour pendant vos modifications. Téléchargez lorsque vous êtes prêt."
+};
+
 function qrT(key, fallback) {
   try {
+    const parentService = window.parent?.TranslationService?.getInstance?.();
+    const language = parentService?.getCurrentLanguage?.() || 'en';
+    if (language === 'fr' && QR_FRENCH_TRANSLATIONS[key]) return QR_FRENCH_TRANSLATIONS[key];
     return window.parent !== window && typeof window.parent.t === 'function'
       ? window.parent.t(key, fallback)
       : fallback;
@@ -637,13 +698,24 @@ function qrT(key, fallback) {
 }
 
 function translateQrGenerator() {
-  const lookup = new Map(Object.entries(QR_TRANSLATIONS).map(([key, value]) => [value, key]));
+  const normalize = value => value.replace(/\s+/g, ' ').trim();
+  const lookup = new Map(Object.entries({
+    ...QR_TRANSLATIONS,
+    "qr.pick_content": "Pick content type & generate an ID",
+    "qr.style_frame_icon": "Style colours, frame & icon",
+    "qr.preview_download": "Preview & download",
+    "qr.content_description": "Choose what the code contains. Asset QR and NFC create tracking links; IMEI/MAC encodes a device identifier as plain text.",
+    "qr.asset_qr_description": "A unique tracking URL is generated automatically. Print this QR and stick it on an asset. When scanned with any phone camera, it records the asset's location on your tracking map.",
+    "qr.optional_logo": "optional logo in the middle",
+    "qr.style_description": "Optional — the defaults (black on white, no frame) scan reliably everywhere. Customise only if you want branding.",
+    "qr.live_preview": "Live preview updates as you edit. Download when ready."
+  }).map(([key, value]) => [normalize(value), key]));
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   const nodes = [];
   while (walker.nextNode()) nodes.push(walker.currentNode);
   nodes.forEach(node => {
     const text = node.nodeValue.trim();
-    const key = lookup.get(text);
+    const key = lookup.get(normalize(text));
     if (key) node.nodeValue = node.nodeValue.replace(text, qrT(key, text));
   });
   document.querySelectorAll('[title], [placeholder]').forEach(el => {
@@ -656,6 +728,12 @@ function translateQrGenerator() {
 }
 
 document.addEventListener('DOMContentLoaded', translateQrGenerator);
+document.addEventListener('DOMContentLoaded', () => {
+  new MutationObserver(() => translateQrGenerator()).observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+});
 window.addEventListener('message', event => {
   if (event.origin === window.location.origin && event.data?.type === 'pinplot-language-changed') {
     window.location.reload();
