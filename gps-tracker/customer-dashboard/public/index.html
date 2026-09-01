@@ -11415,25 +11415,25 @@ function _lmRenderSensorData(t) {
     `;
 }
 
-function _lmRenderDetail(t) {
+function _lmRenderDetail(tag) {
     const panel = document.getElementById('lm-detail-panel');
     if (!panel) return;
-    const label   = esc(t.description || t.device_name || t.imei);
-    const status  = _lmStatusClass(t);
+    const label   = esc(tag.description || tag.device_name || tag.imei);
+    const status  = _lmStatusClass(tag);
     const statusColors = { active: 'var(--success)', idle: 'var(--warning,#f59e0b)', offline: 'var(--danger)' };
     const statusLabel  = { active: 'Active', idle: 'Idle', offline: 'Offline' };
-    const tagTypeDisplay = esc(_ppTagTypeLabel(t.tag_type));
-    const lastSeen  = t.last_seen   ? new Date(t.last_seen).toLocaleString()    : '—';
-    const expiry    = t.expiry_date ? new Date(t.expiry_date).toLocaleDateString() : '—';
-    const daysLeft  = t.package_id
-        ? (t.days_remaining != null
-            ? (t.days_remaining > 0 ? `${t.days_remaining}d ${t('common.left', 'left')}` : t.days_remaining === 0 ? t('common.today', 'Today') : t('assets.expired', 'Expired'))
+    const tagTypeDisplay = esc(_ppTagTypeLabel(tag.tag_type));
+    const lastSeen  = tag.last_seen   ? new Date(tag.last_seen).toLocaleString()    : '—';
+    const expiry    = tag.expiry_date ? new Date(tag.expiry_date).toLocaleDateString() : '—';
+    const daysLeft  = tag.package_id
+        ? (tag.days_remaining != null
+            ? (tag.days_remaining > 0 ? `${tag.days_remaining}d ${t('common.left', 'left')}` : tag.days_remaining === 0 ? t('common.today', 'Today') : t('assets.expired', 'Expired'))
             : '—')
         : '—';
-    const pkgHtml = t.package_id
-        ? `<span>${esc(t.package_name || 'Unknown')}</span>`
+    const pkgHtml = tag.package_id
+        ? `<span>${esc(tag.package_name || 'Unknown')}</span>`
         : `<span style="color:var(--danger);font-weight:600"><i class="fa-solid fa-circle-exclamation" style="margin-right:3px"></i>${t('assets.no_package', 'No Package')}</span>`;
-    const expiryColor = !t.package_id ? 'var(--text-3)' : (t.days_remaining > 7 ? 'var(--success)' : 'var(--danger)');
+    const expiryColor = !tag.package_id ? 'var(--text-3)' : (tag.days_remaining > 7 ? 'var(--success)' : 'var(--danger)');
     panel.innerHTML = `
         <div class="detail-header">
             <div class="detail-icon" style="background:${statusColors[status]}20;color:${statusColors[status]}">
@@ -11441,7 +11441,7 @@ function _lmRenderDetail(t) {
             </div>
             <div>
                 <h3>${label}</h3>
-                <small style="font-family:monospace;color:var(--text-3)">${esc(t.imei)}</small>
+                <small style="font-family:monospace;color:var(--text-3)">${esc(tag.imei)}</small>
             </div>
             <button class="btn-icon close-detail" onclick="document.getElementById('lm-detail-panel').innerHTML=''">
                 <i class="fa-solid fa-xmark"></i>
@@ -11449,7 +11449,7 @@ function _lmRenderDetail(t) {
         </div>
         <div class="detail-grid">
             <div class="detail-item"><label data-i18n="labels.status">Status</label><span style="color:${statusColors[status]}">${statusLabel[status]}</span></div>
-            <div class="detail-item"><label data-i18n="labels.owner">Owner</label><span>${esc((t.owner_email||'').split('@')[0])}</span></div>
+            <div class="detail-item"><label data-i18n="labels.owner">Owner</label><span>${esc((tag.owner_email||'').split('@')[0])}</span></div>
             <div class="detail-item"><label data-i18n="labels.package">Package</label>${pkgHtml}</div>
             <div class="detail-item"><label data-i18n="labels.days_left">Days Left</label><span>${daysLeft}</span></div>
             <div class="detail-item"><label data-i18n="labels.expiry">Expiry</label><span style="color:${expiryColor}">${expiry}</span></div>
@@ -11457,34 +11457,34 @@ function _lmRenderDetail(t) {
             <div class="detail-item detail-full"><label data-i18n="labels.type">Type</label><span>${tagTypeDisplay}</span></div>
         </div>
         ${(() => {
-            const sensorHtml = _lmRenderSensorData(t);
+            const sensorHtml = _lmRenderSensorData(tag);
             console.log('[DETAIL] Sensor HTML output length:', sensorHtml.length, 'chars');
             return sensorHtml;
         })()}
-        ${_lmMarkers[t.imei] ? `<div class="detail-actions">
-            <button class="btn btn-primary btn-sm" onclick="lmSelectFromList('${esc(t.imei)}')">
+        ${_lmMarkers[tag.imei] ? `<div class="detail-actions">
+            <button class="btn btn-primary btn-sm" onclick="lmSelectFromList('${esc(tag.imei)}')">
                 <i class="fa-solid fa-crosshairs"></i> Centre on Map
             </button>
             ${(() => {
                 const sess = getSession();
                 const features = sess && sess.features ? new Set(sess.features) : new Set();
                 const hasFeature = features.has('temperature-graph');
-                const isSeries5 = t.tag_type && ['series_5', 'series5', 'hubble'].includes(t.tag_type.toLowerCase());
-                const hasTemp = t.attributes && t.attributes.Temperature;
+                const isSeries5 = tag.tag_type && ['series_5', 'series5', 'hubble'].includes(tag.tag_type.toLowerCase());
+                const hasTemp = tag.attributes && tag.attributes.Temperature;
                 
                 console.log('[TEMP-GRAPH-CHECK]', {
-                    imei: t.imei,
-                    tag_type: t.tag_type,
+                    imei: tag.imei,
+                    tag_type: tag.tag_type,
                     isSeries5,
                     hasTemp,
-                    temperature: t.attributes?.Temperature,
+                    temperature: tag.attributes?.Temperature,
                     allFeatures: Array.from(features),
                     hasFeature,
                     willShow: hasFeature && isSeries5 && hasTemp
                 });
                 
                 return (hasFeature && isSeries5 && hasTemp) ? `
-                    <button class="btn btn-primary btn-sm" style="background-color: var(--success); border-color: var(--success);" onclick="toggleTemperatureGraph('${esc(t.imei)}', '${esc(t.description || t.device_name || t.imei)}')">
+                    <button class="btn btn-primary btn-sm" style="background-color: var(--success); border-color: var(--success);" onclick="toggleTemperatureGraph('${esc(tag.imei)}', '${esc(tag.description || tag.device_name || tag.imei)}')">
                         <i class="fa-solid fa-temperature-half"></i> Graph
                     </button>
                 ` : '';
