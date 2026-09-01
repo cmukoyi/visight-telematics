@@ -4641,6 +4641,7 @@ class TranslationService {
     #currentLang = 'en';
     #availableLanguages = [];
     #loadPromise = null;
+    #domObserver = null;
 
     constructor() {
         if (TranslationService.#instance) {
@@ -4725,26 +4726,62 @@ class TranslationService {
         return translations[key] || fallback || key;
     }
 
-    // Translate all elements marked with data-i18n="key"
-    translateAll() {
-        document.querySelectorAll('[data-i18n]').forEach(el => {
+    _translateElement(el) {
+        if (!(el instanceof Element)) return;
+
+        if (el.hasAttribute('data-i18n')) {
             const key = el.getAttribute('data-i18n');
             const fallback = el.getAttribute('data-i18n-fallback') || el.textContent;
             el.textContent = this.translate(key, fallback);
-        });
-
-        // Translate placeholders
-        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        }
+        if (el.hasAttribute('data-i18n-placeholder')) {
             const key = el.getAttribute('data-i18n-placeholder');
             const fallback = el.getAttribute('placeholder') || '';
             el.placeholder = this.translate(key, fallback);
-        });
-
-        // Translate titles
-        document.querySelectorAll('[data-i18n-title]').forEach(el => {
+        }
+        if (el.hasAttribute('data-i18n-title')) {
             const key = el.getAttribute('data-i18n-title');
             const fallback = el.getAttribute('title') || '';
             el.title = this.translate(key, fallback);
+        }
+    }
+
+    // Translate all i18n-decorated elements in a given subtree.
+    translateSubtree(root) {
+        if (!root) return;
+
+        this._translateElement(root);
+        if (!(root instanceof Element) && !(root instanceof Document)) return;
+
+        root.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-title]').forEach(el => {
+            this._translateElement(el);
+        });
+    }
+
+    // Translate all elements marked with data-i18n attributes.
+    translateAll() {
+        this.translateSubtree(document);
+    }
+
+    // Keep dynamic UI translated when large blocks are rendered via innerHTML.
+    startAutoTranslateObserver() {
+        if (this.#domObserver || !document.body) return;
+
+        this.#domObserver = new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+                if (mutation.type === 'childList') {
+                    mutation.addedNodes.forEach(node => this.translateSubtree(node));
+                } else if (mutation.type === 'attributes' && mutation.target) {
+                    this.translateSubtree(mutation.target);
+                }
+            }
+        });
+
+        this.#domObserver.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['data-i18n', 'data-i18n-placeholder', 'data-i18n-title']
         });
     }
 }
@@ -4758,6 +4795,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await ts.loadLanguages();
     await ts.loadTranslations(ts.getCurrentLanguage());
     ts.translateAll();
+    ts.startAutoTranslateObserver();
 });
 
 // ── Admin impersonation bootstrap ─────────────────────────────────

@@ -71,22 +71,20 @@ def get_translations(lang_code: str, db: Session = Depends(get_db)):
             detail=f"Language '{lang_code}' not found or inactive"
         )
     
-    # Get all translation keys
+    # Fetch all keys once and all translations for the requested language once
+    # to avoid N+1 database round-trips when key volume grows.
     all_keys = db.query(TranslationKey).all()
-    
-    # Build result dictionary
-    result = {}
-    for key in all_keys:
-        # Try to find translation for this language
-        translation = db.query(Translation).filter(
-            and_(
-                Translation.language_code == lang_code,
-                Translation.key == key.key
-            )
-        ).first()
-        
-        # Use translation if exists, otherwise fall back to default English text
-        result[key.key] = translation.translated_text if translation else key.default_text
+    lang_translations = db.query(Translation).filter(
+        Translation.language_code == lang_code
+    ).all()
+
+    translated_by_key = {t.key: t.translated_text for t in lang_translations}
+
+    # Build result dictionary with fallback to default English text.
+    result = {
+        key.key: translated_by_key.get(key.key, key.default_text)
+        for key in all_keys
+    }
     
     logger.info(f"Fetched {len(result)} translations for language '{lang_code}'")
     return result
