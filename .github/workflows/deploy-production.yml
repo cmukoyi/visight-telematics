@@ -56,6 +56,9 @@ jobs:
           fi
           echo "✅ No dangerous commands found"
 
+      - name: Validate customer dashboard i18n markers
+        run: python3 gps-tracker/backend/scripts/i18n_dashboard_audit.py
+
       - name: Tenant overlay destinations must be gitignored
         run: |
           # Every destination in scripts/build.sh MAP must be gitignored so

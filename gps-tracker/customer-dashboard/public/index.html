@@ -2240,11 +2240,11 @@ input.hive-range::-moz-range-track {
                             </div>
                         </div>
                         <div class="fp-chip-bar">
-                            <div class="fp-chip fp-all active"  onclick="FP.filterCat(this,'all')">      <span class="fp-chip-dot" style="background:var(--green)"></span>All</div>
-                            <div class="fp-chip fp-vehicle"     onclick="FP.filterCat(this,'vehicle')">  <span class="fp-chip-dot" style="background:#3b82f6"></span>Vehicles</div>
-                            <div class="fp-chip fp-equipment"   onclick="FP.filterCat(this,'equipment')"><span class="fp-chip-dot" style="background:#a855f7"></span>Equipment</div>
-                            <div class="fp-chip fp-container"   onclick="FP.filterCat(this,'container')"><span class="fp-chip-dot" style="background:#f97316"></span>Containers</div>
-                            <div class="fp-chip fp-personnel"   onclick="FP.filterCat(this,'personnel')"><span class="fp-chip-dot" style="background:#06b6d4"></span>Personnel</div>
+                            <div class="fp-chip fp-all active"  onclick="FP.filterCat(this,'all')">      <span class="fp-chip-dot" style="background:var(--green)"></span><span data-i18n="common.all">All</span></div>
+                            <div class="fp-chip fp-vehicle"     onclick="FP.filterCat(this,'vehicle')">  <span class="fp-chip-dot" style="background:#3b82f6"></span><span data-i18n="assets.vehicles">Vehicles</span></div>
+                            <div class="fp-chip fp-equipment"   onclick="FP.filterCat(this,'equipment')"><span class="fp-chip-dot" style="background:#a855f7"></span><span data-i18n="assets.equipment">Equipment</span></div>
+                            <div class="fp-chip fp-container"   onclick="FP.filterCat(this,'container')"><span class="fp-chip-dot" style="background:#f97316"></span><span data-i18n="assets.containers">Containers</span></div>
+                            <div class="fp-chip fp-personnel"   onclick="FP.filterCat(this,'personnel')"><span class="fp-chip-dot" style="background:#06b6d4"></span><span data-i18n="assets.personnel">Personnel</span></div>
                         </div>
                         <div class="fp-asset-list" id="fp-asset-list">
                             <div class="fp-empty-state" id="fp-empty-state">
@@ -2276,23 +2276,23 @@ input.hive-range::-moz-range-track {
                         <div class="fp-map-controls">
                             <div class="fp-map-btn-group">
                                 <button class="fp-map-ctrl-btn active" id="fp-btn-assets"  onclick="FP.toggleLayer('assets',this)">
-                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3"/><circle cx="8" cy="8" r="6" stroke-dasharray="2 2"/></svg>Assets
+                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3"/><circle cx="8" cy="8" r="6" stroke-dasharray="2 2"/></svg><span data-i18n="assets.title">Assets</span>
                                 </button>
                                 <button class="fp-map-ctrl-btn" id="fp-btn-zones"   onclick="FP.toggleLayer('zones',this)">
-                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>Zones
+                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg><span data-i18n="floor_plan.zones">Zones</span>
                                 </button>
                                 <button class="fp-map-ctrl-btn" id="fp-btn-beacons" onclick="FP.toggleLayer('beacons',this)">
-                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="1.5" fill="currentColor"/><path d="M5 5a4.2 4.2 0 0 1 6 0M3.5 3.5a6.5 6.5 0 0 1 9 0"/></svg>Beacons
+                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="1.5" fill="currentColor"/><path d="M5 5a4.2 4.2 0 0 1 6 0M3.5 3.5a6.5 6.5 0 0 1 9 0"/></svg><span data-i18n="floor_plan.beacons">Beacons</span>
                                 </button>
                             </div>
                             <div class="fp-map-btn-group">
                                 <button class="fp-map-ctrl-btn" onclick="FP.resetView()">
-                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6V3h3M13 6V3h-3M3 10v3h3M13 10v3h-3"/></svg>Fit view
+                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6V3h3M13 6V3h-3M3 10v3h3M13 10v3h3"/></svg><span data-i18n="floor_plan.fit_to_view">Fit view</span>
                                 </button>
                             </div>
                             <div class="fp-map-btn-group">
                                 <button class="fp-map-ctrl-btn" onclick="FP.exportPNG()">
-                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 10v3a1 1 0 001 1h8a1 1 0 001-1v-3"/><path d="M8 2v7M5 9l3 3 3-3"/></svg>Export PNG
+                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 10v3a1 1 0 001 1h8a1 1 0 001-1v-3"/><path d="M8 2v7M5 9l3 3 3-3"/></svg><span data-i18n="floor_plan.export_png">Export PNG</span>
                                 </button>
                             </div>
                         </div>
@@ -2301,9 +2301,9 @@ input.hive-range::-moz-range-track {
                         <div class="fp-zone-legend" id="fp-zone-legend">
                             <div class="fp-legend-title" data-i18n="text.zones">Zones</div>
                             <div class="fp-legend-item"><div class="fp-legend-swatch" style="background:rgba(0,100,0,.2);border:1.5px solid rgba(0,100,0,.55)"></div><span data-i18n="floor_plan.active_dispatch">Active / Dispatch</span></div>
-                            <div class="fp-legend-item"><div class="fp-legend-swatch" style="background:rgba(239,68,68,.18);border:1.5px solid rgba(239,68,68,.5)"></div>Alert zone</div>
-                            <div class="fp-legend-item"><div class="fp-legend-swatch" style="background:rgba(59,130,246,.15);border:1.5px solid rgba(59,130,246,.45)"></div>Restricted</div>
-                            <div class="fp-legend-item"><div class="fp-legend-swatch" style="background:rgba(245,158,11,.15);border:1.5px solid rgba(245,158,11,.45)"></div>Staging</div>
+                            <div class="fp-legend-item"><div class="fp-legend-swatch" style="background:rgba(239,68,68,.18);border:1.5px solid rgba(239,68,68,.5)"></div><span data-i18n="floor_plan.alert_zone">Alert zone</span></div>
+                            <div class="fp-legend-item"><div class="fp-legend-swatch" style="background:rgba(59,130,246,.15);border:1.5px solid rgba(59,130,246,.45)"></div><span data-i18n="floor_plan.restricted">Restricted</span></div>
+                            <div class="fp-legend-item"><div class="fp-legend-swatch" style="background:rgba(245,158,11,.15);border:1.5px solid rgba(245,158,11,.45)"></div><span data-i18n="floor_plan.staging">Staging</span></div>
                         </div>
 
                         <!-- Scale ruler -->
@@ -4731,17 +4731,29 @@ class TranslationService {
 
         if (el.hasAttribute('data-i18n')) {
             const key = el.getAttribute('data-i18n');
-            const fallback = el.getAttribute('data-i18n-fallback') || el.textContent;
+            let fallback = el.getAttribute('data-i18n-fallback');
+            if (fallback === null) {
+                fallback = el.textContent;
+                el.setAttribute('data-i18n-fallback', fallback);
+            }
             el.textContent = this.translate(key, fallback);
         }
         if (el.hasAttribute('data-i18n-placeholder')) {
             const key = el.getAttribute('data-i18n-placeholder');
-            const fallback = el.getAttribute('placeholder') || '';
+            let fallback = el.getAttribute('data-i18n-placeholder-fallback');
+            if (fallback === null) {
+                fallback = el.getAttribute('placeholder') || '';
+                el.setAttribute('data-i18n-placeholder-fallback', fallback);
+            }
             el.placeholder = this.translate(key, fallback);
         }
         if (el.hasAttribute('data-i18n-title')) {
             const key = el.getAttribute('data-i18n-title');
-            const fallback = el.getAttribute('title') || '';
+            let fallback = el.getAttribute('data-i18n-title-fallback');
+            if (fallback === null) {
+                fallback = el.getAttribute('title') || '';
+                el.setAttribute('data-i18n-title-fallback', fallback);
+            }
             el.title = this.translate(key, fallback);
         }
     }
@@ -9723,7 +9735,7 @@ async function renderGPSTags() {
             <span style="font-size:11px">Owner: ${ownerShort}</span><br>
             <span style="font-size:11px">Last seen: ${t.last_seen ? new Date(t.last_seen).toLocaleString() : '—'}</span><br>
             <button onclick="toggleGpsMark('${esc(t.imei)}')" style="margin-top:6px;font-size:12px;padding:3px 8px;border-radius:4px;border:1px solid #ddd;cursor:pointer;background:#f3f4f6" id="popup-mark-${esc(t.imei.replace(/[^a-z0-9]/gi,'_'))}">
-                <span data-i18n="${isMarked ? 'buttons.unmark' : 'buttons.mark_for_tracking'}">${isMarked ? '★ Unmark' : '☆ Mark for tracking'}</span></button>
+                <span>${isMarked ? `★ ${t('buttons.unmark', 'Unmark')}` : `☆ ${t('buttons.mark_for_tracking', 'Mark for tracking')}`}</span></button>
         `);
         _gpsMarkers[t.imei] = marker;
     });
@@ -9911,7 +9923,7 @@ async function _gpsSearchDuplicate_doNotCall() {
             <span style="font-size:11px">Owner: ${ownerShort}</span><br>
             <span style="font-size:11px">Last seen: ${t.last_seen ? new Date(t.last_seen).toLocaleString() : '—'}</span><br>
             <button onclick="toggleGpsMark('${esc(t.imei)}')" style="margin-top:6px;font-size:12px;padding:3px 8px;border-radius:4px;border:1px solid #ddd;cursor:pointer;background:#f3f4f6" id="popup-mark-${esc(t.imei.replace(/[^a-z0-9]/gi,'_'))}">
-                <span data-i18n="${isMarked ? 'buttons.unmark' : 'buttons.mark_for_tracking'}">${isMarked ? '★ Unmark' : '☆ Mark for tracking'}</span></button>
+                <span>${isMarked ? `★ ${t('buttons.unmark', 'Unmark')}` : `☆ ${t('buttons.mark_for_tracking', 'Mark for tracking')}`}</span></button>
         `);
         _gpsMarkers[t.imei] = marker;
     });
