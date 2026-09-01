@@ -5679,7 +5679,12 @@ function _ppIsQrNfcTag(tag) {
 
 function showTabAlert(prefix, msg, type) {
     const el = document.getElementById(prefix + 'Alert');
-    document.getElementById(prefix + 'AlertText').textContent = msg;
+    const textEl = document.getElementById(prefix + 'AlertText');
+    if (!el || !textEl) {
+        console.warn(`Unable to show tab alert for ${prefix}:`, msg);
+        return;
+    }
+    textEl.textContent = msg;
     el.className = `alert alert-${type}`;
     el.style.display = 'flex';
     setTimeout(() => { el.style.display = 'none'; }, 5000);
@@ -12055,24 +12060,24 @@ function amRenderCards() {
     const statusColors = { active: 'var(--success)', idle: 'var(--warning,#f59e0b)', offline: 'var(--danger)' };
     const statusLabel  = { active: 'Active', idle: 'Idle', offline: 'Offline' };
     const _tagTypeLabel = tt => _ppTagTypeLabel(tt);
-    grid.innerHTML = `<div class="asset-card-grid">${list.map(t => {
-        const status   = _lmStatusClass(t);
+    grid.innerHTML = `<div class="asset-card-grid">${list.map(tag => {
+        const status   = _lmStatusClass(tag);
         const color    = statusColors[status];
-        const label    = esc(t.description || t.device_name || t.imei);
-        const owner    = esc((t.owner_email || '').split('@')[0] || '—');
-        const hasPkg   = !!t.package_id;
+        const label    = esc(tag.description || tag.device_name || tag.imei);
+        const owner    = esc((tag.owner_email || '').split('@')[0] || '—');
+        const hasPkg   = !!tag.package_id;
         const pkgHtml  = hasPkg
-            ? `<span>${esc(t.package_name || 'Unknown')}</span>`
+            ? `<span>${esc(tag.package_name || 'Unknown')}</span>`
             : `<span style="color:var(--danger);font-weight:600"><i class="fa-solid fa-circle-exclamation" style="margin-right:3px"></i>${t('assets.no_package', 'No Package')}</span>`;
-        const tagType  = _tagTypeLabel(t.tag_type);
+        const tagType  = _tagTypeLabel(tag.tag_type);
         const tagTypeColor = tagType === 'Series 1' ? 'var(--primary)' : tagType === 'Series 2' ? 'var(--warning,#f59e0b)' : 'var(--text-3)';
-        const lastSeen = t.last_seen ? new Date(t.last_seen).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
-        const expiryDate = t.expiry_date ? new Date(t.expiry_date).toLocaleDateString([], {day:'2-digit',month:'short',year:'numeric'}) : null;
-        const daysLeft = t.days_remaining != null
-            ? (t.days_remaining > 0 ? `${t.days_remaining} ${t('common.days', 'days')} ${t('common.left', 'left')}` : t.days_remaining === 0 ? t('assets.expires_today', 'Expires today') : t('assets.expired', 'Expired'))
+        const lastSeen = tag.last_seen ? new Date(tag.last_seen).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+        const expiryDate = tag.expiry_date ? new Date(tag.expiry_date).toLocaleDateString([], {day:'2-digit',month:'short',year:'numeric'}) : null;
+        const daysLeft = tag.days_remaining != null
+            ? (tag.days_remaining > 0 ? `${tag.days_remaining} ${t('common.days', 'days')} ${t('common.left', 'left')}` : tag.days_remaining === 0 ? t('assets.expires_today', 'Expires today') : t('assets.expired', 'Expired'))
             : null;
-        const daysColor= t.days_remaining != null
-            ? (t.days_remaining > 30 ? 'var(--success)' : t.days_remaining > 7 ? 'var(--warning)' : 'var(--danger)')
+        const daysColor= tag.days_remaining != null
+            ? (tag.days_remaining > 30 ? 'var(--success)' : tag.days_remaining > 7 ? 'var(--warning)' : 'var(--danger)')
             : (expiryDate ? 'var(--text-2)' : 'var(--text-3)');
         let expiryDisplay = '—';
         if (expiryDate && daysLeft) {
@@ -12082,7 +12087,7 @@ function amRenderCards() {
         } else if (daysLeft) {
             expiryDisplay = daysLeft;
         }
-        const batPct   = t.battery_level;
+        const batPct   = tag.battery_level;
         const batCls   = batPct == null ? '' : batPct > 20 ? 'good' : 'low';
         const batHtml  = batPct != null
             ? `<span class="battery-wrap ${batCls}"><i class="fa-solid fa-battery-full"></i> ${batPct}%</span>` : '—';
@@ -12098,7 +12103,7 @@ function amRenderCards() {
                 <span class="status-dot status-${status}" style="margin-left:auto" title="${statusLabel[status]}"></span>
             </div>
             <div class="asset-card-body">
-                <div class="card-kv"><span data-i18n="text.imei">IMEI</span><span class="mono small">${esc(t.imei)}</span></div>
+                <div class="card-kv"><span data-i18n="text.imei">IMEI</span><span class="mono small">${esc(tag.imei)}</span></div>
                 <div class="card-kv"><span data-i18n="text.owner">Owner</span><span>${owner}</span></div>
                 <div class="card-kv"><span data-i18n="text.package">Package</span>${pkgHtml}</div>
                 <div class="card-kv"><span data-i18n="text.battery">Battery</span>${batHtml}</div>
@@ -12106,16 +12111,16 @@ function amRenderCards() {
                 <div class="card-kv"><span data-i18n="text.expires">Expires</span><span style="color:${daysColor}">${expiryDisplay}</span></div>
             </div>
             <div class="asset-card-footer">
-                <button class="btn btn-ghost btn-sm" onclick="openTagMgmtModal('edit','${esc(t.imei)}')">
+                <button class="btn btn-ghost btn-sm" onclick="openTagMgmtModal('edit','${esc(tag.imei)}')">
                     <i class="fa-solid fa-pen"></i> ${t('common.edit', 'Edit')}
                 </button>
-                ${t.latitude && t.longitude ? `<button class="btn btn-ghost btn-sm" onclick="switchTab('livemap');setTimeout(()=>lmSelectFromList('${esc(t.imei)}'),600)">
+                ${tag.latitude && tag.longitude ? `<button class="btn btn-ghost btn-sm" onclick="switchTab('livemap');setTimeout(()=>lmSelectFromList('${esc(tag.imei)}'),600)">
                     <i class="fa-solid fa-map-pin"></i> ${t('map.map', 'Map')}
                 </button>` : ''}
-                <button class="btn btn-ghost btn-sm" onclick="lmOpenHistory('${esc(t.imei)}')">
+                <button class="btn btn-ghost btn-sm" onclick="lmOpenHistory('${esc(tag.imei)}')">
                     <i class="fa-solid fa-route"></i> ${t('trips.history', 'History')}
                 </button>
-                <button class="btn btn-ghost btn-sm btn-danger-ghost" onclick="deleteTag('${esc(t.id)}','${esc(t.imei)}')" data-i18n-title="tooltips.delete_tag" title="Delete tag">
+                <button class="btn btn-ghost btn-sm btn-danger-ghost" onclick="deleteTag('${esc(tag.id)}','${esc(tag.imei)}')" data-i18n-title="tooltips.delete_tag" title="Delete tag">
                     <i class="fa-solid fa-trash"></i>
                 </button>
             </div>
