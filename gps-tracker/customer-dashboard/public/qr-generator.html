@@ -684,11 +684,11 @@ const QR_FRENCH_TRANSLATIONS = {
   "qr.live_preview": "L'aperçu se met à jour pendant vos modifications. Téléchargez lorsque vous êtes prêt."
 };
 
+let qrLanguage = 'en';
+
 function qrT(key, fallback) {
   try {
-    const parentService = window.parent?.TranslationService?.getInstance?.();
-    const language = parentService?.getCurrentLanguage?.() || 'en';
-    if (language === 'fr' && QR_FRENCH_TRANSLATIONS[key]) return QR_FRENCH_TRANSLATIONS[key];
+    if (qrLanguage === 'fr' && QR_FRENCH_TRANSLATIONS[key]) return QR_FRENCH_TRANSLATIONS[key];
     return window.parent !== window && typeof window.parent.t === 'function'
       ? window.parent.t(key, fallback)
       : fallback;
@@ -699,7 +699,7 @@ function qrT(key, fallback) {
 
 function translateQrGenerator() {
   const normalize = value => value.replace(/\s+/g, ' ').trim();
-  const lookup = new Map(Object.entries({
+  const englishLookup = {
     ...QR_TRANSLATIONS,
     "qr.pick_content": "Pick content type & generate an ID",
     "qr.style_frame_icon": "Style colours, frame & icon",
@@ -709,7 +709,11 @@ function translateQrGenerator() {
     "qr.optional_logo": "optional logo in the middle",
     "qr.style_description": "Optional — the defaults (black on white, no frame) scan reliably everywhere. Customise only if you want branding.",
     "qr.live_preview": "Live preview updates as you edit. Download when ready."
-  }).map(([key, value]) => [normalize(value), key]));
+  };
+  const lookup = new Map([
+    ...Object.entries(englishLookup),
+    ...Object.entries(QR_FRENCH_TRANSLATIONS)
+  ].map(([key, value]) => [normalize(value), key]));
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   const nodes = [];
   while (walker.nextNode()) nodes.push(walker.currentNode);
@@ -735,8 +739,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 window.addEventListener('message', event => {
-  if (event.origin === window.location.origin && event.data?.type === 'pinplot-language-changed') {
-    window.location.reload();
+  if (event.origin === window.location.origin && event.data?.type === 'pinplot-language-changed' && event.data.language) {
+    qrLanguage = event.data.language;
+    translateQrGenerator();
   }
 });
 

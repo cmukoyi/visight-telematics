@@ -2817,7 +2817,8 @@ input.hive-range::-moz-range-track {
                         src="/customer/qr-generator.html"
                         data-i18n-title="tooltips.qr_nfc_generator" title="QR / NFC Generator"
                         style="width:100%;height:min(1820px,calc(100vh - 170px));min-height:820px;border:none;background:transparent"
-                        loading="lazy">
+                        loading="lazy"
+                        onload="this.contentWindow.postMessage({ type: 'pinplot-language-changed', language: localStorage.getItem('pp_portal_language') || 'en' }, window.location.origin)">
                     </iframe>
                 </div>
             </div>
@@ -4712,7 +4713,7 @@ class TranslationService {
         localStorage.setItem(LANG_KEY, lang);
         this.translateAll(); // Observer pattern: notify UI
         document.querySelectorAll('iframe').forEach(frame => {
-            frame.contentWindow?.postMessage({ type: 'pinplot-language-changed' }, window.location.origin);
+            frame.contentWindow?.postMessage({ type: 'pinplot-language-changed', language: lang }, window.location.origin);
         });
     }
 
