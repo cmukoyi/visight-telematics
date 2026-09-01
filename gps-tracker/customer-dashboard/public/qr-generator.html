@@ -574,6 +574,94 @@
 </div>
 
 <script>
+// The generator is embedded in the customer dashboard. Reuse its selected
+// language and translations instead of maintaining a disconnected QR locale.
+const QR_TRANSLATIONS = {
+  "qr.generator_title": "QR Code Generator",
+  "qr.create_scannable_codes": "Create scannable codes for your assets",
+  "qr.content": "Content",
+  "qr.appearance": "Appearance",
+  "qr.preview": "Preview",
+  "qr.asset_qr": "Asset QR",
+  "qr.nfc_tag": "NFC Tag",
+  "qr.quantity": "Quantity",
+  "qr.generated_asset_url": "Generated asset URL",
+  "qr.generated_nfc_url": "Generated NFC tag URL",
+  "qr.new_id": "New ID",
+  "qr.module_style": "Module style",
+  "qr.error_correction": "Error correction",
+  "qr.export_size": "Export size",
+  "qr.centre_icon": "Centre Icon",
+  "qr.built_in": "Built-in",
+  "qr.upload": "Upload",
+  "qr.icon_colour": "Icon colour",
+  "qr.icon_size": "Icon size",
+  "qr.qr_settings": "QR Settings",
+  "qr.colours": "Colours",
+  "qr.qr_colours": "QR colours",
+  "qr.foreground": "Foreground",
+  "qr.background": "Background",
+  "qr.corner_colours": "Corner colours",
+  "qr.outer_ring": "Outer ring",
+  "qr.inner_dot": "Inner dot",
+  "qr.colour_presets": "Colour presets",
+  "qr.frame": "Frame",
+  "qr.label_text": "Label text",
+  "qr.download_history": "Download history",
+  "qr.clear": "Clear",
+  "qr.no_downloads": "No downloads yet this session",
+  "qr.register_asset": "Register this asset?",
+  "qr.asset_id": "Asset ID:",
+  "qr.type": "Type:",
+  "qr.cancel": "Cancel",
+  "qr.confirm_download": "Confirm & download",
+  "qr.square": "Square",
+  "qr.rounded": "Rounded",
+  "qr.dots": "Dots",
+  "qr.none": "None",
+  "qr.reset": "Reset",
+  "qr.copy_nfc_url": "Copy NFC URL",
+  "qr.generating": "Generating...",
+  "qr.single_qr_code": "Single QR code",
+  "qr.single_nfc_tag": "Single NFC tag"
+};
+
+function qrT(key, fallback) {
+  try {
+    return window.parent !== window && typeof window.parent.t === 'function'
+      ? window.parent.t(key, fallback)
+      : fallback;
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function translateQrGenerator() {
+  const lookup = new Map(Object.entries(QR_TRANSLATIONS).map(([key, value]) => [value, key]));
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  nodes.forEach(node => {
+    const text = node.nodeValue.trim();
+    const key = lookup.get(text);
+    if (key) node.nodeValue = node.nodeValue.replace(text, qrT(key, text));
+  });
+  document.querySelectorAll('[title], [placeholder]').forEach(el => {
+    ['title', 'placeholder'].forEach(attribute => {
+      const value = el.getAttribute(attribute);
+      const key = lookup.get(value);
+      if (key) el.setAttribute(attribute, qrT(key, value));
+    });
+  });
+}
+
+document.addEventListener('DOMContentLoaded', translateQrGenerator);
+window.addEventListener('message', event => {
+  if (event.origin === window.location.origin && event.data?.type === 'pinplot-language-changed') {
+    window.location.reload();
+  }
+});
+
 //---------------------------------------------------------------------
 //
 // QR Code Generator for JavaScript

@@ -24,6 +24,7 @@ MARKER_PATTERN = re.compile(
 RUNTIME_CALL_PATTERN = re.compile(
     r"\bt(?:Alert|Confirm|Prompt)?\(\s*['\"](?P<key>[a-z][a-z0-9_.]+)['\"]\s*,\s*['\"](?P<text>(?:\\.|[^'\"])*)['\"]"
 )
+QR_TRANSLATION_PATTERN = re.compile(r'"(?P<key>qr\.[a-z0-9_]+)":\s*"(?P<text>[^"]+)"')
 ATTRIBUTE_PATTERN = re.compile(r'\b(?P<name>placeholder|title)="(?P<value>[^"]*)"')
 TAG_PATTERN = re.compile(r"<[^>]+>")
 EXPLICIT_DEFAULTS = {
@@ -46,6 +47,10 @@ EXPLICIT_DEFAULTS = {
 
 def dashboard_path() -> Path:
     return Path(__file__).resolve().parents[2] / "customer-dashboard/public/index.html"
+
+
+def qr_generator_path() -> Path:
+    return Path(__file__).resolve().parents[2] / "customer-dashboard/public/qr-generator.html"
 
 
 def extract_defaults(content: str) -> dict[str, tuple[str, str]]:
@@ -73,9 +78,18 @@ def extract_defaults(content: str) -> dict[str, tuple[str, str]]:
     return defaults
 
 
+def extract_qr_defaults(content: str) -> dict[str, tuple[str, str]]:
+    return {
+        match.group("key"): (match.group("text"), "QR/NFC generator UI")
+        for match in QR_TRANSLATION_PATTERN.finditer(content)
+    }
+
+
 def main() -> None:
     content = dashboard_path().read_text(encoding="utf-8")
     defaults = extract_defaults(content)
+    qr_defaults = extract_qr_defaults(qr_generator_path().read_text(encoding="utf-8"))
+    defaults.update(qr_defaults)
     marker_keys = set(re.findall(r'data-i18n(?:-placeholder|-title)?="([^"]+)"', content))
     runtime_keys = set(match.group("key") for match in RUNTIME_CALL_PATTERN.finditer(content))
     missing_defaults = sorted(marker_keys | runtime_keys - set(defaults))
