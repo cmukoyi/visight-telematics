@@ -684,7 +684,7 @@ const QR_FRENCH_TRANSLATIONS = {
   "qr.live_preview": "L'aperçu se met à jour pendant vos modifications. Téléchargez lorsque vous êtes prêt."
 };
 
-let qrLanguage = 'en';
+let qrLanguage = new URLSearchParams(window.location.search).get('lang') || 'en';
 
 function qrT(key, fallback) {
   try {
@@ -740,8 +740,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 window.addEventListener('message', event => {
   if (event.origin === window.location.origin && event.data?.type === 'pinplot-language-changed' && event.data.language) {
-    qrLanguage = event.data.language;
-    translateQrGenerator();
+    if (event.data.language !== qrLanguage) {
+      window.location.replace(`/customer/qr-generator.html?lang=${encodeURIComponent(event.data.language)}`);
+    }
   }
 });
 

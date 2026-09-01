@@ -2814,11 +2814,10 @@ input.hive-range::-moz-range-track {
                 
                 <div id="qr-root" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
                     <iframe
-                        src="/customer/qr-generator.html"
+                        src="/customer/qr-generator.html?lang=en"
                         data-i18n-title="tooltips.qr_nfc_generator" title="QR / NFC Generator"
                         style="width:100%;height:min(1820px,calc(100vh - 170px));min-height:820px;border:none;background:transparent"
-                        loading="lazy"
-                        onload="this.contentWindow.postMessage({ type: 'pinplot-language-changed', language: localStorage.getItem('pp_portal_language') || 'en' }, window.location.origin)">
+                        loading="lazy">
                     </iframe>
                 </div>
             </div>
@@ -4713,7 +4712,9 @@ class TranslationService {
         localStorage.setItem(LANG_KEY, lang);
         this.translateAll(); // Observer pattern: notify UI
         document.querySelectorAll('iframe').forEach(frame => {
-            frame.contentWindow?.postMessage({ type: 'pinplot-language-changed', language: lang }, window.location.origin);
+            if (frame.src.includes('/customer/qr-generator.html')) {
+                frame.src = `/customer/qr-generator.html?lang=${encodeURIComponent(lang)}`;
+            }
         });
     }
 
@@ -4812,6 +4813,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     await ts.loadTranslations(ts.getCurrentLanguage());
     ts.translateAll();
     ts.startAutoTranslateObserver();
+    const qrFrame = document.querySelector('#qr-root iframe');
+    if (qrFrame) {
+        qrFrame.src = `/customer/qr-generator.html?lang=${encodeURIComponent(ts.getCurrentLanguage())}`;
+    }
 });
 
 // ── Admin impersonation bootstrap ─────────────────────────────────
