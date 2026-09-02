@@ -2162,7 +2162,7 @@ def update_usergroup(
     # allowed_tag_types: use model_fields_set so explicit null = "reset to all"
     if "allowed_tag_types" in data.model_fields_set:
         tag_types = data.allowed_tag_types
-        valid = {"series1", "series2", "series3"}
+        valid = {"series1", "series2", "series3", "series_4", "series_5"}
         if tag_types is not None:
             bad = [t for t in tag_types if t not in valid]
             if bad:
