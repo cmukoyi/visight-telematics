@@ -851,6 +851,28 @@ class TripEngine:
         journey.leg_count = leg_count
         journey.stationary_count = stationary_count
         
+        # Change 4 (webhook): suppress degenerate webhook journeys after final
+        # aggregates are known. Preserve any idle periods by detaching their
+        # stationaries so they remain as journey-breaking records.
+        if self.is_webhook and leg_count == 0 and total_distance_m == 0:
+            if stationaries:
+                for stationary in stationaries:
+                    stationary.journey_id = None
+                self.db.flush()
+                logger.info(
+                    "🔓 IMEI %s (webhook): Detached %d stationary record(s) before suppressing degenerate journey %s",
+                    self.device_imei, len(stationaries), journey.id
+                )
+
+            logger.warning(
+                "🗑️  IMEI %s (webhook): Suppressing degenerate journey %s (%d legs, %.2f km, %d stationaries)",
+                self.device_imei, journey.id, leg_count, total_distance_m / 1000, stationary_count
+            )
+            self.db.delete(journey)
+            self.db.flush()
+            self.context.current_journey_id = None
+            return None
+
         # v2.2 R3: Prevent 0-leg journeys from persisting
         # If journey has no legs, delete it instead of closing
         # (A journey is defined by movement; stationary-only periods don't qualify)
