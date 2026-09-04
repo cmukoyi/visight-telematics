@@ -592,7 +592,7 @@ jobs:
             }
 
             echo "🌍 Synchronizing customer-dashboard translation keys..."
-            docker compose exec -T backend python app/sync_dashboard_translation_keys.py
+            docker compose exec -T backend python -m app.sync_dashboard_translation_keys
           SSHEOF
 
       # ── Install / refresh daily cleanup cron job ─────────────────

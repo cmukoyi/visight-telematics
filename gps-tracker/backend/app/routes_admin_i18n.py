@@ -11,6 +11,7 @@ from sqlalchemy import and_, or_, func
 from typing import List, Optional, Dict
 from pydantic import BaseModel, Field
 from datetime import datetime
+from html import unescape
 import csv
 import io
 import logging
@@ -28,6 +29,22 @@ router = APIRouter(
     dependencies=[Depends(get_current_admin_user)]  # 🔒 Enforces auth on ALL routes
 )
 logger = logging.getLogger(__name__)
+
+
+def _clean_translation_text(value: str) -> str:
+    """Normalize stored translations before quality checks/display."""
+    return unescape(str(value or "")).replace("\u00a0", " ").strip()
+
+
+def _is_complete_translation(language_code: str, key: TranslationKey, translation: Optional[Translation]) -> bool:
+    if not translation:
+        return False
+    translated_text = _clean_translation_text(translation.translated_text)
+    if not translated_text or translated_text == key.key:
+        return False
+    if language_code != "en" and translated_text == _clean_translation_text(key.default_text):
+        return False
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -142,9 +159,15 @@ def list_languages_admin(
     
     result = []
     for lang in languages:
-        translation_count = db.query(func.count(Translation.id)).filter(
-            Translation.language_code == lang.code
-        ).scalar()
+        all_keys = db.query(TranslationKey).all()
+        translations_by_key = {
+            translation.key: translation
+            for translation in db.query(Translation).filter(Translation.language_code == lang.code).all()
+        }
+        translation_count = sum(
+            1 for key in all_keys
+            if _is_complete_translation(lang.code, key, translations_by_key.get(key.key))
+        )
         
         completion = (translation_count / total_keys * 100) if total_keys > 0 else 0.0
         
@@ -311,9 +334,11 @@ def list_translation_keys(
         for trans in all_translations:
             translations_dict[trans.language_code] = trans.translated_text
         
-        # If filtering by language and missing_only, skip keys that have translations
-        if missing_only and language and language in translations_dict:
-            continue
+        # If filtering by language and missing_only, skip only quality-complete translations.
+        if missing_only and language:
+            translation = next((trans for trans in all_translations if trans.language_code == language), None)
+            if _is_complete_translation(language, key, translation):
+                continue
         
         key_dict = {
             "id": key.id,
@@ -640,10 +665,10 @@ def export_translations(
             )
         ).first()
         
-        translated_text = translation.translated_text if translation else ""
+        translated_text = _clean_translation_text(translation.translated_text) if translation else ""
         
-        # If missing_only, skip keys that have translations
-        if missing_only and translated_text:
+        # If missing_only, skip only quality-complete translations.
+        if missing_only and _is_complete_translation(language_code, key, translation):
             continue
         
         export_data.append({
