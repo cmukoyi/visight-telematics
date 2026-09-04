@@ -56,23 +56,27 @@ EXPLICIT_DEFAULTS = {
 }
 
 
-def dashboard_path() -> Path:
+def customer_dashboard_path(filename: str) -> Path:
     script_path = Path(__file__).resolve()
     candidates = (
-        script_path.parents[2] / "customer-dashboard/public/index.html",
-        script_path.parents[1] / "customer-dashboard/public/index.html",
+        script_path.parents[2] / "customer-dashboard/public" / filename,
+        script_path.parents[1] / "customer-dashboard/public" / filename,
     )
     for candidate in candidates:
         if candidate.is_file():
             return candidate
     raise FileNotFoundError(
-        "Customer dashboard source was not found. Checked: "
+        f"Customer dashboard source '{filename}' was not found. Checked: "
         + ", ".join(str(candidate) for candidate in candidates)
     )
 
 
+def dashboard_path() -> Path:
+    return customer_dashboard_path("index.html")
+
+
 def qr_generator_path() -> Path:
-    return Path(__file__).resolve().parents[2] / "customer-dashboard/public/qr-generator.html"
+    return customer_dashboard_path("qr-generator.html")
 
 
 def extract_defaults(content: str) -> dict[str, tuple[str, str]]:
