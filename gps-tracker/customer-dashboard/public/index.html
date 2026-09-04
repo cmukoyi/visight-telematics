@@ -4728,7 +4728,14 @@ class TranslationService {
 
     translate(key, fallback = null) {
         const translations = this.#translations[this.#currentLang] || {};
-        return translations[key] || fallback || key;
+        return this._normalizeText(translations[key] || fallback || key);
+    }
+
+    _normalizeText(value) {
+        const text = String(value ?? '');
+        const textarea = document.createElement('textarea');
+        textarea.innerHTML = text;
+        return textarea.value.replace(/\u00a0/g, ' ');
     }
 
     _translateElement(el) {
