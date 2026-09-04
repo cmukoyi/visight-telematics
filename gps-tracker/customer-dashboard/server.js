@@ -53,7 +53,8 @@ app.get('/health', (req, res) => {
 // Maps /help/movement-analytics to tenant-specific manual based on branding
 app.get('/help/movement-analytics', (req, res) => {
   const brandName = process.env.BRAND_NAME || 'PinPlot';
-  const isBeacon = brandName.toLowerCase().includes('beacon');
+  const isBeacon = process.env.CUSTOMER_TENANT === 'beacon_telematics'
+    || brandName.toLowerCase().includes('beacon');
   const language = String(req.query.lang || 'en').toLowerCase().split('-')[0];
   const beaconManuals = {
     de: 'Movement_Analytics_Benutzerhandbuch_v2_1_Beacon_DE.html',
