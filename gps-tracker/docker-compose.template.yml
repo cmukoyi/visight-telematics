@@ -131,6 +131,7 @@ services:
       - "3011:3001"
     environment:
       - BACKEND_URL=http://backend:8000/api/v1
+      - CUSTOMER_TENANT=__TENANT_PREFIX__
       - NODE_ENV=production
     volumes:
       # Per-tenant branding (logo, favicon, etc.). Bind-mounted read-only so
