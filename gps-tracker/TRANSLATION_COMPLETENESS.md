@@ -39,6 +39,14 @@ observer translates those markers after rendering. Dates use
 
 ## Production Verification
 
+Populate French translations from inside the backend container. The command
+prints progress every 25 keys and commits each batch, so it is safe to rerun:
+
+```sh
+cd /root/pinplot/gps-tracker
+docker compose exec -T backend python -m app.sync_dashboard_translation_keys --language fr
+```
+
 Run the verifier after every deployment:
 
 ```sh
