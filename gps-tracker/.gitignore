@@ -83,6 +83,8 @@ customer-dashboard/public/help/QR_NFC_Guide_Pinplot.html
 customer-dashboard/public/help/QR_NFC_Guide_Beacon.html
 customer-dashboard/public/help/Movement_Analytics_User_Manual_v2_1_Pinplot.html
 customer-dashboard/public/help/Movement_Analytics_User_Manual_v2_1_Beacon.html
+customer-dashboard/public/help/Movement_Analytics_*_Beacon_*.html
+customer-dashboard/public/help/HIVE_*_Beacon_*.html
 mobile-app/ble_tracker_app/assets/MainLogo.png
 mobile-app/ble_tracker_app/assets/FullLogowhite.png
 mobile-app/ble_tracker_app/web/favicon.ico
