@@ -13376,7 +13376,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // Open the HIVE user manual in a new tab, propagating the current theme.
 function hiveOpenHelp() {
     const theme = document.documentElement.getAttribute('data-theme') || 'light';
-    window.open('/customer/help/hive?theme=' + encodeURIComponent(theme),
+    const language = currentLocale() || 'en';
+    window.open('/customer/help/hive?theme=' + encodeURIComponent(theme) + '&lang=' + encodeURIComponent(language),
                 '_blank', 'noopener,noreferrer');
 }
 
