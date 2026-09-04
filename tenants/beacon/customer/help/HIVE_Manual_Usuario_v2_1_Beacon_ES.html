@@ -1,0 +1,1580 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HIVE — Manual de usuario v2.1</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep:        #0a0f14;
+    --bg-sidebar:     #0c1218;
+    --bg-content:     #0a0f14;
+    --bg-elevated:    #131a22;
+    --bg-card:        #161e28;
+    --border:         #1d2730;
+    --border-bright:  #2a3a48;
+
+    --text-primary:   #e8ecef;
+    --text-secondary: #a0adb8;
+    --text-tertiary:  #6b7785;
+    --text-muted:     #4a5663;
+
+    --green:          #3565d3;
+    --green-dim:      #2850a8;
+    --green-bg:       rgba(53, 101, 211, 0.1);
+    --green-glow:     rgba(53, 101, 211, 0.3);
+
+    --red:            #ff4757;
+    --red-bg:         rgba(255, 71, 87, 0.1);
+    --amber:          #ffb648;
+    --amber-bg:       rgba(255, 182, 72, 0.1);
+    --blue:           #4a9eff;
+    --blue-bg:        rgba(74, 158, 255, 0.1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+    scroll-behavior: smooth;
+  }
+
+  .docs {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    min-height: 100vh;
+  }
+
+  /* ===== Sidebar ===== */
+  .sidebar {
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border);
+    padding: 32px 28px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  .sidebar::-webkit-scrollbar { width: 6px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .docs-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--green);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    margin-bottom: 6px;
+  }
+  .docs-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+    letter-spacing: -0.01em;
+  }
+  .docs-version {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 22px;
+  }
+  .docs-version .new-badge {
+    display: inline-block;
+    background: var(--green-bg);
+    color: var(--green);
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 6px;
+    letter-spacing: 0.06em;
+  }
+
+  .nav-section {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    margin: 22px 0 10px;
+  }
+  .nav-section:first-of-type { margin-top: 0; }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 0 7px 14px;
+    color: var(--text-tertiary);
+    text-decoration: none;
+    font-size: 14px;
+    border-left: 2px solid transparent;
+    margin-left: -16px;
+    padding-left: 14px;
+    transition: all 0.12s;
+    cursor: pointer;
+  }
+  .nav-item::before {
+    content: '•';
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+  .nav-item:hover { color: var(--text-primary); }
+  .nav-item.active {
+    color: var(--green);
+    background: rgba(0, 217, 107, 0.06);
+    border-left-color: var(--green);
+    font-weight: 500;
+  }
+  .nav-item.active::before { color: var(--green); }
+  .nav-item .new-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    background: var(--green);
+    color: var(--bg-deep);
+    padding: 1px 5px;
+    border-radius: 2px;
+    font-weight: 700;
+    margin-left: auto;
+    letter-spacing: 0.04em;
+  }
+
+  /* ===== Content ===== */
+  .content {
+    background: var(--bg-content);
+    background-image:
+      radial-gradient(circle at 20% 0%, rgba(0, 217, 107, 0.04), transparent 50%),
+      radial-gradient(circle at 80% 100%, rgba(0, 217, 107, 0.02), transparent 50%);
+    padding: 60px 80px 120px;
+    max-width: 100%;
+  }
+  .content-inner {
+    max-width: 760px;
+  }
+
+  .kicker {
+    display: flex; align-items: center; gap: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    margin-bottom: 24px;
+  }
+  .kicker::before {
+    content: '';
+    width: 28px; height: 2px;
+    background: var(--green);
+  }
+
+  .hero-title {
+    font-size: 84px;
+    font-weight: 800;
+    line-height: 0.96;
+    letter-spacing: -0.04em;
+    margin-bottom: 32px;
+    color: var(--text-primary);
+  }
+  .hero-title .accent { color: var(--green); display: block; }
+
+  .hero-lede {
+    font-size: 18px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    max-width: 600px;
+    margin-bottom: 32px;
+  }
+
+  .pill-row {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 80px;
+  }
+  .pill {
+    display: inline-flex; align-items: center;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-bright);
+    color: var(--text-secondary);
+    padding: 7px 14px;
+    border-radius: 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+  }
+  .pill.new {
+    background: var(--green-bg);
+    border-color: var(--green-dim);
+    color: var(--green);
+  }
+
+  .section {
+    margin-bottom: 80px;
+    scroll-margin-top: 40px;
+  }
+  .section-head {
+    display: flex; align-items: center; gap: 18px;
+    margin-bottom: 32px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--green);
+    background: rgba(0, 217, 107, 0.08);
+    border: 1px solid var(--green-dim);
+    padding: 6px 10px;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+  }
+  .section-title {
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    flex: 1;
+  }
+  .section-title-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    background: var(--green);
+    color: var(--bg-deep);
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .section h3 {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 36px 0 14px;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+  }
+  .section h4 {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 26px 0 10px;
+    color: var(--text-primary);
+  }
+  .section p {
+    color: var(--text-secondary);
+    margin-bottom: 18px;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+  .section p b, .section p strong {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+  .section a {
+    color: var(--green);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(0, 217, 107, 0.3);
+    transition: border-color 0.15s;
+  }
+  .section a:hover { border-bottom-color: var(--green); }
+
+  .section ul, .section ol {
+    margin: 0 0 18px 4px;
+    padding-left: 24px;
+    color: var(--text-secondary);
+  }
+  .section li {
+    margin-bottom: 8px;
+    line-height: 1.65;
+  }
+  .section li b { color: var(--text-primary); font-weight: 600; }
+  .section li::marker { color: var(--green); }
+
+  .callout {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--green);
+    padding: 18px 22px;
+    margin: 24px 0;
+    border-radius: 4px;
+  }
+  .callout.info { border-left-color: var(--blue); }
+  .callout.warn { border-left-color: var(--amber); }
+  .callout.danger { border-left-color: var(--red); }
+  .callout-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--green);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    margin-bottom: 8px;
+  }
+  .callout.info .callout-title { color: var(--blue); }
+  .callout.warn .callout-title { color: var(--amber); }
+  .callout.danger .callout-title { color: var(--red); }
+  .callout p { margin-bottom: 0; font-size: 14px; }
+
+  .doc-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 18px 0;
+    font-size: 13px;
+  }
+  .doc-table th {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-bright);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .doc-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-secondary);
+  }
+  .doc-table td:first-child {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  .doc-table tr:last-child td { border-bottom: none; }
+  .doc-table .center { text-align: center; }
+
+  code, .kbd {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.88em;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    color: var(--green);
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 12px;
+    letter-spacing: 0.04em;
+  }
+  .status-pill.green { background: var(--green-bg); color: var(--green); }
+  .status-pill.red { background: var(--red-bg); color: var(--red); }
+  .status-pill.amber { background: var(--amber-bg); color: var(--amber); }
+  .status-pill.blue { background: var(--blue-bg); color: var(--blue); }
+  .status-pill.muted { background: var(--bg-elevated); color: var(--text-tertiary); border: 1px solid var(--border-bright); }
+  .status-pill .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .figure {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 24px;
+    margin: 24px 0;
+  }
+  .figure-caption {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--border);
+  }
+  .figure-caption b { color: var(--green); font-weight: 600; }
+
+  .state-diagram {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .state-node {
+    flex: 1;
+    min-width: 110px;
+    text-align: center;
+    padding: 14px 10px;
+    border-radius: 6px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-bright);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+  .state-node.ok { border-color: var(--green-dim); color: var(--green); }
+  .state-node.pending { border-color: var(--amber); color: var(--amber); }
+  .state-node.alert { border-color: var(--red); color: var(--red); }
+  .state-node.resolving { border-color: var(--blue); color: var(--blue); }
+  .state-node.starting { border-color: var(--amber); color: var(--amber); }
+  .state-node.transit { border-color: var(--blue); color: var(--blue); }
+  .state-node.settling { border-color: var(--amber); color: var(--amber); }
+  .state-arrow {
+    color: var(--text-tertiary);
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .pip-row {
+    display: flex; gap: 6px; align-items: center;
+    margin: 12px 0;
+  }
+  .pip {
+    width: 28px; height: 28px;
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+  .pip.fresh { background: var(--green-bg); color: var(--green); border-color: var(--green-dim); }
+  .pip.recent { background: var(--blue-bg); color: var(--blue); border-color: rgba(74, 158, 255, 0.4); }
+  .pip.stale { background: var(--amber-bg); color: var(--amber); border-color: rgba(255, 182, 72, 0.4); }
+  .pip.lost { background: var(--red-bg); color: var(--red); border-color: rgba(255, 71, 87, 0.4); }
+
+  .lifecycle-vis {
+    display: grid;
+    grid-template-columns: 1fr 24px 1fr 24px 1fr;
+    align-items: stretch;
+    gap: 0;
+  }
+  .lifecycle-stage {
+    background: var(--bg-card);
+    border: 1px solid var(--border-bright);
+    border-radius: 6px;
+    padding: 16px 18px;
+    text-align: center;
+  }
+  .lifecycle-stage.active { border-color: var(--green-dim); }
+  .lifecycle-stage.archived { border-color: var(--text-muted); opacity: 0.85; }
+  .lifecycle-stage.purged { border-color: var(--red); opacity: 0.65; }
+  .lifecycle-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    margin-bottom: 6px;
+  }
+  .lifecycle-stage.active .lifecycle-label { color: var(--green); }
+  .lifecycle-stage.archived .lifecycle-label { color: var(--text-secondary); }
+  .lifecycle-stage.purged .lifecycle-label { color: var(--red); }
+  .lifecycle-stage-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+  .lifecycle-duration {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+  .lifecycle-arrow {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+  }
+
+  /* (legacy motion-state visual styles — retained, unused) */
+  .motion-states {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 12px;
+    margin: 24px 0;
+  }
+  .motion-state-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border-bright);
+    border-radius: 6px;
+    padding: 18px 20px;
+  }
+  .motion-state-box.stationary { border-left: 3px solid var(--green); }
+  .motion-state-box.starting { border-left: 3px solid var(--amber); }
+  .motion-state-box.transit { border-left: 3px solid var(--blue); }
+  .motion-state-box.settling { border-left: 3px solid var(--amber); }
+  .motion-state-icon {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+  .motion-state-box.stationary .motion-state-icon { color: var(--green); }
+  .motion-state-box.starting .motion-state-icon { color: var(--amber); }
+  .motion-state-box.transit .motion-state-icon { color: var(--blue); }
+  .motion-state-box.settling .motion-state-icon { color: var(--amber); }
+  .motion-state-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+  .motion-state-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .quick-toc {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 22px 26px;
+    margin-bottom: 60px;
+  }
+  .quick-toc-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    margin-bottom: 12px;
+  }
+  .quick-toc-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px 24px;
+  }
+  .quick-toc-list a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 13px;
+    padding: 4px 0;
+    border-bottom: none !important;
+    transition: color 0.12s;
+    display: flex; align-items: center;
+  }
+  .quick-toc-list a:hover { color: var(--green); }
+  .quick-toc-list a .num {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-muted);
+    margin-right: 10px;
+    font-size: 11px;
+  }
+  .quick-toc-list a .new-mini {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    background: var(--green);
+    color: var(--bg-deep);
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-weight: 700;
+    margin-left: auto;
+    letter-spacing: 0.04em;
+  }
+
+  .doc-footer {
+    margin-top: 100px;
+    padding-top: 30px;
+    border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+
+  /* Whats new banner */
+  .whats-new {
+    background: linear-gradient(135deg, rgba(0, 217, 107, 0.08), rgba(0, 217, 107, 0.02));
+    border: 1px solid var(--green-dim);
+    border-radius: 8px;
+    padding: 24px 28px;
+    margin-bottom: 50px;
+    position: relative;
+  }
+  .whats-new-tag {
+    position: absolute;
+    top: -10px; right: 24px;
+    background: var(--green);
+    color: var(--bg-deep);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 4px 10px;
+    border-radius: 3px;
+  }
+  .whats-new-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+  .whats-new-list {
+    margin: 12px 0 0 4px;
+    padding-left: 24px;
+    color: var(--text-secondary);
+    font-size: 14px;
+  }
+  .whats-new-list li {
+    margin-bottom: 6px;
+  }
+  .whats-new-list li::marker { color: var(--green); }
+
+  @media (max-width: 1100px) {
+    .docs { grid-template-columns: 240px 1fr; }
+    .content { padding: 40px 50px 80px; }
+    .hero-title { font-size: 64px; }
+    .motion-states { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 800px) {
+    .docs { grid-template-columns: 1fr; }
+    .sidebar { position: relative; height: auto; }
+    .content { padding: 30px 24px 60px; }
+    .hero-title { font-size: 44px; }
+    .quick-toc-list { grid-template-columns: 1fr; }
+    .lifecycle-vis { grid-template-columns: 1fr; }
+    .lifecycle-arrow { padding: 6px 0; transform: rotate(90deg); }
+  }
+
+  /* ===== Light theme (toggled) ===== */
+  html[data-theme="light"] {
+    --bg-deep:        #ffffff;
+    --bg-sidebar:     #f6f8fa;
+    --bg-content:     #ffffff;
+    --bg-elevated:    #f1f4f8;
+    --bg-card:        #eaeef4;
+    --border:         #dfe4ea;
+    --border-bright:  #c6ceda;
+
+    --text-primary:   #0e151c;
+    --text-secondary: #3e4b58;
+    --text-tertiary:  #66727f;
+    --text-muted:     #98a3af;
+
+    --green:          #2a55bd;
+    --green-dim:      #9db3e2;
+    --green-bg:       rgba(42, 85, 189, 0.08);
+    --green-glow:     rgba(42, 85, 189, 0.22);
+
+    --red:            #d32236;
+    --red-bg:         rgba(211, 34, 54, 0.09);
+    --amber:          #a86a00;
+    --amber-bg:       rgba(168, 106, 0, 0.11);
+    --blue:           #1a72d8;
+    --blue-bg:        rgba(26, 114, 216, 0.09);
+  }
+  html[data-theme="light"] .content {
+    background-image:
+      radial-gradient(circle at 20% 0%, rgba(42, 85, 189, 0.045), transparent 50%),
+      radial-gradient(circle at 80% 100%, rgba(42, 85, 189, 0.03), transparent 50%);
+  }
+  html[data-theme="light"] .section-num { background: var(--green-bg); }
+  html[data-theme="light"] .nav-item.active { background: var(--green-bg); }
+  html[data-theme="light"] .section a { border-bottom-color: rgba(42, 85, 189, 0.3); }
+  html[data-theme="light"] .whats-new {
+    background: linear-gradient(135deg, rgba(42, 85, 189, 0.07), rgba(42, 85, 189, 0.02));
+  }
+  html[data-theme="light"] .new-tag,
+  html[data-theme="light"] .new-mini,
+  html[data-theme="light"] .whats-new-tag,
+  html[data-theme="light"] .section-title-tag { color: #ffffff; }
+
+  /* ===== Theme toggle ===== */
+  .theme-toggle {
+    position: fixed;
+    top: 18px; right: 24px;
+    z-index: 200;
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-bright);
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 8px 14px;
+    border-radius: 18px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .theme-toggle:hover { color: var(--green); border-color: var(--green-dim); }
+  .theme-toggle:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+  .theme-toggle-icon { font-size: 13px; line-height: 1; }
+  @media (max-width: 800px) {
+    .theme-toggle { top: 10px; right: 12px; padding: 6px 10px; letter-spacing: 0.06em; }
+  }
+  @media print { .theme-toggle { display: none; } }
+</style>
+</head>
+<body>
+
+<button class="theme-toggle" id="themeToggle" type="button" aria-label="Alternar entre modo claro y oscuro">
+  <span class="theme-toggle-icon">☀</span><span class="theme-toggle-label">Claro</span>
+</button>
+
+<div class="docs">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar">
+    <div class="docs-label">Documentación</div>
+    <div class="docs-title">HIVE Tracking</div>
+    <div class="docs-version">v2.1 — Plataforma Beacon Telematics <span class="new-badge">ACTUALIZADO</span></div>
+
+    <div class="nav-section">Primeros pasos</div>
+    <a class="nav-item active" href="#overview">Descripción general</a>
+    <a class="nav-item" href="#whats-new">Novedades de la v2.0 <span class="new-tag">NEW</span></a>
+    <a class="nav-item" href="#how-it-works">Cómo funciona</a>
+    <a class="nav-item" href="#quick-start">Inicio rápido</a>
+    <a class="nav-item" href="#concepts">Conceptos clave</a>
+
+    <div class="nav-section">Crear hives</div>
+    <a class="nav-item" href="#wizard">Asistente de configuración</a>
+    <a class="nav-item" href="#mobility">Perfiles de movilidad</a>
+    <a class="nav-item" href="#thresholds">Umbrales de distancia</a>
+    <a class="nav-item" href="#smart-defaults">Valores predeterminados inteligentes</a>
+
+    <div class="nav-section">Supervisión</div>
+    <a class="nav-item" href="#hive-list">Lista de hives</a>
+    <a class="nav-item" href="#detail-view">Vista detallada</a>
+    <a class="nav-item" href="#alerts">Alertas y rupturas</a>
+    <a class="nav-item" href="#freshness">Frescura de las etiquetas</a>
+
+    <div class="nav-section">Ciclo de vida</div>
+    <a class="nav-item" href="#lifecycle">Vida útil de 60 días</a>
+    <a class="nav-item" href="#deletion">Eliminar y volver a crear</a>
+    <a class="nav-item" href="#archive">Archivo</a>
+
+    <div class="nav-section">Referencia</div>
+    <a class="nav-item" href="#troubleshooting">Resolución de problemas</a>
+    <a class="nav-item" href="#faq">FAQ</a>
+  </aside>
+
+  <!-- ===== CONTENT ===== -->
+  <main class="content">
+    <div class="content-inner">
+
+      <!-- ===== HERO ===== -->
+      <div class="kicker">Manual de usuario · v2.1</div>
+      <h1 class="hero-title">
+        HIVE
+        <span class="accent">Tracking</span>
+      </h1>
+      <p class="hero-lede">
+        Agrupe sus etiquetas BLE en conjuntos vigilados y reciba una alerta en cuanto se separen. Pensado para kits de viaje, herramientas de taller, activos de flota y cualquier otra cosa que deba permanecer junta, en reposo o en movimiento.
+      </p>
+      <div class="pill-row">
+        <span class="pill">Seguimiento de grupo</span>
+        <span class="pill">Localización colaborativa</span>
+        <span class="pill">Ciclo de 60 días</span>
+        <span class="pill">Valores predeterminados inteligentes</span>
+        <span class="pill">Perfiles de movilidad</span>
+        <span class="pill new">Sensible a la obsolescencia</span>
+      </div>
+
+      <!-- What's New banner -->
+      <div class="whats-new">
+        <div class="whats-new-tag">v2.0 · Novedades</div>
+        <div class="whats-new-title">Viajando juntos: se acabaron las falsas alertas</div>
+        <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 0;">
+          Las pruebas en condiciones reales mostraron que HIVE lanzaba falsas alertas de ruptura cuando los grupos viajaban juntos en vehículo. La v2.0 introduce la evaluación sensible a la obsolescencia: HIVE ya no se fía de una «ruptura» construida a partir de reportes de posición capturados en puntos distintos de un mismo trayecto.
+        </p>
+        <ul class="whats-new-list">
+          <li><b>Coherencia temporal</b> — HIVE solo confirma una ruptura a partir de posiciones capturadas en instantes próximos, de modo que viajar ya no parece una separación</li>
+          <li><b>Persistencia obligatoria</b> — una ruptura debe respaldarse con evidencia reciente y coherente antes de confirmarse; los artefactos breves quedan como «sospechados» y se resuelven solos</li>
+          <li><b>Alertas de varias etiquetas (v2.1)</b> — cuando varias etiquetas se van juntas, la alerta indica cuántas se han separado, no solo una</li>
+          <li><b>Protección frente a lecturas erróneas (v2.1)</b> — un único reporte GPS anómalo no puede provocar una falsa alarma; una separación real se confirma igualmente en pocos minutos</li>
+          <li><b>Sin configuración necesaria</b> — la nueva evaluación es automática y se aplica a todos los hives</li>
+        </ul>
+      </div>
+
+      <!-- Quick TOC -->
+      <div class="quick-toc">
+        <div class="quick-toc-title">En este manual</div>
+        <div class="quick-toc-list">
+          <a href="#overview"><span class="num">01</span>Descripción general</a>
+          <a href="#whats-new"><span class="num">02</span>Novedades de la v2.0<span class="new-mini">NEW</span></a>
+          <a href="#how-it-works"><span class="num">03</span>Cómo funciona</a>
+          <a href="#quick-start"><span class="num">04</span>Inicio rápido</a>
+          <a href="#concepts"><span class="num">05</span>Conceptos clave</a>
+          <a href="#wizard"><span class="num">06</span>Asistente de configuración</a>
+          <a href="#mobility"><span class="num">07</span>Perfiles de movilidad</a>
+          <a href="#hive-list"><span class="num">08</span>Lista de hives</a>
+          <a href="#detail-view"><span class="num">09</span>Vista detallada</a>
+          <a href="#alerts"><span class="num">10</span>Alertas y rupturas</a>
+          <a href="#freshness"><span class="num">11</span>Frescura de las etiquetas</a>
+          <a href="#lifecycle"><span class="num">12</span>Vida útil de 60 días</a>
+          <a href="#deletion"><span class="num">13</span>Eliminar y volver a crear</a>
+          <a href="#archive"><span class="num">14</span>Archivo</a>
+          <a href="#troubleshooting"><span class="num">15</span>Resolución de problemas</a>
+          <a href="#faq"><span class="num">16</span>FAQ</a>
+        </div>
+      </div>
+
+      <!-- ===== 01 OVERVIEW ===== -->
+      <section class="section" id="overview">
+        <div class="section-head">
+          <div class="section-num">01</div>
+          <h2 class="section-title">Descripción general</h2>
+        </div>
+
+        <p>
+          HIVE es una función de seguimiento por proximidad para grupos de etiquetas BLE. Usted selecciona un conjunto de 2 a 5 etiquetas que van juntas — un kit de viaje, un juego de herramientas, una carga de reparto — y HIVE vigila sus posiciones. Si alguna etiqueta se aleja de las demás más allá de la distancia configurada, recibirá una alerta.
+        </p>
+
+        <p>
+          HIVE funciona con cualquier etiqueta BLE iBeacon o Eddystone ya registrada en <b>Beacon Telematics</b>. Usa los mismos datos de localización colaborativa que sus etiquetas ya reportan, sin hardware especial ni anclas. Las etiquetas informan de su posición cada vez que pasa cerca un teléfono con una aplicación compatible, lo que significa que la calidad de los datos es mejor en zonas concurridas y, naturalmente, más escasa en las tranquilas.
+        </p>
+
+        <p>
+          Desde la v2.0, HIVE emplea una <b>evaluación sensible a la obsolescencia</b>. Cuando su hive viaja en bloque (en coche, en bici o en su bolsa mientras camina), HIVE distingue entre «realmente separado» y «solo parece separado porque los reportes de posición se tomaron en puntos distintos del trayecto», y evita lanzar falsas alertas.
+        </p>
+
+        <div class="callout">
+          <div class="callout-title">→ De un vistazo</div>
+          <p>
+            Grupos de <b>2 a 5 etiquetas</b> por hive · Umbral de distancia configurable · Perfil de movilidad por hive · Vida operativa de 60 días · Retención en archivo de 60 días · Opción de eliminación definitiva · <b>Evaluación sensible a la obsolescencia (novedad)</b>.
+          </p>
+        </div>
+      </section>
+
+      <!-- ===== 02 WHAT'S NEW ===== -->
+      <section class="section" id="whats-new">
+        <div class="section-head">
+          <div class="section-num">02</div>
+          <h2 class="section-title">Novedades de la v2.0</h2>
+          <span class="section-title-tag">New</span>
+        </div>
+
+        <p>
+          La v2.0 es una actualización sustancial centrada en un solo problema: HIVE no manejaba bien los hives en movimiento. Si alguna vez su kit de viaje ha lanzado una alerta de «ruptura» mientras usted simplemente volvía del supermercado en coche, esta versión es para usted.
+        </p>
+
+        <h3>El problema</h3>
+        <p>
+          Las posiciones de las etiquetas BLE las reportan los teléfonos que pasan cerca, normalmente cada 2 a 5 minutos. Cuando el hive está quieto no hay problema: una posición de hace 3 minutos sigue siendo aproximadamente correcta. Pero cuando el hive se mueve en un vehículo a 40 km/h, una posición de hace 3 minutos está a más de 2 km de donde la etiqueta se encuentra realmente.
+        </p>
+        <p>
+          La versión anterior de HIVE no tenía esto en cuenta. Comparaba la posición reciente de una etiqueta con la posición más antigua de otra, las veía separadas más de un kilómetro y lanzaba una alerta de ruptura, aunque ambas etiquetas estuvieran plácidamente juntas en el maletero del mismo coche.
+        </p>
+
+        <h3>La solución</h3>
+        <p>
+          HIVE utiliza ahora una <b>evaluación sensible a la obsolescencia</b>. Antes de declarar una ruptura comprueba si las posiciones que compara se capturaron en instantes lo bastante próximos como para ser fiables. Dos reportes separados por diez minutos, mientras usted conduce, describen dos puntos distintos de su ruta y no la distancia entre dos etiquetas, así que HIVE se niega a confirmar una ruptura a partir de ellos. Una ruptura solo se confirma cuando reportes recientes y alineados en el tiempo muestran de forma consistente una separación real. Los artefactos breves del desplazamiento aparecen como «sospechados» y se resuelven solos cuando usted se detiene.
+        </p>
+
+        <h3>Qué tiene que hacer usted</h3>
+        <p>
+          Nada. La evaluación sensible a la obsolescencia es automática. No hay ajustes nuevos que configurar y los hives existentes se benefician del nuevo comportamiento en cuanto se actualiza.
+        </p>
+
+        <div class="callout info">
+          <div class="callout-title">→ Un compromiso importante</div>
+          <p>Mientras su hive viaja en bloque, una separación real ocurrida a mitad de trayecto puede aparecer únicamente como ruptura sospechada hasta que usted se detenga y unos reportes recientes y alineados en el tiempo la confirmen. Para la mayoría de los usuarios (que llevan consigo los objetos etiquetados) este es el comportamiento correcto: conduciendo no podría hacer nada útil con una alerta.</p>
+        </div>
+      </section>
+
+      <!-- ===== 03 HOW IT WORKS ===== -->
+      <section class="section" id="how-it-works">
+        <div class="section-head">
+          <div class="section-num">03</div>
+          <h2 class="section-title">Cómo funciona</h2>
+        </div>
+
+        <p>
+          Cada vez que uno de sus objetos etiquetados reporta una nueva posición, HIVE reevalúa el hive. Calcula la distancia entre cada par de etiquetas del grupo y busca la mayor: el <b>diámetro del grupo</b>. Si el diámetro supera su umbral <b>y</b> la separación se confirma con reportes alineados en el tiempo, se lanza una alerta.
+        </p>
+
+        <h3>La máquina de estados de las alertas</h3>
+        <p>
+          Las alertas no saltan a la primera señal de problema; eso generaría ruido por las oscilaciones del GPS y por casos límite pasajeros. En su lugar, los hives recorren una secuencia de estados deliberadamente gradual:
+        </p>
+
+        <div class="figure">
+          <div class="state-diagram">
+            <div class="state-node ok">OK</div>
+            <div class="state-arrow">→</div>
+            <div class="state-node pending">PENDING</div>
+            <div class="state-arrow">→</div>
+            <div class="state-node alert">BREACHING</div>
+            <div class="state-arrow">→</div>
+            <div class="state-node resolving">RESOLVING</div>
+            <div class="state-arrow">→</div>
+            <div class="state-node ok">OK</div>
+          </div>
+          <div class="figure-caption">
+            <b>Figura 1.</b> Máquina de estados de las alertas — se exige confirmación para entrar en ruptura e histéresis para volver a OK.
+          </div>
+        </div>
+
+        <p>
+          Una ruptura sospechada lleva el hive al estado <span class="status-pill amber"><span class="dot"></span>PENDING</span> mientras espera un reporte que la confirme. Una vez confirmada, pasa a <span class="status-pill red"><span class="dot"></span>BREACHING</span> y se envía la alerta. Cuando la etiqueta alejada vuelve al grupo, el hive no se restablece de inmediato: debe caer holgadamente por debajo del umbral antes de pasar por <span class="status-pill blue"><span class="dot"></span>RESOLVING</span> y regresar a <span class="status-pill green"><span class="dot"></span>OK</span>.
+        </p>
+
+        <h3>Detección de la etiqueta desviada</h3>
+        <p>
+          Cuando salta una ruptura, HIVE identifica <b>qué etiqueta</b> la ha provocado contando en cuántos pares por encima del umbral participa cada una. La etiqueta presente en más pares en ruptura se marca como la etiqueta desviada — normalmente la que se ha alejado — y se resalta en las alertas y en la vista detallada. Si dos etiquetas empatan, HIVE elige la que esté más lejos del resto del grupo, de modo que la etiqueta señalada siempre sea una realmente distante.
+        </p>
+
+        <h3>Una o varias etiquetas que se separan</h3>
+        <p>
+          La notificación de ruptura se adapta al número de etiquetas que han abandonado el grupo:
+        </p>
+        <ul>
+          <li><b>Una etiqueta alejada</b> — la alerta la nombra directamente, p. ej. <i>"PB708-475 has separated from Mobile Kit — now 1.1 mi from the group."</i></li>
+          <li><b>Varias etiquetas alejadas</b> — la alerta indica que el grupo se ha dividido y cuántas se han ido, p. ej. <i>"Mobile Kit has split — 2 tags have separated from the group (PB708-475 and 1 other)."</i></li>
+        </ul>
+        <p>
+          La notificación nombra una etiqueta representativa y añade un recuento; la <b>vista detallada</b> lista cada etiqueta con su distancia, de modo que siempre puede ver exactamente cuáles se han movido. El recuento refleja cuántas etiquetas están realmente más allá del umbral: las que se mantuvieron juntas nunca se cuentan, aunque la ruptura implique a varias etiquetas.
+        </p>
+
+        <h3>Evaluación sensible a la obsolescencia (v2.0)</h3>
+        <p>
+          Antes de que la máquina de estados anterior pueda confirmar una ruptura, HIVE aplica una <b>comprobación de obsolescencia</b>. Cada distancia entre dos etiquetas solo se considera fiable si ambas posiciones se capturaron en instantes próximos (unos minutos, ajustados según el perfil de movilidad). Una «ruptura» sostenida únicamente por posiciones desalineadas en el tiempo — la firma típica de un grupo que viaja junto — se mantiene como <span class="status-pill amber"><span class="dot"></span>SUSPECTED</span> y nunca se confirma. Se resuelve sola en cuanto llegan reportes recientes y alineados en el tiempo. Una ruptura solo se confirma cuando reportes temporalmente coherentes muestran de forma consistente una separación real.
+        </p>
+
+        <h3>Por qué una separación real tarda unos minutos en confirmarse</h3>
+        <p>
+          Cuando una etiqueta se separa de verdad, verá brevemente una ruptura <span class="status-pill amber"><span class="dot"></span>SUSPECTED</span> antes de que pase a <span class="status-pill red"><span class="dot"></span>CONFIRMED</span>. Esa breve espera es deliberada: HIVE solo confirma una vez que la separación ha <b>persistido</b> unos minutos, respaldada por reportes de localización recientes. Así se absorbe la lectura GPS errónea ocasional: un único reporte anómalo de un teléfono con mala señal puede situar por un momento una etiqueta lejos del grupo, y la comprobación de persistencia impide que ese fallo puntual provoque una falsa alarma. Una separación genuina supera la espera sin dificultad y se confirma; un fallo momentáneo queda desmentido por el siguiente buen reporte y desaparece sin ruido. Es importante señalar que la evidencia que confirma puede proceder de <b>cualquiera</b> de las etiquetas, de modo que una separación real se confirma incluso si la etiqueta que se aleja solo reporta una vez.
+        </p>
+      </section>
+
+      <!-- ===== 04 QUICK START ===== -->
+      <section class="section" id="quick-start">
+        <div class="section-head">
+          <div class="section-num">04</div>
+          <h2 class="section-title">Inicio rápido</h2>
+        </div>
+
+        <p>Poner en marcha su primer hive lleva menos de un minuto si acepta los ajustes sugeridos.</p>
+
+        <ol>
+          <li>En la barra lateral, elija <b>HIVE Tracking</b> y haga clic en <code>+ New Hive</code>.</li>
+          <li>Escoja las etiquetas que quiere agrupar (entre 2 y 5). Las etiquetas que ya pertenecen a otro hive no estarán disponibles.</li>
+          <li>Dé un nombre al hive; algo descriptivo como <em>Travel Kit</em> o <em>Workshop Tools</em>.</li>
+          <li>HIVE analiza el movimiento reciente de sus etiquetas y sugiere un perfil de movilidad y un umbral de distancia. Si la insignia indica <b>High Confidence</b>, haga clic en <code>Use Suggested Settings</code> y habrá terminado.</li>
+          <li>Si no, haga clic en <code>Review Settings</code> para recorrer el asistente de 3 preguntas.</li>
+        </ol>
+
+        <p>
+          Su hive empieza a hacer seguimiento de inmediato. Hay un breve periodo de calentamiento de 5 a 10 minutos mientras HIVE establece el estado de referencia; después las alertas funcionan con normalidad. Mientras sus objetos viajan juntos, los artefactos de ruptura se mantienen como «sospechados» y se resuelven en cuanto usted se detiene.
+        </p>
+
+        <div class="callout info">
+          <div class="callout-title">→ Consejo</div>
+          <p>Si ya ha usado HIVE, el asistente recuerda su última configuración. Volver a crear un hive con ajustes parecidos son unos pocos clics.</p>
+        </div>
+      </section>
+
+      <!-- ===== 05 KEY CONCEPTS ===== -->
+      <section class="section" id="concepts">
+        <div class="section-head">
+          <div class="section-num">05</div>
+          <h2 class="section-title">Conceptos clave</h2>
+        </div>
+
+        <h3>Diámetro del grupo</h3>
+        <p>
+          La mayor distancia entre dos etiquetas cualesquiera de su hive. Si su hive tiene 5 etiquetas, HIVE mide las 10 distancias por pares e informa de la mayor. El grupo está «junto» mientras el diámetro se mantenga por debajo de su umbral.
+        </p>
+
+        <h3>Umbral de distancia</h3>
+        <p>
+          El diámetro de grupo máximo que usted tolera antes de que salte una alerta. Configurable por hive y mostrado junto al diámetro en tiempo real en todas las pantallas. Los valores predeterminados van de 150 m (activos estáticos) a 1000 m (activos móviles o en tránsito), según el perfil elegido.
+        </p>
+
+        <h3>Perfil de movilidad</h3>
+        <p>
+          Un preajuste agrupado que controla cómo interpreta HIVE los datos de posición de sus etiquetas. Afecta a las ventanas de frescura, la sensibilidad de las alertas, la ventana de coherencia temporal y los requisitos de confirmación. Tres opciones: <b>Stationary</b>, <b>Slow</b> y <b>Mobile</b>.
+        </p>
+
+        <h3>Nivel de frescura</h3>
+        <p>
+          Cada etiqueta se clasifica según lo reciente que sea su último reporte. Las etiquetas van bajando de nivel a medida que permanecen en silencio: <span class="status-pill green"><span class="dot"></span>FRESH</span> <span class="status-pill blue"><span class="dot"></span>RECENT</span> <span class="status-pill amber"><span class="dot"></span>STALE</span> <span class="status-pill red"><span class="dot"></span>LOST</span>. Solo las etiquetas Fresh y Recent participan en la evaluación de alertas.
+        </p>
+
+        <h3>Coherencia temporal <span class="status-pill green" style="margin-left: 8px;"><span class="dot"></span>NEW v2.0</span></h3>
+        <p>
+          Indica si dos reportes de posición se capturaron con la suficiente proximidad en el tiempo como para compararlos de forma significativa. HIVE solo confirma una ruptura a partir de posiciones temporalmente coherentes, de modo que un grupo que viaja junto (cuyos reportes se reparten a lo largo de un trayecto) no parezca una separación. El desfase de tiempo aceptable se ajusta según el perfil de movilidad.
+        </p>
+
+        <h3>Ciclo de vida del hive</h3>
+        <p>
+          Cada hive tiene una vida operativa de 60 días desde el momento de su creación. Pasado ese plazo, se traslada a un archivo de 60 días donde puede consultar su historial, pero ya no hace seguimiento. Terminado el periodo de archivo, los datos se purgan salvo que usted intervenga.
+        </p>
+      </section>
+
+      <!-- ===== 06 SETUP WIZARD ===== -->
+      <section class="section" id="wizard">
+        <div class="section-head">
+          <div class="section-num">06</div>
+          <h2 class="section-title">Asistente de configuración</h2>
+        </div>
+
+        <p>
+          El asistente es un flujo de 3 preguntas diseñado para durar segundos, no minutos. Rellena de antemano cada respuesta según la actividad reciente de sus etiquetas, así que la mayoría de los usuarios solo tiene que confirmar y continuar.
+        </p>
+
+        <h3>Pregunta 1 — ¿Qué está rastreando?</h3>
+        <p>
+          Un nombre descriptivo para el hive. Es opcional pero recomendable: las alertas y el historial hacen referencia a este nombre, de modo que algo concreto como <em>Travel Kit</em> es mejor que <em>Hive 4</em>.
+        </p>
+
+        <h3>Pregunta 2 — ¿Cuánto se mueven estos objetos?</h3>
+        <p>
+          La elección del perfil de movilidad. HIVE lo preselecciona según cómo se han movido sus etiquetas en las últimas semanas, marcado con una insignia <span class="status-pill green"><span class="dot"></span>SUGGESTED</span>. Hay tres opciones:
+        </p>
+        <ul>
+          <li><b>They stay put</b> — objetos que normalmente no deberían moverse de donde usted los ha dejado. Herramientas en un taller, equipos en una campa, instrumentos en un laboratorio.</li>
+          <li><b>They move occasionally</b> — objetos que se mueven a veces y despacio. Ganado, vehículos aparcados, ayudas a la movilidad, equipaje durante un viaje. HIVE espera periodos largos de reposo con movimientos ocasionales.</li>
+          <li><b>They're often on the move</b> — objetos que lleva consigo a diario o que están en tránsito. Efectos personales, paquetes de reparto, equipamiento de flota. HIVE es más preciso cuando estos objetos están en reposo; mientras viajan juntos, los artefactos de ruptura se mantienen como «sospechados» y se resuelven al llegar.</li>
+        </ul>
+        <p>Consulte <a href="#mobility">Perfiles de movilidad</a> para todos los detalles.</p>
+
+        <h3>Pregunta 3 — ¿Cómo de cerca deben permanecer?</h3>
+        <p>
+          El umbral de distancia. Elija entre los valores predefinidos (150 m, 250 m, 450 m, 750 m, 1000 m) o introduzca un valor personalizado. El valor predeterminado corresponde al perfil de movilidad seleccionado.
+        </p>
+
+        <div class="callout info">
+          <div class="callout-title">→ Vía rápida</div>
+          <p>Si HIVE tiene mucha confianza en sus sugerencias (normalmente cuando sus etiquetas cuentan con al menos 7 días de historial), aparece una tarjeta rápida en la parte superior del asistente. Haga clic en <code>Use Suggested Settings</code> para saltarse las preguntas por completo.</p>
+        </div>
+      </section>
+
+      <!-- ===== 07 MOBILITY ===== -->
+      <section class="section" id="mobility">
+        <div class="section-head">
+          <div class="section-num">07</div>
+          <h2 class="section-title">Perfiles de movilidad</h2>
+        </div>
+
+        <p>
+          Los perfiles de movilidad son la decisión de configuración más importante. Le dicen a HIVE qué tipo de activo está rastreando, lo que afecta a casi todos los aspectos de la evaluación de alertas, incluida la ventana de coherencia temporal que usa la evaluación sensible a la obsolescencia.
+        </p>
+
+        <table class="doc-table">
+          <thead>
+            <tr><th>Perfil</th><th>Ideal para</th><th>Umbral predeterminado</th><th>Ventana de coherencia</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Stationary</td>
+              <td>Herramientas, equipos, instrumentos — activos que normalmente no deberían moverse</td>
+              <td>150 m</td>
+              <td>30 min</td>
+            </tr>
+            <tr>
+              <td>Slow</td>
+              <td>Ganado, vehículos aparcados, ayudas a la movilidad, equipaje durante un viaje</td>
+              <td>450 m</td>
+              <td>10 min</td>
+            </tr>
+            <tr>
+              <td>Mobile</td>
+              <td>Efectos personales, equipos compartidos, paquetes en mensajería, elementos de flota, vehículos en carretera</td>
+              <td>1000 m</td>
+              <td>5 min</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Qué cambian realmente los perfiles</h3>
+        <p>
+          Elegir un perfil fija varios parámetros a la vez. A medida que aumenta la movilidad, las ventanas de frescura se acortan (las posiciones antiguas pierden fiabilidad más deprisa), los requisitos de confirmación se endurecen, los filtros de ruido se amplían y la ventana de coherencia temporal se estrecha (de modo que los activos más rápidos exigen reportes más ajustados en el tiempo antes de dar por buena una ruptura).
+        </p>
+        <p>
+          El perfil <b>Mobile</b> cubre un abanico amplio: desde objetos personales que en su mayoría permanecen quietos hasta paquetes de reparto en pleno tránsito. HIVE es más preciso cuando estos objetos están en reposo; mientras viajan juntos, los artefactos de ruptura se mantienen como «sospechados» en lugar de confirmarse, y se resuelven en cuanto el hive se estabiliza.
+        </p>
+        <p>
+          La columna <b>Umbral predeterminado</b> muestra el valor de partida de cada perfil, calibrado para una cadencia de reporte típica de 5 a 10 minutos. Puede subir o bajar el umbral para su caso concreto durante la configuración o más adelante en los ajustes del hive.
+        </p>
+
+        <div class="callout warn">
+          <div class="callout-title">→ Elegir el perfil equivocado</div>
+          <p>Si su hive produce sistemáticamente demasiadas falsas alertas o pasa por alto las reales, es probable que el perfil no encaje. HIVE mostrará una sugerencia discreta si lo detecta. Puede cambiar el perfil a mitad de vida: consulte <a href="#deletion">Eliminar y volver a crear</a>.</p>
+        </div>
+      </section>
+
+      <!-- ===== 08 HIVE LIST ===== -->
+      <section class="section" id="hive-list">
+        <div class="section-head">
+          <div class="section-num">08</div>
+          <h2 class="section-title">Lista de hives</h2>
+        </div>
+
+        <p>
+          La pantalla principal de HIVE muestra todos sus hives activos de un vistazo. Cada tarjeta presenta el nombre del hive, el estado actual, el diámetro del grupo frente al umbral, las casillas de frescura de las etiquetas, la etiqueta desviada (si la hay) y el reloj del ciclo de vida.
+        </p>
+
+        <h3>El estado de un vistazo</h3>
+        <p>
+          El borde superior de color indica el estado al instante:
+        </p>
+        <ul>
+          <li><span class="status-pill green"><span class="dot"></span>VERDE</span> — Todas las etiquetas están juntas, el hive está OK</li>
+          <li><span class="status-pill amber"><span class="dot"></span>ÁMBAR</span> — Datos parciales, problemas de frescura o una ruptura sospechada (sin confirmar)</li>
+          <li><span class="status-pill red"><span class="dot"></span>ROJO</span> — Ruptura activa; una o más etiquetas se han separado</li>
+        </ul>
+
+        <h3>Casillas de etiqueta</h3>
+        <p>
+          Los pequeños cuadrados numerados representan cada etiqueta del hive, con un código de color según la frescura:
+        </p>
+        <div class="pip-row">
+          <div class="pip fresh">01</div>
+          <div class="pip fresh">02</div>
+          <div class="pip recent">03</div>
+          <div class="pip stale">04</div>
+          <div class="pip lost">05</div>
+        </div>
+        <p>
+          Un punto rojo en la esquina de una casilla indica que esa etiqueta es la etiqueta desviada actual.
+        </p>
+
+        <h3>Acciones de la tarjeta</h3>
+        <p>Cada tarjeta ofrece cuatro acciones rápidas:</p>
+        <ul>
+          <li><b>Edit</b> — Abrir los ajustes del hive (perfil de movilidad, umbral)</li>
+          <li><b>Map</b> — Ir a la vista de posición en tiempo real</li>
+          <li><b>History</b> — Revisar alertas y evaluaciones anteriores</li>
+          <li><b>Delete</b> — Mover el hive al archivo (recuperable durante 60 días)</li>
+        </ul>
+      </section>
+
+      <!-- ===== 09 DETAIL VIEW ===== -->
+      <section class="section" id="detail-view">
+        <div class="section-head">
+          <div class="section-num">09</div>
+          <h2 class="section-title">Vista detallada</h2>
+        </div>
+
+        <p>
+          Al hacer clic en cualquier tarjeta de hive se abre su vista detallada, el espacio de trabajo más completo para entender el estado y el historial del hive.
+        </p>
+
+        <h3>Mapa de posiciones en tiempo real</h3>
+        <p>
+          Muestra la posición más reciente de cada etiqueta con respecto a las demás. El círculo discontinuo marca su umbral de distancia. Las líneas de conexión representan las distancias por pares: en verde los pares dentro del límite y en rojo discontinuo los pares por encima del umbral que llevan a la etiqueta desviada.
+        </p>
+
+        <h3>Lectura del diámetro</h3>
+        <p>
+          Una lectura numérica en directo del diámetro actual del grupo, junto a una barra horizontal con la marca del umbral. Cuando la barra rebasa la marca y la separación se confirma con reportes alineados en el tiempo, está en ruptura. Un diámetro que supera el umbral solo por reportes desalineados en el tiempo (algo habitual durante los desplazamientos) se muestra como ruptura sospechada y no confirmada.
+        </p>
+
+        <h3>Tabla de etiquetas</h3>
+        <p>
+          Una fila por etiqueta con el ID, el nombre, la hora del último avistamiento, la distancia al centro del grupo y el papel (núcleo o desviada). Se puede ordenar por cualquier columna. Las etiquetas stale o lost aparecen atenuadas.
+        </p>
+
+        <h3>Paneles laterales</h3>
+        <p>La columna derecha agrupa varios paneles:</p>
+        <ul>
+          <li><b>Active Alert</b> — Detalles de la ruptura actual (si la hay), con la causa y el número de confirmaciones</li>
+          <li><b>Configuration</b> — Perfil de movilidad, umbral, ventanas de frescura y demás parámetros actuales</li>
+          <li><b>Lifecycle</b> — Días restantes en el reloj de 60 días, con un botón rápido <code>Recreate Hive</code></li>
+          <li><b>Recent Activity</b> — Cronología de evaluaciones, eventos de ruptura y alertas de las últimas 24 horas</li>
+        </ul>
+      </section>
+
+      <!-- ===== 10 ALERTS ===== -->
+      <section class="section" id="alerts">
+        <div class="section-head">
+          <div class="section-num">10</div>
+          <h2 class="section-title">Alertas y rupturas</h2>
+        </div>
+
+        <p>
+          HIVE emite distintos tipos de alerta según la calidad de los datos y lo que haya cambiado. Conocer la diferencia le ayuda a responder de forma adecuada.
+        </p>
+
+        <table class="doc-table">
+          <thead>
+            <tr><th>Tipo de alerta</th><th>Significado</th><th>Acción</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Confirmed Breach</td>
+              <td>Varios reportes recientes muestran que el hive está dividido (solo Stationary)</td>
+              <td>Verificar y actuar — la señal más fiable</td>
+            </tr>
+            <tr>
+              <td>Suspected Breach</td>
+              <td>Un reporte reciente indica una ruptura, a la espera de confirmación</td>
+              <td>Vigilar si escala; puede resolverse sola</td>
+            </tr>
+            <tr>
+              <td>Lost Contact</td>
+              <td>Una etiqueta lleva en silencio más allá del umbral «lost»</td>
+              <td>Comprobar la pila y el estado físico de la etiqueta</td>
+            </tr>
+            <tr>
+              <td>Partially Observable</td>
+              <td>Demasiadas etiquetas obsoletas para evaluar con confianza</td>
+              <td>Suele resolverse sola a medida que llegan datos</td>
+            </tr>
+            <tr>
+              <td>Breach Cleared</td>
+              <td>El hive ha vuelto al estado OK</td>
+              <td>Informativa — confirma que el problema está resuelto</td>
+            </tr>
+            <tr>
+              <td>Resolved by Transit <span class="status-pill green" style="font-size: 9px; margin-left: 4px;">NEW</span></td>
+              <td>Una ruptura activa se resolvió porque el hive se puso en movimiento</td>
+              <td>Informativa — la supervisión se reanuda al detenerse</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Por qué las alertas pueden tardar</h3>
+        <p>
+          Como las posiciones de las etiquetas proceden de fuentes colaborativas, la latencia de las alertas depende de la frecuencia con que pasan teléfonos cerca. En zonas urbanas, las rupturas suelen confirmarse en 3 a 8 minutos. En zonas rurales o poco transitadas puede llevar de 15 a 30 minutos o más. No es un retraso del sistema: es el tiempo necesario para reunir evidencia suficiente y estar seguros.
+        </p>
+
+        <div class="callout warn">
+          <div class="callout-title">→ Honestos ante la incertidumbre</div>
+          <p>HIVE prefiere mostrar «calidad de datos degradada» antes que lanzar alertas poco fiables. Si ve este mensaje, significa que el hive no puede afirmar con seguridad qué está pasando, normalmente porque hay etiquetas en silencio o porque sus reportes no están lo bastante alineados en el tiempo, no porque algo vaya mal.</p>
+        </div>
+      </section>
+
+      <!-- ===== 11 FRESHNESS ===== -->
+      <section class="section" id="freshness">
+        <div class="section-head">
+          <div class="section-num">11</div>
+          <h2 class="section-title">Frescura de las etiquetas</h2>
+        </div>
+
+        <p>
+          La frescura de una etiqueta refleja lo reciente que es la posición de la que disponemos. Los umbrales varían según el perfil de movilidad: la posición de un activo que se mueve rápido envejece antes que la de uno estático.
+        </p>
+
+        <table class="doc-table">
+          <thead>
+            <tr><th>Nivel</th><th>Stationary</th><th>Slow</th><th>Mobile</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Fresh</td><td>&lt;30 min</td><td>&lt;20 min</td><td>&lt;15 min</td></tr>
+            <tr><td>Recent</td><td>30 min – 4 h</td><td>20 min – 2 h</td><td>15 min – 1 h</td></tr>
+            <tr><td>Stale</td><td>4–24 h</td><td>2–8 h</td><td>1–4 h</td></tr>
+            <tr><td>Lost</td><td>&gt;24 h</td><td>&gt;8 h</td><td>&gt;2 h</td></tr>
+          </tbody>
+        </table>
+
+        <p>
+          En la evaluación de rupturas solo se usan las etiquetas <b>Fresh</b> y <b>Recent</b>. Las etiquetas stale se excluyen, aunque siguen mostrándose en la interfaz. Las etiquetas lost generan una alerta Lost Contact independiente.
+        </p>
+      </section>
+
+      <!-- ===== 12 LIFECYCLE ===== -->
+      <section class="section" id="lifecycle">
+        <div class="section-head">
+          <div class="section-num">12</div>
+          <h2 class="section-title">Vida útil de 60 días</h2>
+        </div>
+
+        <p>
+          Cada hive tiene una vida operativa fija de 60 días desde el momento de su creación. No es una limitación, sino un mecanismo de higiene que mantiene su lista de hives centrada en lo que de verdad importa. Al caducar, el hive pasa a un archivo de 60 días donde aún puede consultar el historial.
+        </p>
+
+        <div class="figure">
+          <div class="lifecycle-vis">
+            <div class="lifecycle-stage active">
+              <div class="lifecycle-label">Fase 1</div>
+              <div class="lifecycle-stage-name">Activo</div>
+              <div class="lifecycle-duration">Hasta 60 días</div>
+            </div>
+            <div class="lifecycle-arrow">→</div>
+            <div class="lifecycle-stage archived">
+              <div class="lifecycle-label">Fase 2</div>
+              <div class="lifecycle-stage-name">Archivado</div>
+              <div class="lifecycle-duration">60 días de retención</div>
+            </div>
+            <div class="lifecycle-arrow">→</div>
+            <div class="lifecycle-stage purged">
+              <div class="lifecycle-label">Fase 3</div>
+              <div class="lifecycle-stage-name">Purgado</div>
+              <div class="lifecycle-duration">Definitivo</div>
+            </div>
+          </div>
+          <div class="figure-caption">
+            <b>Figura 3.</b> Ciclo de vida del hive — activo hasta 60 días, archivado otros 60 y después purgado.
+          </div>
+        </div>
+
+        <h3>Notificaciones al acercarse la caducidad</h3>
+        <ul>
+          <li><b>7 días antes de caducar</b> — primer aviso, con opción de volver a crearlo en un toque</li>
+          <li><b>2 días antes de caducar</b> — segundo aviso</li>
+          <li><b>Al caducar</b> — notificación final, con opción de volver a crearlo en un toque</li>
+        </ul>
+
+        <h3>Volver a crear un hive</h3>
+        <p>
+          El botón <code>Recreate Hive</code> (visible en la página de detalle del hive y en las notificaciones de caducidad) abre un asistente nuevo, ya rellenado con su configuración y sus etiquetas actuales. Un clic y su seguimiento continúa sin interrupciones.
+        </p>
+
+        <div class="callout info">
+          <div class="callout-title">→ ¿Por qué un límite de 60 días?</div>
+          <p>Los hives se acumulan. Sin un ciclo de vida, los hives abandonados saturan la interfaz y ocupan plazas de etiqueta indefinidamente. El límite de 60 días obliga a una revisión periódica: conserve lo que importa y deje caducar el resto.</p>
+        </div>
+      </section>
+
+      <!-- ===== 13 DELETE & RECREATE ===== -->
+      <section class="section" id="deletion">
+        <div class="section-head">
+          <div class="section-num">13</div>
+          <h2 class="section-title">Eliminar y volver a crear</h2>
+        </div>
+
+        <p>
+          La composición de un hive queda fijada al crearlo. Para añadir o quitar una etiqueta hay que eliminarlo y crear uno nuevo. Suena restrictivo, pero en la práctica es más rápido que editar: el flujo de recreación lo rellena todo de antemano.
+        </p>
+
+        <h3>Dos formas de eliminar</h3>
+
+        <table class="doc-table">
+          <thead>
+            <tr><th>Acción</th><th>Resultado</th><th>¿Reversible?</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Delete</td>
+              <td>El hive pasa al archivo · historial conservado 60 días</td>
+              <td>Sí, mediante Recreate</td>
+            </tr>
+            <tr>
+              <td>Permanently Delete</td>
+              <td>Todos los datos se eliminan de inmediato · sin archivo</td>
+              <td>No</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p>
+          Ambas opciones se ofrecen en la confirmación de borrado estándar. <b>Delete</b> es la opción recuperable; <b>Permanently Delete</b> le exige escribir el nombre del hive para confirmar.
+        </p>
+
+        <h3>El flujo de recreación</h3>
+        <p>
+          Cuando elimina un hive y luego lo vuelve a crear, el asistente se abre relleno con la configuración y las etiquetas del hive eliminado. Puede ajustar lo que quiera — añadir o quitar etiquetas, cambiar el umbral, cambiar de perfil de movilidad — y confirmar. El nuevo hive empieza de cero, sin historial heredado.
+        </p>
+
+        <div class="callout warn">
+          <div class="callout-title">→ Una etiqueta, un hive</div>
+          <p>Una etiqueta solo puede pertenecer a un hive a la vez. Si intenta añadir una etiqueta que ya está en otro hive, verá en cuál está: elimine ese primero para liberarla.</p>
+        </div>
+      </section>
+
+      <!-- ===== 14 ARCHIVE ===== -->
+      <section class="section" id="archive">
+        <div class="section-head">
+          <div class="section-num">14</div>
+          <h2 class="section-title">Archivo</h2>
+        </div>
+
+        <p>
+          La vista Archivo muestra todos sus hives anteriores — tanto eliminados como caducados — dentro de su ventana de retención de 60 días. Cada hive archivado conserva su historial completo de alertas, su registro de evaluaciones y su ficha de configuración.
+        </p>
+
+        <h3>Qué puede hacer en el archivo</h3>
+        <ul>
+          <li><b>Revisar</b> alertas, rupturas y cronologías pasadas</li>
+          <li><b>Volver a crear</b> a partir de la configuración de un hive archivado</li>
+          <li><b>Eliminar definitivamente</b> un hive archivado para borrar sus datos de inmediato</li>
+        </ul>
+
+        <h3>Purga automática</h3>
+        <p>
+          60 días después de entrar en el archivo, los hives se purgan automáticamente. En cada tarjeta archivada verá una cuenta atrás.
+        </p>
+      </section>
+
+      <!-- ===== 15 TROUBLESHOOTING ===== -->
+      <section class="section" id="troubleshooting">
+        <div class="section-head">
+          <div class="section-num">15</div>
+          <h2 class="section-title">Resolución de problemas</h2>
+        </div>
+
+        <h3>Recibo menos falsas alertas de ruptura en los viajes en coche: ¿se ha estropeado algo?</h3>
+        <p>
+          No: es la evaluación sensible a la obsolescencia de la v2.0 funcionando como debe. Antes, HIVE lanzaba falsas rupturas cada vez que usted conducía con el hive en el coche, porque comparaba reportes de posición tomados en puntos distintos de la ruta. Ahora HIVE se niega a confirmar una ruptura a partir de reportes desalineados en el tiempo, así que el desplazamiento produce como mucho una breve ruptura «sospechada» que se resuelve sola. Las separaciones reales siguen saltando una vez que usted se detiene.
+        </p>
+
+        <h3>Vi brevemente «ruptura sospechada» pero ninguna alerta, y todo estaba junto: ¿qué pasó?</h3>
+        <p>
+          Casi con toda seguridad una lectura GPS anómala aislada. Las posiciones colaborativas proceden de teléfonos que pasan cerca y, de vez en cuando, alguno informa de la ubicación de una etiqueta con poca precisión y la sitúa un momento lejos del grupo. La comprobación de persistencia de HIVE está pensada justo para esto: una mala lectura puntual no dura lo suficiente para confirmarse, así que se mantiene como sospechada y desaparece en cuanto llega el siguiente buen reporte. No recibirá una falsa alerta por ello.
+        </p>
+
+        <h3>Veo «ruptura sospechada» y luego «resuelta» mientras viajo: ¿qué es eso?</h3>
+        <p>
+          Es la evaluación sensible a la obsolescencia en acción. Mientras sus objetos viajan juntos, sus reportes de posición se toman en puntos distintos de la ruta, lo que puede parecer brevemente una separación. HIVE lo marca como ruptura <b>sospechada</b> en lugar de confirmarla, y la resuelve automáticamente en cuanto unos reportes recientes y alineados en el tiempo muestran al grupo junto. Un desplazamiento normal no le generará una alerta de ruptura confirmada.
+        </p>
+
+        <h3>Mi hive muestra «Partial Data»: ¿hay algún problema?</h3>
+        <p>
+          Normalmente no. «Partial Data» significa que demasiadas etiquetas del hive no han reportado recientemente como para que HIVE pueda evaluar con confianza. Es habitual en zonas poco transitadas, donde pasan pocos teléfonos. Fíjese en las casillas de frescura: si la mayoría están en ámbar o rojo, el hive se encuentra en una zona tranquila.
+        </p>
+
+        <h3>Recibo demasiadas alertas (estando parado)</h3>
+        <p>
+          Tres cosas que comprobar:
+        </p>
+        <ul>
+          <li>¿Es adecuado su umbral de distancia? Plantéese aumentarlo si recibe falsas alertas; el valor predeterminado del perfil Mobile es 1000 m</li>
+          <li>¿Es correcto su perfil de movilidad? Un perfil estático sobre activos realmente móviles alertará sin parar</li>
+          <li>¿Son ruidosas las posiciones de las etiquetas? Un GPS de teléfono de baja calidad puede producir entre 10 y 50 m de oscilación</li>
+        </ul>
+
+        <h3>Recibo demasiado pocas alertas</h3>
+        <p>
+          O su umbral es demasiado generoso, o sus etiquetas reportan con poca frecuencia. Plantéese ajustar el umbral a la baja y observar durante una semana. Tenga en cuenta que una separación real solo se confirma cuando unos reportes recientes y alineados en el tiempo la establecen: si sus etiquetas reportan muy poco, la confirmación puede retrasarse hasta que lleguen suficientes reportes coherentes.
+        </p>
+
+        <h3>Una etiqueta que quiero usar dice que está «in another hive»</h3>
+        <p>
+          Cada etiqueta solo puede pertenecer a un hive a la vez. La interfaz muestra en qué hive se encuentra ahora mismo: elimine ese hive (o elimínelo definitivamente) para liberar la etiqueta.
+        </p>
+
+        <h3>He cambiado el umbral pero las alertas antiguas no se han actualizado</h3>
+        <p>
+          Los cambios de configuración se aplican solo a las evaluaciones futuras: las alertas históricas se mantienen tal como se evaluaron en su momento. Es intencionado, porque conserva su historial de alertas coherente y reproducible.
+        </p>
+      </section>
+
+      <!-- ===== 16 FAQ ===== -->
+      <section class="section" id="faq">
+        <div class="section-head">
+          <div class="section-num">16</div>
+          <h2 class="section-title">FAQ</h2>
+        </div>
+
+        <h4>¿Cuántas etiquetas puede tener un hive?</h4>
+        <p>Actualmente de 2 a 5. Los grupos más grandes están en la hoja de ruta.</p>
+
+        <h4>¿Puede una etiqueta pertenecer a varios hives?</h4>
+        <p>No. Una etiqueta, un hive en cada momento.</p>
+
+        <h4>¿Hay un límite de hives que puedo tener?</h4>
+        <p>No, puede crear tantos como quiera, siempre que disponga de suficientes etiquetas libres para cada uno.</p>
+
+        <h4>¿Puedo editar las etiquetas de un hive después de crearlo?</h4>
+        <p>No. La composición queda fijada al crearlo. Para cambiarla, elimínelo y vuelva a crearlo: el flujo de recreación lo hace rápido.</p>
+
+        <h4>¿Puedo ampliar la vida de un hive más allá de 60 días?</h4>
+        <p>No directamente, pero puede volver a crear el hive con la misma configuración para iniciar un nuevo ciclo de 60 días. El flujo de recreación lleva unos 10 segundos.</p>
+
+        <h4>¿Funciona HIVE con mis etiquetas actuales?</h4>
+        <p>Sí. Cualquier etiqueta iBeacon o Eddystone registrada en Beacon Telematics puede añadirse a un hive.</p>
+
+        <h4>¿Con qué rapidez llegan las alertas?</h4>
+        <p>Depende de la frecuencia con que reporten sus etiquetas. En zonas urbanas, las alertas suelen llegar entre 3 y 8 minutos después de una ruptura real. En zonas rurales pueden tardar de 15 a 30 minutos. El sistema espera la confirmación para evitar falsas alarmas.</p>
+
+        <h4>¿Me perderé una separación real mientras mi hive está en movimiento? <span class="status-pill green" style="font-size: 9px; margin-left: 4px;">v2.0</span></h4>
+        <p>Una separación genuina se confirma en cuanto unos reportes recientes y alineados en el tiempo la establecen, lo que suele ocurrir poco después de que usted se detenga, cuando los reportes se estabilizan. Durante el desplazamiento, una separación real puede aparecer primero como ruptura sospechada. Cualquier ruptura confirmada se notifica con normalidad. Para la mayoría de los usuarios, cuyos objetos viajan con ellos, la pregunta que importa es «¿ha llegado todo conmigo?», y se responde en cuanto usted se detiene.</p>
+
+        <h4>¿Qué ocurre si se agota la pila de una etiqueta?</h4>
+        <p>Se quedará en silencio y pasará con el tiempo de Stale a Lost. Recibirá una alerta Lost Contact para esa etiqueta. Sustituya la etiqueta y vuelva a añadirla; tenga en cuenta que tendrá que eliminar y volver a crear el hive para cambiarla.</p>
+
+        <h4>¿Puedo exportar el historial de un hive?</h4>
+        <p>La función de exportación está en la hoja de ruta. Por ahora, los hives archivados conservan el historial completo durante 60 días, consultable en la interfaz.</p>
+
+        <h4>¿Cuál es la diferencia entre Delete y Permanently Delete?</h4>
+        <p>Delete traslada el hive a un archivo de 60 días donde aún puede consultar el historial y volver a crearlo. Permanently Delete elimina todos los datos de inmediato y no se puede deshacer.</p>
+      </section>
+
+      <!-- footer -->
+      <div class="doc-footer">
+        <div>HIVE Tracking · v2.1 · Sensible a la obsolescencia</div>
+        <div>Documentación de la plataforma Beacon Telematics</div>
+      </div>
+
+    </div>
+  </main>
+
+</div>
+
+<script>
+  const sections = document.querySelectorAll('.section');
+  const navItems = document.querySelectorAll('.nav-item');
+
+  function setActive() {
+    let current = 'overview';
+    sections.forEach(sec => {
+      const top = sec.getBoundingClientRect().top;
+      if (top < 120) current = sec.id;
+    });
+    navItems.forEach(item => {
+      const href = item.getAttribute('href');
+      if (href === '#' + current) item.classList.add('active');
+      else item.classList.remove('active');
+    });
+  }
+
+  window.addEventListener('scroll', setActive);
+  setActive();
+
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      const target = document.querySelector(a.getAttribute('href'));
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  });
+</script>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    var btn = document.getElementById('themeToggle');
+    var icon = btn.querySelector('.theme-toggle-icon');
+    var label = btn.querySelector('.theme-toggle-label');
+    var TEXT = { dark: 'Claro', light: 'Oscuro' };
+    var ICON = { dark: '\u2600', light: '\u263e' };
+
+    function apply(theme) {
+      root.setAttribute('data-theme', theme);
+      icon.textContent = ICON[theme];
+      label.textContent = TEXT[theme];
+      btn.setAttribute('aria-label', 'Alternar entre modo claro y oscuro');
+    }
+
+    var saved = null;
+    try { saved = localStorage.getItem('hive-manual-theme'); } catch (e) {}
+    apply(saved === 'light' ? 'light' : 'dark');
+
+    btn.addEventListener('click', function () {
+      var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      apply(next);
+      try { localStorage.setItem('hive-manual-theme', next); } catch (e) {}
+    });
+  })();
+</script>
+
+</body>
+</html>
