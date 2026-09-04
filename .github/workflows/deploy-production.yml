@@ -510,7 +510,8 @@ jobs:
           DO_USER: ${{ secrets.DO_USER }}
         run: |
           # Pass tenant-specific server path through to remote shell
-          ssh "$DO_USER@$DO_SERVER_IP" \
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 -o TCPKeepAlive=yes \
+            "$DO_USER@$DO_SERVER_IP" \
               "SERVER_DIR='${SERVER_DIR}' bash -s" << 'SSHEOF'
             set -e
             cd "${SERVER_DIR}/gps-tracker"
