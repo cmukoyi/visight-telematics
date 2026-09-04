@@ -54,8 +54,17 @@ app.get('/health', (req, res) => {
 app.get('/help/movement-analytics', (req, res) => {
   const brandName = process.env.BRAND_NAME || 'PinPlot';
   const isBeacon = brandName.toLowerCase().includes('beacon');
-  const filename = isBeacon 
-    ? 'Movement_Analytics_User_Manual_v2_1_Beacon.html'
+  const language = String(req.query.lang || 'en').toLowerCase().split('-')[0];
+  const beaconManuals = {
+    de: 'Movement_Analytics_Benutzerhandbuch_v2_1_Beacon_DE.html',
+    en: 'Movement_Analytics_User_Manual_v2_1_Beacon_EN.html',
+    es: 'Movement_Analytics_Manual_Usuario_v2_1_Beacon_ES.html',
+    fr: 'Movement_Analytics_Manuel_Utilisateur_v2_1_Beacon_FR.html',
+    it: 'Movement_Analytics_Manuale_Utente_v2_1_Beacon_IT.html',
+    nl: 'Movement_Analytics_Gebruikershandleiding_v2_1_Beacon_NL.html',
+  };
+  const filename = isBeacon
+    ? (beaconManuals[language] || beaconManuals.en)
     : 'Movement_Analytics_User_Manual_v2_1_Pinplot.html';
   
   const filePath = path.join(publicDir, 'help', filename);

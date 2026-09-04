@@ -13390,8 +13390,8 @@ function qrOpenHelp() {
 // Open the Movement Analytics user manual in a new tab
 function mhaOpenHelp() {
     const theme = document.documentElement.getAttribute('data-theme') || 'light';
-    // Use pretty route - server detects tenant and serves correct manual
-    window.open('/customer/help/movement-analytics?theme=' + encodeURIComponent(theme),
+    const language = currentLocale() || 'en';
+    window.open('/customer/help/movement-analytics?theme=' + encodeURIComponent(theme) + '&lang=' + encodeURIComponent(language),
                 '_blank', 'noopener,noreferrer');
 }
 </script>
