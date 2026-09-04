@@ -1,39 +1,551 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="robots" content="noindex, nofollow">
-  <title>Hubble Tag Activated</title>
-  <style>
-    :root { color-scheme: light; }
-    * { box-sizing: border-box; }
-    body {
-      align-items: center;
-      background: #f3f7f5;
-      color: #17211c;
-      display: flex;
-      font-family: Georgia, serif;
-      justify-content: center;
-      margin: 0;
-      min-height: 100vh;
-      padding: 24px;
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#042A0C">
+<meta name="color-scheme" content="dark">
+<title>Tag activated — PinPlot</title>
+
+<!-- Only runs when JS is available, so a no-JS phone still gets the English page. -->
+<script>document.documentElement.className = 'i18n-pending';</script>
+
+<style>
+  :root{
+    /* PinPlot brand primary is #006400. It is used as a wash over a deeper
+       base rather than flat, because the logo's own green gauge segment
+       (#4EA72E) drops to 2.4:1 against full #006400 and muddies. At the
+       wash strength below it holds above 4:1. */
+    --green-deep:#042A0C;
+    --green:#006400;
+    --green-lift:#0A5218;
+    --signal:#7BE0A0;   /* mint — emitter, rules, focus */
+    --live:#A3E635;     /* lime — reads as lit against the green ground */
+    --ink:#FDFDFD;
+    --ink-muted:#B8D8BE;
+    --hairline:rgba(184,216,190,.22);
+    --logo-height:clamp(32px, 6.2svh, 52px);
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0;}
+
+  html{-webkit-text-size-adjust:100%;}
+
+  /* Hides content only between first paint and the string swap. */
+  .i18n-pending main{visibility:hidden;}
+
+  body{
+    background:var(--green-deep);
+    background-image:
+      radial-gradient(120% 60% at 50% -10%, rgba(0,100,0,.45) 0%, rgba(0,100,0,0) 62%);
+    background-repeat:no-repeat;
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    font-size:16px;
+    line-height:1.5;
+    min-height:100vh;
+    min-height:100svh;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+    overflow-x:hidden;
+  }
+
+  /* Scripts whose glyphs need more vertical room. */
+  html:lang(ar) body,
+  html:lang(ja) body,
+  html:lang(zh) body{line-height:1.62;}
+
+  .shell{
+    max-width:480px;
+    margin:0 auto;
+    min-height:100vh;
+    min-height:100svh;
+    display:flex;
+    flex-direction:column;
+    padding:
+      calc(clamp(14px, 2.4svh, 30px) + env(safe-area-inset-top)) 24px
+      calc(clamp(12px, 2svh, 26px) + env(safe-area-inset-bottom));
+  }
+
+  /* ---------- brand ----------
+     The wordmark is inline SVG, so it stays crisp at any size and takes its
+     colour from `color`. Change --logo-height alone to resize it. */
+  .brand{
+    display:flex;
+    justify-content:center;
+    color:var(--ink);
+  }
+  .brand svg{
+    height:var(--logo-height);
+    width:auto;
+    display:block;
+    opacity:.94;
+  }
+
+  /* ---------- emitter (hero) ---------- */
+  .emitter{
+    --core:clamp(22px, 4svh, 34px);
+    position:relative;
+    width:calc(var(--core) * 4.4);
+    height:calc(var(--core) * 4.4);
+    margin:clamp(12px, 2.6svh, 34px) auto clamp(12px, 2.4svh, 30px);
+    display:grid;
+    place-items:center;
+  }
+  .emitter .ring{
+    position:absolute;
+    inset:0;
+    margin:auto;
+    width:var(--core);
+    height:var(--core);
+    border:1.5px solid var(--signal);
+    border-radius:50%;
+    opacity:0;
+    animation:emit 3.4s cubic-bezier(.22,.61,.36,1) infinite;
+  }
+  .emitter .ring:nth-child(2){animation-delay:1.13s;}
+  .emitter .ring:nth-child(3){animation-delay:2.26s;}
+
+  @keyframes emit{
+    0%   {transform:scale(1);   opacity:.85;}
+    70%  {opacity:.10;}
+    100% {transform:scale(4.4); opacity:0;}
+  }
+
+  .core{
+    position:relative;
+    width:var(--core);
+    height:var(--core);
+    border-radius:50%;
+    background:var(--signal);
+    box-shadow:0 0 0 .24em rgba(123,224,160,.14), 0 0 30px rgba(123,224,160,.40);
+  }
+  .core svg{
+    position:absolute;
+    inset:0;
+    margin:auto;
+    width:calc(var(--core) * .5);
+    height:calc(var(--core) * .5);
+    display:block;
+  }
+  .core path{
+    stroke:var(--green-deep);
+    stroke-width:2.4;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+    fill:none;
+    stroke-dasharray:22;
+    stroke-dashoffset:22;
+    animation:draw .5s .25s ease-out forwards;
+  }
+  @keyframes draw{to{stroke-dashoffset:0;}}
+
+  /* ---------- copy ---------- */
+  .headline{
+    font-size:clamp(25px, min(8.6vw, 4.4svh), 38px);
+    font-weight:600;
+    letter-spacing:-.022em;
+    line-height:1.09;
+    text-align:center;
+    text-wrap:balance;
+  }
+  /* Tight tracking is a Latin-script nicety; it damages these. */
+  html:lang(ar) .headline,
+  html:lang(ja) .headline,
+  html:lang(zh) .headline{letter-spacing:0;line-height:1.28;}
+
+  .lede{
+    margin:clamp(9px, 1.6svh, 16px) auto 0;
+    max-width:340px;
+    text-align:center;
+    color:var(--ink-muted);
+    font-size:16px;
+    line-height:1.56;
+  }
+
+  /* ---------- live status ---------- */
+  .status{
+    margin-top:clamp(12px, 2.2svh, 24px);
+    display:flex;
+    justify-content:center;
+  }
+  .live{
+    font-size:14.5px;
+    font-weight:500;
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    color:var(--live);
+  }
+  .live i{
+    width:7px;
+    height:7px;
+    border-radius:50%;
+    background:var(--live);
+    box-shadow:0 0 0 3px rgba(163,230,53,.22);
+    animation:breathe 2.6s ease-in-out infinite;
+    flex:none;
+  }
+  @keyframes breathe{50%{opacity:.35;}}
+
+  /* ---------- permanence notice ---------- */
+  .notice{
+    margin-top:clamp(16px, 2.8svh, 30px);
+    padding-inline-start:16px;              /* flips automatically for RTL */
+    border-inline-start:2px solid var(--signal);
+  }
+  .notice h2{
+    font-size:16.5px;
+    font-weight:600;
+    letter-spacing:-.008em;
+  }
+  .notice p{
+    margin-top:7px;
+    color:var(--ink-muted);
+    font-size:15px;
+    line-height:1.6;
+  }
+
+  /* ---------- footer ---------- */
+  footer{
+    margin-top:auto;
+    padding-top:clamp(14px, 2.6svh, 34px);
+    color:var(--ink-muted);
+  }
+  .next{
+    font-size:14.5px;
+    line-height:1.55;
+    padding-bottom:clamp(10px, 1.6svh, 18px);
+    border-bottom:1px solid var(--hairline);
+  }
+  .colophon{
+    padding-top:clamp(10px, 1.6svh, 16px);
+    font-size:13px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    opacity:.85;
+  }
+
+  #lang{
+    appearance:none;
+    -webkit-appearance:none;
+    background:transparent;
+    border:0;
+    border-bottom:1px solid var(--hairline);
+    color:var(--ink-muted);
+    font:inherit;
+    font-size:13px;
+    padding:2px 2px 3px;
+    border-radius:0;
+    cursor:pointer;
+  }
+  #lang option{background:var(--green-lift);color:var(--ink);}
+
+  /* ---------- entrance ---------- */
+  .rise{opacity:0;transform:translateY(10px);animation:rise .62s cubic-bezier(.2,.7,.3,1) forwards;}
+  .d1{animation-delay:.06s;} .d2{animation-delay:.30s;} .d3{animation-delay:.42s;}
+  .d4{animation-delay:.54s;} .d5{animation-delay:.66s;} .d6{animation-delay:.78s;}
+  @keyframes rise{to{opacity:1;transform:none;}}
+
+  #lang:focus-visible{outline:2px solid var(--signal);outline-offset:3px;border-radius:3px;}
+
+  @media (prefers-reduced-motion:reduce){
+    .emitter .ring{
+      animation:none;
+      opacity:.34;
     }
-    main {
-      background: #fff;
-      border: 1px solid #cfddd3;
-      border-radius: 8px;
-      max-width: 440px;
-      padding: 42px 32px;
-      text-align: center;
-      width: 100%;
-    }
-    h1 { font-size: 28px; margin: 0; }
-  </style>
+    .emitter .ring:nth-child(1){transform:scale(2.0);}
+    .emitter .ring:nth-child(2){transform:scale(3.1);opacity:.2;}
+    .emitter .ring:nth-child(3){transform:scale(4.2);opacity:.11;}
+    .core path{animation:none;stroke-dashoffset:0;}
+    .live i{animation:none;}
+    .rise{animation:none;opacity:1;transform:none;}
+  }
+
+
+</style>
 </head>
 <body>
-  <main>
-    <h1>Hubble Tag Activated</h1>
-  </main>
+<main class="shell">
+
+  <div class="brand rise d1">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 273" role="img" aria-label="PinPlot"><path fill="#FFFFFF" fill-rule="evenodd" d="M163.8 213.7C145.8 181.7 130.9 154.8 130.6 154.0C130.2 152.9 134.0 150.4 145.7 144.3L161.3 136.1L164.9 138.9C170.6 143.4 180.1 147.8 187.6 149.3L194.5 150.7L208.0 175.1C215.5 188.5 223.4 202.9 225.7 207.1L229.9 214.7L216.9 237.6C209.7 250.2 202.4 263.1 200.7 266.2C199.0 269.4 197.3 272.0 197.0 272.0C196.7 271.9 181.8 245.7 163.8 213.7ZM742.5 205.0C703.1 198.8 682.6 168.3 687.0 122.4C690.8 81.9 710.3 60.9 747.7 57.1C796.9 52.0 825.4 79.1 825.4 130.5C825.3 183.6 792.7 212.8 742.5 205.0ZM1.1 201.6C0.2 200.6 -0.0 183.8 0.2 136.3L0.5 72.5L3.0 68.1C7.7 59.7 8.6 59.5 39.5 59.5C86.2 59.5 101.2 68.2 105.0 97.1C109.2 128.9 91.0 152.2 60.0 154.7L52.4 155.3L47.0 150.8C39.6 144.8 38.1 142.1 40.3 138.6C43.5 133.7 51.5 128.3 56.5 127.7C66.5 126.3 71.0 119.7 71.0 106.5C71.0 89.5 64.0 83.4 45.3 84.2C32.3 84.7 33.6 78.7 33.0 144.3C32.7 175.2 32.1 201.1 31.7 201.8C30.5 203.6 2.7 203.5 1.1 201.6ZM299.7 202.4C299.3 202.0 299.0 170.7 299.0 132.8L299.0 63.9L301.6 61.4C304.1 58.8 304.4 58.8 315.8 59.2C337.5 59.9 341.2 64.0 377.5 126.6C386.1 141.5 394.2 155.0 395.5 156.6L397.9 159.5L398.0 115.3L398.0 71.2L401.9 66.3C412.6 53.0 413.4 52.9 422.3 63.8L428.0 70.7L428.0 135.3C428.0 211.4 429.7 203.4 413.6 202.8C392.8 202.2 386.1 194.9 351.0 135.0C341.5 118.8 333.0 104.3 332.1 102.8C331.2 101.2 330.2 100.0 329.8 100.0C329.4 100.0 328.9 123.1 328.8 151.2L328.5 202.5L314.4 202.8C306.7 202.9 300.1 202.7 299.7 202.4ZM462.2 201.8C460.6 200.2 460.5 77.4 462.1 71.5C465.1 60.9 470.7 59.0 499.2 59.0C541.7 59.0 556.9 66.0 564.1 89.1C574.6 122.7 551.4 154.9 516.7 155.0C510.5 155.0 497.9 143.9 499.9 140.2C502.2 136.0 512.1 128.0 515.1 128.0C535.2 128.0 538.8 91.1 519.3 85.2C513.4 83.4 500.0 83.6 497.3 85.5C493.3 88.3 493.0 92.3 493.0 147.6C493.0 187.5 492.7 200.9 491.8 201.8C491.0 202.6 486.2 203.0 477.0 203.0C467.8 203.0 463.0 202.6 462.2 201.8ZM600.7 201.8C588.9 198.7 588.7 197.5 588.3 132.0C587.8 67.3 587.3 72.1 595.1 63.6C604.1 53.8 604.2 53.8 610.7 60.2C621.5 70.7 620.4 64.5 621.0 121.7L621.5 171.9L623.8 174.2C626.0 176.4 626.8 176.5 646.5 176.8L667.0 177.1L673.0 182.7C680.4 189.6 680.4 190.5 672.9 197.4L666.9 203.0L635.7 202.9C618.4 202.8 602.8 202.3 600.7 201.8ZM882.2 201.8C881.3 200.9 881.0 186.4 881.0 142.8L881.0 85.0L864.4 85.0L847.7 85.0L842.3 80.4C833.2 72.6 833.2 71.2 842.6 63.5L848.2 59.0L897.6 59.0L947.0 59.0L953.7 65.4L960.4 71.7L957.7 74.9C956.2 76.7 953.1 79.7 950.9 81.6L946.8 85.0L930.4 85.0L914.0 85.0L914.0 141.4C914.0 175.7 913.6 198.9 913.0 200.4L912.0 203.0L897.7 203.0C887.9 203.0 883.0 202.6 882.2 201.8ZM229.5 185.8C224.6 176.9 218.8 166.6 216.8 162.8C214.8 159.1 212.4 155.0 211.6 153.8C209.1 150.3 209.6 149.3 214.9 147.5C224.2 144.4 237.2 133.9 242.3 125.3C243.3 123.5 244.6 122.0 245.1 122.0C246.7 122.0 275.0 138.2 275.0 139.2C275.0 140.5 239.9 202.0 239.1 202.0C238.8 202.0 234.4 194.7 229.5 185.8ZM767.0 176.9C784.3 172.6 794.1 150.0 791.1 121.7C788.1 94.4 779.0 84.5 757.0 84.5C731.8 84.5 721.1 98.3 721.0 131.1C721.0 166.6 738.5 184.1 767.0 176.9ZM191.0 132.6C161.7 126.0 151.2 89.4 172.4 67.7C186.6 53.0 211.6 53.6 225.2 68.9C249.2 95.9 225.3 140.5 191.0 132.6ZM220.8 98.2C223.8 94.4 221.1 89.0 216.1 89.0C212.5 89.0 211.0 90.7 211.0 94.6C211.0 100.3 217.3 102.6 220.8 98.2ZM169.0 98.0C169.0 96.8 169.5 96.3 170.3 96.6C172.2 97.3 174.2 94.6 173.8 91.8C173.6 89.9 172.9 89.5 170.0 89.5L166.5 89.5L166.2 94.8C166.0 99.0 166.2 100.0 167.4 100.0C168.3 100.0 169.0 99.1 169.0 98.0ZM178.8 94.8C178.4 87.4 176.0 87.1 176.0 94.4C176.0 98.8 176.3 100.0 177.6 100.0C178.8 100.0 179.0 99.0 178.8 94.8ZM184.0 96.8L184.0 93.5L186.0 96.8C189.1 101.9 191.0 101.0 191.0 94.5C191.0 88.3 189.3 87.0 188.8 92.8L188.5 96.5L186.3 92.8C183.0 87.1 181.0 87.8 181.0 94.5C181.0 98.7 181.3 100.0 182.5 100.0C183.5 100.0 184.0 99.0 184.0 96.8ZM196.0 98.0C196.0 96.8 196.5 96.3 197.4 96.6C198.9 97.2 202.0 94.5 202.0 92.6C202.0 90.4 199.3 88.8 196.3 89.2C193.0 89.6 191.2 100.0 194.4 100.0C195.3 100.0 196.0 99.1 196.0 98.0ZM210.0 99.0C210.0 98.5 209.1 98.0 208.0 98.0C206.3 98.0 206.0 97.3 206.0 93.4C206.0 86.9 203.6 88.1 203.2 94.8L202.9 100.0L206.4 100.0C208.4 100.0 210.0 99.5 210.0 99.0ZM229.0 95.5C229.0 92.2 229.4 91.0 230.5 91.0C231.3 91.0 232.0 90.5 232.0 90.0C232.0 89.5 230.0 89.0 227.5 89.0C225.0 89.0 223.0 89.5 223.0 90.0C223.0 90.5 223.7 91.0 224.5 91.0C225.6 91.0 226.0 92.2 226.0 95.5C226.0 98.8 226.4 100.0 227.5 100.0C228.6 100.0 229.0 98.8 229.0 95.5ZM214.4 96.6C213.4 94.0 214.4 91.5 216.5 91.5C218.1 91.5 218.5 92.2 218.5 94.5C218.5 97.8 215.5 99.4 214.4 96.6Z"/><path fill="#4EA72E" fill-rule="evenodd" d="M266.0 118.5C257.4 113.6 251.6 109.7 251.8 108.9C258.6 80.7 239.6 47.9 212.0 39.9C204.7 37.9 205.0 38.7 205.0 18.3L205.0 -0.2L208.2 0.5C248.3 8.5 274.1 34.2 284.2 76.0C287.0 87.8 285.1 119.5 281.2 125.7C280.7 126.5 276.0 124.3 266.0 118.5ZM168.2 96.0C168.2 93.5 168.4 92.2 168.7 93.0C169.0 93.8 170.0 95.1 170.9 95.9C172.4 97.2 172.4 97.2 170.8 96.7C169.6 96.3 169.0 96.8 168.7 98.3C168.5 99.5 168.2 98.5 168.2 96.0Z"/><path fill="#E97132" fill-rule="evenodd" d="M144.5 48.9C136.8 44.5 130.2 40.5 129.7 40.1C128.6 39.0 139.3 26.6 146.7 20.5C157.6 11.5 174.7 4.0 189.8 1.6L193.0 1.0L192.8 20.2L192.5 39.3L186.5 40.9C178.8 43.1 170.9 47.4 164.9 52.8C159.1 58.0 161.1 58.4 144.5 48.9Z"/><path fill="#FF0000" fill-rule="evenodd" d="M120.3 133.2C109.9 109.8 110.1 67.7 120.8 51.3C121.4 50.4 139.9 59.9 149.6 66.2C150.3 66.7 149.9 69.2 148.1 74.2C143.6 87.3 144.6 106.1 150.6 118.4C151.9 121.1 153.0 123.5 153.0 123.6C153.0 124.1 124.8 139.0 123.9 139.0C123.3 139.0 121.7 136.4 120.3 133.2Z"/><path fill="#06111C" fill-rule="evenodd" d="M166.0 95.0C166.0 89.3 167.5 88.0 171.6 89.9C174.6 91.2 174.6 95.3 171.7 95.8C170.1 96.1 170.0 95.9 171.2 94.1C172.6 91.8 171.8 90.5 169.5 91.3C168.5 91.7 168.0 93.3 168.0 96.0C168.0 98.2 167.6 100.0 167.0 100.0C166.4 100.0 166.0 97.7 166.0 95.0ZM176.0 95.1C176.0 92.3 176.4 89.8 177.0 89.5C177.6 89.1 178.0 91.0 178.0 94.4C178.0 97.5 177.6 100.0 177.0 100.0C176.4 100.0 176.0 97.8 176.0 95.1ZM181.0 95.1C181.0 87.8 183.1 87.4 186.6 94.0L188.5 97.5L188.8 93.2C189.2 87.4 191.0 88.9 191.0 95.1C191.0 100.9 189.7 101.2 186.5 96.2C183.9 92.1 183.0 92.2 183.0 96.5C183.0 98.4 182.6 100.0 182.0 100.0C181.4 100.0 181.0 97.8 181.0 95.1ZM194.0 94.5C194.0 89.5 194.2 89.0 196.2 89.0C201.1 89.0 203.1 95.0 198.5 95.8C196.9 96.1 196.7 95.9 197.8 94.9C199.5 93.1 199.3 91.0 197.5 91.0C196.4 91.0 196.0 92.2 196.0 95.5C196.0 98.0 195.6 100.0 195.0 100.0C194.4 100.0 194.0 97.5 194.0 94.5ZM204.0 94.4C204.0 91.0 204.4 89.1 205.0 89.5C205.6 89.8 206.0 91.9 206.0 94.1C206.0 96.8 206.4 98.0 207.4 98.0C208.2 98.0 209.2 98.5 209.5 99.0C209.9 99.6 208.8 100.0 207.1 100.0C204.0 100.0 204.0 100.0 204.0 94.4ZM212.0 98.1C209.4 93.1 212.9 87.9 217.8 89.6C220.8 90.7 222.1 96.0 219.9 98.6C218.2 100.7 213.3 100.4 212.0 98.1ZM226.0 95.5C226.0 92.2 225.6 91.0 224.5 91.0C223.7 91.0 223.0 90.5 223.0 90.0C223.0 89.5 224.8 89.0 227.0 89.0C229.2 89.0 231.0 89.5 231.0 90.0C231.0 90.5 230.3 91.0 229.5 91.0C228.4 91.0 228.0 92.2 228.0 95.5C228.0 98.0 227.6 100.0 227.0 100.0C226.4 100.0 226.0 98.0 226.0 95.5ZM218.0 97.6C219.8 95.3 218.8 91.5 216.3 91.2C213.7 90.8 212.4 94.0 214.0 97.0C215.3 99.4 216.3 99.5 218.0 97.6Z"/></svg>
+  </div>
+
+  <div class="emitter rise d2" aria-hidden="true">
+    <span class="ring"></span>
+    <span class="ring"></span>
+    <span class="ring"></span>
+    <span class="core">
+      <svg viewBox="0 0 24 24"><path d="M5 12.5l4.6 4.5L19 7.5"/></svg>
+    </span>
+  </div>
+
+  <h1 class="headline rise d3" data-t="headline">Your tag is live</h1>
+
+  <p class="lede rise d3" data-t="lede">
+    Thank you for choosing PinPlot. Your BLE sticker tag switched on the moment
+    you scanned it.
+  </p>
+
+  <p class="status rise d4">
+    <span class="live"><i></i><span data-t="broadcasting">Broadcasting</span></span>
+  </p>
+
+  <section class="notice rise d5">
+    <h2 data-t="noticeH">Activation is permanent</h2>
+    <p data-t="noticeP">
+      That was a one-time scan. The tag stays on for the life of its battery and
+      can&rsquo;t be switched off &mdash; not by scanning again, not by any other
+      means.
+    </p>
+  </section>
+
+  <footer class="rise d6">
+    <p class="next" data-t="next">
+      It appears on your tracking dashboard within a few minutes.
+    </p>
+    <div class="colophon">
+      <span>PinPlot</span>
+      <select id="lang" aria-label="Language"></select>
+    </div>
+  </footer>
+
+</main>
+
+<script>
+(function () {
+  /* ------------------------------------------------------------------
+     STRINGS
+     Add a language by adding one entry. The picker builds itself from
+     this object, so nothing else needs changing.
+     ------------------------------------------------------------------ */
+  var STRINGS = {
+    en: {
+      name: 'English', dir: 'ltr',
+      title: 'Tag activated — PinPlot',
+      headline: 'Your tag is live',
+      lede: 'Thank you for choosing PinPlot. Your BLE sticker tag switched on the moment you scanned it.',
+      broadcasting: 'Broadcasting',
+      noticeH: 'Activation is permanent',
+      noticeP: 'That was a one-time scan. The tag stays on for the life of its battery and can’t be switched off — not by scanning again, not by any other means.',
+      next: 'It appears on your tracking dashboard within a few minutes.',
+      langLabel: 'Language'
+    },
+    fr: {
+      name: 'Français', dir: 'ltr',
+      title: 'Tag activé — PinPlot',
+      headline: 'Votre tag est actif',
+      lede: 'Merci d’avoir choisi PinPlot. Votre tag adhésif BLE s’est allumé dès que vous l’avez scanné.',
+      broadcasting: 'Émission en cours',
+      noticeH: 'L\u2019activation est définitive',
+      noticeP: 'Il s’agissait d’un scan unique. Le tag reste allumé pendant toute la durée de vie de sa pile et ne peut pas être éteint — ni en le scannant à nouveau, ni par aucun autre moyen.',
+      next: 'Il apparaît sur votre tableau de bord de suivi en quelques minutes.',
+      langLabel: 'Langue'
+    },
+    de: {
+      name: 'Deutsch', dir: 'ltr',
+      title: 'Tag aktiviert — PinPlot',
+      headline: 'Ihr Tag ist aktiv',
+      lede: 'Danke, dass Sie sich für PinPlot entschieden haben. Ihr BLE-Aufkleber-Tag wurde beim Scannen eingeschaltet.',
+      broadcasting: 'Sendet',
+      noticeH: 'Die Aktivierung ist dauerhaft',
+      noticeP: 'Das war ein einmaliger Scan. Das Tag bleibt für die gesamte Lebensdauer seiner Batterie eingeschaltet und lässt sich nicht ausschalten — weder durch erneutes Scannen noch auf andere Weise.',
+      next: 'Es erscheint innerhalb weniger Minuten in Ihrem Tracking-Dashboard.',
+      langLabel: 'Sprache'
+    },
+    es: {
+      name: 'Español', dir: 'ltr',
+      title: 'Etiqueta activada — PinPlot',
+      headline: 'Tu etiqueta está activa',
+      lede: 'Gracias por elegir PinPlot. Tu etiqueta adhesiva BLE se encendió en cuanto la escaneaste.',
+      broadcasting: 'Emitiendo',
+      noticeH: 'La activación es permanente',
+      noticeP: 'Ha sido un escaneo único. La etiqueta permanece encendida durante toda la vida de su pila y no puede apagarse: ni volviéndola a escanear, ni de ninguna otra forma.',
+      next: 'Aparece en tu panel de seguimiento en unos minutos.',
+      langLabel: 'Idioma'
+    },
+    it: {
+      name: 'Italiano', dir: 'ltr',
+      title: 'Tag attivato — PinPlot',
+      headline: 'Il tuo tag è attivo',
+      lede: 'Grazie per aver scelto PinPlot. Il tuo tag adesivo BLE si è acceso nel momento in cui l’hai scansionato.',
+      broadcasting: 'In trasmissione',
+      noticeH: 'L\u2019attivazione è permanente',
+      noticeP: 'È stata una scansione unica. Il tag resta acceso per tutta la durata della batteria e non può essere spento: né scansionandolo di nuovo, né in alcun altro modo.',
+      next: 'Compare sulla dashboard di tracciamento in pochi minuti.',
+      langLabel: 'Lingua'
+    },
+    pt: {
+      name: 'Português', dir: 'ltr',
+      title: 'Etiqueta ativada — PinPlot',
+      headline: 'A sua etiqueta está ativa',
+      lede: 'Obrigado por escolher a PinPlot. A sua etiqueta adesiva BLE ligou-se assim que a leu.',
+      broadcasting: 'A transmitir',
+      noticeH: 'A ativação é permanente',
+      noticeP: 'Foi uma leitura única. A etiqueta permanece ligada durante toda a vida útil da pilha e não pode ser desligada — nem lendo-a novamente, nem por qualquer outro meio.',
+      next: 'Aparece no seu painel de monitorização em poucos minutos.',
+      langLabel: 'Idioma'
+    },
+    'pt-BR': {
+      name: 'Português (Brasil)', dir: 'ltr',
+      title: 'Etiqueta ativada — PinPlot',
+      headline: 'Sua etiqueta está ativa',
+      lede: 'Obrigado por escolher a PinPlot. Sua etiqueta adesiva BLE foi ligada no momento em que você a escaneou.',
+      broadcasting: 'Transmitindo',
+      noticeH: 'A ativação é permanente',
+      noticeP: 'Essa foi uma leitura única. A etiqueta continua ligada por toda a vida útil da bateria e não pode ser desligada — nem escaneando de novo, nem de qualquer outra forma.',
+      next: 'Ela aparece no seu painel de rastreamento em poucos minutos.',
+      langLabel: 'Idioma'
+    },
+    nl: {
+      name: 'Nederlands', dir: 'ltr',
+      title: 'Tag geactiveerd — PinPlot',
+      headline: 'Je tag is actief',
+      lede: 'Bedankt dat je voor PinPlot hebt gekozen. Je BLE-stickertag is ingeschakeld op het moment dat je hem scande.',
+      broadcasting: 'Zendt uit',
+      noticeH: 'De activering is permanent',
+      noticeP: 'Dit was een eenmalige scan. De tag blijft aan zolang de batterij meegaat en kan niet worden uitgeschakeld — niet door opnieuw te scannen en ook niet op een andere manier.',
+      next: 'Hij verschijnt binnen een paar minuten op je trackingdashboard.',
+      langLabel: 'Taal'
+    },
+    pl: {
+      name: 'Polski', dir: 'ltr',
+      title: 'Tag aktywowany — PinPlot',
+      headline: 'Twój tag jest aktywny',
+      lede: 'Dziękujemy za wybór PinPlot. Twój naklejany tag BLE włączył się w momencie zeskanowania.',
+      broadcasting: 'Nadaje',
+      noticeH: 'Aktywacja jest nieodwracalna',
+      noticeP: 'To było jednorazowe skanowanie. Tag pozostaje włączony przez cały okres pracy baterii i nie można go wyłączyć — ani przez ponowne zeskanowanie, ani w żaden inny sposób.',
+      next: 'Pojawi się w panelu śledzenia w ciągu kilku minut.',
+      langLabel: 'Język'
+    },
+    tr: {
+      name: 'Türkçe', dir: 'ltr',
+      title: 'Etiket etkinleştirildi — PinPlot',
+      headline: 'Etiketiniz aktif',
+      lede: 'PinPlot’u tercih ettiğiniz için teşekkürler. BLE etiketiniz taradığınız anda açıldı.',
+      broadcasting: 'Yayında',
+      noticeH: 'Etkinleştirme kalıcıdır',
+      noticeP: 'Bu tek seferlik bir taramaydı. Etiket, pili bitene kadar açık kalır ve kapatılamaz — ne tekrar tarayarak ne de başka bir yolla.',
+      next: 'Birkaç dakika içinde takip panonuzda görünür.',
+      langLabel: 'Dil'
+    },
+    ar: {
+      name: 'العربية', dir: 'rtl',
+      title: 'تم تفعيل البطاقة — PinPlot',
+      headline: 'بطاقتك تعمل الآن',
+      lede: 'شكرًا لاختيارك PinPlot. تم تشغيل بطاقة BLE اللاصقة بمجرد مسحها.',
+      broadcasting: 'جارٍ البث',
+      noticeH: 'التفعيل نهائي',
+      noticeP: 'كان ذلك مسحًا لمرة واحدة. تظل البطاقة مُشغَّلة طوال عمر بطاريتها ولا يمكن إيقافها — لا بإعادة مسحها ولا بأي وسيلة أخرى.',
+      next: 'ستظهر في لوحة التتبع خلال دقائق قليلة.',
+      langLabel: 'اللغة'
+    },
+    zh: {
+      name: '简体中文', dir: 'ltr',
+      title: '标签已激活 — PinPlot',
+      headline: '您的标签已启用',
+      lede: '感谢您选择 PinPlot。您的 BLE 贴片标签在扫描时已自动开机。',
+      broadcasting: '广播中',
+      noticeH: '激活不可撤销',
+      noticeP: '这是一次性扫描。标签将在电池耗尽前保持开机，且无法关闭——再次扫描不行，其他任何方式也不行。',
+      next: '几分钟内它就会出现在您的追踪面板中。',
+      langLabel: '语言'
+    },
+    ja: {
+      name: '日本語', dir: 'ltr',
+      title: 'タグを有効化しました — PinPlot',
+      headline: 'タグが稼働中です',
+      lede: 'PinPlot をお選びいただきありがとうございます。BLE ステッカータグはスキャンと同時に電源が入りました。',
+      broadcasting: '発信中',
+      noticeH: '有効化は取り消せません',
+      noticeP: 'スキャンは一度きりです。タグは電池が切れるまで稼働し続け、電源を切ることはできません。再スキャンでも、ほかの方法でも停止できません。',
+      next: '数分以内に追跡ダッシュボードに表示されます。',
+      langLabel: '言語'
+    }
+  };
+
+  var FALLBACK = 'en';
+  var params = new URLSearchParams(location.search);
+
+  /* ------------------------------------------------------------------
+     Which language? In priority order:
+       1. ?lang= in the URL          (testing only — every tag ships the
+                                      same URL, so this is never set in
+                                      the field)
+       2. a choice made on this device earlier
+       3. the phone's own language list
+       4. English
+     ------------------------------------------------------------------ */
+  function pick() {
+    var forced = params.get('lang');
+    if (forced && STRINGS[forced]) return forced;
+    if (forced && STRINGS[forced.split('-')[0]]) return forced.split('-')[0];
+
+    var saved;
+    try { saved = localStorage.getItem('beacon.lang'); } catch (e) {}
+    if (saved && STRINGS[saved]) return saved;
+
+    var prefs = navigator.languages || [navigator.language || ''];
+    for (var i = 0; i < prefs.length; i++) {
+      var tag = prefs[i];
+      if (!tag) continue;
+      if (STRINGS[tag]) return tag;                                  // exact, e.g. pt-BR
+      var base = tag.split('-')[0];
+      if (STRINGS[base]) return base;                                // e.g. de-AT -> de
+    }
+    return FALLBACK;
+  }
+
+  function render(code) {
+    var t = STRINGS[code] || STRINGS[FALLBACK];
+
+    document.documentElement.lang = code;
+    document.documentElement.dir = t.dir;
+    document.title = t.title;
+
+    var nodes = document.querySelectorAll('[data-t]');
+    for (var i = 0; i < nodes.length; i++) {
+      var key = nodes[i].getAttribute('data-t');
+      if (t[key]) nodes[i].textContent = t[key];
+    }
+
+    var sel = document.getElementById('lang');
+    sel.setAttribute('aria-label', t.langLabel);
+    sel.value = code;
+  }
+
+  function buildPicker(active) {
+    var sel = document.getElementById('lang');
+    var frag = document.createDocumentFragment();
+    for (var code in STRINGS) {
+      if (!Object.prototype.hasOwnProperty.call(STRINGS, code)) continue;
+      var o = document.createElement('option');
+      o.value = code;
+      o.textContent = STRINGS[code].name;
+      if (code === active) o.selected = true;
+      frag.appendChild(o);
+    }
+    sel.appendChild(frag);
+    sel.addEventListener('change', function () {
+      try { localStorage.setItem('beacon.lang', sel.value); } catch (e) {}
+      render(sel.value);
+    });
+  }
+
+  try {
+    var code = pick();
+    buildPicker(code);
+    render(code);
+  } catch (e) {
+    /* Anything unexpected leaves the English markup in place. */
+  } finally {
+    document.documentElement.classList.remove('i18n-pending');
+  }
+})();
+</script>
 </body>
 </html>
