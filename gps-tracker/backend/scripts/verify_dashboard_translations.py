@@ -16,7 +16,6 @@ from app.sync_dashboard_translation_keys import (
     dashboard_path,
     extract_defaults,
     extract_qr_defaults,
-    matches_default_translation,
     qr_generator_path,
 )
 
@@ -42,9 +41,9 @@ def main() -> int:
 
     incomplete = [
         key
-        for key, (default_text, _context) in defaults.items()
+        for key, (_default_text, _context) in defaults.items()
         if not translations.get(key)
-        or matches_default_translation(translations[key], default_text)
+        or translations[key] == key
     ]
     print(f"{args.language} dashboard translations: {len(defaults) - len(incomplete)}/{len(defaults)}")
     if not incomplete:

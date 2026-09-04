@@ -5610,8 +5610,9 @@ function switchTab(name) {
     activeTab.style.display = 'flex';
     const btn = document.querySelector(`.nav-item[data-tab="${name}"], .sidebar-link[onclick*="'${name}'"]`);
     if (btn) btn.classList.add('active');
+    const tabTitle = btn?.querySelector('.nav-label')?.textContent.trim() || TAB_TITLES[name] || name;
     const pageTitleEl = document.getElementById('pageTitle');
-    if (pageTitleEl) pageTitleEl.textContent = TAB_TITLES[name] || name;
+    if (pageTitleEl) pageTitleEl.textContent = tabTitle;
 
     // Toggle full-bleed mode on the content wrapper for Live Map
     const contentEl = document.querySelector('.content');
@@ -5620,7 +5621,7 @@ function switchTab(name) {
     const _runTabTask = (task, label) => {
         Promise.resolve(task).catch(err => {
             console.warn(`Tab load failed (${label}):`, err);
-            showTabAlert('Load issue', `${TAB_TITLES[name] || name} is taking too long. Please refresh or try again.`, 'error');
+            showTabAlert('Load issue', `${tabTitle} is taking too long. Please refresh or try again.`, 'error');
         });
     };
 

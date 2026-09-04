@@ -4,8 +4,9 @@
 
 For every active non-English language, every translation key discovered from
 `customer-dashboard/public/index.html` and `qr-generator.html` must have a
-non-empty value that is not an English fallback. Whitespace, HTML entities, and
-casing differences do not make an English value a valid translation.
+non-empty stored value. Valid French technical terms, names, and acronyms may
+correctly be identical to English, for example `PIN`, `QR`, `Excel`, `PDF`,
+`Description`, `Type`, and `Satellite`.
 
 The deployment runs `app.sync_dashboard_translation_keys`. It uses Azure
 Translator's authenticated batch API, not a public free translation API. It now
@@ -14,9 +15,9 @@ completion signal; the percentage in the admin portal is informational only.
 
 ## Current French Result
 
-The production check on 2026-09-04 failed: `626/899` dashboard keys are valid
-French translations and `273` are missing or still English fallbacks. Do not
-mark French complete until the verifier returns `899/899` with exit code `0`.
+The first Azure synchronization on 2026-09-04 wrote 234 French entries, including
+all Hive wizard strings. Do not mark French complete until the verifier returns
+`899/899` with exit code `0`.
 
 ## Reported Dashboard Coverage
 

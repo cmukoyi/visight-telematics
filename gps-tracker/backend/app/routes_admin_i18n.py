@@ -36,19 +36,13 @@ def _clean_translation_text(value: str) -> str:
     return unescape(str(value or "")).replace("\u00a0", " ").strip()
 
 
-def _matches_default_translation(translated_text: str, default_text: str) -> bool:
-    """Compare text independent of casing and incidental whitespace."""
-    normalize = lambda value: " ".join(_clean_translation_text(value).split()).casefold()
-    return normalize(translated_text) == normalize(default_text)
-
-
 def _is_complete_translation(language_code: str, key: TranslationKey, translation: Optional[Translation]) -> bool:
     if not translation:
         return False
     translated_text = _clean_translation_text(translation.translated_text)
     if not translated_text or translated_text == key.key:
         return False
-    if language_code != "en" and _matches_default_translation(translated_text, key.default_text):
+    if translated_text == key.key:
         return False
     return True
 

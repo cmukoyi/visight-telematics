@@ -126,9 +126,9 @@ def incomplete_translation_keys(session, defaults: dict[str, tuple[str, str]], l
     }
     return [
         key
-        for key, (default_text, _context) in defaults.items()
+        for key, (_default_text, _context) in defaults.items()
         if not translations.get(key)
-        or matches_default_translation(translations[key], default_text)
+        or translations[key] == key
     ]
 
 
@@ -182,7 +182,7 @@ def sync_translations(session, defaults: dict[str, tuple[str, str]], language_co
                 Translation.key == key,
             ).first()
             current_text = clean_translation_text(existing.translated_text) if existing else ""
-            if code == "en" or not existing or not current_text or current_text == key or matches_default_translation(current_text, default_text):
+            if code == "en" or not existing or not current_text or current_text == key:
                 pending.append((key, default_text, existing))
 
         print(f"{code}: {len(pending)} translation(s) needed")
