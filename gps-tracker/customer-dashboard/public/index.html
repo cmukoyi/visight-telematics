@@ -2629,7 +2629,7 @@ input.hive-range::-moz-range-track {
                                 </div>
                                 <!-- Notification email address list -->
                                 <div id="notif-email-addresses-section" style="padding:8px 0 4px">
-                                    <div style="font-size:12px;color:var(--text-3);margin-bottom:8px">Notification addresses — your login email is always included.</div>
+                                    <div style="font-size:12px;color:var(--text-3);margin-bottom:8px" data-i18n="settings.notification_addresses_login_included">Notification addresses — your login email is always included.</div>
                                     <div id="notif-email-tags" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
                                     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                                         <input type="email" id="notif-email-add-input" data-i18n-placeholder="settings.add_email_placeholder" placeholder="Add email address…"
@@ -2909,7 +2909,7 @@ input.hive-range::-moz-range-track {
                         <option value="offline" data-i18n="options.seen_gt_7_days">Seen &gt; 7 days</option>
                     </select>
                     <button class="btn btn-secondary btn-small" onclick="rptActRefresh()">
-                        <i class="fa-solid fa-rotate-right"></i> Refresh
+                        <i class="fa-solid fa-rotate-right"></i> <span data-i18n="common.refresh">Refresh</span>
                     </button>
                     <div class="rpt-export-group" id="rpt-act-export-btn" style="display:none">
                         <button class="btn btn-primary btn-small" onclick="rptActExportCSV()">
@@ -3026,7 +3026,7 @@ input.hive-range::-moz-range-track {
                         <option value="exit" data-i18n="options.exit_only">Exit only</option>
                     </select>
                     <button class="btn btn-secondary btn-small" onclick="rptGeoRefresh()">
-                        <i class="fa-solid fa-rotate-right"></i> Refresh
+                        <i class="fa-solid fa-rotate-right"></i> <span data-i18n="common.refresh">Refresh</span>
                     </button>
                     <div class="rpt-export-group" id="rpt-geo-export-btn" style="display:none">
                         <button class="btn btn-primary btn-small" onclick="rptGeoExportCSV()">
@@ -3066,7 +3066,7 @@ input.hive-range::-moz-range-track {
             <div id="tab-reports-battery" class="tab-content">
                 <div class="rpt-toolbar">
                     <div style="display:flex;align-items:center;gap:8px">
-                        <label style="font-size:12px;color:var(--text-3);white-space:nowrap">Battery ≤</label>
+                        <label style="font-size:12px;color:var(--text-3);white-space:nowrap" data-i18n="reports.battery_lte">Battery ≤</label>
                         <select id="rpt-bat-threshold" onchange="rptBatFilter()" style="width:auto">
                             <option value="10" data-i18n="options.10">10%</option>
                             <option value="20" selected data-i18n="options.20">20%</option>
@@ -3076,7 +3076,7 @@ input.hive-range::-moz-range-track {
                         </select>
                     </div>
                     <div style="display:flex;align-items:center;gap:8px">
-                        <label style="font-size:12px;color:var(--text-3);white-space:nowrap">Silent ≥</label>
+                        <label style="font-size:12px;color:var(--text-3);white-space:nowrap" data-i18n="reports.silent_gte">Silent ≥</label>
                         <select id="rpt-bat-offline-hrs" onchange="rptBatFilter()" style="width:auto">
                             <option value="0" data-i18n="options.any_duration">Any duration</option>
                             <option value="24" data-i18n="options.24_hours">24 hours</option>
@@ -3086,7 +3086,7 @@ input.hive-range::-moz-range-track {
                         </select>
                     </div>
                     <button class="btn btn-secondary btn-small" onclick="rptBatRefresh()">
-                        <i class="fa-solid fa-rotate-right"></i> Refresh
+                        <i class="fa-solid fa-rotate-right"></i> <span data-i18n="common.refresh">Refresh</span>
                     </button>
                     <div class="rpt-export-group" id="rpt-bat-export-btn" style="display:none">
                         <button class="btn btn-primary btn-small" onclick="rptBatExportCSV()">
@@ -3753,9 +3753,9 @@ input.hive-range::-moz-range-track {
                                 <div class="mha-pills">
                                     <span class="mha-pill" data-range="today" onclick="mhaSetDateRange('today', this)" data-i18n="text.today">Today</span>
                                     <span class="mha-pill" data-range="yesterday" onclick="mhaSetDateRange('yesterday', this)" data-i18n="text.yesterday">Yesterday</span>
-                                    <span class="mha-pill on" data-range="7d" onclick="mhaSetDateRange('7d', this)">Last 7 days</span>
-                                    <span class="mha-pill" data-range="30d" onclick="mhaSetDateRange('30d', this)">Last 30 days</span>
-                                    <span class="mha-pill" data-range="custom" onclick="mhaSetDateRange('custom', this)" style="color:var(--text-3)"><i class="fa-solid fa-calendar"></i> Custom</span>
+                                    <span class="mha-pill on" data-range="7d" onclick="mhaSetDateRange('7d', this)" data-i18n="options.last_7_days">Last 7 days</span>
+                                    <span class="mha-pill" data-range="30d" onclick="mhaSetDateRange('30d', this)" data-i18n="options.last_30_days">Last 30 days</span>
+                                    <span class="mha-pill" data-range="custom" onclick="mhaSetDateRange('custom', this)" style="color:var(--text-3)"><i class="fa-solid fa-calendar"></i> <span data-i18n="common.custom">Custom</span></span>
                                 </div>
                                 <!-- Custom date inputs (hidden by default) -->
                                 <div id="mha-custom-dates" style="display:none;margin-top:8px;">
@@ -4086,7 +4086,7 @@ input.hive-range::-moz-range-track {
               ════════════════════════════════════════ -->
               <div id="hive-screen-wizard" style="display:none">
                 <div class="hive-page-header">
-                  <div class="hive-page-title"><i class="fa-solid fa-plus"></i> Create New Hive</div>
+                  <div class="hive-page-title"><i class="fa-solid fa-plus"></i> <span data-i18n="hive.create_new_hive">Create New Hive</span></div>
                 </div>
                 <div class="hive-wizard">
                   <div id="hive-wiz-err" class="alert" style="display:none;margin-bottom:16px"><span id="hive-wiz-err-text"></span></div>
@@ -4347,7 +4347,7 @@ input.hive-range::-moz-range-track {
                     <span style="font-weight:600" data-i18n="text.enable_advanced_trip_analysis">Enable Advanced Trip Analysis</span>
                 </label>
                 <p style="font-size:12px;color:var(--text-secondary);margin:6px 0 0 24px">
-                    Subscribe this device to the Trip Engine for journey detection, stationary tracking, and Movement Analytics features.
+                    <span data-i18n="assets.trip_engine_subscription_hint">Subscribe this device to the Trip Engine for journey detection, stationary tracking, and Movement Analytics features.</span>
                 </p>
             </div>
             <div class="form-group">
@@ -4805,6 +4805,9 @@ class TranslationService {
 
 // Global shorthand for translate()
 window.t = (key, fallback) => TranslationService.getInstance().translate(key, fallback);
+function currentLocale() {
+    return TranslationService.getInstance().getCurrentLanguage() || undefined;
+}
 
 // Initialize translations on page load
 document.addEventListener('DOMContentLoaded', async () => {
@@ -5988,8 +5991,8 @@ async function openTagMgmtModal(mode, imei) {
     const tag = _lmTags.find(t => t.imei === imei);
     if (!tag) return;
 
-    document.getElementById('tagMgmtTitle').textContent = 'Edit Tag';
-    document.getElementById('tagMgmtSubmitBtn').textContent = 'Save Changes';
+    document.getElementById('tagMgmtTitle').textContent = t('assets.edit_tag', 'Edit Tag');
+    document.getElementById('tagMgmtSubmitBtn').textContent = t('settings.save_changes', 'Save Changes');
     document.getElementById('tagMgmtTagId').value = String(tag.id);
     document.getElementById('tagMgmtMode').value = 'edit';
     document.getElementById('tagMgmtAlert').style.display = 'none';
@@ -6049,14 +6052,14 @@ async function openTagMgmtModal(mode, imei) {
 
     // Package — shown in edit mode; not required (tag may already have one)
     document.getElementById('tagMgmtPackageGroup').style.display = '';
-    document.getElementById('tagMgmtPackageGroup').querySelector('label').textContent = 'Package';
+    document.getElementById('tagMgmtPackageGroup').querySelector('label').textContent = t('assets.package', 'Package');
     document.getElementById('tagMgmtPackage').removeAttribute('required');
     // Non-admins cannot assign or reassign a package — only Admin portal users can
     const _isAdmin = _isAdminLike();
     if (!_isAdmin) {
         document.getElementById('tagMgmtPackage').disabled = true;
         const _pkgLabel = document.getElementById('tagMgmtPackageGroup').querySelector('label');
-        _pkgLabel.innerHTML = 'Package <span style="font-size:11px;color:var(--text-3);font-weight:400">(Admin only — contact your administrator to change)</span>';
+        _pkgLabel.innerHTML = `${t('assets.package', 'Package')} <span style="font-size:11px;color:var(--text-3);font-weight:400">${t('assets.admin_only_package_hint', '(Admin only - contact your administrator to change)')}</span>`;
     } else {
         document.getElementById('tagMgmtPackage').disabled = false;
     }
@@ -6069,12 +6072,12 @@ async function openTagMgmtModal(mode, imei) {
     _banner.style.cssText = 'padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:8px;background:var(--surface-2,#f3f4f6);color:var(--text-2,#6b7280);border:1px solid var(--border,#e5e7eb)';
     if (tag.activation_date) {
         const ad = new Date(tag.activation_date);
-        const expStr = tag.expiry_date ? new Date(tag.expiry_date).toLocaleDateString() : 'N/A';
-        _banner.innerHTML = `<i class="fa-solid fa-circle-check" style="color:var(--green,#22c55e);margin-right:6px"></i>Activated ${ad.toLocaleDateString()} · Expires ${expStr}`;
+        const expStr = tag.expiry_date ? new Date(tag.expiry_date).toLocaleDateString(currentLocale()) : 'N/A';
+        _banner.innerHTML = `<i class="fa-solid fa-circle-check" style="color:var(--green,#22c55e);margin-right:6px"></i>${t('assets.activated', 'Activated')} ${ad.toLocaleDateString(currentLocale())} · ${t('assets.expires', 'Expires')} ${expStr}`;
     } else if (tag.package_id) {
-        _banner.innerHTML = `<i class="fa-solid fa-clock" style="color:var(--yellow,#eab308);margin-right:6px"></i>Awaiting first GPS fix — expiry will be calculated on activation`;
+        _banner.innerHTML = `<i class="fa-solid fa-clock" style="color:var(--yellow,#eab308);margin-right:6px"></i>${t('assets.awaiting_first_gps_expiry', 'Awaiting first GPS fix - expiry will be calculated on activation')}`;
     } else {
-        _banner.innerHTML = `<i class="fa-solid fa-circle-exclamation" style="color:var(--red,#ef4444);margin-right:6px"></i>No package assigned — tag is Inactive`;
+        _banner.innerHTML = `<i class="fa-solid fa-circle-exclamation" style="color:var(--red,#ef4444);margin-right:6px"></i>${t('assets.no_package_inactive', 'No package assigned - tag is Inactive')}`;
     }
     document.getElementById('tagMgmtForm').insertBefore(_banner, document.getElementById('tagMgmtImeiGroup'));
 
@@ -6791,7 +6794,7 @@ function notifAddEmail() {
     const loginEmail = getSession().user?.email || '';
     const existingChips = [...document.querySelectorAll('#notif-email-tags .notif-email-chip[data-email]')].map(c => c.dataset.email);
     if (val === loginEmail || existingChips.includes(val)) {
-        alertTx.textContent = 'That address is already in the list.';
+        alertTx.textContent = t('settings.address_already_in_list', 'That address is already in the list.');
         alertEl.className   = 'alert alert-error';
         alertEl.style.display = 'flex';
         return;
@@ -7247,10 +7250,10 @@ function _rptActRenderRows(rows) {
 function _rptActUpdateSummary() {
     const counts = { active: 0, idle: 0, offline: 0, unknown: 0 };
     _rptActFiltered.forEach(t => counts[_rptActivityStatus(t.hours_silent)]++);
-    document.getElementById('rpt-act-count-total').innerHTML   = `<strong>${_rptActFiltered.length}</strong> assets`;
-    document.getElementById('rpt-act-count-active').innerHTML  = `<strong>${counts.active}</strong> active`;
-    document.getElementById('rpt-act-count-idle').innerHTML    = `<strong>${counts.idle}</strong> idle`;
-    document.getElementById('rpt-act-count-offline').innerHTML = `<strong>${counts.offline}</strong> offline`;
+    document.getElementById('rpt-act-count-total').innerHTML   = `<strong>${_rptActFiltered.length}</strong> ${t('assets.title', 'assets')}`;
+    document.getElementById('rpt-act-count-active').innerHTML  = `<strong>${counts.active}</strong> ${t('common.active', 'active')}`;
+    document.getElementById('rpt-act-count-idle').innerHTML    = `<strong>${counts.idle}</strong> ${t('common.idle', 'idle')}`;
+    document.getElementById('rpt-act-count-offline').innerHTML = `<strong>${counts.offline}</strong> ${t('common.offline', 'offline')}`;
     document.getElementById('rpt-act-summary').style.display   = 'flex';
 }
 
@@ -7469,9 +7472,9 @@ function _rptGeoRenderRows(rows) {
 function _rptGeoUpdateSummary() {
     const entries = _rptGeoFiltered.filter(e => e.event_type === 'entry').length;
     const exits   = _rptGeoFiltered.filter(e => e.event_type === 'exit').length;
-    document.getElementById('rpt-geo-count-total').innerHTML = `<strong>${_rptGeoFiltered.length}</strong> events`;
-    document.getElementById('rpt-geo-count-entry').innerHTML = `<strong>${entries}</strong> entries`;
-    document.getElementById('rpt-geo-count-exit').innerHTML  = `<strong>${exits}</strong> exits`;
+    document.getElementById('rpt-geo-count-total').innerHTML = `<strong>${_rptGeoFiltered.length}</strong> ${t('reports.events', 'events')}`;
+    document.getElementById('rpt-geo-count-entry').innerHTML = `<strong>${entries}</strong> ${t('reports.entries', 'entries')}`;
+    document.getElementById('rpt-geo-count-exit').innerHTML  = `<strong>${exits}</strong> ${t('reports.exits', 'exits')}`;
     document.getElementById('rpt-geo-summary').style.display = 'flex';
 }
 
@@ -7575,9 +7578,9 @@ function _rptBatRenderRows(rows) {
 function _rptBatUpdateSummary() {
     const lowBat  = _rptBatFiltered.filter(t => t.battery_level != null && t.battery_level <= 20).length;
     const offline = _rptBatFiltered.filter(t => t.hours_silent  != null && t.hours_silent  >= 48).length;
-    document.getElementById('rpt-bat-count-total').innerHTML   = `<strong>${_rptBatFiltered.length}</strong> assets`;
-    document.getElementById('rpt-bat-count-low-bat').innerHTML = `<strong>${lowBat}</strong> low battery`;
-    document.getElementById('rpt-bat-count-offline').innerHTML = `<strong>${offline}</strong> offline`;
+    document.getElementById('rpt-bat-count-total').innerHTML   = `<strong>${_rptBatFiltered.length}</strong> ${t('assets.title', 'assets')}`;
+    document.getElementById('rpt-bat-count-low-bat').innerHTML = `<strong>${lowBat}</strong> ${t('reports.low_battery', 'low battery')}`;
+    document.getElementById('rpt-bat-count-offline').innerHTML = `<strong>${offline}</strong> ${t('common.offline', 'offline')}`;
     document.getElementById('rpt-bat-summary').style.display   = 'flex';
 }
 
@@ -7847,8 +7850,8 @@ function _rptAlertsRender() {
         return;
     }
     const unreadCount = _alertsData.filter(a => !a.is_read && !_alertsRead.has(a.id)).length;
-    document.getElementById('rpt-alerts-count').innerHTML  = `<strong>${_alertsData.length}</strong> alerts`;
-    document.getElementById('rpt-alerts-unread').innerHTML = `<strong>${unreadCount}</strong> unread`;
+    document.getElementById('rpt-alerts-count').innerHTML  = `<strong>${_alertsData.length}</strong> ${t('alerts.alerts', 'alerts')}`;
+    document.getElementById('rpt-alerts-unread').innerHTML = `<strong>${unreadCount}</strong> ${t('alerts.unread', 'unread')}`;
     if (summary) summary.style.display = 'flex';
     if (markBtn) markBtn.style.display  = unreadCount > 0 ? '' : 'none';
     tbody.innerHTML = _alertsData.map(a => {
@@ -7903,7 +7906,7 @@ async function rptAlertMarkRead(id, rowEl) {
     _updateBellBadge();
     const unreadCount = _alertsData.filter(x => !x.is_read && !_alertsRead.has(x.id)).length;
     const unreadEl = document.getElementById('rpt-alerts-unread');
-    if (unreadEl) unreadEl.innerHTML = `<strong>${unreadCount}</strong> unread`;
+    if (unreadEl) unreadEl.innerHTML = `<strong>${unreadCount}</strong> ${t('alerts.unread', 'unread')}`;
     const markBtn = document.getElementById('rpt-alerts-mark-all-btn');
     if (markBtn) markBtn.style.display = unreadCount > 0 ? '' : 'none';
     // Persist to server (fire-and-forget)
@@ -7922,8 +7925,8 @@ async function rptAlertDelete(id, rowEl) {
         const unreadCount = _alertsData.filter(x => !x.is_read && !_alertsRead.has(x.id)).length;
         const countEl  = document.getElementById('rpt-alerts-count');
         const unreadEl = document.getElementById('rpt-alerts-unread');
-        if (countEl)  countEl.innerHTML  = `<strong>${_alertsData.length}</strong> alerts`;
-        if (unreadEl) unreadEl.innerHTML = `<strong>${unreadCount}</strong> unread`;
+        if (countEl)  countEl.innerHTML  = `<strong>${_alertsData.length}</strong> ${t('alerts.alerts', 'alerts')}`;
+        if (unreadEl) unreadEl.innerHTML = `<strong>${unreadCount}</strong> ${t('alerts.unread', 'unread')}`;
         if (!_alertsData.length) _rptAlertsRender();
     } catch (_) {}
 }
@@ -9165,12 +9168,12 @@ function _rptFmtDateTime(iso) {
 function _rptSubUpdateSummary() {
     const counts = { active: 0, expiring: 0, expired: 0, new: 0, none: 0 };
     _rptSubFiltered.forEach(t => counts[_rptSubStatus(t)]++);
-    document.getElementById('rpt-sub-count-total').innerHTML    = `<strong>${_rptSubFiltered.length}</strong> tags`;
-    document.getElementById('rpt-sub-count-active').innerHTML   = `<strong>${counts.active}</strong> active`;
-    document.getElementById('rpt-sub-count-expiring').innerHTML = `<strong>${counts.expiring}</strong> expiring`;
-    document.getElementById('rpt-sub-count-expired').innerHTML  = `<strong>${counts.expired}</strong> expired`;
-    document.getElementById('rpt-sub-count-new').innerHTML      = `<strong>${counts.new}</strong> new`;
-    document.getElementById('rpt-sub-count-none').innerHTML     = `<strong>${counts.none}</strong> no package`;
+    document.getElementById('rpt-sub-count-total').innerHTML    = `<strong>${_rptSubFiltered.length}</strong> ${t('assets.tags', 'tags')}`;
+    document.getElementById('rpt-sub-count-active').innerHTML   = `<strong>${counts.active}</strong> ${t('common.active', 'active')}`;
+    document.getElementById('rpt-sub-count-expiring').innerHTML = `<strong>${counts.expiring}</strong> ${t('assets.expiring', 'expiring')}`;
+    document.getElementById('rpt-sub-count-expired').innerHTML  = `<strong>${counts.expired}</strong> ${t('assets.expired', 'expired')}`;
+    document.getElementById('rpt-sub-count-new').innerHTML      = `<strong>${counts.new}</strong> ${t('geofences.new', 'new')}`;
+    document.getElementById('rpt-sub-count-none').innerHTML     = `<strong>${counts.none}</strong> ${t('assets.no_package', 'no package')}`;
     document.getElementById('rpt-sub-summary').style.display    = 'flex';
 }
 
@@ -9262,8 +9265,8 @@ function renderCategoriesList() {
 }
 
 function openAddCategoryModal() {
-    document.getElementById('categoryModalTitle').textContent = 'Add Category';
-    document.getElementById('catSubmitBtn').textContent = 'Add Category';
+    document.getElementById('categoryModalTitle').textContent = t('buttons.add_category', 'Add Category');
+    document.getElementById('catSubmitBtn').textContent = t('buttons.add_category', 'Add Category');
     document.getElementById('catId').value = '';
     document.getElementById('catName').value = '';
     document.getElementById('catIcon').value = '';
@@ -9276,7 +9279,7 @@ function openEditCategoryModal(id) {
     const cat = _categoriesCache.find(c => c.id === id);
     if (!cat) return;
     document.getElementById('categoryModalTitle').textContent = 'Edit Category';
-    document.getElementById('catSubmitBtn').textContent = 'Save Changes';
+    document.getElementById('catSubmitBtn').textContent = t('settings.save_changes', 'Save Changes');
     document.getElementById('catId').value = cat.id;
     document.getElementById('catName').value = cat.name;
     document.getElementById('catIcon').value = cat.icon || '';
@@ -10921,7 +10924,7 @@ function _lmPlaceMarkers() {
             .addTo(_liveMap);
         const label = esc(t.description || t.device_name || t.imei);
         const status = _lmStatusClass(t);
-        const statusLabels = { active: 'Active', idle: 'Idle', offline: 'Offline' };
+        const statusLabels = { active: t('common.active', 'Active'), idle: t('common.idle', 'Idle'), offline: t('common.offline', 'Offline') };
         
         // Build sensor data snippet for popup (only key fields)
         console.log('[POPUP] Building sensor snippet for tag:', t.imei, 'attributes:', t.attributes);
@@ -10950,7 +10953,7 @@ function _lmPlaceMarkers() {
                     <span class="status-dot status-${status}"></span>
                     <span>${statusLabels[status]}</span>
                 </div>
-                ${t.last_seen ? `<div style="font-size:.78rem;color:var(--text-3);margin-bottom:6px">${new Date(t.last_seen).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>` : ''}
+                ${t.last_seen ? `<div style="font-size:.78rem;color:var(--text-3);margin-bottom:6px">${new Date(t.last_seen).toLocaleString(currentLocale(), {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>` : ''}
                 ${sensorSnippet}
                 <div style="display:flex;gap:5px;margin-top:2px">
                     <button class="btn-popup-hist" onclick="lmOpenHistory('${esc(t.imei)}')">
@@ -11376,17 +11379,17 @@ function _lmRenderSensorData(t) {
     
     // Priority sensor fields to display
     const priorityFields = [
-        { key: 'Temperature', icon: 'fa-temperature-half', color: 'var(--primary)' },
-        { key: 'Altitude', icon: 'fa-mountain', color: 'var(--success)' },
-        { key: 'RSSI', icon: 'fa-signal', color: 'var(--warning)' },
-        { key: 'GPS_Accuracy', icon: 'fa-bullseye', color: 'var(--text-3)' },
-        { key: 'Battery', icon: 'fa-battery-half', color: 'var(--success)' }
+        { key: 'Temperature', label: t('text.temperature', 'Temperature'), icon: 'fa-temperature-half', color: 'var(--primary)' },
+        { key: 'Altitude', label: t('text.altitude', 'Altitude'), icon: 'fa-mountain', color: 'var(--success)' },
+        { key: 'RSSI', label: 'RSSI', icon: 'fa-signal', color: 'var(--warning)' },
+        { key: 'GPS_Accuracy', label: t('assets.gps_accuracy', 'GPS Accuracy'), icon: 'fa-bullseye', color: 'var(--text-3)' },
+        { key: 'Battery', label: t('text.battery', 'Battery'), icon: 'fa-battery-half', color: 'var(--success)' }
     ];
     
     priorityFields.forEach(field => {
         if (attrs[field.key] && attrs[field.key].value) {
             sensorFields.push({
-                label: field.key.replace(/_/g, ' '),
+                label: field.label,
                 value: esc(attrs[field.key].value),
                 icon: field.icon,
                 color: field.color
@@ -11413,7 +11416,7 @@ function _lmRenderSensorData(t) {
     return `
         <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px">
             <h4 style="font-size:12px;font-weight:600;color:var(--text-2);margin:0 0 8px 0;text-transform:uppercase;letter-spacing:0.5px">
-                <i class="fa-solid fa-microchip" style="margin-right:6px"></i>Sensor Data
+                <i class="fa-solid fa-microchip" style="margin-right:6px"></i>${t('assets.sensor_data', 'Sensor Data')}
             </h4>
             <div class="detail-grid">
                 ${sensorHtml}
@@ -11428,10 +11431,10 @@ function _lmRenderDetail(tag) {
     const label   = esc(tag.description || tag.device_name || tag.imei);
     const status  = _lmStatusClass(tag);
     const statusColors = { active: 'var(--success)', idle: 'var(--warning,#f59e0b)', offline: 'var(--danger)' };
-    const statusLabel  = { active: 'Active', idle: 'Idle', offline: 'Offline' };
+    const statusLabel  = { active: t('common.active', 'Active'), idle: t('common.idle', 'Idle'), offline: t('common.offline', 'Offline') };
     const tagTypeDisplay = esc(_ppTagTypeLabel(tag.tag_type));
-    const lastSeen  = tag.last_seen   ? new Date(tag.last_seen).toLocaleString()    : '—';
-    const expiry    = tag.expiry_date ? new Date(tag.expiry_date).toLocaleDateString() : '—';
+    const lastSeen  = tag.last_seen   ? new Date(tag.last_seen).toLocaleString(currentLocale())    : '—';
+    const expiry    = tag.expiry_date ? new Date(tag.expiry_date).toLocaleDateString(currentLocale()) : '—';
     const daysLeft  = tag.package_id
         ? (tag.days_remaining != null
             ? (tag.days_remaining > 0 ? `${tag.days_remaining}d ${t('common.left', 'left')}` : tag.days_remaining === 0 ? t('common.today', 'Today') : t('assets.expired', 'Expired'))
@@ -11470,7 +11473,7 @@ function _lmRenderDetail(tag) {
         })()}
         ${_lmMarkers[tag.imei] ? `<div class="detail-actions">
             <button class="btn btn-primary btn-sm" onclick="lmSelectFromList('${esc(tag.imei)}')">
-                <i class="fa-solid fa-crosshairs"></i> Centre on Map
+                <i class="fa-solid fa-crosshairs"></i> ${t('map.centre_on_map', 'Centre on Map')}
             </button>
             ${(() => {
                 const sess = getSession();
@@ -11492,7 +11495,7 @@ function _lmRenderDetail(tag) {
                 
                 return (hasFeature && isSeries5 && hasTemp) ? `
                     <button class="btn btn-primary btn-sm" style="background-color: var(--success); border-color: var(--success);" onclick="toggleTemperatureGraph('${esc(tag.imei)}', '${esc(tag.description || tag.device_name || tag.imei)}')">
-                        <i class="fa-solid fa-temperature-half"></i> Graph
+                        <i class="fa-solid fa-temperature-half"></i> ${t('text.graph', 'Graph')}
                     </button>
                 ` : '';
             })()}
@@ -11802,7 +11805,7 @@ async function histLoadTrips() {
     // Show trips panel, hide waypoints
     document.getElementById('hist-trips-list').style.display = '';
     document.getElementById('hist-timeline').style.display  = 'none';
-    document.getElementById('hist-track-summary').textContent = 'Loading journeys…';
+    document.getElementById('hist-track-summary').textContent = t('trips.loading_journeys', 'Loading journeys...');
     document.getElementById('hist-trip-count').textContent = '';
     document.getElementById('hist-trips-list').innerHTML =
         '<div style="padding:24px;text-align:center;color:var(--text-3)"><i class="fa-solid fa-spinner fa-spin"></i></div>';
@@ -11832,14 +11835,14 @@ async function histLoadTrips() {
         if (seq !== _histLoadSeq) return; // stale error — ignore
         const raw = err.message || '';
         const userMsg = /vehicle.*not.*found|not.*found.*mzone|mzone|vehicle.*not/i.test(raw)
-            ? 'No journeys in the selected date range.'
+            ? t('trips.no_journeys_selected_range', 'No journeys in the selected date range.')
             : esc(raw);
         document.getElementById('hist-trips-list').innerHTML =
             `<div style="padding:32px;text-align:center;color:var(--text-3)">
                 <i class="fa-solid fa-route" style="font-size:28px;opacity:.3;display:block;margin-bottom:10px"></i>
                 <p style="font-size:.83rem">${userMsg}</p>
              </div>`;
-        document.getElementById('hist-track-summary').textContent = 'Failed to load journeys';
+        document.getElementById('hist-track-summary').textContent = t('trips.failed_to_load_journeys', 'Failed to load journeys');
     }
 }
 
@@ -11849,15 +11852,15 @@ function histLoadTrack() { histLoadTrips(); }
 function _histRenderTripsList() {
     const trips = _histTrips;
     const count = trips.length;
-    document.getElementById('hist-trip-count').textContent = count ? `${count} journey${count > 1 ? 's' : ''}` : '';
+    document.getElementById('hist-trip-count').textContent = count ? `${count} ${count > 1 ? t('trips.journeys', 'journeys') : t('trips.journey', 'journey')}` : '';
     document.getElementById('hist-track-summary').textContent =
-        count ? `${count} journey${count > 1 ? 's' : ''} found — click one to view route` : 'No journeys found for this date range.';
+        count ? `${count} ${count > 1 ? t('trips.journeys', 'journeys') : t('trips.journey', 'journey')} ${t('trips.found_click_route', 'found - click one to view route')}` : t('trips.no_journeys_found_date_range', 'No journeys found for this date range.');
 
     if (!count) {
         document.getElementById('hist-trips-list').innerHTML =
             `<div style="padding:40px;text-align:center;color:var(--text-3)">
                 <i class="fa-solid fa-route" style="font-size:36px;opacity:.2;display:block;margin-bottom:12px"></i>
-                <p style="font-size:.83rem">No journeys recorded in this date range.</p>
+                <p style="font-size:.83rem">${t('trips.no_journeys_recorded_date_range', 'No journeys recorded in this date range.')}</p>
              </div>`;
         return;
     }
@@ -11867,7 +11870,7 @@ function _histRenderTripsList() {
         const end    = trip.endUtcTimestamp   ? new Date(trip.endUtcTimestamp)   : null;
         const startStr = start ? start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
         const endStr   = end   ? end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })   : '—';
-        const dateStr  = start ? start.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }) : '';
+        const dateStr  = start ? start.toLocaleDateString(currentLocale(), { weekday: 'short', month: 'short', day: 'numeric' }) : '';
         const distMi   = trip.distance ? Number(trip.distance).toFixed(1) : null;  // backend already returns miles
         const durMins  = trip.duration ? Math.round(trip.duration / 60) : null;
         const from = trip.startLocationDescription || '—';
@@ -13155,9 +13158,9 @@ document.querySelector('[data-hscreen="archive"]')?.addEventListener('click', ()
 
 // ── wizard ────────────────────────────────────────────────────────────────────
 const WIZARD_PROFILES = [
-    { id: 'stationary', label: 'They stay put',              desc: "Tools in a workshop, equipment in a yard, instruments in a lab. Items that shouldn't normally move from where you've placed them.<br><em>HIVE alerts you to any movement or separation. Tight threshold, fast detection.</em><br><em>Best for: theft monitoring, asset location verification, \"did this walk away?\" tracking.</em>" },
-    { id: 'slow',       label: 'They move occasionally',      desc: 'Livestock, parked vehicles between trips, mobility aids, luggage during a stay. Items that mostly stay put but move slowly when they do.<br><em>HIVE pauses monitoring during movement and resumes when the items are at rest. Alerts arrive once things settle.</em><br><em>Best for: tracking items that have long stationary periods with occasional slow movement between locations.</em>' },
-    { id: 'mobile',     label: 'They move regularly or in transit', desc: 'Personal belongings carried day-to-day, shared equipment, couriered packages, fleet items, vehicles on the road. Items that travel with you or are actively being moved.<br><em>HIVE pauses monitoring during transit and resumes when you arrive at your destination. Wider threshold to handle position uncertainty during movement. Alerts arrive after you\'ve stopped.</em><br><em>Best for: travel kits (\"did everything arrive with me?\"), delivery tracking, fleet monitoring. Most accurate at rest; in-transit alerts are paused by design.</em>' },
+    { id: 'stationary', labelKey: 'hive.profile_stationary_label', label: 'They stay put', descKey: 'hive.profile_stationary_desc', desc: "Tools in a workshop, equipment in a yard, instruments in a lab. Items that shouldn't normally move from where you've placed them.<br><em>HIVE alerts you to any movement or separation. Tight threshold, fast detection.</em><br><em>Best for: theft monitoring, asset location verification, \"did this walk away?\" tracking.</em>" },
+    { id: 'slow', labelKey: 'hive.profile_slow_label', label: 'They move occasionally', descKey: 'hive.profile_slow_desc', desc: 'Livestock, parked vehicles between trips, mobility aids, luggage during a stay. Items that mostly stay put but move slowly when they do.<br><em>HIVE pauses monitoring during movement and resumes when the items are at rest. Alerts arrive once things settle.</em><br><em>Best for: tracking items that have long stationary periods with occasional slow movement between locations.</em>' },
+    { id: 'mobile', labelKey: 'hive.profile_mobile_label', label: 'They move regularly or in transit', descKey: 'hive.profile_mobile_desc', desc: 'Personal belongings carried day-to-day, shared equipment, couriered packages, fleet items, vehicles on the road. Items that travel with you or are actively being moved.<br><em>HIVE pauses monitoring during transit and resumes when you arrive at your destination. Wider threshold to handle position uncertainty during movement. Alerts arrive after you\'ve stopped.</em><br><em>Best for: travel kits (\"did everything arrive with me?\"), delivery tracking, fleet monitoring. Most accurate at rest; in-transit alerts are paused by design.</em>' },
 ];
 
 function hiveWizReset() {
@@ -13198,15 +13201,16 @@ function hiveWizRender() {
         const cls = i < step-1 ? 'hive-done' : i === step-1 ? 'hive-current' : '';
         return `<div class="hive-wizard-bar ${cls}"></div>`;
     }).join('');
-    document.getElementById('hive-wiz-stepmeta').innerHTML = `<span>Step ${step < 10 ? '0'+step : step} of 0${total}</span><span>${['Select Tags','Movement Profile','Name & Threshold'][step-1]}</span>`;
+    const stepLabels = [t('hive.select_tags', 'Select Tags'), t('hive.movement_profile', 'Movement Profile'), t('hive.name_threshold', 'Name & Threshold')];
+    document.getElementById('hive-wiz-stepmeta').innerHTML = `<span>${t('common.step', 'Step')} ${step < 10 ? '0'+step : step} ${t('common.of', 'of')} 0${total}</span><span>${stepLabels[step-1]}</span>`;
     document.getElementById('hive-wiz-back-btn').style.display = step === 1 ? 'none' : '';
-    document.getElementById('hive-wiz-next-btn').textContent = step === total ? 'Create Hive' : 'Continue →';
+    document.getElementById('hive-wiz-next-btn').textContent = step === total ? t('hive.create_hive', 'Create Hive') : `${t('common.continue', 'Continue')} →`;
 
     const content = document.getElementById('hive-wiz-step-content');
     if (step === 1) {
         content.innerHTML = `
-          <div class="hive-wizard-q">Which tags should be in this hive?</div>
-          <div class="hive-wizard-help">Select the assets you want to keep together. Each tag can only be in one active hive at a time.</div>
+          <div class="hive-wizard-q">${t('hive.which_tags_question', 'Which tags should be in this hive?')}</div>
+          <div class="hive-wizard-help">${t('hive.select_assets_help', 'Select the assets you want to keep together. Each tag can only be in one active hive at a time.')}</div>
           <div class="hive-tag-selector">${_hiveWizAvailableTags.length
             ? _hiveWizAvailableTags.map(t => {
                 const sel = hiveWizState.selectedTags.includes(t.tag_id);
@@ -13215,7 +13219,7 @@ function hiveWizRender() {
                   <div><div class="hive-tag-sel-name">${hiveEsc(t.label||t.tag_id)}</div><div class="hive-tag-sel-id">${hiveEsc(t.tag_id)}</div></div>
                 </div>`;
               }).join('')
-            : '<div style="text-align:center;padding:40px;color:var(--text-3)">No available tags — all tags are already in active hives.</div>'
+            : `<div style="text-align:center;padding:40px;color:var(--text-3)">${t('hive.no_available_tags', 'No available tags - all tags are already in active hives.')}</div>`
           }</div>`;
     } else if (step === 2) {
         const sug = hiveWizState._suggestion;
@@ -13225,8 +13229,8 @@ function hiveWizRender() {
             hiveWizState.profile = sug.suggested_profile;
         }
         content.innerHTML = `
-          <div class="hive-wizard-q">How much do these items move?</div>
-          <div class="hive-wizard-help">This affects how quickly HIVE flags problems and how it handles your items being on the move. You can change this later.</div>
+          <div class="hive-wizard-q">${t('hive.movement_question', 'How much do these items move?')}</div>
+          <div class="hive-wizard-help">${t('hive.movement_help', 'This affects how quickly HIVE flags problems and how it handles your items being on the move. You can change this later.')}</div>
           <div class="hive-options">${WIZARD_PROFILES.map(p => {
             const sel   = hiveWizState.profile === p.id;
             const showBadge = sug && sug.suggested_profile === p.id && sug.confidence !== 'none';
@@ -13235,28 +13239,28 @@ function hiveWizRender() {
             return `<div class="hive-option ${sel?'hive-selected':''}" onclick="hiveWizState.profile='${p.id}';hiveWizRender()">
               <div class="hive-option-radio"></div>
               <div>
-                <div class="hive-option-title">${p.label} ${badge}</div>
-                <div class="hive-option-desc">${p.desc}${note}</div>
+                <div class="hive-option-title">${t(p.labelKey, p.label)} ${badge}</div>
+                <div class="hive-option-desc">${t(p.descKey, p.desc)}${note}</div>
               </div>
             </div>`;
           }).join('')}</div>`;
     } else {
         const sug = hiveWizState._suggestion;
         content.innerHTML = `
-          <div class="hive-wizard-q">Name your hive & set the threshold</div>
-          <div class="hive-wizard-help">Give this group a descriptive name. The distance threshold is the maximum allowed spread before an alert is raised.</div>
+          <div class="hive-wizard-q">${t('hive.name_threshold_question', 'Name your hive & set the threshold')}</div>
+          <div class="hive-wizard-help">${t('hive.name_threshold_help', 'Give this group a descriptive name. The distance threshold is the maximum allowed spread before an alert is raised.')}</div>
           <div class="hive-form-group">
-            <label class="hive-form-label">Hive Name *</label>
+            <label class="hive-form-label">${t('hive.hive_name_required', 'Hive Name *')}</label>
             <input type="text" class="hive-form-input" data-i18n-placeholder="placeholders.eg_travel_kit" placeholder="e.g. Travel Kit" value="${hiveEsc(hiveWizState.name)}" oninput="hiveWizState.name=this.value">
           </div>
           <div class="hive-form-group">
-            <label class="hive-form-label">Distance Threshold (metres) *</label>
+            <label class="hive-form-label">${t('hive.distance_threshold_metres_required', 'Distance Threshold (metres) *')}</label>
             <input type="number" class="hive-form-input" data-i18n-placeholder="placeholders.eg_100" placeholder="e.g. 100" min="1" max="50000" value="${hiveWizState.threshold_m||''}" oninput="hiveWizState.threshold_m=parseFloat(this.value)">
           </div>
           <div class="hive-form-group">
-            <label class="hive-form-label">Validity (days)</label>
+            <label class="hive-form-label">${t('hive.validity_days', 'Validity (days)')}</label>
             <input type="number" class="hive-form-input" placeholder="60" min="1" max="3650" value="${hiveWizState.validity_days||60}" oninput="hiveWizState.validity_days=parseInt(this.value)||60">
-            <div class="hive-wizard-help" style="margin-top:4px">Hive auto-archives after this many days. Default 60 days. You can extend later.</div>
+            <div class="hive-wizard-help" style="margin-top:4px">${t('hive.validity_help', 'Hive auto-archives after this many days. Default 60 days. You can extend later.')}</div>
           </div>
           <div class="hive-form-summary"><strong>${hiveWizState.selectedTags.length} tags</strong> · <strong>${HIVE_PROFILE_LABELS[hiveWizState.profile]||''} profile</strong>${(() => { const PROFILE_DEFAULTS = { stationary: 150, slow: 450, mobile: 1000 }; const defaultThreshold = PROFILE_DEFAULTS[hiveWizState.profile] || 1000; return ' · Suggested: ' + defaultThreshold + 'm threshold'; })()}</div>`;
     }
@@ -14734,13 +14738,13 @@ function mhaOpenHelp() {
       // The asset's last_seen from /api/portal/tags is the actual last position time
       
       // Get range label for display
-      let rangeLabel = 'last 7 days';
-      if (_mhaDateRange === 'today') rangeLabel = 'today';
-      else if (_mhaDateRange === 'yesterday') rangeLabel = 'yesterday';
-      else if (_mhaDateRange === '30d') rangeLabel = 'last 30 days';
+    let rangeLabel = t('options.last_7_days', 'Last 7 days');
+    if (_mhaDateRange === 'today') rangeLabel = t('common.today', 'today');
+    else if (_mhaDateRange === 'yesterday') rangeLabel = t('common.yesterday', 'yesterday');
+    else if (_mhaDateRange === '30d') rangeLabel = t('options.last_30_days', 'Last 30 days');
       else if (_mhaDateRange === 'custom') {
-        const start = startDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
-        const end = endDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        const start = startDate.toLocaleDateString(currentLocale(), { month: 'short', day: 'numeric' });
+        const end = endDate.toLocaleDateString(currentLocale(), { month: 'short', day: 'numeric' });
         rangeLabel = `${start} - ${end}`;
       }
       
@@ -14775,7 +14779,7 @@ function mhaOpenHelp() {
     const journeysByDate = {};
     journeys.forEach(journey => {
       const startDate = new Date(journey.started_at);
-      const dateKey = startDate.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
+    const dateKey = startDate.toLocaleDateString(currentLocale(), { weekday: 'short', day: 'numeric', month: 'short' });
       if (!journeysByDate[dateKey]) {
         journeysByDate[dateKey] = { date: startDate, journeys: [] };
       }
@@ -14788,10 +14792,10 @@ function mhaOpenHelp() {
     let html = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <span style="font-size:12px;color:var(--text-2);">
-          ${journeys.length} journey${journeys.length !== 1 ? 's' : ''}
+          ${journeys.length} ${journeys.length === 1 ? t('trips.journey', 'journey') : t('trips.journeys', 'journeys')}
         </span>
         <button class="mha-plot-all" id="mha-plot-all-journeys-btn" onclick="mhaPlotAllJourneys()">
-          <i class="fa-solid fa-route"></i> Plot all
+          <i class="fa-solid fa-route"></i> ${t('trips.plot_all', 'Plot all')}
         </button>
       </div>`;
     
@@ -14800,7 +14804,7 @@ function mhaOpenHelp() {
     
     dateGroups.forEach((group, groupIdx) => {
       // Date header
-      html += `<div class="mha-date-hd">${group.date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })}</div>`;
+    html += `<div class="mha-date-hd">${group.date.toLocaleDateString(currentLocale(), { weekday: 'short', day: 'numeric', month: 'short' })}</div>`;
       
       // Journeys in this date group
       group.journeys.forEach((journey, idx) => {
@@ -14821,7 +14825,7 @@ function mhaOpenHelp() {
             html += `
               <div class="mha-idle">
                 <span class="mha-idle-rail"></span>
-                <span class="mha-idle-pill"><i class="fa-solid fa-clock"></i> ${mhaFormatDuration(idleDuration)} idle</span>
+                <span class="mha-idle-pill"><i class="fa-solid fa-clock"></i> ${mhaFormatDuration(idleDuration)} ${t('common.idle', 'idle')}</span>
               </div>`;
           }
         }
@@ -14831,26 +14835,26 @@ function mhaOpenHelp() {
         const endDate = new Date(journey.ended_at);
         const distance = fmtDistance(journey.total_distance_m);
         const isSelected = _mhaActiveJourney === journey.id;
-        const airTag = journey.is_air_journey ? ' <span class="airtag">✈ flight</span>' : '';
+        const airTag = journey.is_air_journey ? ` <span class="airtag">✈ ${t('trips.flight', 'flight')}</span>` : '';
         
         // Build metadata line: "19:59 – 05:00 · 7 legs · 6 stationaries · 82 positions"
-        const startTime = startDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-        const endTime = endDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+        const startTime = startDate.toLocaleTimeString(currentLocale(), { hour: '2-digit', minute: '2-digit', hour12: false });
+        const endTime = endDate.toLocaleTimeString(currentLocale(), { hour: '2-digit', minute: '2-digit', hour12: false });
         let metaParts = [`${startTime} – ${endTime}`];
-        if (journey.leg_count > 0) metaParts.push(`${journey.leg_count} leg${journey.leg_count !== 1 ? 's' : ''}`);
-        if (journey.stationary_count > 0) metaParts.push(`${journey.stationary_count} ${journey.stationary_count === 1 ? 'stationary' : 'stationaries'}`);
+        if (journey.leg_count > 0) metaParts.push(`${journey.leg_count} ${journey.leg_count === 1 ? t('trips.leg', 'leg') : t('trips.legs', 'legs')}`);
+        if (journey.stationary_count > 0) metaParts.push(`${journey.stationary_count} ${journey.stationary_count === 1 ? t('general.stationary', 'stationary') : t('trips.stationaries', 'stationaries')}`);
         // We don't have position_count in journey data, so omit for now
         const metaLine = metaParts.join(' · ');
         
         html += `
           <div class="mha-journey-card ${isSelected ? 'selected open' : ''}" data-journey-id="${journey.id}" onclick="mhaToggleJourney('${journey.id}', event)">
             <div class="mha-jhead">
-              <span class="mha-jtitle">Journey ${journeyNumber}${airTag}</span>
+              <span class="mha-jtitle">${t('trips.journey', 'Journey')} ${journeyNumber}${airTag}</span>
               <span class="mha-jkm">${distance}</span>
             </div>
             <div class="mha-jmeta">${metaLine}</div>
             <div class="mha-journey-steps" id="mha-steps-${journey.id}">
-              <div style="text-align:center;padding:10px;color:var(--text-3);"><i class="fa-solid fa-spinner fa-spin"></i> Loading details...</div>
+              <div style="text-align:center;padding:10px;color:var(--text-3);"><i class="fa-solid fa-spinner fa-spin"></i> ${t('common.loading', 'Loading...')}</div>
             </div>
           </div>`;
         
@@ -14986,7 +14990,7 @@ function mhaOpenHelp() {
         const firstLeg = data.legs[0];
         const startLat = firstLeg.start_lat || firstLeg.latitude;
         const startLng = firstLeg.start_lng || firstLeg.longitude;
-        const startTime = new Date(firstLeg.started_at).toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit', hour12: false});
+        const startTime = new Date(firstLeg.started_at).toLocaleTimeString(currentLocale(), {hour: '2-digit', minute: '2-digit', hour12: false});
         const startAddr = firstLeg.start_address ? mhaShortAddress(firstLeg.start_address) : '';
         
         stepsHtml += `
@@ -15030,19 +15034,19 @@ function mhaOpenHelp() {
               <div class="mha-step" data-leg-id="${leg.id}" onclick="mhaFocusLegById(event, '${leg.id}')">
                 <i class="dot sd" style="background:#3b82f6;"></i>
                 <div>
-                  <span class="val">✈ Air leg</span>
-                  <span class="lbl"> · ${distance} · ${durationMin} min · great-circle · path unknown</span>
+                  <span class="val">✈ ${t('trips.air_leg', 'Air leg')}</span>
+                  <span class="lbl"> · ${distance} · ${durationMin} ${t('common.minutes', 'min')} · ${t('trips.path_unknown', 'path unknown')}</span>
                 </div>
               </div>`;
           } else {
             // Road leg: show standard label
-            const partialWarn = (posCount > 0 && posCount < 5) ? ' <span class="warn">· partial path</span>' : '';
+            const partialWarn = (posCount > 0 && posCount < 5) ? ` <span class="warn">· ${t('trips.partial_path', 'partial path')}</span>` : '';
             stepsHtml += `
               <div class="mha-step" data-leg-id="${leg.id}" onclick="mhaFocusLegById(event, '${leg.id}')">
                 <i class="dot sd" style="background:#3b82f6;"></i>
                 <div>
-                  <span class="val">Leg ${legCounter}</span>
-                  <span class="lbl"> · ${distance}${posCount > 0 ? ' · ' + posCount + ' positions' : ''} · ${durationMin} min${partialWarn}</span>
+                  <span class="val">${t('trips.leg', 'Leg')} ${legCounter}</span>
+                  <span class="lbl"> · ${distance}${posCount > 0 ? ' · ' + posCount + ' ' + t('trips.positions', 'positions') : ''} · ${durationMin} ${t('common.minutes', 'min')}${partialWarn}</span>
                 </div>
               </div>`;
           }
@@ -15065,7 +15069,7 @@ function mhaOpenHelp() {
             <div class="mha-step" data-stat-id="${stat.id}" onclick="mhaFocusPoint(event, ${lat}, ${lng}, 15)">
               <i class="dot sd" style="background:#f59e0b;"></i>
               <div>
-                <span class="val">Stationary ${statCounter}</span>
+                <span class="val">${t('general.stationary', 'Stationary')} ${statCounter}</span>
                 <span class="lbl"> · ${durationText}${addr ? ' · ' + esc(addr) : ''}</span>
               </div>
             </div>`;
@@ -15082,13 +15086,13 @@ function mhaOpenHelp() {
         
         if (lastStat && new Date(lastStat.ended_at) > new Date(lastLeg.ended_at)) {
           // Journey ends with a stationary (most recent event)
-          endTime = new Date(lastStat.ended_at).toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit', hour12: false});
+          endTime = new Date(lastStat.ended_at).toLocaleTimeString(currentLocale(), {hour: '2-digit', minute: '2-digit', hour12: false});
           endLat = lastStat.anchor_lat || lastStat.centroid_lat || lastStat.latitude;
           endLng = lastStat.anchor_lng || lastStat.centroid_lng || lastStat.longitude;
           endAddr = lastStat.address ? mhaShortAddress(lastStat.address) : '';
         } else {
           // Journey ends with a leg (movement)
-          endTime = new Date(lastLeg.ended_at).toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit', hour12: false});
+          endTime = new Date(lastLeg.ended_at).toLocaleTimeString(currentLocale(), {hour: '2-digit', minute: '2-digit', hour12: false});
           endLat = lastLeg.end_lat || lastLeg.latitude;
           endLng = lastLeg.end_lng || lastLeg.longitude;
           endAddr = lastLeg.end_address ? mhaShortAddress(lastLeg.end_address) : '';
@@ -15098,7 +15102,7 @@ function mhaOpenHelp() {
           <div class="mha-step" onclick="mhaFocusPoint(event, ${endLat}, ${endLng}, 15)">
             <i class="dot sd" style="background:#ef4444;"></i>
             <div>
-              <span class="val">End</span>
+              <span class="val">${t('trips.end', 'End')}</span>
               <span class="lbl"> · ${endTime}${endAddr ? ' · ' + esc(endAddr) : ''}</span>
             </div>
           </div>`;
@@ -15111,7 +15115,7 @@ function mhaOpenHelp() {
       console.error('[MHA] Error loading journey details:', err);
       stepsDiv.innerHTML = `
         <div style="text-align:center;padding:10px;color:var(--danger);">
-          <i class="fa-solid fa-triangle-exclamation"></i> Failed to load details
+          <i class="fa-solid fa-triangle-exclamation"></i> ${t('trips.failed_to_load_details', 'Failed to load details')}
         </div>`;
     }
   }
@@ -15810,7 +15814,7 @@ function mhaOpenHelp() {
     positionsBody.innerHTML = `
       <div style="text-align:center;padding:40px 16px;color:var(--text-3);">
         <i class="fa-solid fa-spinner fa-spin" style="font-size:32px;margin-bottom:12px;display:block;"></i>
-        Loading positions...
+        ${t('trips.loading_positions', 'Loading positions...')}
       </div>`;
     
     try {
@@ -15841,7 +15845,7 @@ function mhaOpenHelp() {
         positionsBody.innerHTML = `
           <div class="mha-jp-placeholder">
             <i class="fa-solid fa-location-dot"></i>
-            <p>No positions found</p>
+            <p>${t('trips.no_positions_found', 'No positions found')}</p>
           </div>`;
         return;
       }
@@ -15850,7 +15854,7 @@ function mhaOpenHelp() {
       const grouped = {};
       data.positions.forEach(pos => {
         const date = new Date(pos.observed_at);
-        const dateKey = date.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+        const dateKey = date.toLocaleDateString(currentLocale(), { weekday: 'short', day: 'numeric', month: 'short' });
         if (!grouped[dateKey]) grouped[dateKey] = [];
         grouped[dateKey].push(pos);
       });
@@ -15859,11 +15863,11 @@ function mhaOpenHelp() {
       let html = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
           <span style="font-size:12px;color:var(--text-2);">
-            ${data.positions.length} position${data.positions.length !== 1 ? 's' : ''}
-            ${data.total > data.positions.length ? ` (showing ${data.positions.length} of ${data.total})` : ''}
+            ${data.positions.length} ${data.positions.length === 1 ? t('trips.position', 'position') : t('trips.positions', 'positions')}
+            ${data.total > data.positions.length ? ` (${t('common.showing', 'showing')} ${data.positions.length} ${t('common.of', 'of')} ${data.total})` : ''}
           </span>
           <button class="mha-plot-all" onclick="mhaPlotAllPositions()">
-            <i class="fa-solid fa-map-pin"></i> Plot all
+            <i class="fa-solid fa-map-pin"></i> ${t('trips.plot_all', 'Plot all')}
           </button>
         </div>`;
       
@@ -15889,16 +15893,16 @@ function mhaOpenHelp() {
       Object.keys(grouped).forEach(dateKey => {
         html += `<div class="mha-date-header">${dateKey}</div>`;
         grouped[dateKey].forEach(pos => {
-          const time = new Date(pos.observed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const time = new Date(pos.observed_at).toLocaleTimeString(currentLocale(), { hour: '2-digit', minute: '2-digit' });
           const fullAddr = pos.address || `${pos.latitude.toFixed(4)}, ${pos.longitude.toFixed(4)}`;
           const addr = pos.address ? mhaShortAddress(pos.address) : fullAddr;
           
           // Determine if position belongs to a leg or stationary
           let linkHtml = '';
           if (pos.leg_id && legMap[pos.leg_id]) {
-            linkHtml = `<span class="mha-position-link leg">Leg ${legMap[pos.leg_id]}</span>`;
+                        linkHtml = `<span class="mha-position-link leg">${t('trips.leg', 'Leg')} ${legMap[pos.leg_id]}</span>`;
           } else if (pos.stationary_id && statMap[pos.stationary_id]) {
-            linkHtml = `<span class="mha-position-link stat">Stationary ${statMap[pos.stationary_id]}</span>`;
+                        linkHtml = `<span class="mha-position-link stat">${t('general.stationary', 'Stationary')} ${statMap[pos.stationary_id]}</span>`;
           }
           
           html += `
