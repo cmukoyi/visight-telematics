@@ -38,9 +38,7 @@
     // Helper functions for translating JavaScript strings
     
     function t(key, fallback) {
-        // Get translation for key, fallback to English if not found
-        if (!window.translations || !window.currentLanguage) return fallback;
-        return window.translations[window.currentLanguage]?.[key] || fallback;
+        return TranslationService.getInstance().translate(key, fallback);
     }
     
     function tAlert(key, fallback) {
@@ -10926,18 +10924,18 @@ function _lmPlaceMarkers() {
         }
         return true;
     });
-    located.forEach(t => {
-        const m = L.marker([parseFloat(t.latitude), parseFloat(t.longitude)], { icon: _lmMarkerIcon(t) })
+    located.forEach(tag => {
+        const m = L.marker([parseFloat(tag.latitude), parseFloat(tag.longitude)], { icon: _lmMarkerIcon(tag) })
             .addTo(_liveMap);
-        const label = esc(t.description || t.device_name || t.imei);
-        const status = _lmStatusClass(t);
+        const label = esc(tag.description || tag.device_name || tag.imei);
+        const status = _lmStatusClass(tag);
         const statusLabels = { active: t('common.active', 'Active'), idle: t('common.idle', 'Idle'), offline: t('common.offline', 'Offline') };
         
         // Build sensor data snippet for popup (only key fields)
-        console.log('[POPUP] Building sensor snippet for tag:', t.imei, 'attributes:', t.attributes);
+        console.log('[POPUP] Building sensor snippet for tag:', tag.imei, 'attributes:', tag.attributes);
         let sensorSnippet = '';
-        if (t.attributes) {
-            const attrs = t.attributes;
+        if (tag.attributes) {
+            const attrs = tag.attributes;
             const snippets = [];
             if (attrs.Temperature?.value) snippets.push(`🌡️ ${esc(attrs.Temperature.value)}`);
             if (attrs.Altitude?.value) snippets.push(`⛰️ ${esc(attrs.Altitude.value)}`);
@@ -10955,25 +10953,25 @@ function _lmPlaceMarkers() {
         m.bindPopup(`
             <div class="map-popup">
                 <strong>${label}</strong><br>
-                <small class="mono">${esc(t.imei)}</small>
+                <small class="mono">${esc(tag.imei)}</small>
                 <div class="popup-status">
                     <span class="status-dot status-${status}"></span>
                     <span>${statusLabels[status]}</span>
                 </div>
-                ${t.last_seen ? `<div style="font-size:.78rem;color:var(--text-3);margin-bottom:6px">${new Date(t.last_seen).toLocaleString(currentLocale(), {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>` : ''}
+                ${tag.last_seen ? `<div style="font-size:.78rem;color:var(--text-3);margin-bottom:6px">${new Date(tag.last_seen).toLocaleString(currentLocale(), {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>` : ''}
                 ${sensorSnippet}
                 <div style="display:flex;gap:5px;margin-top:2px">
-                    <button class="btn-popup-hist" onclick="lmOpenHistory('${esc(t.imei)}')">
+                    <button class="btn-popup-hist" onclick="lmOpenHistory('${esc(tag.imei)}')">
                         <i class='fa-solid fa-route'></i> History
                     </button>
-                    <button class="btn-popup-share" onclick="lmShareTag('${esc(t.imei)}',event)">
+                    <button class="btn-popup-share" onclick="lmShareTag('${esc(tag.imei)}',event)">
                         <i class='fa-solid fa-share-nodes'></i> Share
                     </button>
                 </div>
             </div>
         `, { maxWidth: 240 });
-        m.on('click', () => _lmSelectTag(t.imei));
-        _lmMarkers[t.imei] = m;
+        m.on('click', () => _lmSelectTag(tag.imei));
+        _lmMarkers[tag.imei] = m;
     });
     if (located.length > 0) {
         const bounds = L.latLngBounds(located.map(t => [parseFloat(t.latitude), parseFloat(t.longitude)]));
