@@ -11,10 +11,15 @@ manually maintained seed script omits it.
 from __future__ import annotations
 
 import re
+import time
+import json
+from html import unescape
 from pathlib import Path
+from urllib.parse import quote
+from urllib.request import urlopen
 
 from app.database import SessionLocal
-from app.models_i18n import TranslationKey
+from app.models_i18n import Language, Translation, TranslationKey
 
 
 MARKER_PATTERN = re.compile(
@@ -91,6 +96,66 @@ def extract_qr_defaults(content: str) -> dict[str, tuple[str, str]]:
     }
 
 
+def clean_translation_text(value: str) -> str:
+    return unescape(str(value or "")).replace("\u00a0", " ").strip()
+
+
+def translate_text(text: str, target_lang: str) -> str | None:
+    if target_lang == "en":
+        return text
+    try:
+        url = f"https://api.mymemory.translated.net/get?q={quote(text)}&langpair=en|{target_lang}"
+        with urlopen(url, timeout=10) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        translated = payload.get("responseData", {}).get("translatedText")
+        translated = clean_translation_text(translated)
+        if not translated or translated.upper().startswith("INVALID"):
+            return None
+        return translated
+    except Exception as exc:
+        print(f"  ⚠️  Translation failed for {target_lang}: {exc}")
+        return None
+
+
+def sync_translations(session, defaults: dict[str, tuple[str, str]]) -> dict[str, int]:
+    languages = session.query(Language).filter(Language.is_active == True).all()
+    stats = {"created": 0, "updated": 0, "cleaned": 0, "failed": 0}
+
+    for language in languages:
+        code = language.code
+        for key, (default_text, _context) in defaults.items():
+            default_text = clean_translation_text(default_text)
+            existing = session.query(Translation).filter(
+                Translation.language_code == code,
+                Translation.key == key,
+            ).first()
+
+            if code == "en":
+                translated = default_text
+            else:
+                current_text = clean_translation_text(existing.translated_text) if existing else ""
+                if existing and current_text and current_text not in {key, default_text}:
+                    if current_text != existing.translated_text:
+                        existing.translated_text = current_text
+                        stats["cleaned"] += 1
+                    continue
+                translated = translate_text(default_text, code)
+                time.sleep(0.15)
+                if not translated:
+                    stats["failed"] += 1
+                    continue
+
+            if existing:
+                if existing.translated_text != translated:
+                    existing.translated_text = translated
+                    stats["updated"] += 1
+            else:
+                session.add(Translation(language_code=code, key=key, translated_text=translated))
+                stats["created"] += 1
+
+    return stats
+
+
 def main() -> None:
     content = dashboard_path().read_text(encoding="utf-8")
     defaults = extract_defaults(content)
@@ -98,7 +163,7 @@ def main() -> None:
     defaults.update(qr_defaults)
     marker_keys = set(re.findall(r'data-i18n(?:-placeholder|-title)?="([^"]+)"', content))
     runtime_keys = set(match.group("key") for match in RUNTIME_CALL_PATTERN.finditer(content))
-    missing_defaults = sorted(marker_keys | runtime_keys - set(defaults))
+    missing_defaults = sorted((marker_keys | runtime_keys) - set(defaults))
     if missing_defaults:
         raise RuntimeError(
             "Missing English defaults for dashboard i18n keys: " + ", ".join(missing_defaults)
@@ -121,8 +186,13 @@ def main() -> None:
             if key not in existing
         ]
         session.add_all(new_keys)
+        translation_stats = sync_translations(session, defaults)
         session.commit()
-        print(f"Dashboard i18n keys: {len(defaults)} found, {len(new_keys)} created, {len(existing)} already present")
+        print(
+            f"Dashboard i18n keys: {len(defaults)} found, {len(new_keys)} created, {len(existing)} already present; "
+            f"translations created={translation_stats['created']} updated={translation_stats['updated']} "
+            f"cleaned={translation_stats['cleaned']} failed={translation_stats['failed']}"
+        )
     finally:
         session.close()
 
