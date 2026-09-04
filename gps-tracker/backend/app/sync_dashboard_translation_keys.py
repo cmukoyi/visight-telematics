@@ -57,7 +57,18 @@ EXPLICIT_DEFAULTS = {
 
 
 def dashboard_path() -> Path:
-    return Path(__file__).resolve().parents[2] / "customer-dashboard/public/index.html"
+    script_path = Path(__file__).resolve()
+    candidates = (
+        script_path.parents[2] / "customer-dashboard/public/index.html",
+        script_path.parents[1] / "customer-dashboard/public/index.html",
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    raise FileNotFoundError(
+        "Customer dashboard source was not found. Checked: "
+        + ", ".join(str(candidate) for candidate in candidates)
+    )
 
 
 def qr_generator_path() -> Path:
@@ -100,6 +111,11 @@ def clean_translation_text(value: str) -> str:
     return unescape(str(value or "")).replace("\u00a0", " ").strip()
 
 
+def matches_default_translation(translated_text: str, default_text: str) -> bool:
+    normalize = lambda value: " ".join(clean_translation_text(value).split()).casefold()
+    return normalize(translated_text) == normalize(default_text)
+
+
 def translate_text(text: str, target_lang: str) -> str | None:
     if target_lang == "en":
         return text
@@ -134,7 +150,7 @@ def sync_translations(session, defaults: dict[str, tuple[str, str]]) -> dict[str
                 translated = default_text
             else:
                 current_text = clean_translation_text(existing.translated_text) if existing else ""
-                if existing and current_text and current_text not in {key, default_text}:
+                if existing and current_text and current_text != key and not matches_default_translation(current_text, default_text):
                     if current_text != existing.translated_text:
                         existing.translated_text = current_text
                         stats["cleaned"] += 1
