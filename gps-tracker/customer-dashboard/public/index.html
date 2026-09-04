@@ -6340,6 +6340,13 @@ async function settingsSaveLanguage(lang) {
     // Refresh dynamic content that rendered translated text with t().
     try { if(typeof locRenderAll==='function') locRenderAll(); } catch(e){}
     try {
+        if (_liveMap && _lmTags.length && typeof _lmPlaceMarkers === 'function') {
+            _lmPlaceMarkers();
+            const selectedTag = _lmTags.find(tag => tag.imei === _lmSelected);
+            if (selectedTag && typeof _lmRenderDetail === 'function') _lmRenderDetail(selectedTag);
+        }
+    } catch(e){}
+    try {
         const wizard = document.getElementById('hive-screen-wizard');
         if (wizard?.style.display !== 'none' && typeof hiveWizRender === 'function') {
             hiveWizRender();
