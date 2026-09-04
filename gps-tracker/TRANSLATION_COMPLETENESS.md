@@ -7,9 +7,10 @@ For every active non-English language, every translation key discovered from
 non-empty value that is not an English fallback. Whitespace, HTML entities, and
 casing differences do not make an English value a valid translation.
 
-The deployment runs `app.sync_dashboard_translation_keys`. It now fails if this
-rule is not true. A successful deployment is therefore the completion signal;
-the percentage in the admin portal is informational only.
+The deployment runs `app.sync_dashboard_translation_keys`. It uses Azure
+Translator's authenticated batch API, not a public free translation API. It now
+fails if this rule is not true. A successful deployment is therefore the
+completion signal; the percentage in the admin portal is informational only.
 
 ## Current French Result
 
@@ -39,8 +40,16 @@ observer translates those markers after rendering. Dates use
 
 ## Production Verification
 
-Populate French translations from inside the backend container. The command
-prints progress every 25 keys and commits each batch, so it is safe to rerun:
+Before synchronization, configure these values in the production `backend/.env`:
+
+```sh
+AZURE_TRANSLATOR_ENDPOINT=https://YOUR_RESOURCE_NAME.cognitiveservices.azure.com
+AZURE_TRANSLATOR_KEY=YOUR_AZURE_TRANSLATOR_KEY
+AZURE_TRANSLATOR_REGION=YOUR_RESOURCE_REGION
+```
+
+Populate French translations from inside the backend container. Azure Translator
+handles up to 100 strings per request, and each completed batch is committed:
 
 ```sh
 cd /root/pinplot/gps-tracker

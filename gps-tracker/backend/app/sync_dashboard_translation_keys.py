@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import argparse
 import re
-import time
 import json
+import os
 from html import unescape
 from pathlib import Path
-from urllib.parse import quote
-from urllib.request import urlopen
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 MARKER_PATTERN = re.compile(
     r'<(?P<tag>[a-zA-Z][^>]*?)\sdata-i18n(?P<kind>-placeholder|-title)?="(?P<key>[^"]+)"(?P<tail>[^>]*)>(?P<text>.*?)</[^>]+>',
@@ -132,21 +132,39 @@ def incomplete_translation_keys(session, defaults: dict[str, tuple[str, str]], l
     ]
 
 
-def translate_text(text: str, target_lang: str) -> str | None:
-    if target_lang == "en":
-        return text
-    try:
-        url = f"https://api.mymemory.translated.net/get?q={quote(text)}&langpair=en|{target_lang}"
-        with urlopen(url, timeout=10) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-        translated = payload.get("responseData", {}).get("translatedText")
-        translated = clean_translation_text(translated)
-        if not translated or translated.upper().startswith("INVALID"):
-            return None
-        return translated
-    except Exception as exc:
-        print(f"  ⚠️  Translation failed for {target_lang}: {exc}")
-        return None
+def translate_batch(texts: list[str], target_lang: str) -> list[str]:
+    """Translate up to 100 dashboard strings with Azure Translator."""
+    endpoint = os.getenv("AZURE_TRANSLATOR_ENDPOINT", "").rstrip("/")
+    api_key = os.getenv("AZURE_TRANSLATOR_KEY", "")
+    region = os.getenv("AZURE_TRANSLATOR_REGION", "")
+    if not endpoint or not api_key:
+        raise RuntimeError(
+            "Azure Translator is required for dashboard sync. Set "
+            "AZURE_TRANSLATOR_ENDPOINT and AZURE_TRANSLATOR_KEY in backend/.env."
+        )
+
+    query = urlencode({"api-version": "3.0", "from": "en", "to": target_lang})
+    headers = {
+        "Content-Type": "application/json; charset=utf-8",
+        "Ocp-Apim-Subscription-Key": api_key,
+    }
+    if region:
+        headers["Ocp-Apim-Subscription-Region"] = region
+    request = Request(
+        f"{endpoint}/translate?{query}",
+        data=json.dumps([{"text": text} for text in texts]).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    with urlopen(request, timeout=30) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    translations = [
+        clean_translation_text(item["translations"][0]["text"])
+        for item in payload
+    ]
+    if len(translations) != len(texts) or any(not text for text in translations):
+        raise RuntimeError("Azure Translator returned an incomplete translation batch.")
+    return translations
 
 
 def sync_translations(session, defaults: dict[str, tuple[str, str]], language_codes: set[str] | None = None) -> dict[str, int]:
@@ -168,29 +186,20 @@ def sync_translations(session, defaults: dict[str, tuple[str, str]], language_co
                 pending.append((key, default_text, existing))
 
         print(f"{code}: {len(pending)} translation(s) needed")
-        for index, (key, default_text, existing) in enumerate(pending, start=1):
-            default_text = clean_translation_text(default_text)
-
-            if code == "en":
-                translated = default_text
-            else:
-                translated = translate_text(default_text, code)
-                time.sleep(0.15)
-                if not translated:
-                    stats["failed"] += 1
-                    continue
-
-            if existing:
-                if existing.translated_text != translated:
-                    existing.translated_text = translated
-                    stats["updated"] += 1
-            else:
-                session.add(Translation(language_code=code, key=key, translated_text=translated))
-                stats["created"] += 1
-
-            if index % 25 == 0 or index == len(pending):
-                session.commit()
-                print(f"{code}: {index}/{len(pending)} processed")
+        for start in range(0, len(pending), 100):
+            batch = pending[start:start + 100]
+            source_texts = [clean_translation_text(default_text) for _key, default_text, _existing in batch]
+            translated_texts = source_texts if code == "en" else translate_batch(source_texts, code)
+            for (key, _default_text, existing), translated in zip(batch, translated_texts):
+                if existing:
+                    if existing.translated_text != translated:
+                        existing.translated_text = translated
+                        stats["updated"] += 1
+                else:
+                    session.add(Translation(language_code=code, key=key, translated_text=translated))
+                    stats["created"] += 1
+            session.commit()
+            print(f"{code}: {min(start + len(batch), len(pending))}/{len(pending)} processed")
 
     return stats
 
