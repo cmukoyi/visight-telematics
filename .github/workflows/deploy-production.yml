@@ -592,7 +592,9 @@ jobs:
             }
 
             echo "🌍 Synchronizing customer-dashboard translation keys..."
+            docker compose exec -T backend python -c "from app.sync_dashboard_translation_keys import dashboard_path, qr_generator_path; assert dashboard_path().is_file(); assert qr_generator_path().is_file(); print(f'✅ Sync sources: {dashboard_path()}, {qr_generator_path()}')"
             docker compose exec -T backend python -m app.sync_dashboard_translation_keys
+            docker compose exec -T backend python -c "from app.database import SessionLocal; from app.models_i18n import Translation, TranslationKey; keys = ('hive.create_new_hive', 'hive.select_tags', 'hive.which_tags_question', 'hive.select_assets_help', 'common.step', 'common.of', 'common.continue'); session = SessionLocal(); rows = session.query(Translation, TranslationKey).join(TranslationKey, Translation.key == TranslationKey.key).filter(Translation.language_code == 'fr', Translation.key.in_(keys)).all(); session.close(); assert len(rows) == len(keys), f'Missing French Hive translations: found {len(rows)}/{len(keys)}'; untranslated = [translation.key for translation, key in rows if translation.translated_text.strip().casefold() == key.default_text.strip().casefold()]; assert not untranslated, f'English Hive translations remain: {untranslated}'; print('✅ French Hive translations verified')"
           SSHEOF
 
       # ── Install / refresh daily cleanup cron job ─────────────────
