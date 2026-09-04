@@ -10969,10 +10969,10 @@ function _lmPlaceMarkers() {
                 ${sensorSnippet}
                 <div style="display:flex;gap:5px;margin-top:2px">
                     <button class="btn-popup-hist" onclick="lmOpenHistory('${esc(tag.imei)}')">
-                        <i class='fa-solid fa-route'></i> History
+                        <i class='fa-solid fa-route'></i> ${t('trips.history', 'History')}
                     </button>
                     <button class="btn-popup-share" onclick="lmShareTag('${esc(tag.imei)}',event)">
-                        <i class='fa-solid fa-share-nodes'></i> Share
+                        <i class='fa-solid fa-share-nodes'></i> ${t('common.share', 'Share')}
                     </button>
                 </div>
             </div>
@@ -11374,18 +11374,18 @@ function _lmSelectTag(imei) {
     if (tag) _lmRenderDetail(tag);
 }
 
-function _lmRenderSensorData(t) {
+function _lmRenderSensorData(tag) {
     // Render sensor data for Series 5 (Hubble) tags
     // Data comes from attributes field: { Temperature: {value, show_on_map}, Altitude: {value, show_on_map}, ... }
-    console.log('[SENSOR] _lmRenderSensorData called for tag:', t.imei);
-    console.log('[SENSOR] Tag attributes:', t.attributes);
+    console.log('[SENSOR] _lmRenderSensorData called for tag:', tag.imei);
+    console.log('[SENSOR] Tag attributes:', tag.attributes);
     
-    if (!t.attributes) {
+    if (!tag.attributes) {
         console.log('[SENSOR] No attributes found, returning empty');
         return '';
     }
     
-    const attrs = t.attributes;
+    const attrs = tag.attributes;
     const sensorFields = [];
     console.log('[SENSOR] Processing attributes:', Object.keys(attrs));
     
