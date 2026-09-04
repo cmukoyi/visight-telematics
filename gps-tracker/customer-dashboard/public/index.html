@@ -6337,8 +6337,14 @@ async function settingsSaveLanguage(lang) {
     const ts = TranslationService.getInstance();
     await ts.setLanguage(lang);
     showToast && showToast(`Language changed to ${lang.toUpperCase()}`);
-    // Refresh any dynamic content that may have i18n keys
+    // Refresh dynamic content that rendered translated text with t().
     try { if(typeof locRenderAll==='function') locRenderAll(); } catch(e){}
+    try {
+        const wizard = document.getElementById('hive-screen-wizard');
+        if (wizard?.style.display !== 'none' && typeof hiveWizRender === 'function') {
+            hiveWizRender();
+        }
+    } catch(e){}
 }
 
 async function populateLanguageSelector() {
