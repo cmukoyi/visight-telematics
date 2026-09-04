@@ -120,6 +120,21 @@ def matches_default_translation(translated_text: str, default_text: str) -> bool
     return normalize(translated_text) == normalize(default_text)
 
 
+def incomplete_translation_keys(session, defaults: dict[str, tuple[str, str]], language_code: str) -> list[str]:
+    translations = {
+        translation.key: clean_translation_text(translation.translated_text)
+        for translation in session.query(Translation).filter(
+            Translation.language_code == language_code
+        ).all()
+    }
+    return [
+        key
+        for key, (default_text, _context) in defaults.items()
+        if not translations.get(key)
+        or matches_default_translation(translations[key], default_text)
+    ]
+
+
 def translate_text(text: str, target_lang: str) -> str | None:
     if target_lang == "en":
         return text
@@ -208,11 +223,27 @@ def main() -> None:
         session.add_all(new_keys)
         translation_stats = sync_translations(session, defaults)
         session.commit()
+        incomplete_by_language = {
+            language.code: incomplete_translation_keys(session, defaults, language.code)
+            for language in session.query(Language).filter(
+                Language.is_active == True,
+                Language.code != "en",
+            ).all()
+        }
+        incomplete_by_language = {
+            code: keys for code, keys in incomplete_by_language.items() if keys
+        }
         print(
             f"Dashboard i18n keys: {len(defaults)} found, {len(new_keys)} created, {len(existing)} already present; "
             f"translations created={translation_stats['created']} updated={translation_stats['updated']} "
             f"cleaned={translation_stats['cleaned']} failed={translation_stats['failed']}"
         )
+        if incomplete_by_language:
+            details = "; ".join(
+                f"{code}: {len(keys)} incomplete ({', '.join(keys[:20])})"
+                for code, keys in incomplete_by_language.items()
+            )
+            raise RuntimeError(f"Dashboard translation sync incomplete: {details}")
     finally:
         session.close()
 
