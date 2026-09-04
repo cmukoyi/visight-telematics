@@ -10,6 +10,7 @@ manually maintained seed script omits it.
 """
 from __future__ import annotations
 
+import argparse
 import re
 import time
 import json
@@ -148,28 +149,31 @@ def translate_text(text: str, target_lang: str) -> str | None:
         return None
 
 
-def sync_translations(session, defaults: dict[str, tuple[str, str]]) -> dict[str, int]:
+def sync_translations(session, defaults: dict[str, tuple[str, str]], language_codes: set[str] | None = None) -> dict[str, int]:
     languages = session.query(Language).filter(Language.is_active == True).all()
+    if language_codes:
+        languages = [language for language in languages if language.code in language_codes]
     stats = {"created": 0, "updated": 0, "cleaned": 0, "failed": 0}
 
     for language in languages:
         code = language.code
+        pending = []
         for key, (default_text, _context) in defaults.items():
-            default_text = clean_translation_text(default_text)
             existing = session.query(Translation).filter(
                 Translation.language_code == code,
                 Translation.key == key,
             ).first()
+            current_text = clean_translation_text(existing.translated_text) if existing else ""
+            if code == "en" or not existing or not current_text or current_text == key or matches_default_translation(current_text, default_text):
+                pending.append((key, default_text, existing))
+
+        print(f"{code}: {len(pending)} translation(s) needed")
+        for index, (key, default_text, existing) in enumerate(pending, start=1):
+            default_text = clean_translation_text(default_text)
 
             if code == "en":
                 translated = default_text
             else:
-                current_text = clean_translation_text(existing.translated_text) if existing else ""
-                if existing and current_text and current_text != key and not matches_default_translation(current_text, default_text):
-                    if current_text != existing.translated_text:
-                        existing.translated_text = current_text
-                        stats["cleaned"] += 1
-                    continue
                 translated = translate_text(default_text, code)
                 time.sleep(0.15)
                 if not translated:
@@ -184,6 +188,10 @@ def sync_translations(session, defaults: dict[str, tuple[str, str]]) -> dict[str
                 session.add(Translation(language_code=code, key=key, translated_text=translated))
                 stats["created"] += 1
 
+            if index % 25 == 0 or index == len(pending):
+                session.commit()
+                print(f"{code}: {index}/{len(pending)} processed")
+
     return stats
 
 
@@ -191,6 +199,15 @@ def main() -> None:
     global Language, Translation, TranslationKey
     from app.database import SessionLocal
     from app.models_i18n import Language, Translation, TranslationKey
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--language",
+        action="append",
+        dest="languages",
+        help="Synchronize only this active language; repeat for multiple languages.",
+    )
+    args = parser.parse_args()
 
     content = dashboard_path().read_text(encoding="utf-8")
     defaults = extract_defaults(content)
@@ -221,14 +238,14 @@ def main() -> None:
             if key not in existing
         ]
         session.add_all(new_keys)
-        translation_stats = sync_translations(session, defaults)
+        translation_stats = sync_translations(session, defaults, set(args.languages) if args.languages else None)
         session.commit()
+        target_languages = session.query(Language).filter(Language.is_active == True)
+        if args.languages:
+            target_languages = target_languages.filter(Language.code.in_(args.languages))
         incomplete_by_language = {
             language.code: incomplete_translation_keys(session, defaults, language.code)
-            for language in session.query(Language).filter(
-                Language.is_active == True,
-                Language.code != "en",
-            ).all()
+            for language in target_languages.filter(Language.code != "en").all()
         }
         incomplete_by_language = {
             code: keys for code, keys in incomplete_by_language.items() if keys
