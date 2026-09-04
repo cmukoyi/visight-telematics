@@ -18,10 +18,6 @@ from pathlib import Path
 from urllib.parse import quote
 from urllib.request import urlopen
 
-from app.database import SessionLocal
-from app.models_i18n import Language, Translation, TranslationKey
-
-
 MARKER_PATTERN = re.compile(
     r'<(?P<tag>[a-zA-Z][^>]*?)\sdata-i18n(?P<kind>-placeholder|-title)?="(?P<key>[^"]+)"(?P<tail>[^>]*)>(?P<text>.*?)</[^>]+>',
     re.DOTALL,
@@ -192,6 +188,10 @@ def sync_translations(session, defaults: dict[str, tuple[str, str]]) -> dict[str
 
 
 def main() -> None:
+    global Language, Translation, TranslationKey
+    from app.database import SessionLocal
+    from app.models_i18n import Language, Translation, TranslationKey
+
     content = dashboard_path().read_text(encoding="utf-8")
     defaults = extract_defaults(content)
     qr_defaults = extract_qr_defaults(qr_generator_path().read_text(encoding="utf-8"))
