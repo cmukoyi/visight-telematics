@@ -34,6 +34,7 @@ COPY ./backend/ .
 # The i18n synchronizer scans the customer dashboard to keep database keys in
 # sync with the UI served by the separate customer container.
 COPY ./customer-dashboard/public/index.html /app/customer-dashboard/public/index.html
+COPY ./customer-dashboard/public/qr-generator.html /app/customer-dashboard/public/qr-generator.html
 
 # Create static directory and copy QR asset HTML files from customer-dashboard
 # These are served by the backend for QR code scans (public endpoints, no auth)
