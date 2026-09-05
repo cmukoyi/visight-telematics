@@ -21,6 +21,7 @@ from app.database import get_db
 from app.models import UserGroup, UserGroupPackage, PortalUser, Building, Floor, IndoorGateway, Room, BLETag, User, TagCategory, GeofenceAlert, POI, POITrackerLink, GeofenceState, PortalAlert, TagIndoorPosition, DeviceState
 from app.models_admin import TagPackage
 from app.admin_auth import hash_password, verify_password
+from app.auth import get_password_hash, verify_password as verify_mobile_password
 from app.services.device_providers.provider_factory import DeviceProviderFactory
 from app.services.email_service import EmailService as _EmailService
 
@@ -383,6 +384,7 @@ class PortalUserOut(BaseModel):
     expires_at: Optional[datetime] = None
     role: str = "admin"
     custom_features: Optional[list] = None
+    mobile_user_id: Optional[UUID] = None
 
     class Config:
         from_attributes = True
@@ -549,39 +551,12 @@ def list_portal_users(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """List all portal users in the caller's UserGroup.
-    
-    Excludes flutter app users who were manually assigned to the usergroup.
-    Flutter users (those in 'users' table) appear in 'End User App Users' instead.
-    """
+    """List all portal users in the caller's UserGroup."""
     me = get_portal_user_from_request(request, db)
-    
-    # Get all portal_users in this usergroup
-    portal_users_query = db.query(PortalUser).filter(
+    users = db.query(PortalUser).filter(
         PortalUser.usergroup_id == me.usergroup_id,
-    )
-    
-    # Exclude flutter users (those who exist in 'users' table)
-    # These are mobile app users who were manually assigned via portal_users
-    flutter_user_emails = db.query(User.email).filter(
-        User.email.in_(
-            db.query(PortalUser.email).filter(
-                PortalUser.usergroup_id == me.usergroup_id
-            )
-        )
-    ).all()
-    flutter_user_emails_set = {email for (email,) in flutter_user_emails}
-    
-    users = portal_users_query.order_by(PortalUser.created_at).all()
-    
-    # Filter out flutter users from portal users list
-    # Exception: NEVER filter out system_admins (built-in admins), even if they use the Flutter app
-    pure_portal_users = [
-        u for u in users 
-        if u.role == 'system_admin' or u.email not in flutter_user_emails_set
-    ]
-    
-    return [PortalUserOut.model_validate(u) for u in pure_portal_users]
+    ).order_by(PortalUser.created_at).all()
+    return [PortalUserOut.model_validate(user) for user in users]
 
 
 @router.post("/users", response_model=PortalUserCreateResponse)
@@ -1854,7 +1829,11 @@ def admin_reset_user_password(
 
     import secrets as _secrets
     temp_password = _secrets.token_urlsafe(12)
-    target.hashed_password = hash_password(temp_password)
+    credential_user = db.query(User).filter(User.id == target.mobile_user_id).first() if target.mobile_user_id else None
+    if credential_user:
+        credential_user.hashed_password = get_password_hash(temp_password)
+    else:
+        target.hashed_password = hash_password(temp_password)
     db.commit()
 
     return AdminPasswordResetResponse(
@@ -1877,11 +1856,20 @@ def change_password(
 ):
     """Let the logged-in portal user change their own password."""
     me = get_portal_user_from_request(request, db)
-    if not verify_password(me.hashed_password, data.current_password):
+    credential_user = db.query(User).filter(User.id == me.mobile_user_id).first() if me.mobile_user_id else None
+    password_is_valid = (
+        verify_mobile_password(data.current_password, credential_user.hashed_password)
+        if credential_user and credential_user.hashed_password
+        else verify_password(me.hashed_password, data.current_password)
+    )
+    if not password_is_valid:
         raise HTTPException(status_code=400, detail="Current password is incorrect")
     if len(data.new_password) < 8:
         raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
-    me.hashed_password = hash_password(data.new_password)
+    if credential_user:
+        credential_user.hashed_password = get_password_hash(data.new_password)
+    else:
+        me.hashed_password = hash_password(data.new_password)
     db.commit()
     return {"detail": "Password updated successfully"}
 
@@ -2230,6 +2218,10 @@ class MobileUserOut(BaseModel):
     is_active: bool = True
     created_at: Optional[datetime] = None
     tags: List[MobileUserTagOut] = []
+    portal_access: bool = False
+    portal_linked: bool = False
+    portal_user_id: Optional[UUID] = None
+    portal_role: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -2301,16 +2293,88 @@ def list_mobile_users(request: Request, db: Session = Depends(get_db)):
             package_name=pkg_map.get(str(tag.package_id)) if tag.package_id else None,
             is_active=tag.is_active,
         ))
-    return [
-        MobileUserOut(
-            id=u.id, email=u.email,
-            first_name=u.first_name, last_name=u.last_name,
-            is_active=u.is_active,
-            created_at=u.created_at,
-            tags=tags_by_user.get(str(u.id), [])
+    portal_users = db.query(PortalUser).filter(
+        PortalUser.usergroup_id == me.usergroup_id,
+    ).all()
+    portal_users_by_email = {portal_user.email.lower(): portal_user for portal_user in portal_users}
+    portal_users_by_mobile_id = {
+        str(portal_user.mobile_user_id): portal_user
+        for portal_user in portal_users if portal_user.mobile_user_id
+    }
+    result = []
+    for user in users:
+        portal_user = portal_users_by_mobile_id.get(str(user.id)) or portal_users_by_email.get(user.email.lower())
+        result.append(MobileUserOut(
+            id=user.id, email=user.email,
+            first_name=user.first_name, last_name=user.last_name,
+            is_active=user.is_active,
+            created_at=user.created_at,
+            tags=tags_by_user.get(str(user.id), []),
+            portal_access=portal_user is not None,
+            portal_linked=bool(portal_user and str(portal_user.mobile_user_id) == str(user.id)),
+            portal_user_id=portal_user.id if portal_user else None,
+            portal_role=portal_user.role if portal_user else None,
+        ))
+    return result
+
+
+class PromoteMobileUserRequest(BaseModel):
+    role: str = "reporter"
+    custom_features: Optional[list] = None
+
+
+@router.post("/mobile-users/{user_id}/promote", response_model=PortalUserOut)
+def promote_mobile_user_to_portal(user_id: UUID, data: PromoteMobileUserRequest, request: Request, db: Session = Depends(get_db)):
+    """Grant portal access to a Flutter user without creating a second credential."""
+    me = get_portal_user_from_request(request, db)
+    if not _user_can_manage(me, "users"):
+        raise HTTPException(status_code=403, detail="You don't have permission to manage portal access")
+    group = _get_group_and_assert_domain(me, db)
+    mobile_user = db.query(User).filter(User.id == user_id).first()
+    if not mobile_user or not any(mobile_user.email.lower().endswith("@" + domain) for domain in _domains(group)):
+        raise HTTPException(status_code=404, detail="Flutter user not found in your group")
+    role = data.role if data.role in {"admin", "manager", "reporter", "custom"} else "reporter"
+    portal_user = db.query(PortalUser).filter(PortalUser.email == mobile_user.email).first()
+    if portal_user and str(portal_user.usergroup_id) != str(group.id):
+        raise HTTPException(status_code=409, detail="This email already has portal access in another group")
+    if not portal_user:
+        portal_user = PortalUser(
+            usergroup_id=group.id,
+            mobile_user_id=mobile_user.id,
+            email=mobile_user.email,
+            hashed_password=mobile_user.hashed_password or get_password_hash(secrets.token_urlsafe(24)),
+            first_name=mobile_user.first_name,
+            last_name=mobile_user.last_name,
+            role=role,
+            custom_features=data.custom_features if role == "custom" else None,
         )
-        for u in users
-    ]
+        db.add(portal_user)
+    else:
+        portal_user.mobile_user_id = mobile_user.id
+        portal_user.role = role
+        portal_user.custom_features = data.custom_features if role == "custom" else None
+        portal_user.is_active = True
+    db.commit()
+    db.refresh(portal_user)
+    return PortalUserOut.model_validate(portal_user)
+
+
+@router.delete("/mobile-users/{user_id}/portal-access", status_code=204)
+def revoke_mobile_user_portal_access(user_id: UUID, request: Request, db: Session = Depends(get_db)):
+    """Remove portal access while preserving the Flutter user and its tags."""
+    me = get_portal_user_from_request(request, db)
+    if not _user_can_manage(me, "users"):
+        raise HTTPException(status_code=403, detail="You don't have permission to manage portal access")
+    portal_user = db.query(PortalUser).filter(
+        PortalUser.mobile_user_id == user_id,
+        PortalUser.usergroup_id == me.usergroup_id,
+    ).first()
+    if not portal_user:
+        raise HTTPException(status_code=404, detail="Promoted portal access not found")
+    if str(portal_user.id) == str(me.id):
+        raise HTTPException(status_code=400, detail="Use another portal administrator to remove your own access")
+    db.delete(portal_user)
+    db.commit()
 
 
 class MobileUserPatch(BaseModel):
@@ -2350,6 +2414,12 @@ def delete_mobile_user(user_id: UUID, request: Request, db: Session = Depends(ge
         raise HTTPException(status_code=404, detail="User not found")
     if not any(user.email.lower().endswith(f"@{d}") for d in domains):
         raise HTTPException(status_code=403, detail="User does not belong to your domain")
+    # Deleting the Flutter account must also remove its linked portal access;
+    # otherwise the portal account would retain a dead credential reference.
+    db.query(PortalUser).filter(
+        PortalUser.mobile_user_id == user.id,
+        PortalUser.usergroup_id == me.usergroup_id,
+    ).delete(synchronize_session=False)
     db.delete(user)
     db.commit()
     return
@@ -4061,7 +4131,11 @@ def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
     user = db.query(PortalUser).filter(PortalUser.email == email).first()
     if not user:
         raise HTTPException(status_code=400, detail="Invalid or expired PIN")
-    user.hashed_password = hash_password(data.new_password)
+    credential_user = db.query(User).filter(User.id == user.mobile_user_id).first() if user.mobile_user_id else None
+    if credential_user:
+        credential_user.hashed_password = get_password_hash(data.new_password)
+    else:
+        user.hashed_password = hash_password(data.new_password)
     db.commit()
     del _portal_reset_pins[email]
     return {"detail": "Password reset successfully"}

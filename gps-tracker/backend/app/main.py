@@ -846,10 +846,6 @@ def _auto_provision_portal_user(db: Session, user: "User") -> None:
         return
     domain = email.split("@")[-1].lower()
 
-    # Already has a portal account somewhere?
-    if db.query(_PU).filter(_PU.email == email).first():
-        return
-
     matching_groups = [
         g for g in db.query(_UG).filter(_UG.email_domain.isnot(None), _UG.is_active == True).all()
         if domain in [d.strip().lower() for d in (g.email_domain or "").split(",") if d.strip()]
@@ -858,12 +854,18 @@ def _auto_provision_portal_user(db: Session, user: "User") -> None:
         return
 
     for group in matching_groups:
+        existing_portal_user = db.query(_PU).filter(_PU.email == email).first()
+        if existing_portal_user:
+            if existing_portal_user.usergroup_id == group.id and not existing_portal_user.mobile_user_id:
+                existing_portal_user.mobile_user_id = user.id
+            continue
         temp_pw = _secrets.token_urlsafe(16)
         portal_user = _PU(
             id=str(_uuid.uuid4()),
             usergroup_id=group.id,
+            mobile_user_id=user.id,
             email=email,
-            hashed_password=_hash(temp_pw),
+            hashed_password=user.hashed_password or _hash(temp_pw),
             first_name=user.first_name or None,
             last_name=user.last_name or None,
             is_active=True,

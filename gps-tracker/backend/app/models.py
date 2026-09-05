@@ -441,6 +441,7 @@ class PortalUser(Base):
 
     id              = get_uuid_column()
     usergroup_id    = get_uuid_fk("user_groups.id")
+    mobile_user_id  = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), unique=True, nullable=True, index=True)
     email           = Column(String(255), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
     first_name      = Column(String(100))
@@ -476,6 +477,7 @@ class PortalUser(Base):
     notify_hive_breach_sms = Column(Boolean, nullable=False, default=True)
 
     usergroup = relationship("UserGroup", back_populates="portal_users")
+    mobile_user = relationship("User", foreign_keys=[mobile_user_id])
 
 
 class Building(Base):
