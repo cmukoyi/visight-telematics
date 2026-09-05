@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tracciamento asset QR e NFC — Guida utente Beacon Telematics</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep:        #0a0f14;
+    --bg-sidebar:     #0c1218;
+    --bg-content:     #0a0f14;
+    --bg-elevated:    #131a22;
+    --bg-card:        #161e28;
+    --border:         #1d2730;
+    --border-bright:  #2a3a48;
+    --text-primary:   #e8ecef;
+    --text-secondary: #a0adb8;
+    --text-tertiary:  #6b7785;
+    --text-muted:     #4a5663;
+    --green:          #3565d3;
+    --green-dim:      #2850a8;
+    --green-bg:       rgba(53, 101, 211, 0.1);
+    --green-glow:     rgba(53, 101, 211, 0.3);
+    --red:            #ff4757;
+    --red-bg:         rgba(255, 71, 87, 0.1);
+    --amber:          #ffb648;
+    --amber-bg:       rgba(255, 182, 72, 0.1);
+    --blue:           #4a9eff;
+    --blue-bg:        rgba(74, 158, 255, 0.1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg-deep); color: var(--text-primary); font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; font-size: 15px; line-height: 1.7; -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
+  .docs { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
+  .sidebar { background: var(--bg-sidebar); border-right: 1px solid var(--border); padding: 32px 28px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+  .sidebar::-webkit-scrollbar { width: 6px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .docs-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; color: var(--green); text-transform: uppercase; letter-spacing: 0.18em; margin-bottom: 6px; }
+  .docs-title { font-size: 22px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; letter-spacing: -0.01em; }
+  .docs-version { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); padding-bottom: 22px; border-bottom: 1px solid var(--border); margin-bottom: 22px; }
+  .docs-version .new-badge { display: inline-block; background: var(--green-bg); color: var(--green); font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 3px; margin-left: 6px; letter-spacing: 0.06em; }
+  .nav-section { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.18em; margin: 22px 0 10px; }
+  .nav-section:first-of-type { margin-top: 0; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 7px 0 7px 14px; color: var(--text-tertiary); text-decoration: none; font-size: 14px; border-left: 2px solid transparent; margin-left: -16px; padding-left: 14px; transition: all 0.12s; cursor: pointer; }
+  .nav-item::before { content: '•'; color: var(--text-muted); font-size: 14px; }
+  .nav-item:hover { color: var(--text-primary); }
+  .nav-item.active { color: var(--green); background: rgba(53, 101, 211, 0.06); border-left-color: var(--green); font-weight: 500; }
+  .nav-item.active::before { color: var(--green); }
+  .nav-item .new-tag { font-family: 'JetBrains Mono', monospace; font-size: 8px; background: var(--green); color: var(--bg-deep); padding: 1px 5px; border-radius: 2px; font-weight: 700; margin-left: auto; letter-spacing: 0.04em; }
+  .content { background: var(--bg-content); background-image: radial-gradient(circle at 20% 0%, rgba(53, 101, 211, 0.04), transparent 50%), radial-gradient(circle at 80% 100%, rgba(53, 101, 211, 0.02), transparent 50%); padding: 60px 80px 120px; max-width: 100%; }
+  .content-inner { max-width: 760px; }
+  .kicker { display: flex; align-items: center; gap: 14px; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.22em; margin-bottom: 24px; }
+  .kicker::before { content: ''; width: 28px; height: 2px; background: var(--green); }
+  .hero-title { font-size: 84px; font-weight: 800; line-height: 0.96; letter-spacing: -0.04em; margin-bottom: 32px; color: var(--text-primary); }
+  .hero-title .accent { color: var(--green); display: block; }
+  .hero-lede { font-size: 18px; line-height: 1.6; color: var(--text-secondary); max-width: 600px; margin-bottom: 32px; }
+  .pill-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 80px; }
+  .pill { display: inline-flex; align-items: center; background: var(--bg-elevated); border: 1px solid var(--border-bright); color: var(--text-secondary); padding: 7px 14px; border-radius: 18px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.04em; }
+  .pill.new { background: var(--green-bg); border-color: var(--green-dim); color: var(--green); }
+  .section { margin-bottom: 80px; scroll-margin-top: 40px; }
+  .section-head { display: flex; align-items: center; gap: 18px; margin-bottom: 32px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+  .section-num { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--green); background: rgba(53, 101, 211, 0.08); border: 1px solid var(--green-dim); padding: 6px 10px; border-radius: 4px; letter-spacing: 0.05em; }
+  .section-title { font-size: 36px; font-weight: 800; letter-spacing: -0.02em; color: var(--text-primary); flex: 1; }
+  .section-title-tag { font-family: 'JetBrains Mono', monospace; font-size: 10px; background: var(--green); color: var(--bg-deep); padding: 4px 8px; border-radius: 3px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+  .section h3 { font-size: 20px; font-weight: 700; margin: 36px 0 14px; letter-spacing: -0.01em; color: var(--text-primary); }
+  .section h4 { font-size: 15px; font-weight: 700; margin: 26px 0 10px; color: var(--text-primary); }
+  .section p { color: var(--text-secondary); margin-bottom: 18px; font-size: 15px; line-height: 1.7; }
+  .section p b, .section p strong { color: var(--text-primary); font-weight: 600; }
+  .section a { color: var(--green); text-decoration: none; border-bottom: 1px solid rgba(0, 217, 107, 0.3); transition: border-color 0.15s; }
+  .section a:hover { border-bottom-color: var(--green); }
+  .section ul, .section ol { margin: 0 0 18px 4px; padding-left: 24px; color: var(--text-secondary); }
+  .section li { margin-bottom: 8px; line-height: 1.65; }
+  .section li b { color: var(--text-primary); font-weight: 600; }
+  .section li::marker { color: var(--green); }
+  .callout { background: var(--bg-elevated); border: 1px solid var(--border); border-left: 3px solid var(--green); padding: 18px 22px; margin: 24px 0; border-radius: 4px; }
+  .callout.info { border-left-color: var(--blue); }
+  .callout.warn { border-left-color: var(--amber); }
+  .callout.danger { border-left-color: var(--red); }
+  .callout-title { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; color: var(--green); text-transform: uppercase; letter-spacing: 0.16em; margin-bottom: 8px; }
+  .callout.info .callout-title { color: var(--blue); }
+  .callout.warn .callout-title { color: var(--amber); }
+  .callout.danger .callout-title { color: var(--red); }
+  .callout p { margin-bottom: 0; font-size: 14px; }
+  .doc-table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 13px; }
+  .doc-table th { background: var(--bg-elevated); color: var(--text-primary); text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border-bright); font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+  .doc-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text-secondary); }
+  .doc-table td:first-child { color: var(--text-primary); font-weight: 500; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .doc-table tr:last-child td { border-bottom: none; }
+  code, .kbd { font-family: 'JetBrains Mono', monospace; font-size: 0.88em; background: var(--bg-elevated); border: 1px solid var(--border); color: var(--green); padding: 1px 6px; border-radius: 3px; }
+  .status-pill { display: inline-flex; align-items: center; gap: 6px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 12px; letter-spacing: 0.04em; }
+  .status-pill.green { background: var(--green-bg); color: var(--green); }
+  .status-pill.amber { background: var(--amber-bg); color: var(--amber); }
+  .status-pill.blue  { background: var(--blue-bg);  color: var(--blue); }
+  .status-pill.muted { background: var(--bg-elevated); color: var(--text-tertiary); border: 1px solid var(--border-bright); }
+  .status-pill .dot  { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .figure { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 6px; padding: 24px; margin: 24px 0; }
+  .figure-caption { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.12em; margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border); }
+  .figure-caption b { color: var(--green); font-weight: 600; }
+  .state-diagram { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .state-node { flex: 1; min-width: 110px; text-align: center; padding: 14px 10px; border-radius: 6px; background: var(--bg-card); border: 1px solid var(--border-bright); font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; color: var(--text-secondary); }
+  .state-node.ok { border-color: var(--green-dim); color: var(--green); }
+  .state-node.pending { border-color: var(--amber); color: var(--amber); }
+  .state-node.alert { border-color: var(--red); color: var(--red); }
+  .state-node.blue { border-color: var(--blue); color: var(--blue); }
+  .state-arrow { color: var(--text-tertiary); font-size: 14px; flex-shrink: 0; }
+  .quick-toc { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 6px; padding: 22px 26px; margin-bottom: 60px; }
+  .quick-toc-title { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.16em; margin-bottom: 12px; }
+  .quick-toc-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 24px; }
+  .quick-toc-list a { color: var(--text-secondary); text-decoration: none; font-size: 13px; padding: 4px 0; border-bottom: none !important; transition: color 0.12s; display: flex; align-items: center; }
+  .quick-toc-list a:hover { color: var(--green); }
+  .quick-toc-list a .num { font-family: 'JetBrains Mono', monospace; color: var(--text-muted); margin-right: 10px; font-size: 11px; }
+  .doc-footer { margin-top: 100px; padding-top: 30px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); }
+  .doc-footer .brand { color: var(--green); font-weight: 600; }
+  .step-list { list-style: none; padding: 0; margin: 0 0 18px 0; counter-reset: steps; }
+  .step-list li { counter-increment: steps; display: flex; gap: 16px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .step-list li:last-child { border-bottom: none; }
+  .step-list li::before { content: counter(steps); flex-shrink: 0; width: 26px; height: 26px; background: var(--green-bg); border: 1px solid var(--green-dim); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: var(--green); margin-top: 2px; }
+  .step-list li div { color: var(--text-secondary); font-size: 14px; line-height: 1.6; }
+  .step-list li div b { color: var(--text-primary); }
+  .flow-diagram { display: flex; flex-direction: column; gap: 0; margin: 24px 0; }
+  .flow-row { display: flex; align-items: stretch; gap: 0; }
+  .flow-node { background: var(--bg-card); border: 1px solid var(--border-bright); border-radius: 6px; padding: 14px 18px; flex: 1; }
+  .flow-node.highlight { border-color: var(--green-dim); background: rgba(53,101,211,0.05); }
+  .flow-node-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.16em; margin-bottom: 4px; }
+  .flow-node-label.g { color: var(--green); }
+  .flow-node-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+  .flow-node-desc { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .flow-arrow { display: flex; align-items: center; justify-content: center; padding: 0 8px; color: var(--text-muted); font-size: 18px; }
+  .flow-down { display: flex; justify-content: center; padding: 6px 0; color: var(--text-muted); font-size: 18px; }
+  .id-anatomy { background: var(--bg-card); border: 1px solid var(--border-bright); border-radius: 6px; padding: 20px 24px; margin: 20px 0; }
+  .id-display { font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 700; color: var(--text-primary); letter-spacing: 0.04em; margin-bottom: 16px; }
+  .id-display .seg-prefix { color: var(--green); }
+  .id-display .seg-type   { color: var(--amber); }
+  .id-display .seg-time   { color: var(--blue); }
+  .id-display .seg-count  { color: var(--red); }
+  .id-display .seg-rand   { color: var(--text-secondary); }
+  .id-legend { display: flex; flex-wrap: wrap; gap: 12px 24px; }
+  .id-legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); }
+  .id-legend-swatch { width: 10px; height: 10px; border-radius: 2px; }
+
+  /* ===== Light theme (toggled) ===== */
+  html[data-theme="light"] {
+    --bg-deep:        #ffffff;
+    --bg-sidebar:     #f6f8fa;
+    --bg-content:     #ffffff;
+    --bg-elevated:    #f1f4f8;
+    --bg-card:        #eaeef4;
+    --border:         #dfe4ea;
+    --border-bright:  #c6ceda;
+    --text-primary:   #0e151c;
+    --text-secondary: #3e4b58;
+    --text-tertiary:  #66727f;
+    --text-muted:     #98a3af;
+    --green:          #2a55bd;
+    --green-dim:      #9db3e2;
+    --green-bg:       rgba(42, 85, 189, 0.08);
+    --green-glow:     rgba(42, 85, 189, 0.22);
+    --red:            #d32236;
+    --red-bg:         rgba(211, 34, 54, 0.09);
+    --amber:          #a86a00;
+    --amber-bg:       rgba(168, 106, 0, 0.11);
+    --blue:           #1a72d8;
+    --blue-bg:        rgba(26, 114, 216, 0.09);
+  }
+  html[data-theme="light"] .content { background-image: radial-gradient(circle at 20% 0%, rgba(42, 85, 189, 0.045), transparent 50%), radial-gradient(circle at 80% 100%, rgba(42, 85, 189, 0.03), transparent 50%); }
+  html[data-theme="light"] .section-num { background: var(--green-bg); }
+  html[data-theme="light"] .nav-item.active { background: var(--green-bg); }
+  html[data-theme="light"] .section a { border-bottom-color: rgba(42, 85, 189, 0.3); }
+  html[data-theme="light"] .flow-node.highlight { background: var(--green-bg); }
+  html[data-theme="light"] .new-tag,
+  html[data-theme="light"] .section-title-tag { color: #ffffff; }
+
+  /* ===== Theme toggle ===== */
+  .theme-toggle {
+    position: fixed;
+    top: 18px; right: 24px;
+    z-index: 200;
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-bright);
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 8px 14px;
+    border-radius: 18px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .theme-toggle:hover { color: var(--green); border-color: var(--green-dim); }
+  .theme-toggle:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+  .theme-toggle-icon { font-size: 13px; line-height: 1; }
+  @media (max-width: 800px) { .theme-toggle { top: 10px; right: 12px; padding: 6px 10px; letter-spacing: 0.06em; } }
+  @media print { .theme-toggle { display: none; } }
+</style>
+</head>
+<body>
+
+<button class="theme-toggle" id="themeToggle" type="button" aria-label="Alterna modalità chiara e scura">
+  <span class="theme-toggle-icon">☀</span><span class="theme-toggle-label">Chiaro</span>
+</button>
+
+<div class="docs">
+
+<!-- ── Sidebar ── -->
+<nav class="sidebar">
+  <div class="docs-label">Beacon Telematics</div>
+  <div class="docs-title">Tracciamento QR e NFC</div>
+  <div class="docs-version">Guida utente v1.0 <span class="new-badge">NUOVO</span></div>
+
+  <div class="nav-section">Panoramica</div>
+  <a class="nav-item active" href="#overview">Che cos'è il tracciamento QR/NFC?</a>
+  <a class="nav-item" href="#how-it-works">Come funziona</a>
+  <a class="nav-item" href="#asset-types">Tipi di codice</a>
+
+  <div class="nav-section">Per iniziare</div>
+  <a class="nav-item" href="#generator">Il generatore di QR</a>
+  <a class="nav-item" href="#creating-qr">Creare un QR per un asset</a>
+  <a class="nav-item" href="#creating-nfc">Creare un tag NFC</a>
+  <a class="nav-item" href="#creating-imei">Codici IMEI / MAC</a>
+  <a class="nav-item" href="#bulk">Generazione in blocco</a>
+
+  <div class="nav-section">Scansione</div>
+  <a class="nav-item" href="#phone-scan">Scansionare con il telefono</a>
+  <a class="nav-item" href="#map-update">Aggiornamenti della mappa</a>
+
+  <div class="nav-section">Riferimento</div>
+  <a class="nav-item" href="#id-format">Formato dell'ID asset</a>
+  <a class="nav-item" href="#billing">Registrazione e fatturazione</a>
+  <a class="nav-item" href="#faq">FAQ</a>
+</nav>
+
+<!-- ── Content ── -->
+<main class="content">
+<div class="content-inner">
+
+  <div class="kicker">Beacon Telematics — Tracciamento asset</div>
+  <h1 class="hero-title">QR e NFC<br><span class="accent">Tracciamento asset.</span></h1>
+  <p class="hero-lede">Collega qualsiasi asset fisico alla tua mappa Beacon Telematics con un adesivo QR stampato o un tag NFC programmato. Appena qualcuno lo scansiona, la posizione si aggiorna in tempo reale, senza bisogno di app.</p>
+
+  <div class="pill-row">
+    <span class="pill">Nessuna app necessaria</span>
+    <span class="pill">Mappa aggiornata in tempo reale</span>
+    <span class="pill new">QR · NFC · IMEI / MAC</span>
+    <span class="pill">Generazione in blocco</span>
+    <span class="pill">Monitoraggio della precisione GPS</span>
+  </div>
+
+  <!-- Quick TOC -->
+  <div class="quick-toc">
+    <div class="quick-toc-title">In questa guida</div>
+    <div class="quick-toc-list">
+      <a href="#overview"><span class="num">01</span>Che cos'è il tracciamento QR/NFC?</a>
+      <a href="#generator"><span class="num">04</span>Il generatore di QR</a>
+      <a href="#how-it-works"><span class="num">02</span>Come funziona</a>
+      <a href="#bulk"><span class="num">08</span>Generazione in blocco</a>
+      <a href="#asset-types"><span class="num">03</span>Tipi di codice</a>
+      <a href="#phone-scan"><span class="num">09</span>Scansionare con il telefono</a>
+      <a href="#creating-qr"><span class="num">05</span>Creare un QR per un asset</a>
+      <a href="#id-format"><span class="num">11</span>Formato dell'ID asset</a>
+      <a href="#creating-nfc"><span class="num">06</span>Creare un tag NFC</a>
+      <a href="#billing"><span class="num">12</span>Registrazione e fatturazione</a>
+    </div>
+  </div>
+
+  <!-- ── Section 1: Overview ── -->
+  <section class="section" id="overview">
+    <div class="section-head">
+      <span class="section-num">01</span>
+      <span class="section-title">Che cos'è il tracciamento QR/NFC?</span>
+      <span class="section-title-tag">New</span>
+    </div>
+    <p>Il tracciamento QR/NFC arricchisce la tua piattaforma Beacon Telematics con un modo leggero e privo di infrastrutture per registrare la posizione di qualsiasi asset fisico. Non servono lettori fissi, gateway Bluetooth né hardware specialistico: bastano un'etichetta stampata o un adesivo NFC.</p>
+    <p>Ogni asset riceve un identificativo univoco — un <strong>Pinplot Asset ID</strong> — incorporato in un codice QR o programmato in un chip NFC. Quando un dipendente, un autista o qualsiasi persona autorizzata scansiona il codice con un normale smartphone, la piattaforma registra le sue coordinate GPS e sposta immediatamente il marcatore dell'asset sulla mappa in tempo reale.</p>
+
+    <div class="callout">
+      <div class="callout-title">Vantaggio principale</div>
+      <p>Poiché la scansione avviene in un normale browser mobile, <strong>non serve scaricare alcuna app</strong>. Qualsiasi dispositivo iOS o Android con fotocamera e connessione a Internet può aggiornare la posizione di un asset in meno di 10 secondi.</p>
+    </div>
+
+    <h3>Che cosa puoi tracciare</h3>
+    <p>La funzione supporta tre tipi di codice, per coprire esigenze operative diverse:</p>
+    <table class="doc-table">
+      <tr><th>Tipo di codice</th><th>Caso d'uso</th><th>Risultato</th></tr>
+      <tr><td>Asset QR</td><td>Veicoli, attrezzature, container — tutto ciò che offre una superficie piana per un adesivo</td><td>URL di tracciamento Beacon Telematics codificato in un'immagine QR</td></tr>
+      <tr><td>NFC Tag</td><td>Asset per cui la scansione è poco pratica: si avvicina il telefono al tag</td><td>URL di tracciamento Beacon Telematics scritto su un chip NFC</td></tr>
+      <tr><td>IMEI / MAC</td><td>Etichettatura di dispositivi: codifica un identificativo hardware per la consultazione manuale</td><td>QR in testo semplice (senza collegamento alla mappa)</td></tr>
+    </table>
+  </section>
+
+  <!-- ── Section 2: How It Works ── -->
+  <section class="section" id="how-it-works">
+    <div class="section-head">
+      <span class="section-num">02</span>
+      <span class="section-title">Come funziona</span>
+    </div>
+    <p>Il flusso del tracciamento QR/NFC si articola in tre fasi: <strong>generare</strong>, <strong>applicare</strong> e <strong>scansionare</strong>.</p>
+
+    <div class="figure">
+      <div class="flow-diagram">
+        <div class="flow-row">
+          <div class="flow-node highlight">
+            <div class="flow-node-label g">Fase 1</div>
+            <div class="flow-node-name">Generare</div>
+            <div class="flow-node-desc">Crea un ID asset univoco e scarica l'immagine QR o l'URL NFC dallo strumento generatore di Beacon Telematics.</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node">
+            <div class="flow-node-label">Fase 2</div>
+            <div class="flow-node-name">Applicare</div>
+            <div class="flow-node-desc">Stampa e applica l'adesivo QR sull'asset, oppure programma il chip NFC e fissalo in posizione.</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node">
+            <div class="flow-node-label">Fase 3</div>
+            <div class="flow-node-name">Scansionare</div>
+            <div class="flow-node-desc">Il personale scansiona con la fotocamera del telefono. Il GPS viene rilevato e la mappa si aggiorna in pochi secondi.</div>
+          </div>
+        </div>
+      </div>
+      <div class="figure-caption"><b>Figura 1</b> — Flusso completo del tracciamento QR/NFC</div>
+    </div>
+
+    <h3>Che cosa accade quando un codice viene scansionato</h3>
+    <ol class="step-list">
+      <li><div><b>La fotocamera rileva l'URL del QR.</b> Le fotocamere di iOS e Android leggono automaticamente i codici QR e mostrano un banner da toccare: nessuna app necessaria.</div></li>
+      <li><div><b>Il browser apre la pagina di destinazione Beacon Telematics.</b> La pagina <code>portal.beacontelematics.com/asset/HPSQ…</code> si carica e mostra il nome dell'asset.</div></li>
+      <li><div><b>Viene richiesta l'autorizzazione alla posizione.</b> Alla prima scansione su un dato dispositivo, il browser chiede l'accesso alla posizione. La scelta viene ricordata per tutte le scansioni successive.</div></li>
+      <li><div><b>Le coordinate GPS vengono rilevate.</b> Il browser usa il chip GPS del dispositivo (<code>enableHighAccuracy: true</code>) per ottenere la migliore precisione disponibile: in genere 3-15 metri all'aperto.</div></li>
+      <li><div><b>La posizione viene inviata a Pinplot.</b> Le coordinate e l'ID dell'asset vengono trasmessi a <code>POST /api/scan</code>. La scansione viene registrata nel log cronologico completo.</div></li>
+      <li><div><b>La mappa si aggiorna in tempo reale.</b> Il marcatore dell'asset si sposta nella nuova posizione in tutte le sessioni della dashboard Beacon Telematics aperte, simultaneamente.</div></li>
+    </ol>
+
+    <div class="callout info">
+      <div class="callout-title">Precisione GPS</div>
+      <p>Le scansioni con precisione peggiore di 500 metri vengono rifiutate automaticamente. La pagina di scansione mostra il valore di precisione, così l'utente sa se deve spostarsi in un punto migliore. La precisione viene memorizzata con ogni scansione e visualizzata nel popup della mappa come cerchio tratteggiato.</p>
+    </div>
+  </section>
+
+  <!-- ── Section 3: Code Types ── -->
+  <section class="section" id="asset-types">
+    <div class="section-head">
+      <span class="section-num">03</span>
+      <span class="section-title">Tipi di codice</span>
+    </div>
+
+    <h3>Asset QR</h3>
+    <p>Il metodo di tracciamento principale. Un identificativo <code>HPSQ…</code> univoco viene incorporato in un codice QR che codifica l'URL completo dell'asset su Beacon Telematics. Stampalo su un'etichetta, applicalo all'asset ed è subito pronto per la scansione.</p>
+    <p><strong>Ideale per:</strong> veicoli, rimorchi, attrezzature di cantiere, container, pallet — qualsiasi asset con una superficie sufficientemente ampia per un adesivo (almeno circa 25 mm di lato per una scansione affidabile).</p>
+
+    <h3>NFC Tag</h3>
+    <p>Funziona esattamente come l'Asset QR, ma usa la comunicazione di prossimità anziché la fotocamera. Lo stesso URL Pinplot viene scritto su un chip NFC vergine con una qualsiasi app di scrittura NFC. Quando l'utente avvicina il telefono a pochi centimetri dal tag, il browser si apre e la scansione procede esattamente come con un codice QR.</p>
+    <p><strong>Ideale per:</strong> asset collocati in ambienti bui, asset maneggiati di frequente (che rendono scomoda la scansione) o beni di valore per cui si preferisce un chip discreto e integrato a un adesivo visibile.</p>
+
+    <div class="callout warn">
+      <div class="callout-title">Compatibilità NFC</div>
+      <p>La lettura NFC in background richiede iOS 13+ (iPhone 7 o successivo) o Android 9+. La maggior parte dei dispositivi in uso dal 2020 è compatibile. Android supporta l'NFC da più tempo e con meno restrizioni rispetto a iOS.</p>
+    </div>
+
+    <h3>IMEI / MAC</h3>
+    <p>Codifica un identificativo hardware come codice QR in testo semplice, non come URL Pinplot. Scansionando il codice viene mostrato il valore grezzo (ad es. <code>357012345678901</code>), che l'operatore può leggere o copiare. Questo non aggiorna la mappa Beacon Telematics: serve unicamente da etichetta identificativa.</p>
+    <p><strong>Ideale per:</strong> portatili, tablet, router, switch di rete — qualsiasi dispositivo per cui si vuole evitare di leggere a mano un numero di serie da un adesivo.</p>
+
+    <div class="callout info">
+      <div class="callout-title">Comportamento della fotocamera — IMEI/MAC</div>
+      <p>Le app fotocamera native di iOS e Android possono mostrare un invito «Cerca» invece del testo semplice. Per i codici IMEI/MAC, indica al tuo team di usare Google Lens o un'app dedicata alla scansione di QR: entrambe mostrano il valore decodificato grezzo.</p>
+    </div>
+  </section>
+
+  <!-- ── Section 4: Generator ── -->
+  <section class="section" id="generator">
+    <div class="section-head">
+      <span class="section-num">04</span>
+      <span class="section-title">Il generatore di QR</span>
+    </div>
+    <p>Il generatore di QR Pinplot è uno strumento che funziona nel browser: nessuna installazione richiesta. Aprilo su qualsiasi computer con un browser moderno. È organizzato in tre colonne che ti guidano da sinistra a destra.</p>
+
+    <table class="doc-table">
+      <tr><th>Colonna</th><th>Scopo</th></tr>
+      <tr><td>① Content</td><td>Scegli il tipo di codice (Asset QR, NFC Tag o IMEI/MAC), genera o inserisci l'identificativo e configura le impostazioni specifiche del QR.</td></tr>
+      <tr><td>② Appearance</td><td>Personalizza colori, stili degli angoli, cornici e icone centrali. Tutte le impostazioni sono facoltative: i valori predefiniti si scansionano senza problemi.</td></tr>
+      <tr><td>③ Preview &amp; Download</td><td>L'anteprima si aggiorna in tempo reale a ogni modifica. Scarica quando il risultato ti soddisfa. Sotto l'anteprima trovi la cronologia dei download, per riscaricare i codici.</td></tr>
+    </table>
+
+    <div class="callout">
+      <div class="callout-title">Suggerimento</div>
+      <p>Lo strumento ha un <strong>interruttore per la modalità scura</strong> nell'angolo in alto a destra. Le due modalità producono un risultato identico: il tema cambia solo l'interfaccia dello strumento, non l'immagine QR scaricata.</p>
+    </div>
+  </section>
+
+  <!-- ── Section 5: Creating a QR ── -->
+  <section class="section" id="creating-qr">
+    <div class="section-head">
+      <span class="section-num">05</span>
+      <span class="section-title">Creare un QR per un asset</span>
+    </div>
+
+    <ol class="step-list">
+      <li><div><b>Seleziona la scheda «Asset QR»</b> nella colonna Content. Viene generato automaticamente un ID <code>HPSQ…</code> univoco, mostrato come <code>portal.beacontelematics.com/asset/HPSQ…</code>.</div></li>
+      <li><div><b>Controlla l'ID generato.</b> Ogni ID è univoco. Se te ne serve uno nuovo — per esempio perché hai fatto più tentativi — fai clic su <strong>⟳ New ID</strong>.</div></li>
+      <li><div><b>Personalizza l'aspetto (facoltativo).</b> Regola i colori, scegli una cornice o aggiungi un'icona centrale nella colonna Appearance. L'anteprima si aggiorna in tempo reale.</div></li>
+      <li><div><b>Fai clic su «⬇ PNG» o «⬇ SVG».</b> Prima del download compare una finestra di conferma.</div></li>
+      <li><div><b>Conferma la registrazione.</b> La finestra spiega che il download registra l'ID dell'asset presso la piattaforma. È un'operazione unica per ogni ID: riscaricare lo stesso codice non genera un addebito doppio.</div></li>
+      <li><div><b>Stampa e applica l'etichetta</b> sull'asset fisico.</div></li>
+    </ol>
+
+    <div class="callout warn">
+      <div class="callout-title">Importante — la registrazione avviene al download</div>
+      <p>Un asset viene registrato nel database Beacon Telematics solo quando fai clic su scarica. Gli ID generati ma mai scaricati non sono registrati e non possono essere scansionati con successo. Questa scelta mantiene pulito il tuo registro degli asset.</p>
+    </div>
+
+    <h3>Scegliere un formato</h3>
+    <table class="doc-table">
+      <tr><th>Formato</th><th>Ideale per</th></tr>
+      <tr><td>PNG</td><td>La maggior parte delle stampanti di etichette, Word/Google Docs, uso generale. Rasterizzato alla dimensione scelta (128-512 px).</td></tr>
+      <tr><td>SVG</td><td>Flussi di stampa professionali, etichette di grande formato o qualsiasi caso in cui serva nitidezza perfetta a ogni dimensione.</td></tr>
+    </table>
+  </section>
+
+  <!-- ── Section 6: Creating NFC ── -->
+  <section class="section" id="creating-nfc">
+    <div class="section-head">
+      <span class="section-num">06</span>
+      <span class="section-title">Creare un tag NFC</span>
+    </div>
+    <p>I tag NFC si programmano, non si stampano. Il generatore produce un URL che tu scrivi su un chip NTAG213 o NTAG216 vergine usando un'app di scrittura NFC.</p>
+
+    <ol class="step-list">
+      <li><div><b>Seleziona la scheda «NFC Tag»</b> nella colonna Content. Viene generato e mostrato un ID <code>HPSN…</code> univoco.</div></li>
+      <li><div><b>Fai clic su «🔗 Copy NFC URL»</b> nel pannello di anteprima. Compare una finestra di conferma. Dopo la conferma, l'URL completo viene copiato negli appunti.</div></li>
+      <li><div><b>Apri la tua app di scrittura NFC</b> sul telefono (ad es. NFC Tools, Trigger o TagWriter). Crea un nuovo <strong>record URI</strong>.</div></li>
+      <li><div><b>Incolla l'URL copiato</b> nel campo URI e scrivilo sul chip vergine. La scrittura richiede meno di un secondo.</div></li>
+      <li><div><b>Prova il tag</b> avvicinando il telefono. La pagina di destinazione Pinplot dovrebbe aprirsi automaticamente.</div></li>
+      <li><div><b>Applica o incorpora il chip</b> sull'asset, in un punto accessibile per l'avvicinamento del telefono.</div></li>
+    </ol>
+
+    <div class="callout info">
+      <div class="callout-title">Hardware NFC consigliato</div>
+      <p>Gli adesivi NTAG213 standard vanno bene nella maggior parte dei casi. Per ambienti gravosi (esterni, macchinari, temperature estreme) usa tag NFC per superfici metalliche omologati per le tue condizioni operative. I chip con almeno 144 byte di memoria possono contenere l'URL Pinplot.</p>
+    </div>
+  </section>
+
+  <!-- ── Section 7: IMEI/MAC ── -->
+  <section class="section" id="creating-imei">
+    <div class="section-head">
+      <span class="section-num">07</span>
+      <span class="section-title">Codici IMEI / MAC</span>
+    </div>
+    <p>I codici IMEI/MAC sono codici QR in testo semplice: non rimandano a Pinplot e non aggiornano la mappa. Sono solo etichette di identificazione.</p>
+
+    <ol class="step-list">
+      <li><div><b>Seleziona la scheda «IMEI / MAC».</b></div></li>
+      <li><div><b>Inserisci il valore</b>: un numero IMEI di 15 cifre oppure un indirizzo MAC separato da due punti (ad es. <code>AA:BB:CC:DD:EE:FF</code>).</div></li>
+      <li><div><b>Se vuoi, inserisci un prefisso di etichetta</b> come <code>IMEI</code> o <code>MAC</code>. Viene anteposto al valore codificato (ad es. <code>IMEI:357012345678901</code>). Lascialo vuoto per codificare solo il valore grezzo.</div></li>
+      <li><div><b>Scarica in PNG o SVG</b>: non compare alcuna finestra di conferma, perché i codici IMEI/MAC non vengono registrati presso la piattaforma.</div></li>
+    </ol>
+
+    <div class="callout">
+      <div class="callout-title">Scansionare i codici IMEI/MAC</div>
+      <p>Sugli scanner industriali (Zebra, Honeywell, Datalogic) il valore decodificato compare direttamente. Sui telefoni usa <strong>Google Lens</strong> o un'app dedicata alla scansione di QR: l'app fotocamera nativa può mostrare l'opzione «Cerca» invece del testo grezzo.</p>
+    </div>
+  </section>
+
+  <!-- ── Section 8: Bulk ── -->
+  <section class="section" id="bulk">
+    <div class="section-head">
+      <span class="section-num">08</span>
+      <span class="section-title">Generazione in blocco</span>
+    </div>
+    <p>Quando allestisci una flotta, rifornisci un magazzino o programmi un lotto di tag NFC, puoi generare più codici univoci in un'unica operazione senza modificare le impostazioni di aspetto.</p>
+
+    <h3>Asset QR in blocco (ZIP)</h3>
+    <ol class="step-list">
+      <li><div><b>Seleziona la scheda «Asset QR»</b> e configura l'aspetto come faresti normalmente.</div></li>
+      <li><div><b>Imposta il campo Quantity</b> su un valore compreso fra 2 e 250. Il testo di aiuto si aggiorna confermando il numero di codici e il formato di output.</div></li>
+      <li><div><b>Il pulsante PNG diventa «⭳ ZIP (PNG)».</b> L'opzione SVG viene nascosta: l'esportazione in blocco è solo in PNG.</div></li>
+      <li><div><b>Fai clic su «⭳ ZIP (PNG)».</b> La finestra di conferma riepiloga il numero di codici che verranno registrati.</div></li>
+      <li><div><b>Conferma.</b> Il generatore crea un QR alla volta, mostrando una barra di avanzamento. Al termine viene scaricato un unico file ZIP che contiene un PNG per ogni ID asset, con ciascun file denominato in base al proprio ID.</div></li>
+    </ol>
+
+    <div class="callout warn">
+      <div class="callout-title">Fatturazione</div>
+      <p>Ogni ID univoco di un lotto è una registrazione fatturabile a sé. Un lotto di 50 codici registra 50 asset. Riscaricare lo stesso file ZIP non registra né addebita di nuovo gli ID che esistono già.</p>
+    </div>
+
+    <h3>Tag NFC in blocco (Excel)</h3>
+    <ol class="step-list">
+      <li><div><b>Seleziona la scheda «NFC Tag»</b> e imposta il campo Quantity sul numero di tag necessari.</div></li>
+      <li><div><b>Il pulsante «Copy NFC URL» diventa «📊 Download Excel».</b></div></li>
+      <li><div><b>Fai clic su «📊 Download Excel»</b> e conferma la finestra. Viene scaricato subito un file <code>.xlsx</code>.</div></li>
+      <li><div><b>Apri il file Excel.</b> Ogni riga contiene le colonne Asset ID, NFC URL, Type e Status. Usa questo file per tenere traccia dei chip già programmati.</div></li>
+      <li><div><b>Copia ciascun URL dal file Excel</b> nella tua app di scrittura NFC per programmare ogni chip.</div></li>
+    </ol>
+  </section>
+
+  <!-- ── Section 9: Phone Scan ── -->
+  <section class="section" id="phone-scan">
+    <div class="section-head">
+      <span class="section-num">09</span>
+      <span class="section-title">Scansionare con il telefono</span>
+    </div>
+    <p>Scansionare un Asset QR o un tag NFC con il telefono non richiede l'installazione di alcuna app. Il processo avviene interamente nel browser.</p>
+
+    <h3>Codice QR</h3>
+    <ol class="step-list">
+      <li><div><b>Apri l'app fotocamera nativa</b> su iPhone o Android. Puntala verso il codice QR: compare automaticamente il banner <em>«portal.beacontelematics.com/asset/HPSQ…»</em>.</div></li>
+      <li><div><b>Tocca il banner.</b> Safari o Chrome apre la pagina dell'asset su Beacon Telematics.</div></li>
+      <li><div><b>Consenti l'accesso alla posizione</b> quando richiesto. È un'autorizzazione unica per dispositivo: il browser la ricorda per tutte le scansioni successive.</div></li>
+      <li><div><b>Attendi la conferma.</b> Una volta registrata la scansione, la pagina mostra «✓ Location updated successfully». Vengono indicati la precisione GPS e il numero della scansione.</div></li>
+      <li><div><b>Chiudi la scheda del browser.</b> La scansione è completata.</div></li>
+    </ol>
+
+    <h3>Tag NFC</h3>
+    <p>Tieni il telefono a 2-4 centimetri dal tag NFC. Il banner o la notifica compare automaticamente: toccalo e si apre la stessa pagina di destinazione. Il resto del processo è identico a una scansione QR.</p>
+
+    <div class="callout">
+      <div class="callout-title">GPS all'aperto e al chiuso</div>
+      <p>All'aperto il GPS di uno smartphone raggiunge in genere una precisione di 3-15 metri. Al chiuso la precisione peggiora fino a 50-300 metri, perché il dispositivo ripiega sul WiFi e sulla triangolazione cellulare. Le scansioni peggiori di 500 metri vengono rifiutate. Il valore di precisione è visibile nella pagina di destinazione e viene memorizzato con ogni scansione.</p>
+    </div>
+
+    <h3>Che cosa mostra la mappa</h3>
+    <p>Ogni scansione di un Asset QR o di un tag NFC sposta il marcatore dell'asset sulla mappa in tempo reale di Beacon Telematics. Il colore del marcatore indica l'origine della scansione:</p>
+    <table class="doc-table">
+      <tr><th>Colore</th><th>Origine</th></tr>
+      <tr><td><span class="status-pill green"><span class="dot"></span>Verde</span></td><td>Scansione di un codice QR</td></tr>
+      <tr><td><span class="status-pill amber"><span class="dot"></span>Ambra</span></td><td>Lettura NFC</td></tr>
+    </table>
+    <p>Attorno a ogni marcatore un cerchio tratteggiato di precisione si ridimensiona in base al valore di precisione GPS al momento della scansione. Facendo clic sul marcatore si apre un popup con nome dell'asset, ID, tipo, precisione, numero totale di scansioni e data e ora dell'ultimo avvistamento, oltre a un collegamento alla cronologia completa delle scansioni.</p>
+  </section>
+
+  <!-- ── Section 10: Map Updates ── -->
+  <section class="section" id="map-update">
+    <div class="section-head">
+      <span class="section-num">10</span>
+      <span class="section-title">Aggiornamenti della mappa</span>
+    </div>
+    <p>La mappa Pinplot riceve gli eventi di scansione in tempo reale tramite un flusso <strong>Server-Sent Events (SSE)</strong>. Appena il server conferma una scansione, tutte le sessioni aperte della dashboard Beacon Telematics ricevono l'aggiornamento e spostano il marcatore, senza dover ricaricare la pagina.</p>
+
+    <div class="state-diagram">
+      <div class="state-node blue">Asset QR scansionato</div>
+      <div class="state-arrow">→</div>
+      <div class="state-node pending">GPS rilevato</div>
+      <div class="state-arrow">→</div>
+      <div class="state-node ok">POST /api/scan</div>
+      <div class="state-arrow">→</div>
+      <div class="state-node ok">Il marcatore si sposta</div>
+    </div>
+
+    <p>Al caricamento della pagina, la mappa recupera tutte le posizioni attuali degli asset da <code>GET /api/assets</code> e disegna un marcatore per ogni asset scansionato almeno una volta. Gli asset registrati ma mai scansionati non compaiono finché non arriva la loro prima scansione.</p>
+
+    <h3>Cronologia delle scansioni</h3>
+    <p>Ogni scansione viene conservata in modo permanente nel database. La cronologia completa di un asset è raggiungibile dal popup della mappa tramite il collegamento «View scan history». In questo modo è possibile visualizzare le tracce degli spostamenti e produrre report di audit.</p>
+  </section>
+
+  <!-- ── Section 11: ID Format ── -->
+  <section class="section" id="id-format">
+    <div class="section-head">
+      <span class="section-num">11</span>
+      <span class="section-title">Formato dell'ID asset</span>
+    </div>
+    <p>Ogni ID asset Pinplot segue un formato fisso di 15 caratteri che codifica il tipo di asset e garantisce l'univocità.</p>
+
+    <div class="id-anatomy">
+      <div class="id-display">
+        <span class="seg-prefix">HPS</span><span class="seg-type">Q</span><span class="seg-time">123456</span><span class="seg-count">001</span><span class="seg-rand">02</span>
+      </div>
+      <div class="id-legend">
+        <div class="id-legend-item"><div class="id-legend-swatch" style="background:#3565d3"></div>HPS — prefisso fisso della piattaforma</div>
+        <div class="id-legend-item"><div class="id-legend-swatch" style="background:#ffb648"></div>Q o N — tipo di codice (QR / NFC)</div>
+        <div class="id-legend-item"><div class="id-legend-swatch" style="background:#4a9eff"></div>6 cifre — ultime 6 cifre del timestamp Unix (ms)</div>
+        <div class="id-legend-item"><div class="id-legend-swatch" style="background:#ff4757"></div>3 cifre — contatore ciclico (000-999)</div>
+        <div class="id-legend-item"><div class="id-legend-swatch" style="background:#6b7785"></div>2 cifre — suffisso casuale (00-99)</div>
+      </div>
+    </div>
+
+    <p>La combinazione di timestamp al millisecondo, contatore ciclico e suffisso casuale rende le collisioni fra ID statisticamente trascurabili, anche generando molti ID contemporaneamente. Il codice di tipo, in terza posizione, indica a ogni componente del sistema se il supporto fisico è un adesivo QR o un tag NFC.</p>
+
+    <table class="doc-table">
+      <tr><th>Codice di tipo</th><th>Significato</th><th>Esempio</th></tr>
+      <tr><td>Q</td><td>Adesivo con codice QR</td><td>HPSQ123456001</td></tr>
+      <tr><td>N</td><td>Tag NFC</td><td>HPSN123456002</td></tr>
+    </table>
+  </section>
+
+  <!-- ── Section 12: Billing ── -->
+  <section class="section" id="billing">
+    <div class="section-head">
+      <span class="section-num">12</span>
+      <span class="section-title">Registrazione e fatturazione</span>
+    </div>
+    <p>Un ID asset viene registrato presso la piattaforma Beacon Telematics nel momento in cui scarichi il suo QR o copi il suo URL NFC. È una scelta progettuale deliberata: gli ID generati nello strumento ma mai scaricati non sono registrati e non incidono sul consumo.</p>
+
+    <div class="callout warn">
+      <div class="callout-title">Azione fatturabile</div>
+      <p>Ogni ID asset univoco registrato incide sul consumo del tuo account Beacon Telematics. Prima di ogni download che registra uno o più ID viene mostrata una finestra di conferma. Riscaricare un ID già registrato non genera un addebito doppio.</p>
+    </div>
+
+    <h3>Regole di registrazione</h3>
+    <table class="doc-table">
+      <tr><th>Azione</th><th>Registra?</th><th>Addebitata?</th></tr>
+      <tr><td>Generare / fare clic su «New ID»</td><td>No</td><td>No</td></tr>
+      <tr><td>Scaricare PNG o SVG (prima volta)</td><td>Sì</td><td>Sì</td></tr>
+      <tr><td>Riscaricare lo stesso QR</td><td>No (409 — esiste già)</td><td>No</td></tr>
+      <tr><td>Copiare l'URL NFC (prima volta)</td><td>Sì</td><td>Sì</td></tr>
+      <tr><td>Copiare di nuovo l'URL NFC</td><td>No (409 — esiste già)</td><td>No</td></tr>
+      <tr><td>Download IMEI/MAC</td><td>No</td><td>No</td></tr>
+    </table>
+  </section>
+
+  <!-- ── Section 13: FAQ ── -->
+  <section class="section" id="faq">
+    <div class="section-head">
+      <span class="section-num">13</span>
+      <span class="section-title">FAQ</span>
+    </div>
+
+    <h3>Chi effettua la scansione ha bisogno di un account Pinplot?</h3>
+    <p>No. La pagina di destinazione della scansione è pubblicamente accessibile: chiunque abbia uno smartphone può scansionare un asset e aggiornarne la posizione. È una scelta voluta, pensata per i casi in cui il personale sul campo o gli autisti non hanno credenziali della piattaforma. Se necessario, l'autenticazione potrà essere aggiunta in una versione futura.</p>
+
+    <h3>Che cosa succede se il GPS viene negato?</h3>
+    <p>La pagina di destinazione mostra un messaggio chiaro che spiega che l'accesso alla posizione è necessario e come riattivarlo nelle impostazioni del browser. Nessuna scansione viene registrata finché non è disponibile una posizione GPS valida.</p>
+
+    <h3>Lo stesso QR può essere scansionato più volte?</h3>
+    <p>Sì. Ogni scansione crea una nuova voce nella cronologia. L'ultima posizione dell'asset sulla mappa rispecchia sempre la scansione più recente. Non c'è un limite al numero di scansioni di un asset.</p>
+
+    <h3>Che cosa succede se il codice QR si danneggia?</h3>
+    <p>I codici QR vengono generati per impostazione predefinita con il 25% di correzione degli errori (livello Q), il che significa che restano leggibili anche quando fino al 25% del codice è coperto o danneggiato. Per i codici con un'icona centrale, la correzione degli errori sale automaticamente al 30% (livello H).</p>
+
+    <h3>Di che dimensione vanno stampate le etichette QR?</h3>
+    <p>Si consigliano almeno 25 mm × 25 mm per una scansione affidabile a distanza di braccio. Per l'uso all'aperto o per la scansione da lontano (ad esempio da un carrello elevatore), usa 50 mm × 50 mm o più. Mantieni sempre la zona di silenzio (il bordo bianco) che il generatore aggiunge automaticamente.</p>
+
+    <h3>Posso applicare il mio marchio ai codici QR?</h3>
+    <p>Sì. Il generatore supporta colori personalizzati di primo piano e sfondo, colori degli angoli, otto stili di cornice e il caricamento di un'icona centrale. Il colore principale usato in tutta la piattaforma può essere modificato nel codice sorgente dello strumento per adattarlo alla tua palette aziendale.</p>
+  </section>
+
+  <!-- Footer -->
+  <div class="doc-footer">
+    <span><span class="brand">Beacon Telematics</span> — Guida utente al tracciamento asset QR e NFC v1.0</span>
+    <span>beacontelematics.com</span>
+  </div>
+
+</div>
+</main>
+</div>
+
+<script>
+  // Highlight active nav item on scroll
+  const sections = document.querySelectorAll('.section');
+  const navItems = document.querySelectorAll('.nav-item');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        navItems.forEach(n => n.classList.remove('active'));
+        const active = document.querySelector(`.nav-item[href="#${e.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-30% 0px -65% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    var btn = document.getElementById('themeToggle');
+    var icon = btn.querySelector('.theme-toggle-icon');
+    var label = btn.querySelector('.theme-toggle-label');
+    var TEXT = { dark: 'Chiaro', light: 'Scuro' };
+    var ICON = { dark: '\u2600', light: '\u263e' };
+
+    function apply(theme) {
+      root.setAttribute('data-theme', theme);
+      icon.textContent = ICON[theme];
+      label.textContent = TEXT[theme];
+      btn.setAttribute('aria-label', 'Alterna modalità chiara e scura');
+    }
+
+    var saved = null;
+    try { saved = localStorage.getItem('qrnfc-guide-theme'); } catch (e) {}
+    apply(saved === 'light' ? 'light' : 'dark');
+
+    btn.addEventListener('click', function () {
+      var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      apply(next);
+      try { localStorage.setItem('qrnfc-guide-theme', next); } catch (e) {}
+    });
+  })();
+</script>
+
+</body>
+</html>

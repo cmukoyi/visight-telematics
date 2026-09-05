@@ -84,9 +84,19 @@ app.get('/help/movement-analytics', (req, res) => {
 // Pretty route for QR/NFC guide
 app.get('/help/qr-nfc', (req, res) => {
   const brandName = process.env.BRAND_NAME || 'PinPlot';
-  const isBeacon = brandName.toLowerCase().includes('beacon');
-  const filename = isBeacon 
-    ? 'QR_NFC_Guide_Beacon.html'
+  const isBeacon = process.env.CUSTOMER_TENANT === 'beacon_telematics'
+    || brandName.toLowerCase().includes('beacon');
+  const language = String(req.query.lang || 'en').toLowerCase().split('-')[0];
+  const beaconGuides = {
+    de: 'QR_NFC_Guide_Beacon_DE.html',
+    en: 'QR_NFC_Guide_Beacon_EN.html',
+    es: 'QR_NFC_Guide_Beacon_ES.html',
+    fr: 'QR_NFC_Guide_Beacon_FR.html',
+    it: 'QR_NFC_Guide_Beacon_IT.html',
+    nl: 'QR_NFC_Guide_Beacon_NL.html',
+  };
+  const filename = isBeacon
+    ? (beaconGuides[language] || beaconGuides.en)
     : 'QR_NFC_Guide_Pinplot.html';
   
   const filePath = path.join(publicDir, 'help', filename);
