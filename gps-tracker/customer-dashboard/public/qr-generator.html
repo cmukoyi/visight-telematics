@@ -736,18 +736,25 @@ function translateQrGenerator() {
   nodes.forEach(node => {
     const text = node.nodeValue.trim();
     const key = lookup.get(normalize(text));
-    if (key) node.nodeValue = node.nodeValue.replace(text, qrT(key, text));
+    if (key) {
+      const translated = node.nodeValue.replace(text, qrT(key, text));
+      if (translated !== node.nodeValue) node.nodeValue = translated;
+    }
   });
   document.querySelectorAll('[data-qr-i18n]').forEach(el => {
     const key = el.getAttribute('data-qr-i18n');
     const fallback = QR_TRANSLATIONS[key] || el.textContent;
-    el.textContent = qrT(key, fallback);
+    const translated = qrT(key, fallback);
+    if (el.textContent !== translated) el.textContent = translated;
   });
   document.querySelectorAll('[title], [placeholder]').forEach(el => {
     ['title', 'placeholder'].forEach(attribute => {
       const value = el.getAttribute(attribute);
       const key = lookup.get(value);
-      if (key) el.setAttribute(attribute, qrT(key, value));
+      if (key) {
+        const translated = qrT(key, value);
+        if (translated !== value) el.setAttribute(attribute, translated);
+      }
     });
   });
 }
