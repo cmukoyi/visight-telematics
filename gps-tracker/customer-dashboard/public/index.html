@@ -11600,11 +11600,11 @@ function alFilterCat(cat) {
 
 function alRenderTable() {
     const query = (document.getElementById('al-search')?.value || '').toLowerCase();
-    const list  = _lmTags.filter(t => {
-        const inCat = _alCatFilter === 'all' || t.category_id === _alCatFilter;
+    const list  = _lmTags.filter(tag => {
+        const inCat = _alCatFilter === 'all' || tag.category_id === _alCatFilter;
         if (!inCat) return false;
         if (!query) return true;
-        return [t.imei, t.description, t.device_name, t.owner_email].join(' ').toLowerCase().includes(query);
+        return [tag.imei, tag.description, tag.device_name, tag.owner_email].join(' ').toLowerCase().includes(query);
     });
     const tbody = document.getElementById('al-tbody');
     if (!tbody) return;
