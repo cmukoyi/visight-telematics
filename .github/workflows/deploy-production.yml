@@ -393,14 +393,27 @@ jobs:
           SERVER=$(echo "$DO_SERVER_IP" | tr -d '[:space:]')
           USER=$(echo "$DO_USER" | tr -d '[:space:]')
           mkdir -p .env-snapshot
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            "${USER}@${SERVER}" \
-            "cd '${SERVER_DIR}/gps-tracker' && \
-             find . -type f \( -name '.env' -o -name '*.env' -o -name '.env.*' \) \
-               -not -path '*/node_modules/*' \
-               -not -path '*/.git/*' \
-               -print0 2>/dev/null | xargs -0 -r sha256sum 2>/dev/null | sort" \
-            > .env-snapshot/before.txt
+          for attempt in 1 2 3; do
+            if ssh -o ConnectTimeout=20 -o ConnectionAttempts=1 \
+              -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              "${USER}@${SERVER}" \
+              "cd '${SERVER_DIR}/gps-tracker' && \
+               find . -type f \( -name '.env' -o -name '*.env' -o -name '.env.*' \) \
+                 -not -path '*/node_modules/*' \
+                 -not -path '*/.git/*' \
+                 -print0 2>/dev/null | xargs -0 -r sha256sum 2>/dev/null | sort" \
+              > .env-snapshot/before.txt.tmp; then
+              mv .env-snapshot/before.txt.tmp .env-snapshot/before.txt
+              break
+            fi
+            rm -f .env-snapshot/before.txt.tmp
+            if [ "$attempt" -eq 3 ]; then
+              echo "❌ Unable to establish SSH after 3 attempts; no code was synced."
+              exit 1
+            fi
+            echo "⚠️  SSH attempt $attempt failed; retrying in 5 seconds..."
+            sleep 5
+          done
           echo "── .env files on server BEFORE rsync ──"
           cat .env-snapshot/before.txt || echo "(none)"
           echo "── end snapshot ──"
