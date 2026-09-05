@@ -13383,8 +13383,8 @@ function hiveOpenHelp() {
 
 function qrOpenHelp() {
     const theme = document.documentElement.getAttribute('data-theme') || 'light';
-    // Use pretty route - server detects tenant and serves correct guide
-    window.open('/customer/help/qr-nfc?theme=' + encodeURIComponent(theme),
+    const language = currentLocale() || 'en';
+    window.open('/customer/help/qr-nfc?theme=' + encodeURIComponent(theme) + '&lang=' + encodeURIComponent(language),
                 '_blank', 'noopener,noreferrer');
 }
 
