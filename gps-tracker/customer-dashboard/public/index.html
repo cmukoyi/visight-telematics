@@ -17029,7 +17029,7 @@ function mhaOpenHelp() {
         updateStats(points, _tempGraphGaps);
         
         // Show gap legend if needed
-        document.getElementById('temp-graph-gap-legend').style.display = showGaps && _tempGraphGaps.length > 0 ? 'flex' : 'none';
+        document.getElementById('temp-graph-gap-legend').style.display = _tempGraphGaps.length > 0 ? 'flex' : 'none';
         
         console.log('[TEMP GRAPH] Chart created successfully');
     }
