@@ -11613,50 +11613,50 @@ function alRenderTable() {
         return;
     }
     const statusColors = { active: 'var(--success)', idle: 'var(--warning,#f59e0b)', offline: 'var(--danger)' };
-    const statusLabel  = { active: 'Active', idle: 'Idle', offline: 'Offline' };
+    const statusLabel  = { active: t('common.active', 'Active'), idle: t('common.idle', 'Idle'), offline: t('common.offline', 'Offline') };
     const _tagTypeLabel = tt => _ppTagTypeLabel(tt);
-    tbody.innerHTML = list.map(t => {
-        const status = _lmStatusClass(t);
-        const label  = esc(t.description || t.device_name || t.imei);
-        const owner  = esc((t.owner_email || '').split('@')[0] || '—');
-        const typeLabel = _tagTypeLabel(t.tag_type);
+    tbody.innerHTML = list.map(tag => {
+        const status = _lmStatusClass(tag);
+        const label  = esc(tag.description || tag.device_name || tag.imei);
+        const owner  = esc((tag.owner_email || '').split('@')[0] || '—');
+        const typeLabel = _tagTypeLabel(tag.tag_type);
         const typeColor = typeLabel === 'Series 1' ? 'var(--primary)' : typeLabel === 'Series 2' ? 'var(--warning,#f59e0b)' : 'var(--text-3)';
-        const batPct = t.battery_level != null ? t.battery_level : null;
+        const batPct = tag.battery_level != null ? tag.battery_level : null;
         const batCls = batPct == null ? '' : batPct > 20 ? 'good' : 'low';
         const batHtml= batPct != null
             ? `<span class="battery-wrap ${batCls}"><i class="fa-solid fa-battery-full"></i> <small>${batPct}%</small></span>` : '—';
-        const hasGPS = !!(t.latitude && t.longitude);
+        const hasGPS = !!(tag.latitude && tag.longitude);
         const locHtml = hasGPS
-            ? `<span style="color:var(--success);font-size:.78rem"><i class="fa-solid fa-location-dot"></i> ${esc(t.location_description || '—')}</span>`
+            ? `<span style="color:var(--success);font-size:.78rem"><i class="fa-solid fa-location-dot"></i> ${esc(tag.location_description || '—')}</span>`
             : `<span style="color:var(--text-3);font-size:.78rem"><i class="fa-solid fa-location-dot"></i> No GPS</span>`;
-        const lastSeen = t.last_seen ? new Date(t.last_seen).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
-        const pkgHtml = t.package_id
-            ? `<span style="font-size:.78rem">${esc(t.package_name || 'Unknown')}</span>`
+        const lastSeen = tag.last_seen ? new Date(tag.last_seen).toLocaleString(currentLocale(), {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+        const pkgHtml = tag.package_id
+            ? `<span style="font-size:.78rem">${esc(tag.package_name || 'Unknown')}</span>`
             : `<span style="font-size:.78rem;color:var(--danger);font-weight:600"><i class="fa-solid fa-circle-exclamation" style="margin-right:3px"></i>${t('assets.no_package', 'No Package')}</span>`;
-        const expiryDate = t.expiry_date ? new Date(t.expiry_date).toLocaleDateString([], {day:'2-digit',month:'short',year:'numeric'}) : null;
-        const daysLeft = t.package_id
-            ? (t.days_remaining != null
-                ? (t.days_remaining > 30 ? `<span style="color:var(--success);font-size:.78rem">${t.days_remaining}d<br><small style="color:var(--text-3)">${expiryDate}</small></span>`
-                 : t.days_remaining > 7  ? `<span style="color:var(--warning);font-size:.78rem">${t.days_remaining}d<br><small style="color:var(--text-3)">${expiryDate}</small></span>`
-                 : t.days_remaining >= 0 ? `<span style="color:var(--danger);font-size:.78rem">${t.days_remaining}d<br><small>${expiryDate}</small></span>`
+        const expiryDate = tag.expiry_date ? new Date(tag.expiry_date).toLocaleDateString(currentLocale(), {day:'2-digit',month:'short',year:'numeric'}) : null;
+        const daysLeft = tag.package_id
+            ? (tag.days_remaining != null
+                ? (tag.days_remaining > 30 ? `<span style="color:var(--success);font-size:.78rem">${tag.days_remaining}d<br><small style="color:var(--text-3)">${expiryDate}</small></span>`
+                 : tag.days_remaining > 7  ? `<span style="color:var(--warning);font-size:.78rem">${tag.days_remaining}d<br><small style="color:var(--text-3)">${expiryDate}</small></span>`
+                 : tag.days_remaining >= 0 ? `<span style="color:var(--danger);font-size:.78rem">${tag.days_remaining}d<br><small>${expiryDate}</small></span>`
                  : `<span style="color:var(--danger);font-size:.78rem">${t('assets.expired', 'Expired')}<br><small>${expiryDate}</small></span>`)
                 : '—')
             : `<span style="color:var(--danger);font-size:.78rem">—</span>`;
         return `<tr>
             <td>
                 <div class="table-asset-name">
-                    <div class="tbl-icon" style="background:${alCatLabel(t).color}20;color:${alCatLabel(t).color}">
-                        <i class="fa-solid ${alCatLabel(t).icon}"></i>
+                    <div class="tbl-icon" style="background:${alCatLabel(tag).color}20;color:${alCatLabel(tag).color}">
+                        <i class="fa-solid ${alCatLabel(tag).icon}"></i>
                     </div>
                     <div>
                         <strong>${label}</strong>
-                        <small class="mono">${esc(t.imei)}</small>
+                        <small class="mono">${esc(tag.imei)}</small>
                     </div>
                 </div>
             </td>
-            <td style="font-size:.82rem;color:var(--text-2)">${esc(t.description || t.imei)}</td>
+            <td style="font-size:.82rem;color:var(--text-2)">${esc(tag.description || tag.imei)}</td>
             <td><span style="font-size:.75rem;font-weight:600;color:${typeColor};background:${typeColor}18;padding:2px 7px;border-radius:20px;white-space:nowrap">${typeLabel}</span></td>
-            <td style="font-size:.78rem;color:var(--text-2)">${alCatLabel(t).label}</td>
+            <td style="font-size:.78rem;color:var(--text-2)">${alCatLabel(tag).label}</td>
             <td>
                 <div style="display:flex;align-items:center;gap:5px">
                     <span class="status-dot status-${status}"></span>
@@ -11670,10 +11670,10 @@ function alRenderTable() {
             <td style="font-size:.78rem">${daysLeft}</td>
             <td>
                 <div class="row-actions">
-                    ${hasGPS ? `<button class="btn-icon-sm" data-i18n-title="tooltips.view_on_map" title="View on map" onclick="switchTab('livemap');setTimeout(()=>lmSelectFromList('${esc(t.imei)}'),600)">
+                    ${hasGPS ? `<button class="btn-icon-sm" data-i18n-title="tooltips.view_on_map" title="View on map" onclick="switchTab('livemap');setTimeout(()=>lmSelectFromList('${esc(tag.imei)}'),600)">
                         <i class="fa-solid fa-map-pin"></i>
                     </button>` : ''}
-                    <button class="btn-icon-sm" data-i18n-title="tooltips.movement_history" title="Movement History" onclick="lmOpenHistory('${esc(t.imei)}')">
+                    <button class="btn-icon-sm" data-i18n-title="tooltips.movement_history" title="Movement History" onclick="lmOpenHistory('${esc(tag.imei)}')">
                         <i class="fa-solid fa-route"></i>
                     </button>
                 </div>
