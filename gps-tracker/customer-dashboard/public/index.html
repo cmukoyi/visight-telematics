@@ -11699,6 +11699,11 @@ let _histTripSeq        = 0;    // same guard for histSelectTrip waypoint fetche
 // Navigate to History tab pre-selecting a specific tag — avoids the old
 // setTimeout/histPreselect race where trips would load for the wrong asset.
 function lmOpenHistory(imei) {
+    const tag = _lmTags.find(tag => tag.imei === imei);
+    if (tag?.trip_subscribed && typeof window.mhaOpenAsset === 'function') {
+        window.mhaOpenAsset(imei);
+        return;
+    }
     _histPendingImei = imei;
     switchTab('history');
 }
@@ -14220,6 +14225,7 @@ function mhaOpenHelp() {
   let _mhaAssets = [];
   let _mhaAllAssets = [];
   let _mhaSelectedImei = null;
+    let _mhaPendingImei = null;
   let _mhaActiveJourney = null;
   let _mhaFilterStatus = 'all';
   let _mhaSearchQuery = '';
@@ -14294,6 +14300,11 @@ function mhaOpenHelp() {
     
     // Load assets (Phase 5.3)
     await mhaLoadAssets();
+        if (_mhaPendingImei) {
+            const imei = _mhaPendingImei;
+            _mhaPendingImei = null;
+            await window.mhaSelectAsset(imei);
+        }
     
     // Render category filter pills from database
     mhaRenderCategoryPills();
@@ -14728,6 +14739,11 @@ function mhaOpenHelp() {
   };
 
   // Phase 5.3: Select asset
+    window.mhaOpenAsset = function(imei) {
+        _mhaPendingImei = imei;
+        switchTab('history-advanced');
+    };
+
   window.mhaSelectAsset = async function(imei) {
     _mhaSelectedImei = imei;
     const asset = _mhaAllAssets.find(a => a.imei === imei);
