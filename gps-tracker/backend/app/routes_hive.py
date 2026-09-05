@@ -562,6 +562,28 @@ def _create_hive_inner(
 
 # ─── Get hive detail ─────────────────────────────────────────────────────────
 
+@router.get("/tag/{tag_id}/membership")
+def get_tag_hive_membership(tag_id: str, request: Request, db: Session = Depends(get_db)):
+    """Return the current user's Hive membership for a tag, if one exists."""
+    me = get_portal_user_from_request(request, db)
+    try:
+        tag_uuid = uuid.UUID(tag_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid tag ID")
+
+    membership = (
+        db.query(HiveTagMembership)
+        .join(Hive, HiveTagMembership.hive_id == Hive.id)
+        .filter(HiveTagMembership.tag_id == tag_uuid, Hive.usergroup_id == me.usergroup_id)
+        .first()
+    )
+    if not membership:
+        return {"hive_name": None}
+
+    hive = db.query(Hive).filter(Hive.id == membership.hive_id).first()
+    return {"hive_name": hive.name if hive else None}
+
+
 @router.get("/{hive_id}")
 def get_hive(hive_id: str, request: Request, db: Session = Depends(get_db)):
     me = get_portal_user_from_request(request, db)

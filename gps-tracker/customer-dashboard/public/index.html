@@ -12179,6 +12179,19 @@ function amRenderCards() {
 async function deleteTag(tagId, imei) {
     if (!tConfirm('confirm.delete_tag', `Delete tag ${imei}? This cannot be undone.`)) return;
     try {
+        const membershipResponse = await apiFetch(`/api/portal/hive/tag/${tagId}/membership`);
+        if (!membershipResponse.ok) throw new Error('Unable to verify Hive membership');
+        const membership = await membershipResponse.json();
+        if (membership.hive_name) {
+            const warning = t('hive.delete_member_warning', 'Warning: this tag is a member of Hive {name}. Continue with delete or cancel?')
+                .replace('{name}', membership.hive_name);
+            if (!confirm(warning)) return;
+        }
+    } catch (err) {
+        tAlert('common.error', `${t('common.error', 'Error')}: ${err.message}`);
+        return;
+    }
+    try {
         const res = await apiFetch(`/api/portal/tags/${tagId}`, { method: 'DELETE' });
         if (res.status === 204 || res.ok) {
             _lmTags = _lmTags.filter(t => t.id !== tagId);
