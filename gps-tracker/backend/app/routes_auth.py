@@ -10,8 +10,9 @@ import os
 import logging
 
 from app.database import get_db
-from app.models import UserGroup, PortalUser
+from app.models import User, UserGroup, PortalUser
 from app.admin_auth import verify_password
+from app.auth import verify_password as verify_mobile_password
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 logger = logging.getLogger(__name__)
@@ -141,7 +142,13 @@ def login(
         PortalUser.is_active == True,
     ).first()
     
-    if not user or not verify_password(user.hashed_password, data.password):
+    credential_user = db.query(User).filter(User.id == user.mobile_user_id).first() if user and user.mobile_user_id else None
+    password_is_valid = (
+        verify_mobile_password(data.password, credential_user.hashed_password)
+        if credential_user and credential_user.hashed_password
+        else bool(user and user.hashed_password and verify_password(user.hashed_password, data.password))
+    )
+    if not user or not password_is_valid:
         _login_record_failure(ip)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -156,6 +163,8 @@ def login(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This account has expired"
         )
+    if credential_user and not credential_user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Mobile app account is inactive")
     
     # Verify usergroup is active
     group = db.query(UserGroup).filter(

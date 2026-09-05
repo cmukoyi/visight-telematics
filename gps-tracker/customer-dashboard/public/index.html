@@ -10263,6 +10263,16 @@ function _euRender(users) {
                 }
             </td>
             <td style="text-align:center;white-space:nowrap" onclick="event.stopPropagation()">
+                ${u.portal_linked
+                    ? `<button class="btn-sm btn-outline-warn" data-i18n-title="tooltips.remove_portal_access" title="Remove portal access"
+                            onclick="_euRevokePortalAccess('${esc(String(u.id))}','${esc(name)}')">
+                            <i class="fa-solid fa-user-minus" style="font-size:.78rem"></i> Remove Portal Access
+                       </button>`
+                    : `<button class="btn-sm btn-outline-ok" data-i18n-title="tooltips.promote_to_portal" title="Promote to portal user"
+                            onclick="_euPromoteToPortal('${esc(String(u.id))}','${esc(name)}')">
+                            <i class="fa-solid fa-user-shield" style="font-size:.78rem"></i> Promote to Portal
+                       </button>`
+                }
                 ${isActive
                     ? `<button class="btn-sm btn-outline-warn" data-i18n-title="tooltips.deactivate_user" title="Deactivate user" onclick="_euSetActive('${esc(String(u.id))}',false,'${esc(name)}')">
                             <i class="fa-solid fa-ban" style="font-size:.78rem"></i> Deactivate
@@ -10362,6 +10372,32 @@ async function _euDelete(userId, name) {
         if (!res.ok && res.status !== 204) throw new Error('Failed to delete user');
         _euAllUsers = _euAllUsers.filter(x => String(x.id) !== String(userId));
         _euFilter(document.getElementById('endUsersSearch')?.value || '');
+    } catch (err) {
+        alert(err.message);
+    }
+}
+
+async function _euPromoteToPortal(userId, name) {
+    if (!confirm(`Promote "${name}" to a portal user? They will use their existing Flutter app password to sign in.`)) return;
+    try {
+        const res = await apiFetch(`/api/portal/mobile-users/${userId}/promote`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role: 'reporter' }),
+        });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Failed to promote user');
+        await loadUsers();
+    } catch (err) {
+        alert(err.message);
+    }
+}
+
+async function _euRevokePortalAccess(userId, name) {
+    if (!confirm(`Remove portal access for "${name}"? Their Flutter app account and tags will remain active.`)) return;
+    try {
+        const res = await apiFetch(`/api/portal/mobile-users/${userId}/portal-access`, { method: 'DELETE' });
+        if (!res.ok && res.status !== 404) throw new Error((await res.json().catch(() => ({}))).detail || 'Failed to remove portal access');
+        await loadUsers();
     } catch (err) {
         alert(err.message);
     }
