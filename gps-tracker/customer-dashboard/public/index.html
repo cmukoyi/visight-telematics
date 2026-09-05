@@ -12176,8 +12176,12 @@ function amRenderCards() {
     }).join('')}</div>`;
 }
 
+const _deletingTagIds = new Set();
+
 async function deleteTag(tagId, imei) {
+    if (_deletingTagIds.has(tagId)) return;
     if (!tConfirm('confirm.delete_tag', `Delete tag ${imei}? This cannot be undone.`)) return;
+    _deletingTagIds.add(tagId);
     try {
         const membershipResponse = await apiFetch(`/api/portal/hive/tag/${tagId}/membership`);
         if (!membershipResponse.ok) throw new Error('Unable to verify Hive membership');
@@ -12189,11 +12193,12 @@ async function deleteTag(tagId, imei) {
         }
     } catch (err) {
         tAlert('common.error', `${t('common.error', 'Error')}: ${err.message}`);
+        _deletingTagIds.delete(tagId);
         return;
     }
     try {
         const res = await apiFetch(`/api/portal/tags/${tagId}`, { method: 'DELETE' });
-        if (res.status === 204 || res.ok) {
+        if (res.status === 204 || res.ok || res.status === 404) {
             _lmTags = _lmTags.filter(t => t.id !== tagId);
             amRenderCards();
             alRenderTable();
@@ -12203,6 +12208,8 @@ async function deleteTag(tagId, imei) {
         }
     } catch (err) {
         tAlert('common.error', `${t('common.error', 'Error')}: ${err.message}`);
+    } finally {
+        _deletingTagIds.delete(tagId);
     }
 }
 
