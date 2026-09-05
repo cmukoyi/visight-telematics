@@ -126,7 +126,7 @@ ALL_SECTIONS = list(SECTION_FEATURES.keys())
 # Tenant feature → tab name mapping
 # Maps high-level tenant feature names to specific tab keys
 TENANT_FEATURE_TABS: dict = {
-    "livemap": ["livemap"],
+    "livemap": ["livemap", "assets"],
     "history": ["history"],
     "history-advanced": ["history-advanced"],
     "alerts": ["reports-alerts"],
