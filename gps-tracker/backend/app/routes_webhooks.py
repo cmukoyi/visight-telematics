@@ -18,6 +18,7 @@ from app.models import BLETag, User, DevicePosition, DeviceState, WebhookLog
 from app.services.geofence_service import GeofenceService
 from app.services.geocode_service import GeocodeService
 from app.services.device_providers.hubble_provider import HubbleTagProvider
+from app.services.portal_alert_service import check_temperature_alert
 from sqlalchemy.dialects.postgresql import insert
 
 logger = logging.getLogger(__name__)
@@ -237,6 +238,7 @@ async def hubble_webhook(
                 temperature = sensor_data.get("temperature")
                 if temperature is not None:
                     attrs["Temperature"] = {"value": f"{temperature}°C", "show_on_map": True}
+                    check_temperature_alert(db, tracker, float(temperature))
                 
                 # Battery
                 battery = sensor_data.get("battery")

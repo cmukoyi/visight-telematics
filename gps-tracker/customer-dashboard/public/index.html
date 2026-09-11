@@ -2611,6 +2611,16 @@ input.hive-range::-moz-range-track {
                                         <span class="toggle-track"><span class="toggle-thumb"></span></span>
                                     </label>
                                 </div>
+                                <div class="settings-row">
+                                    <div>
+                                        <div class="settings-row-label"><i class="fa-solid fa-temperature-half" style="margin-right:6px;color:var(--warning)"></i><span data-i18n="settings.temperature_monitoring">Temperature threshold</span></div>
+                                        <div class="settings-row-hint" data-i18n="settings.temperature_monitoring_hint">Alert when a monitored tag crosses its configured high or low temperature limit.</div>
+                                    </div>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="notif-temperature" onchange="settingsSaveNotifications()">
+                                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                                    </label>
+                                </div>
                                 <!-- Delivery method -->
                                 <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-3);padding:14px 0 8px" data-i18n="settings.how_to_notify">
                                     How to notify me
@@ -3470,6 +3480,16 @@ input.hive-range::-moz-range-track {
                 cursor:pointer; 
                 padding:4px 8px; 
             }
+            .temp-graph-threshold-btn { margin-left:auto; }
+            .temp-threshold-pop { position:absolute; z-index:30; top:48px; right:52px; width:250px; padding:13px 14px; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 28px rgba(0,0,0,.25); }
+            .temp-threshold-row { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:9px 0 3px; }
+            .temp-threshold-label { font-size:11px; color:var(--text-2); }
+            .temp-threshold-value { font-size:11px; font-weight:600; }
+            .temp-threshold-range { width:100%; }
+            .temp-threshold-scope { display:flex; margin-top:5px; border:1px solid var(--border); border-radius:7px; overflow:hidden; }
+            .temp-threshold-scope button { flex:1; border:0; padding:6px 4px; background:transparent; color:var(--text-2); font-size:10px; cursor:pointer; }
+            .temp-threshold-scope button.active { background:var(--primary); color:#fff; }
+            .temp-threshold-apply { width:100%; margin-top:10px; padding:7px 10px; border:1px solid var(--success); border-radius:7px; background:color-mix(in srgb,var(--success) 18%,transparent); color:var(--success); font-weight:600; cursor:pointer; }
             .temp-graph-preset { 
                 font-family:inherit; 
                 font-size:11px; 
@@ -6759,7 +6779,7 @@ async function _loadSettingsNotifications() {
         if (!res.ok) throw new Error(await safeJsonDetail(res, 'Failed'));
         _notifCache = await res.json();
     } catch (_) {
-        _notifCache = { alerts_enabled: true, notify_geofence_exit: true, notify_battery_low: true, notify_offline: true, notify_hive_breach: true, notify_via_email: true };
+        _notifCache = { alerts_enabled: true, notify_geofence_exit: true, notify_battery_low: true, notify_offline: true, notify_hive_breach: true, notify_temperature: true, notify_via_email: true };
     }
     if (loading) loading.style.display = 'none';
     if (body)    body.style.display    = '';
@@ -6861,6 +6881,7 @@ function _renderNotifications(p) {
     setChk('notif-battery',  p.notify_battery_low);
     setChk('notif-offline',  p.notify_offline);
     setChk('notif-hive',     p.notify_hive_breach);
+    setChk('notif-temperature', p.notify_temperature);
     setChk('notif-email',    p.notify_via_email);
     const triggers = document.getElementById('notif-triggers');
     if (triggers) triggers.style.opacity = p.alerts_enabled ? '1' : '0.4';
@@ -6907,6 +6928,7 @@ async function settingsSaveNotifications() {
                 notify_battery_low:   getChk('notif-battery'),
                 notify_offline:       getChk('notif-offline'),
                 notify_hive_breach:   getChk('notif-hive'),
+                notify_temperature:   getChk('notif-temperature'),
                 notify_via_email:     getChk('notif-email'),
                 sms_enabled:          getChk('notif-sms-enabled'),
                 notify_geofence_sms:  getChk('notif-sms-geofence'),
@@ -16360,6 +16382,7 @@ function mhaOpenHelp() {
             </div>
             <div class="temp-graph-meta" id="temp-graph-meta"></div>
             <div class="temp-graph-spacer"></div>
+            <button class="btn btn-ghost btn-sm temp-graph-threshold-btn" id="temp-threshold-btn" type="button" aria-expanded="false" aria-label="Temperature thresholds"><i class="fa-solid fa-sliders"></i></button>
             <div style="display:flex; gap:5px;" id="temp-graph-presets"></div>
             <label class="temp-graph-smooth">
                 <input type="checkbox" id="temp-graph-smooth-toggle" checked>
@@ -16376,6 +16399,20 @@ function mhaOpenHelp() {
             <button class="temp-graph-close" onclick="closeTemperatureGraph()" aria-label="Close">
                 <i class="fa-solid fa-xmark"></i>
             </button>
+        </div>
+        <div class="temp-threshold-pop" id="temp-threshold-pop" role="dialog" aria-label="Temperature thresholds" hidden>
+            <div class="temp-threshold-row">
+                <label class="temp-threshold-label"><input type="checkbox" id="temp-threshold-enabled"> <span data-i18n="settings.temperature_monitoring">Enable monitoring</span></label>
+                <button class="temp-graph-close" id="temp-threshold-close" type="button" aria-label="Close">&times;</button>
+            </div>
+            <div class="temp-threshold-row"><span class="temp-threshold-label">High threshold</span><output class="temp-threshold-value" id="temp-threshold-high-value">35.0°C</output></div>
+            <input class="temp-threshold-range" id="temp-threshold-high" type="range" min="-15" max="45" step="0.5" value="35">
+            <div class="temp-threshold-row"><span class="temp-threshold-label">Low threshold</span><output class="temp-threshold-value" id="temp-threshold-low-value">2.0°C</output></div>
+            <input class="temp-threshold-range" id="temp-threshold-low" type="range" min="-15" max="45" step="0.5" value="2">
+            <div class="temp-threshold-label">Apply to</div>
+            <div class="temp-threshold-scope"><button type="button" class="active" data-temp-scope="tag">This tag only</button><button type="button" data-temp-scope="series5">All Series 5</button></div>
+            <button class="temp-threshold-apply" id="temp-threshold-apply" type="button">Apply thresholds</button>
+            <div id="temp-threshold-status" class="temp-threshold-label" style="margin-top:8px"></div>
         </div>
         
         <div id="temp-graph-loading" class="temp-graph-loading" style="display:none">
@@ -16474,6 +16511,8 @@ function mhaOpenHelp() {
     let _showAltitude = false;
     let _zoomView = null;
     let _dragState = null;
+    let _tempThresholdScope = 'tag';
+    let _tempThresholdConfig = {enabled: false, high_c: 35, low_c: 2};
     
     const GAP_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 hours
     const MIN_VIEW_MS = 5 * 60 * 1000; // 5 minutes minimum zoom
@@ -16658,6 +16697,32 @@ function mhaOpenHelp() {
             ctx.restore();
         }
     };
+
+    const temperatureThresholdPlugin = {
+        id: 'temperatureThresholds',
+        beforeDatasetsDraw(chart) {
+            if (!_tempThresholdConfig.enabled) return;
+            const {ctx, chartArea, scales} = chart;
+            if (!chartArea || !scales.y) return;
+            ctx.save();
+            [[_tempThresholdConfig.high_c, '#ef4444', 'High'], [_tempThresholdConfig.low_c, '#3b82f6', 'Low']].forEach(([value, color, label]) => {
+                const y = scales.y.getPixelForValue(value);
+                if (y < chartArea.top || y > chartArea.bottom) return;
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1.2;
+                ctx.setLineDash([6, 4]);
+                ctx.beginPath();
+                ctx.moveTo(chartArea.left, y);
+                ctx.lineTo(chartArea.right, y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = color;
+                ctx.font = '600 10px sans-serif';
+                ctx.fillText(`${label} ${Number(value).toFixed(1)}°C`, chartArea.left + 5, y - 4);
+            });
+            ctx.restore();
+        },
+    };
     
     // Initialize preset buttons
     function initPresets() {
@@ -16710,6 +16775,68 @@ function mhaOpenHelp() {
             }
         };
     }
+
+    function renderTemperatureThresholds() {
+        const config = _tempThresholdConfig;
+        const enabled = document.getElementById('temp-threshold-enabled');
+        const high = document.getElementById('temp-threshold-high');
+        const low = document.getElementById('temp-threshold-low');
+        if (!enabled || !high || !low) return;
+        enabled.checked = !!config.enabled;
+        high.value = config.high_c;
+        low.value = config.low_c;
+        document.getElementById('temp-threshold-high-value').textContent = `${Number(config.high_c).toFixed(1)}°C`;
+        document.getElementById('temp-threshold-low-value').textContent = `${Number(config.low_c).toFixed(1)}°C`;
+        high.disabled = low.disabled = !config.enabled;
+    }
+
+    async function loadTemperatureThresholds() {
+        try {
+            const response = await apiFetch(`/api/portal/tags/${_tempGraphTagId}/temperature-thresholds`);
+            if (response.ok) _tempThresholdConfig = await response.json();
+        } catch (error) {
+            console.warn('[TEMP GRAPH] Failed to load thresholds:', error);
+        }
+        renderTemperatureThresholds();
+        if (_tempGraphChart) _tempGraphChart.update();
+    }
+
+    function initTemperatureThresholds() {
+        const button = document.getElementById('temp-threshold-btn');
+        const popup = document.getElementById('temp-threshold-pop');
+        const enabled = document.getElementById('temp-threshold-enabled');
+        const high = document.getElementById('temp-threshold-high');
+        const low = document.getElementById('temp-threshold-low');
+        if (!button || !popup || !enabled || !high || !low || button.dataset.bound) return;
+        button.dataset.bound = 'true';
+        const update = () => {
+            let highValue = Number(high.value);
+            let lowValue = Number(low.value);
+            if (lowValue >= highValue) {
+                if (document.activeElement === low) lowValue = highValue - 1;
+                else highValue = lowValue + 1;
+            }
+            _tempThresholdConfig = {enabled: enabled.checked, high_c: highValue, low_c: lowValue};
+            renderTemperatureThresholds();
+        };
+        button.onclick = event => { event.stopPropagation(); popup.hidden = !popup.hidden; button.setAttribute('aria-expanded', String(!popup.hidden)); if (!popup.hidden) loadTemperatureThresholds(); };
+        document.getElementById('temp-threshold-close').onclick = () => { popup.hidden = true; button.setAttribute('aria-expanded', 'false'); };
+        [enabled, high, low].forEach(input => input.addEventListener('input', update));
+        popup.querySelectorAll('[data-temp-scope]').forEach(scopeButton => scopeButton.onclick = () => {
+            _tempThresholdScope = scopeButton.dataset.tempScope;
+            popup.querySelectorAll('[data-temp-scope]').forEach(item => item.classList.toggle('active', item === scopeButton));
+        });
+        document.getElementById('temp-threshold-apply').onclick = async () => {
+            const response = await apiFetch(`/api/portal/tags/${_tempGraphTagId}/temperature-thresholds`, {
+                method: 'PUT', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({..._tempThresholdConfig, scope: _tempThresholdScope, skip_configured: true}),
+            });
+            const status = document.getElementById('temp-threshold-status');
+            if (!response.ok) { status.textContent = 'Could not save thresholds.'; return; }
+            const result = await response.json();
+            status.textContent = `${result.updated} tag${result.updated === 1 ? '' : 's'} updated.`;
+        };
+    }
     
     // Toggle temperature graph panel
     window.toggleTemperatureGraph = function(imei, tagName) {
@@ -16743,11 +16870,13 @@ function mhaOpenHelp() {
         // Initialize presets and toggles
         initPresets();
         initToggles();
+        initTemperatureThresholds();
         
         // Show panel (slides up from bottom)
         const panel = document.getElementById('temp-graph-panel');
         panel.classList.add('open');
         _tempGraphOpen = true;
+        loadTemperatureThresholds();
         
         // Adjust map area height to make room for graph (50-50 split)
         const mapArea = document.querySelector('#tab-livemap .map-area');
@@ -16892,7 +17021,7 @@ function mhaOpenHelp() {
         
         // Register plugin
         if (!Chart.registry.plugins.get('gapBands')) {
-            Chart.register(gapBandPlugin);
+            Chart.register(gapBandPlugin, temperatureThresholdPlugin);
         }
         
         // Prepare datasets
