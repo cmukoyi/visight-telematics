@@ -16698,6 +16698,141 @@ function mhaOpenHelp() {
         }
     };
 
+    const TEMP_OVERVIEW_EDGE_PX = 7;
+
+    function temperatureOverviewMetrics() {
+        const wrap = document.getElementById('temp-graph-ov-wrap');
+        const rect = wrap.getBoundingClientRect();
+        const points = _tempGraphData || [];
+        const span = {from: points[0]?.x || 0, to: points[points.length - 1]?.x || 1};
+        const view = _zoomView || span;
+        const width = Math.max(1, rect.width);
+        const toX = time => ((time - span.from) / Math.max(1, span.to - span.from)) * width;
+        const toTime = x => span.from + (Math.min(width, Math.max(0, x)) / width) * (span.to - span.from);
+        return {rect, span, view, width, height: rect.height, toX, toTime};
+    }
+
+    function clampTemperatureView(from, to, span) {
+        const minimum = MIN_VIEW_MS;
+        let start = from;
+        let end = to;
+        if (end - start < minimum) {
+            const middle = (start + end) / 2;
+            start = middle - minimum / 2;
+            end = middle + minimum / 2;
+        }
+        if (start < span.from) { end += span.from - start; start = span.from; }
+        if (end > span.to) { start -= end - span.to; end = span.to; }
+        return {from: Math.max(span.from, start), to: Math.min(span.to, end)};
+    }
+
+    function drawTemperatureOverview() {
+        const canvas = document.getElementById('temp-graph-ov-canvas');
+        const wrap = document.getElementById('temp-graph-ov-wrap');
+        const points = _tempGraphData || [];
+        if (!canvas || !wrap || points.length < 1) return;
+        const metrics = temperatureOverviewMetrics();
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.round(metrics.width * dpr);
+        canvas.height = Math.round(metrics.height * dpr);
+        const ctx = canvas.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, metrics.width, metrics.height);
+        if (points.length > 1) {
+            const values = points.map(point => point.temp).filter(value => value != null);
+            const low = Math.min(...values);
+            const high = Math.max(...values);
+            const range = Math.max(0.1, high - low);
+            const y = value => metrics.height - 3 - ((value - low) / range) * Math.max(1, metrics.height - 8);
+            const step = Math.max(1, Math.floor(points.length / metrics.width));
+            ctx.beginPath();
+            for (let index = 0; index < points.length; index += step) {
+                const point = points[index];
+                const x = metrics.toX(point.x);
+                index === 0 ? ctx.moveTo(x, y(point.temp)) : ctx.lineTo(x, y(point.temp));
+            }
+            ctx.strokeStyle = 'rgba(34, 197, 94, .65)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+        const left = metrics.toX(metrics.view.from);
+        const right = metrics.toX(metrics.view.to);
+        ctx.fillStyle = 'rgba(15, 23, 42, .42)';
+        ctx.fillRect(0, 0, left, metrics.height);
+        ctx.fillRect(right, 0, metrics.width - right, metrics.height);
+        ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--success').trim() || '#22c55e';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(left + .5, .5, Math.max(1, right - left - 1), metrics.height - 1);
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--success').trim() || '#22c55e';
+        [left, right].forEach(edge => ctx.fillRect(Math.min(metrics.width - 3, Math.max(0, edge - 1.5)), metrics.height / 2 - 7, 3, 14));
+        wrap.setAttribute('role', 'slider');
+        wrap.setAttribute('aria-valuenow', String(Math.round(((metrics.view.from - metrics.span.from) / Math.max(1, metrics.span.to - metrics.span.from)) * 100)));
+        document.getElementById('temp-graph-reset')?.classList.toggle('show', !!_zoomView);
+    }
+
+    function applyTemperatureView(nextView) {
+        _zoomView = nextView;
+        const view = _zoomView || temperatureOverviewMetrics().span;
+        if (_tempGraphChart?.options?.scales?.x) {
+            _tempGraphChart.options.scales.x.min = view.from;
+            _tempGraphChart.options.scales.x.max = view.to;
+            _tempGraphChart.update('none');
+        }
+        if (_tempGraphData) updateStats(_tempGraphData, _tempGraphGaps);
+        drawTemperatureOverview();
+    }
+
+    function initTemperatureOverview() {
+        const wrap = document.getElementById('temp-graph-ov-wrap');
+        if (!wrap || wrap.dataset.bound) return;
+        wrap.dataset.bound = 'true';
+        wrap.addEventListener('pointerdown', event => {
+            const metrics = temperatureOverviewMetrics();
+            const x = event.clientX - metrics.rect.left;
+            const left = metrics.toX(metrics.view.from);
+            const right = metrics.toX(metrics.view.to);
+            let mode;
+            if (Math.abs(x - left) <= TEMP_OVERVIEW_EDGE_PX) mode = 'left';
+            else if (Math.abs(x - right) <= TEMP_OVERVIEW_EDGE_PX) mode = 'right';
+            else if (x > left && x < right) mode = 'pan';
+            else {
+                const width = metrics.view.to - metrics.view.from;
+                const center = metrics.toTime(x);
+                applyTemperatureView(clampTemperatureView(center - width / 2, center + width / 2, metrics.span));
+                mode = 'pan';
+            }
+            _dragState = {mode, startX: x, from: metrics.view.from, to: metrics.view.to};
+            wrap.setPointerCapture(event.pointerId);
+            event.preventDefault();
+        });
+        wrap.addEventListener('pointermove', event => {
+            if (!_dragState) return;
+            const metrics = temperatureOverviewMetrics();
+            const x = event.clientX - metrics.rect.left;
+            const delta = (x - _dragState.startX) / metrics.width * (metrics.span.to - metrics.span.from);
+            if (_dragState.mode === 'pan') applyTemperatureView(clampTemperatureView(_dragState.from + delta, _dragState.to + delta, metrics.span));
+            else if (_dragState.mode === 'left') applyTemperatureView(clampTemperatureView(Math.min(_dragState.from + delta, _dragState.to - MIN_VIEW_MS), _dragState.to, metrics.span));
+            else applyTemperatureView(clampTemperatureView(_dragState.from, Math.max(_dragState.to + delta, _dragState.from + MIN_VIEW_MS), metrics.span));
+        });
+        ['pointerup', 'pointercancel'].forEach(type => wrap.addEventListener(type, event => {
+            _dragState = null;
+            try { wrap.releasePointerCapture(event.pointerId); } catch (_) {}
+        }));
+        wrap.addEventListener('dblclick', () => applyTemperatureView(null));
+        wrap.addEventListener('keydown', event => {
+            const metrics = temperatureOverviewMetrics();
+            const width = metrics.view.to - metrics.view.from;
+            const step = width * .15;
+            if (event.key === 'ArrowLeft') applyTemperatureView(clampTemperatureView(metrics.view.from - step, metrics.view.to - step, metrics.span));
+            else if (event.key === 'ArrowRight') applyTemperatureView(clampTemperatureView(metrics.view.from + step, metrics.view.to + step, metrics.span));
+            else if (event.key === 'Home') applyTemperatureView(null);
+            else return;
+            event.preventDefault();
+        });
+        document.getElementById('temp-graph-reset')?.addEventListener('click', () => applyTemperatureView(null));
+        window.addEventListener('resize', drawTemperatureOverview);
+    }
+
     const temperatureThresholdPlugin = {
         id: 'temperatureThresholds',
         beforeDatasetsDraw(chart) {
@@ -16871,6 +17006,7 @@ function mhaOpenHelp() {
         initPresets();
         initToggles();
         initTemperatureThresholds();
+        initTemperatureOverview();
         
         // Show panel (slides up from bottom)
         const panel = document.getElementById('temp-graph-panel');
@@ -16987,6 +17123,7 @@ function mhaOpenHelp() {
             // Store data and build chart
             _tempGraphData = data.points;
             buildChart(_tempGraphData);
+            drawTemperatureOverview();
             
         } catch (err) {
             console.error('[TEMP GRAPH] Error loading data:', err);
@@ -17020,9 +17157,8 @@ function mhaOpenHelp() {
         const visibleGaps = _tempGraphGaps;
         
         // Register plugin
-        if (!Chart.registry.plugins.get('gapBands')) {
-            Chart.register(gapBandPlugin, temperatureThresholdPlugin);
-        }
+        if (!Chart.registry.plugins.get('gapBands')) Chart.register(gapBandPlugin);
+        if (!Chart.registry.plugins.get('temperatureThresholds')) Chart.register(temperatureThresholdPlugin);
         
         // Prepare datasets
         const smoothOn = document.getElementById('temp-graph-smooth-toggle')?.checked ?? true;
@@ -17121,8 +17257,8 @@ function mhaOpenHelp() {
                 scales: {
                     x: {
                         type: 'linear',
-                        min: points[0].x,
-                        max: points[points.length - 1].x,
+                        min: _zoomView ? _zoomView.from : points[0].x,
+                        max: _zoomView ? _zoomView.to : points[points.length - 1].x,
                         grid: {color: 'rgba(0,0,0,0.05)'},
                         ticks: {
                             maxRotation: 0,
@@ -17159,6 +17295,7 @@ function mhaOpenHelp() {
         
         // Show gap legend if needed
         document.getElementById('temp-graph-gap-legend').style.display = _tempGraphGaps.length > 0 ? 'flex' : 'none';
+        drawTemperatureOverview();
         
         console.log('[TEMP GRAPH] Chart created successfully');
     }
