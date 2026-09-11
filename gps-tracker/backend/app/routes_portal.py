@@ -9,9 +9,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from datetime import datetime, timedelta, timezone
 from time import perf_counter
-from typing import List, Optional
+from typing import List, Optional, Literal
 from uuid import UUID
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 import jwt
 import os
 import secrets
@@ -1674,6 +1674,7 @@ class NotificationPrefsOut(BaseModel):
     notify_battery_low: bool
     notify_offline: bool
     notify_hive_breach: bool = True
+    notify_temperature: bool = True
     notify_via_email: bool
     notification_emails: Optional[List[str]] = None   # extra notification addresses
     # SMS
@@ -1696,6 +1697,7 @@ class NotificationPrefsUpdate(BaseModel):
     notify_battery_low: Optional[bool] = None
     notify_offline: Optional[bool] = None
     notify_hive_breach: Optional[bool] = None
+    notify_temperature: Optional[bool] = None
     notify_via_email: Optional[bool] = None
     notification_emails: Optional[List[str]] = None   # None = do not change; [] = clear all extra
     # SMS
@@ -1735,6 +1737,8 @@ def update_notification_prefs(
         me.notify_offline = data.notify_offline
     if data.notify_hive_breach is not None:
         me.notify_hive_breach = data.notify_hive_breach
+    if data.notify_temperature is not None:
+        me.notify_temperature = data.notify_temperature
     if data.notify_via_email is not None:
         me.notify_via_email = data.notify_via_email
     if data.notification_emails is not None:
@@ -2989,6 +2993,90 @@ class PortalTripsRequest(BaseModel):
     vehicleId: str
     startDate: str   # ISO 8601 UTC e.g. "2025-10-01T07:00:00Z"
     endDate: str     # ISO 8601 UTC e.g. "2025-10-01T18:00:59Z"
+
+
+class TemperatureThresholdUpdate(BaseModel):
+    enabled: bool
+    high_c: float = Field(ge=-14, le=45)
+    low_c: float = Field(ge=-15, le=44)
+    scope: Literal["tag", "series5"] = "tag"
+    skip_configured: bool = True
+
+
+def _temperature_tag_access(db: Session, request: Request, tag_id: str):
+    """Return the current group and tag after applying portal ownership rules."""
+    current_user = get_portal_user_from_request(request, db)
+    tag = db.query(BLETag).filter(BLETag.id == tag_id).first()
+    group = db.query(UserGroup).filter(UserGroup.id == current_user.usergroup_id).first()
+    if not tag or not group:
+        raise HTTPException(status_code=404, detail="Tag not found")
+
+    domains = _domains(group)
+    domain_user_ids = [str(uid) for (uid,) in db.query(User.id).filter(_domain_filter(domains)).all()] if domains else []
+    portal_user_ids = [str(uid) for (uid,) in db.query(User.id)
+                       .join(PortalUser, User.email == PortalUser.email)
+                       .filter(PortalUser.usergroup_id == current_user.usergroup_id).all()]
+    owner_id = str(tag.user_id) if tag.user_id else None
+    created_by_group = (tag.attributes or {}).get("_created_usergroup_id") == str(group.id)
+    if owner_id not in set(domain_user_ids + portal_user_ids) and not created_by_group:
+        raise HTTPException(status_code=403, detail="Access denied - tag not owned by your organization")
+    if tag.tag_type not in ["series_5", "series5", "hubble"]:
+        raise HTTPException(status_code=400, detail="Temperature thresholds require a Series 5 tag")
+    return current_user, group, tag
+
+
+@router.get("/tags/{tag_id}/temperature-thresholds")
+def get_temperature_thresholds(tag_id: str, request: Request, db: Session = Depends(get_db)):
+    _, _, tag = _temperature_tag_access(db, request, tag_id)
+    config = (tag.attributes or {}).get("_temperature_monitoring") or {}
+    return {
+        "enabled": bool(config.get("enabled", False)),
+        "high_c": float(config.get("high_c", 35)),
+        "low_c": float(config.get("low_c", 2)),
+    }
+
+
+@router.put("/tags/{tag_id}/temperature-thresholds")
+def update_temperature_thresholds(
+    tag_id: str,
+    data: TemperatureThresholdUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    _, group, tag = _temperature_tag_access(db, request, tag_id)
+    if data.low_c >= data.high_c:
+        raise HTTPException(status_code=400, detail="Low threshold must be below high threshold")
+
+    targets = [tag]
+    if data.scope == "series5":
+        group_id = str(group.id)
+        domains = _domains(group)
+        domain_user_ids = [uid for (uid,) in db.query(User.id).filter(_domain_filter(domains)).all()] if domains else []
+        portal_user_ids = [uid for (uid,) in db.query(User.id)
+                           .join(PortalUser, User.email == PortalUser.email)
+                           .filter(PortalUser.usergroup_id == group.id).all()]
+        owner_ids = set(domain_user_ids + portal_user_ids)
+        candidates = db.query(BLETag).filter(BLETag.tag_type.in_(["series_5", "series5", "hubble"])).all()
+        targets = [candidate for candidate in candidates if (
+            str(candidate.user_id) in {str(owner_id) for owner_id in owner_ids}
+            or (candidate.attributes or {}).get("_created_usergroup_id") == group_id
+        )]
+
+    changed = 0
+    for target in targets:
+        existing = (target.attributes or {}).get("_temperature_monitoring")
+        if data.scope == "series5" and data.skip_configured and isinstance(existing, dict) and existing.get("enabled"):
+            continue
+        attrs = dict(target.attributes or {})
+        attrs["_temperature_monitoring"] = {
+            "enabled": data.enabled,
+            "high_c": data.high_c,
+            "low_c": data.low_c,
+        }
+        target.attributes = attrs
+        changed += 1
+    db.commit()
+    return {"enabled": data.enabled, "high_c": data.high_c, "low_c": data.low_c, "updated": changed}
 
 
 @router.get("/tags/{tag_id}/temperature")

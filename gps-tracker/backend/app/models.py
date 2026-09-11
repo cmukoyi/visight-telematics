@@ -466,6 +466,7 @@ class PortalUser(Base):
     notify_battery_low   = Column(Boolean, nullable=False, default=True)
     notify_offline       = Column(Boolean, nullable=False, default=True)
     notify_hive_breach   = Column(Boolean, nullable=False, default=True)
+    notify_temperature    = Column(Boolean, nullable=False, default=True)
     notify_via_email     = Column(Boolean, nullable=False, default=True)
     notification_emails  = Column(JSON, nullable=True)               # extra notification addresses (list of strings)
     # SMS notification preferences

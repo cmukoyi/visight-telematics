@@ -25,6 +25,7 @@ OFFLINE_THRESHOLD_DAYS = 7          # days with no last_seen
 ALERT_RETENTION_DAYS = 7            # purge alerts older than this
 BATTERY_DEDUPE_HOURS = 24           # re-raise battery alert at most once per day
 OFFLINE_DEDUPE_HOURS = 24           # same for offline
+TEMPERATURE_DEDUPE_HOURS = 6        # avoid repeating a persistent breach
 
 
 def _tag_label(tag: BLETag) -> str:
@@ -128,7 +129,60 @@ _NOTIFY_FLAG = {
     "gdpr_deletion_warning": "alerts_enabled",         # always send if alerts are on
     "hive_breach":           "notify_hive_breach",
     "hive_breach_cleared":   "notify_hive_breach",
+    "temperature_high":      "notify_temperature",
+    "temperature_low":       "notify_temperature",
 }
+
+
+def _group_has_temperature_subscriber(db: Session, usergroup_id: str) -> bool:
+    """Return whether an active group member opted into temperature alerts."""
+    import uuid as _uuid
+    try:
+        group_id = _uuid.UUID(usergroup_id)
+    except (ValueError, TypeError):
+        return False
+    return db.query(PortalUser).filter(
+        PortalUser.usergroup_id == group_id,
+        PortalUser.is_active == True,
+        PortalUser.alerts_enabled == True,
+        PortalUser.notify_temperature == True,
+    ).first() is not None
+
+
+def check_temperature_alert(db: Session, tag: BLETag, temperature_c: float) -> bool:
+    """Create a deduplicated alert when a tag crosses its configured limit."""
+    config = (tag.attributes or {}).get("_temperature_monitoring")
+    if not isinstance(config, dict) or not config.get("enabled"):
+        return False
+    try:
+        high_c = float(config["high_c"])
+        low_c = float(config["low_c"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    if low_c < temperature_c < high_c:
+        return False
+
+    alert_type = "temperature_high" if temperature_c >= high_c else "temperature_low"
+    boundary = high_c if alert_type == "temperature_high" else low_c
+    group_ids = _groups_for_tag(db, tag)
+    label = _tag_label(tag)
+    tag_id = str(tag.id)
+    created = False
+    for usergroup_id in group_ids:
+        if not _group_has_temperature_subscriber(db, usergroup_id):
+            continue
+        if _recent_alert_exists(db, usergroup_id, tag_id, alert_type, TEMPERATURE_DEDUPE_HOURS):
+            continue
+        direction = "above" if alert_type == "temperature_high" else "below"
+        title = f"Temperature {direction} threshold — {label}"
+        message = f"{label} reported {temperature_c:.1f}°C, {direction} the configured limit of {boundary:.1f}°C."
+        meta = {"temperature_c": temperature_c, "threshold_c": boundary, "imei": tag.imei}
+        create_alert(db, usergroup_id, tag_id, alert_type, title, message, meta)
+        _notify_group_by_email(db, usergroup_id, alert_type, title, message, meta)
+        _notify_group_by_sms(db, usergroup_id, alert_type, title, message)
+        created = True
+        logger.info("Temperature %s alert created for tag %s -> group %s", alert_type, tag.imei, usergroup_id)
+    return created
 
 
 def _notify_group_by_sms(db: Session, usergroup_id: str, alert_type: str,
