@@ -16511,6 +16511,8 @@ function mhaOpenHelp() {
     let _showAltitude = false;
     let _zoomView = null;
     let _dragState = null;
+    let _temperatureSelection = null;
+    let _temperatureSelectionDrag = null;
     let _tempThresholdScope = 'tag';
     let _tempThresholdConfig = {enabled: false, high_c: 35, low_c: 2};
     
@@ -16608,9 +16610,10 @@ function mhaOpenHelp() {
     function updateStats(points, gaps) {
         if (!points || points.length === 0) return;
         
-        const viewFrom = _zoomView ? _zoomView.from : points[0].x;
-        const viewTo = _zoomView ? _zoomView.to : points[points.length - 1].x;
+        const viewFrom = _temperatureSelection ? _temperatureSelection.from : (_zoomView ? _zoomView.from : points[0].x);
+        const viewTo = _temperatureSelection ? _temperatureSelection.to : (_zoomView ? _zoomView.to : points[points.length - 1].x);
         const stats = calculateStats(points, gaps, viewFrom, viewTo);
+        document.getElementById('temp-graph-stats')?.classList.toggle('scoped', !!_temperatureSelection);
         
         // Temperature
         const tempEl = document.getElementById('temp-stat-temp');
@@ -16698,6 +16701,31 @@ function mhaOpenHelp() {
         }
     };
 
+    const temperatureSelectionPlugin = {
+        id: 'temperatureSelection',
+        afterDatasetsDraw(chart) {
+            const selection = _temperatureSelectionDrag || _temperatureSelection;
+            if (!selection) return;
+            const {ctx, chartArea, scales} = chart;
+            if (!chartArea || !scales.x) return;
+            const left = Math.max(chartArea.left, scales.x.getPixelForValue(Math.min(selection.from, selection.to)));
+            const right = Math.min(chartArea.right, scales.x.getPixelForValue(Math.max(selection.from, selection.to)));
+            if (right <= left) return;
+            ctx.save();
+            ctx.fillStyle = 'rgba(127, 164, 255, 0.16)';
+            ctx.fillRect(left, chartArea.top, right - left, chartArea.bottom - chartArea.top);
+            ctx.strokeStyle = 'rgba(233, 240, 255, 0.9)';
+            ctx.lineWidth = 1.5;
+            [left, right].forEach(edge => {
+                ctx.beginPath();
+                ctx.moveTo(edge + 0.5, chartArea.top);
+                ctx.lineTo(edge + 0.5, chartArea.bottom);
+                ctx.stroke();
+            });
+            ctx.restore();
+        },
+    };
+
     const TEMP_OVERVIEW_EDGE_PX = 7;
 
     function temperatureOverviewMetrics() {
@@ -16780,6 +16808,78 @@ function mhaOpenHelp() {
         }
         if (_tempGraphData) updateStats(_tempGraphData, _tempGraphGaps);
         drawTemperatureOverview();
+    }
+
+    function temperatureChartTime(clientX) {
+        const chart = _tempGraphChart;
+        const canvas = document.getElementById('temp-graph-canvas');
+        if (!chart || !canvas || !chart.scales.x) return null;
+        const rect = canvas.getBoundingClientRect();
+        const pixel = Math.min(chart.chartArea.right, Math.max(chart.chartArea.left, clientX - rect.left));
+        return chart.scales.x.getValueForPixel(pixel);
+    }
+
+    function renderTemperatureSelection() {
+        if (_tempGraphChart) _tempGraphChart.render();
+    }
+
+    function clearTemperatureSelection() {
+        if (!_temperatureSelection && !_temperatureSelectionDrag) return;
+        _temperatureSelection = null;
+        _temperatureSelectionDrag = null;
+        updateStats(_tempGraphData, _tempGraphGaps);
+        renderTemperatureSelection();
+    }
+
+    function setTemperatureTooltipEnabled(enabled) {
+        const tooltip = _tempGraphChart?.options?.plugins?.tooltip;
+        if (tooltip) tooltip.enabled = enabled;
+    }
+
+    function initTemperatureChartSelection() {
+        const canvas = document.getElementById('temp-graph-canvas');
+        if (!canvas || canvas.dataset.selectionBound) return;
+        canvas.dataset.selectionBound = 'true';
+        canvas.addEventListener('pointerdown', event => {
+            const time = temperatureChartTime(event.clientX);
+            if (time == null) return;
+            _temperatureSelectionDrag = {startX: event.clientX, startTime: time, moved: false};
+            setTemperatureTooltipEnabled(false);
+            try { canvas.setPointerCapture(event.pointerId); } catch (_) {}
+        });
+        canvas.addEventListener('pointermove', event => {
+            if (!_temperatureSelectionDrag) return;
+            if (Math.abs(event.clientX - _temperatureSelectionDrag.startX) > 4) _temperatureSelectionDrag.moved = true;
+            if (!_temperatureSelectionDrag.moved) return;
+            const time = temperatureChartTime(event.clientX);
+            if (time == null) return;
+            _temperatureSelectionDrag.currentTime = time;
+            _temperatureSelectionDrag.band = {
+                from: Math.min(_temperatureSelectionDrag.startTime, time),
+                to: Math.max(_temperatureSelectionDrag.startTime, time),
+            };
+            renderTemperatureSelection();
+        });
+        const finishSelection = event => {
+            if (!_temperatureSelectionDrag) return;
+            const drag = _temperatureSelectionDrag;
+            const travel = Math.abs((event.clientX || drag.startX) - drag.startX);
+            _temperatureSelectionDrag = null;
+            setTemperatureTooltipEnabled(true);
+            try { canvas.releasePointerCapture(event.pointerId); } catch (_) {}
+            if (travel < 8 || !drag.band || drag.band.to - drag.band.from < 60000) {
+                clearTemperatureSelection();
+                return;
+            }
+            _temperatureSelection = drag.band;
+            updateStats(_tempGraphData, _tempGraphGaps);
+            renderTemperatureSelection();
+        };
+        canvas.addEventListener('pointerup', finishSelection);
+        canvas.addEventListener('pointercancel', finishSelection);
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && !_temperatureSelectionDrag) clearTemperatureSelection();
+        });
     }
 
     function initTemperatureOverview() {
@@ -17007,6 +17107,7 @@ function mhaOpenHelp() {
         initToggles();
         initTemperatureThresholds();
         initTemperatureOverview();
+        initTemperatureChartSelection();
         
         // Show panel (slides up from bottom)
         const panel = document.getElementById('temp-graph-panel');
@@ -17061,6 +17162,8 @@ function mhaOpenHelp() {
         _tempGraphData = null;
         _tempGraphGaps = [];
         _zoomView = null;
+        _temperatureSelection = null;
+        _temperatureSelectionDrag = null;
     };
 
     window.isTemperatureGraphOpen = () => _tempGraphOpen;
@@ -17122,6 +17225,7 @@ function mhaOpenHelp() {
             
             // Store data and build chart
             _tempGraphData = data.points;
+            _temperatureSelection = null;
             buildChart(_tempGraphData);
             drawTemperatureOverview();
             
@@ -17159,6 +17263,7 @@ function mhaOpenHelp() {
         // Register plugin
         if (!Chart.registry.plugins.get('gapBands')) Chart.register(gapBandPlugin);
         if (!Chart.registry.plugins.get('temperatureThresholds')) Chart.register(temperatureThresholdPlugin);
+        if (!Chart.registry.plugins.get('temperatureSelection')) Chart.register(temperatureSelectionPlugin);
         
         // Prepare datasets
         const smoothOn = document.getElementById('temp-graph-smooth-toggle')?.checked ?? true;
