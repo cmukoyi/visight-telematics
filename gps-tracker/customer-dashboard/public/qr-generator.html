@@ -705,6 +705,7 @@ let qrLanguage = new URLSearchParams(window.location.search).get('lang') || 'en'
 function qrT(key, fallback) {
   try {
     if (qrLanguage === 'fr' && QR_FRENCH_TRANSLATIONS[key]) return QR_FRENCH_TRANSLATIONS[key];
+    if (qrLanguage === 'en') return QR_TRANSLATIONS[key] || fallback;
     return window.parent !== window && typeof window.parent.t === 'function'
       ? window.parent.t(key, fallback)
       : fallback;
