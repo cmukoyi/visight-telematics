@@ -2282,6 +2282,10 @@ class TripEngine:
                     if self.context.journey_just_created:
                         result['journey_created'] = True
                 self.context.leg_buffer = []
+                # Closing the ground leg and opening the air leg are two distinct
+                # legs from one incoming point — clear the guard so the air leg
+                # below isn't rejected as a re-entrant duplicate.
+                self.context.leg_persisted_this_invocation = False
 
             # Create air leg (endpoints = last pre-silence & first post-silence)
             air_leg_buffer = [
