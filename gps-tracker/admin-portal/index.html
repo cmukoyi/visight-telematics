@@ -8372,7 +8372,7 @@ dashboard.welcome,Bienvenue</pre>
             });
 
             // Update checkboxes
-            ['livemap', 'history', 'history-advanced', 'alerts', 'geofences', 'reports', 'management', 'floorplan', 'settings', 'hive', 'developers'].forEach(feature => {
+            ['livemap', 'history', 'history-advanced', 'alerts', 'geofences', 'reports', 'management', 'floorplan', 'settings', 'hive', 'developers', 'temperature-graph', 'hubble'].forEach(feature => {
                 const checkbox = document.getElementById(`tf_${feature}`);
                 if (checkbox) {
                     checkbox.checked = enabledMap[feature] !== false; // Default to true if missing
