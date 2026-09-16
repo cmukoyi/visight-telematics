@@ -55,9 +55,8 @@ Rules:
     - Journey grouping: 30 min dwell threshold
 
 Filters:
-    - Outlier gate: > 200 km/h → classify by 3-part AND
-    - Air legs: ≥ 300 km/h AND ≥ 150 km AND multi-hour gap (validated on real flights)
-    - GPS glitches: > 200 km/h but < 150 km → discard
+    - Flight detection: airport-pair + displacement + gap (primary), implied speed >200 km/h (backup)
+    - Bad-fix ceiling: > 1000 km/h → discard, not a flight
     - Median smoothing: window 3 on lat/lng
     - Gap policy: spatial jump = unknown-path leg, temporal gap = long stationary
 
@@ -93,11 +92,12 @@ from app.models import (
     TripConfig,
     BLETag,
 )
+from app.services.airport_lookup import near_commercial_airport
 
 logger = logging.getLogger(__name__)
 
 # ── Engine Version (v2.2.0 - Fix Register) ────────────────────────────────
-ENGINE_VERSION = "2.1.25"  # v2.1.25: Fix rebuild loop - only query orphaned positions AFTER last_processed_at
+ENGINE_VERSION = "2.1.26"  # v2.1.26: Signature-based flight detection (airport-pair + displacement + gap, not speed-only)
 
 # ── Verbose Debug Logging for Specific Devices ────────────────────────────
 VERBOSE_DEBUG_DEVICES = {
@@ -130,6 +130,17 @@ DEFAULT_DEDUPE_WINDOW_S = 60  # R5: Deduplication time window
 
 # v2.1.6 B3: Air leg gate parameters
 DEFAULT_AIR_MIN_GAP_MIN = 60  # B3: Minimum gap in minutes for air leg classification
+
+# ── Flight (air journey) detection — signature-based, not speed-only ──────
+# A real flight goes dark in the air, so it shows LOW implied speed across a
+# large displacement; primary trigger is airport-pair + displacement + gap,
+# with implied speed retained only as a backup. See
+# features_dev/trip-engine-flight-detection.md for the design rationale.
+FLIGHT_MIN_DISP_KM = 300     # min great-circle displacement to consider a flight
+FLIGHT_MIN_GAP_H = 0.75      # min gap duration (45 min) for the primary trigger
+AIRPORT_RADIUS_KM = 5        # how near an endpoint must be to a commercial airport
+FLIGHT_MIN_KMH = 200         # backup implied-speed threshold (unchanged from today)
+MAX_AIR_SPEED_KMH = 1000     # sanity ceiling — above this is a bad fix, not a flight
 
 # ═══════════════════════════════════════════════════════════════════════════
 # WEBHOOK DEVICE PROFILE (Minew E9/MST03/MTB02)
@@ -2229,70 +2240,70 @@ class TripEngine:
         if time_diff_seconds > 0:
             implied_speed_kmh = (distance_m / time_diff_seconds) * 3.6
         
-        # Step 1: Outlier/air gate (spec Section 2.3, 2.4a)
-        # v2.1.6 B3: Compare KILOMETRES to AIR_MIN_KM (not metres!)
-        if implied_speed_kmh > self.config.max_speed_kmh:
-            # v2.1.6 B3: 3-part AND for air leg classification (prevents discarding real flights)
-            # Spec 2.4a: "glitches are fast but short (sub-100 km, sub-minute)"
-            distance_km = distance_m / 1000
-            time_diff_min = time_diff_seconds / 60  # B3: Use minutes
-            
-            is_air_speed = implied_speed_kmh >= self.config.air_speed_kmh  # ≥300 km/h
-            is_air_distance = distance_km >= self.config.air_min_distance_km  # B3: ≥150 km (KILOMETRES!)
-            is_air_gap = time_diff_min >= self.config.air_min_gap_min  # B3: ≥60 min (replaces "multi-hour")
-            
-            if is_air_speed and is_air_distance and is_air_gap:
-                # AIR LEG: All 3 conditions met (validated on Dublin⇄Split flights)
-                logger.info(
-                    "✈️  IMEI %s: Air leg detected: %.0f km @ %.0f km/h over %.1f min gap",
-                    self.device_imei, distance_km, implied_speed_kmh, time_diff_min
-                )
-                
-                # If in MOVE state, close current leg first
-                if self.context.current_state == "MOVE" and len(self.context.leg_buffer) >= 2:
-                    leg = self._create_leg(self.context.leg_buffer, is_air_leg=False)
-                    if leg:
-                        result['leg_created'] = True
-                        if self.context.journey_just_created:
-                            result['journey_created'] = True
-                    self.context.leg_buffer = []
-                
-                # Create air leg (endpoints = last pre-silence & first post-silence)
-                air_leg_buffer = [
-                    (self.context.last_position_lat, self.context.last_position_lng, 
-                     self.context.last_position_time, self.context.last_position_id),
-                    (lat, lng, observed_at, position_id)
-                ]
-                air_leg = self._create_leg(air_leg_buffer, is_air_leg=True)
-                if air_leg:
+        # Step 1: Flight (air journey) detection — signature-based, not speed-only.
+        # A real flight goes dark in the air, so it shows LOW implied speed across a
+        # large displacement; the primary trigger is airport-pair + displacement + gap,
+        # with implied speed retained only as a backup for airports outside the dataset.
+        # Runs before gap bridging so a webhook device never draws a flight as a drive.
+        distance_km = distance_m / 1000
+        gap_h = time_diff_seconds / 3600
+        time_diff_min = time_diff_seconds / 60
+
+        if implied_speed_kmh > MAX_AIR_SPEED_KMH:
+            # Sanity ceiling — faster than any airliner, so this is a bad GPS fix
+            logger.warning(
+                "⚠️  IMEI %s: Bad GPS fix discarded: %.0f km @ %.0f km/h (exceeds %.0f km/h sanity ceiling)",
+                self.device_imei, distance_km, implied_speed_kmh, MAX_AIR_SPEED_KMH
+            )
+            return result
+
+        is_airport_pair = (
+            near_commercial_airport(self.context.last_position_lat, self.context.last_position_lng, AIRPORT_RADIUS_KM)
+            and near_commercial_airport(lat, lng, AIRPORT_RADIUS_KM)
+        )
+        trigger_primary = (
+            distance_km >= FLIGHT_MIN_DISP_KM
+            and gap_h >= FLIGHT_MIN_GAP_H
+            and is_airport_pair
+        )
+        trigger_backup = FLIGHT_MIN_KMH < implied_speed_kmh <= MAX_AIR_SPEED_KMH
+
+        if trigger_primary or trigger_backup:
+            logger.info(
+                "✈️  IMEI %s: Air journey detected: %.0f km @ %.0f km/h over %.1f min gap (primary=%s, airport_pair=%s)",
+                self.device_imei, distance_km, implied_speed_kmh, time_diff_min, trigger_primary, is_airport_pair
+            )
+
+            # If in MOVE state, close current leg first
+            if self.context.current_state == "MOVE" and len(self.context.leg_buffer) >= 2:
+                leg = self._create_leg(self.context.leg_buffer, is_air_leg=False)
+                if leg:
                     result['leg_created'] = True
-                    result['air_leg_detected'] = True
                     if self.context.journey_just_created:
                         result['journey_created'] = True
-                
-                # Start new stationary at destination (arrival airport)
-                # (ANCHOR ASSIGNMENT - air leg exception to 3-place rule)
-                self.context.current_state = "STATIONARY"
-                self.context.anchor_lat = lat  # ← ASSIGNMENT (air leg)
-                self.context.anchor_lng = lng  # ← ASSIGNMENT (air leg)
-                self.context.anchor_points = [(lat, lng, observed_at, position_id)]
-            elif distance_km < self.config.air_min_distance_km:
-                # GLITCH: Fast but short (< 150 km) → discard point
-                logger.warning(
-                    "⚠️  IMEI %s: GPS glitch discarded: %.0f m @ %.0f km/h (fast but short)",
-                    self.device_imei, distance_m, implied_speed_kmh
-                )
-                return result
-            else:
-                # OUTLIER: Fast and far but missing other air leg criteria
-                # Could be data error, treat as unknown-path leg
-                logger.warning(
-                    "⚠️  IMEI %s: High-speed outlier: %.0f km @ %.0f km/h over %.1f hr (not air leg)",
-                    self.device_imei, distance_km, implied_speed_kmh, time_diff_hours
-                )
-                # Let it fall through to be processed as spatial gap
+                self.context.leg_buffer = []
 
-        
+            # Create air leg (endpoints = last pre-silence & first post-silence)
+            air_leg_buffer = [
+                (self.context.last_position_lat, self.context.last_position_lng,
+                 self.context.last_position_time, self.context.last_position_id),
+                (lat, lng, observed_at, position_id)
+            ]
+            air_leg = self._create_leg(air_leg_buffer, is_air_leg=True)
+            if air_leg:
+                result['leg_created'] = True
+                result['air_leg_detected'] = True
+                if self.context.journey_just_created:
+                    result['journey_created'] = True
+
+            # Start new stationary at destination (arrival airport)
+            # (ANCHOR ASSIGNMENT - air leg exception to 3-place rule)
+            self.context.current_state = "STATIONARY"
+            self.context.anchor_lat = lat  # ← ASSIGNMENT (air leg)
+            self.context.anchor_lng = lng  # ← ASSIGNMENT (air leg)
+            self.context.anchor_points = [(lat, lng, observed_at, position_id)]
+            # else: not a flight — leave as-is, falls through to gap handling below
+
         # Step 2: Gap handling (device-type-specific)
         # v2.1.22: Webhook devices use DISPLACEMENT-aware gap logic
         #          Jimi devices use TIME-based gap timeout (30 min)
