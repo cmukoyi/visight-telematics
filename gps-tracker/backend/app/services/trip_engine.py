@@ -127,6 +127,8 @@ DEFAULT_MIN_LEG_EXCURSION_M = 500  # R4a: Maximum excursion threshold
 DEFAULT_ANCHOR_RESUME_RADIUS_M = 200  # R4b: Anchor restoration radius (2 × R)
 DEFAULT_STATIONARY_FLUSH_INTERVAL_MIN = 0  # R4c: DISABLED until R2 verified (prevents 2.1.2 regression)
 DEFAULT_DEDUPE_WINDOW_S = 60  # R5: Deduplication time window
+MIN_STATIONARY_DWELL_S = 60
+MIN_STATIONARY_POINTS = 2
 
 # v2.1.6 B3: Air leg gate parameters
 DEFAULT_AIR_MIN_GAP_MIN = 60  # B3: Minimum gap in minutes for air leg classification
@@ -861,21 +863,18 @@ class TripEngine:
         journey.leg_count = leg_count
         journey.stationary_count = stationary_count
         
-        # Change 4 (webhook): suppress degenerate webhook journeys after final
-        # aggregates are known. Preserve any idle periods by detaching their
-        # stationaries so they remain as journey-breaking records.
-        if self.is_webhook and leg_count == 0 and total_distance_m == 0:
+        if leg_count == 0 and total_distance_m == 0:
             if stationaries:
                 for stationary in stationaries:
                     stationary.journey_id = None
                 self.db.flush()
                 logger.info(
-                    "🔓 IMEI %s (webhook): Detached %d stationary record(s) before suppressing degenerate journey %s",
+                    "🔓 IMEI %s: Detached %d stationary record(s) before suppressing degenerate journey %s",
                     self.device_imei, len(stationaries), journey.id
                 )
 
             logger.warning(
-                "🗑️  IMEI %s (webhook): Suppressing degenerate journey %s (%d legs, %.2f km, %d stationaries)",
+                "🗑️  IMEI %s: Suppressing degenerate journey %s (%d legs, %.2f km, %d stationaries)",
                 self.device_imei, journey.id, leg_count, total_distance_m / 1000, stationary_count
             )
             self.db.delete(journey)
@@ -883,19 +882,6 @@ class TripEngine:
             self.context.current_journey_id = None
             return None
 
-        # v2.2 R3: Prevent 0-leg journeys from persisting
-        # If journey has no legs, delete it instead of closing
-        # (A journey is defined by movement; stationary-only periods don't qualify)
-        if leg_count == 0:
-            logger.warning(
-                "🗑️  IMEI %s: Deleting 0-leg journey %s (%d stationaries, %.2f km)",
-                self.device_imei, journey.id, stationary_count, total_distance_m / 1000
-            )
-            self.db.delete(journey)
-            self.db.flush()
-            self.context.current_journey_id = None
-            return None
-        
         self.db.flush()
         
         logger.info(
@@ -989,6 +975,14 @@ class TripEngine:
         duration_seconds = (ended_at - started_at).total_seconds()
         dwell_min = duration_seconds / 60.0
         point_count = len(self.context.anchor_points)
+
+        if duration_seconds < MIN_STATIONARY_DWELL_S or point_count < MIN_STATIONARY_POINTS:
+            logger.debug(
+                "⏭️  IMEI %s: Open stationary below quality floor (%.0f s < %d OR %d points < %d) - not flushed",
+                self.device_imei, duration_seconds, MIN_STATIONARY_DWELL_S,
+                point_count, MIN_STATIONARY_POINTS
+            )
+            return
         
         # v2.1.14 C2a: Fire journey break if open stop crosses threshold
         # This catches still-accumulating stops that never get evaluated on departure
@@ -1146,19 +1140,13 @@ class TripEngine:
         duration_seconds = (ended_at - started_at).total_seconds()
         point_count = len(points)
         
-        # v2.1.22: Webhook device quality floor (min-dwell + min-points)
-        # Prevents 1-point, zero-duration stationary spam from bursty reporting
-        if self.is_webhook:
-            min_dwell_s = WEBHOOK_PROFILE["stationary_min_dwell_s"]
-            min_points = WEBHOOK_PROFILE["stationary_min_points"]
-            
-            if duration_seconds < min_dwell_s or point_count < min_points:
-                logger.debug(
-                    "⏭️  IMEI %s (webhook): Stationary below quality floor (%.0f s < %d s OR %d points < %d) - discarding",
-                    self.device_imei, duration_seconds, min_dwell_s, point_count, min_points
-                )
-                # Don't persist - fold these points into adjacent leg/anchor
-                return None
+        if duration_seconds < MIN_STATIONARY_DWELL_S or point_count < MIN_STATIONARY_POINTS:
+            logger.debug(
+                "⏭️  IMEI %s: Stationary below quality floor (%.0f s < %d OR %d points < %d) - discarding",
+                self.device_imei, duration_seconds, MIN_STATIONARY_DWELL_S,
+                point_count, MIN_STATIONARY_POINTS
+            )
+            return None
         
         # Get start/end position IDs (if available)
         start_position_id = points[0][3] if len(points) > 0 and points[0][3] else None
