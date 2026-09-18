@@ -7668,6 +7668,8 @@ function _alertMeta(type) {
         case 'hive_breach':              return { icon: 'fa-triangle-exclamation', color: 'var(--danger)',  label: 'Hive Breach'    };
         case 'hive_breach_cleared':      return { icon: 'fa-circle-check',         color: 'var(--success)', label: 'Hive Cleared'   };
         case 'hive_resolved_by_transit': return { icon: 'fa-car-side',             color: 'var(--primary)', label: 'Hive On the Move' };
+        case 'temperature_high':         return { icon: 'fa-temperature-high',      color: 'var(--danger)',  label: t('alerts.temperature_high', 'High Temperature') };
+        case 'temperature_low':          return { icon: 'fa-temperature-low',       color: 'var(--primary)', label: t('alerts.temperature_low', 'Low Temperature') };
         default:                         return { icon: 'fa-bell',                 color: 'var(--primary)', label: type             };
     }
 }

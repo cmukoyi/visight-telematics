@@ -90,6 +90,8 @@ NEW_KEYS = [
     ('alerts.type', 'alerts', 'Type'),
     ('alerts.detail', 'alerts', 'Detail'),
     ('alerts.time', 'alerts', 'Time'),
+    ('alerts.temperature_high', 'alerts', 'High Temperature'),
+    ('alerts.temperature_low', 'alerts', 'Low Temperature'),
 ]
 
 

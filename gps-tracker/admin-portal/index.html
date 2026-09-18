@@ -8181,6 +8181,7 @@ dashboard.welcome,Bienvenue</pre>
     // ========================================================================
     // LANGUAGES FUNCTIONS
     // ========================================================================
+    let languageNameByCode = {};
 
     async function loadLanguages() {
         try {
@@ -8191,6 +8192,7 @@ dashboard.welcome,Bienvenue</pre>
             if (!response.ok) throw new Error('Failed to load languages');
 
             const languages = await response.json();
+            languageNameByCode = Object.fromEntries(languages.map(language => [language.code, language.name]));
             const tbody = document.getElementById('languagesTableBody');
             
             // Safety check - element might not exist if tab isn't visible
@@ -8296,10 +8298,20 @@ dashboard.welcome,Bienvenue</pre>
         }
 
         try {
-            const response = await fetch(`/api/admin/i18n/languages/${code}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${authToken}` }
-            });
+            const request = activate
+                ? fetch(`/api/admin/i18n/languages/${code}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ code, name: languageNameByCode[code] || code, is_active: true })
+                })
+                : fetch(`/api/admin/i18n/languages/${code}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+            const response = await request;
 
             if (!response.ok) {
                 const error = await response.json();

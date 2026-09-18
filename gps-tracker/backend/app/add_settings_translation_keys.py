@@ -100,6 +100,8 @@ NEW_KEYS = [
     ('settings.offline_7_days_hint', 'settings', 'Alert when a tag hasn\'t been detected for an extended period.'),
     ('settings.hive_breach', 'settings', 'Hive breach detected'),
     ('settings.hive_breach_hint', 'settings', 'Alert when a tag separates from its HIVE group beyond the configured threshold.'),
+    ('settings.temperature_monitoring', 'settings', 'Temperature threshold'),
+    ('settings.temperature_monitoring_hint', 'settings', 'Alert when a monitored tag crosses its configured high or low temperature limit.'),
     ('settings.how_to_notify', 'settings', 'How to notify me'),
     ('settings.email_notifications', 'settings', 'Email notifications'),
     ('settings.email_notifications_hint', 'settings', 'Send alert emails to the addresses listed below.'),
