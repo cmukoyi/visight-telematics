@@ -1101,8 +1101,11 @@ class TripEngine:
             journey.ended_at = max(leg.ended_at for leg in legs)  # B5: Legs only!
             journey.total_duration_seconds = int((journey.ended_at - journey.started_at).total_seconds())
         
-        # v2.1.6 B3: Set is_air_journey flag if any leg has mode='air'
-        journey.is_air_journey = any(leg.is_air_leg for leg in legs)
+        journey.is_air_journey = (
+            len(legs) == 1
+            and len(stationaries) == 0
+            and legs[0].is_air_leg
+        )
         
         self.db.flush()
         
@@ -2285,6 +2288,10 @@ class TripEngine:
                 # Closing the ground leg and opening the air leg are two distinct
                 # legs from one incoming point — clear the guard so the air leg
                 # below isn't rejected as a re-entrant duplicate.
+                self.context.leg_persisted_this_invocation = False
+
+            if self.context.current_journey_id:
+                self._close_journey(skip_anchor_flush=True)
                 self.context.leg_persisted_this_invocation = False
 
             # Create air leg (endpoints = last pre-silence & first post-silence)
