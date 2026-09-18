@@ -478,7 +478,6 @@ class EngineContext:
     journey_just_created: bool = False  # Flag for tracking new journey creation
     
     # v2.1.6 B1: Re-entrancy guards
-    leg_persisted_this_invocation: bool = False
     stationary_persisted_this_invocation: bool = False
     
     # v2.1.14 C2a: Journey break on open stop
@@ -1626,14 +1625,6 @@ class TripEngine:
         # Ensure journey is open
         self._ensure_journey_open(started_at)
         
-        # v2.1.6 B1: Re-entrancy guard - assert we haven't already persisted a leg in this invocation
-        if self.context.leg_persisted_this_invocation:
-            logger.error(
-                "🚨 IMEI %s: Re-entrancy violation! Already persisted a leg in this invocation",
-                self.device_imei
-            )
-            raise RuntimeError("Re-entrancy violation: leg already persisted in this invocation")
-        
         # v2.1.6 B1: Overlap guard - reject if overlaps existing leg
         overlap_check = self.db.execute(
             select(Leg).where(
@@ -1700,9 +1691,6 @@ class TripEngine:
         # Fetch the leg object
         leg = self.db.query(Leg).filter(Leg.id == returned_id).one()
         self.db.flush()
-        
-        # v2.1.6 B1: Set re-entrancy guard flag
-        self.context.leg_persisted_this_invocation = True
         
         # Build PostGIS geometry for the leg path
         # v2.1: Air legs use great-circle (straight line), ground legs use all points
@@ -1920,9 +1908,6 @@ class TripEngine:
             self.context.stop_candidate_since = None
             self.context.stop_candidate_points = []
             
-            # v2.1.17 D1: Clear re-entrancy flag after state reset
-            self.context.leg_persisted_this_invocation = False
-            
             logger.info(
                 "🔄 D1: State reset to anchor stationary at (%.4f, %.4f) ending %s",
                 anchor_stat.anchor_lat, anchor_stat.anchor_lng,
@@ -1941,9 +1926,6 @@ class TripEngine:
             self.context.leg_buffer = []
             self.context.stop_candidate_since = None
             self.context.stop_candidate_points = []
-            
-            # v2.1.17 D1: Clear re-entrancy flag after state reset
-            self.context.leg_persisted_this_invocation = False
             
             logger.info("🔄 D1: State reset to initial (no anchor found before rebuild point)")
     
@@ -2194,9 +2176,6 @@ class TripEngine:
         """
         result = {}
         
-        # v2.1.6 B1: Clear leg re-entrancy flag at start of each position processing
-        self.context.leg_persisted_this_invocation = False
-        
         # Update watermark
         self.context.last_processed_at = observed_at
         
@@ -2269,7 +2248,10 @@ class TripEngine:
             and gap_h >= FLIGHT_MIN_GAP_H
             and is_airport_pair
         )
-        trigger_backup = FLIGHT_MIN_KMH < implied_speed_kmh <= MAX_AIR_SPEED_KMH
+        trigger_backup = (
+            distance_km >= self.config.air_min_distance_km
+            and FLIGHT_MIN_KMH < implied_speed_kmh <= MAX_AIR_SPEED_KMH
+        )
 
         if trigger_primary or trigger_backup:
             logger.info(
@@ -2285,14 +2267,8 @@ class TripEngine:
                     if self.context.journey_just_created:
                         result['journey_created'] = True
                 self.context.leg_buffer = []
-                # Closing the ground leg and opening the air leg are two distinct
-                # legs from one incoming point — clear the guard so the air leg
-                # below isn't rejected as a re-entrant duplicate.
-                self.context.leg_persisted_this_invocation = False
-
             if self.context.current_journey_id:
                 self._close_journey(skip_anchor_flush=True)
-                self.context.leg_persisted_this_invocation = False
 
             # Create air leg (endpoints = last pre-silence & first post-silence)
             air_leg_buffer = [
