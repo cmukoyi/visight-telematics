@@ -13,9 +13,11 @@
          match BRAND_NAME / BRAND_PRODUCT in backend env. Falls back to
          the static text above if /api/branding fails. -->
     <script>
+            window.ADMIN_BRANDING = null;
       (function(){
         function applyBrand(b){
           if (!b) return;
+                    window.ADMIN_BRANDING = b;
           const product = b.product || (b.name ? b.name + ' Admin' : null);
           if (product) document.title = product;
           // Replace any element with data-brand="name|product"
@@ -7056,9 +7058,8 @@ dashboard.welcome,Bienvenue</pre>
 
     // ── FLUTTER USERS ──────────────────────────────────────────────────────
     function openFlutterRegistration() {
-        // Open Flutter app registration flow in new tab
-        // The URL uses the hash router format for Flutter web app
-        const registrationUrl = 'https://pinplot.me/#/welcome';
+        const domain = window.ADMIN_BRANDING?.domain || window.location.hostname || 'pinplot.me';
+        const registrationUrl = `https://${domain}/#/welcome`;
         
         // Open in new tab
         const newWindow = window.open(registrationUrl, '_blank');
