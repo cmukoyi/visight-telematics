@@ -3481,15 +3481,17 @@ input.hive-range::-moz-range-track {
                 padding:4px 8px; 
             }
             .temp-graph-threshold-btn { margin-left:auto; }
-            .temp-threshold-pop { position:absolute; z-index:30; top:48px; right:52px; width:250px; padding:13px 14px; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 28px rgba(0,0,0,.25); }
+            .temp-threshold-pop { position:absolute; z-index:30; top:48px; right:52px; width:250px; padding:13px 14px; background:#ffffff; opacity:1; border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 28px rgba(0,0,0,.25); }
+            [data-theme="dark"] .temp-threshold-pop { background:#151922; }
             .temp-threshold-row { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:9px 0 3px; }
             .temp-threshold-label { font-size:11px; color:var(--text-2); }
             .temp-threshold-value { font-size:11px; font-weight:600; }
             .temp-threshold-range { width:100%; }
             .temp-threshold-scope { display:flex; margin-top:5px; border:1px solid var(--border); border-radius:7px; overflow:hidden; }
-            .temp-threshold-scope button { flex:1; border:0; padding:6px 4px; background:transparent; color:var(--text-2); font-size:10px; cursor:pointer; }
+            .temp-threshold-scope button { flex:1; border:0; padding:6px 4px; background:#ffffff; color:var(--text-2); font-size:10px; cursor:pointer; }
+            [data-theme="dark"] .temp-threshold-scope button { background:#151922; }
             .temp-threshold-scope button.active { background:var(--primary); color:#fff; }
-            .temp-threshold-apply { width:100%; margin-top:10px; padding:7px 10px; border:1px solid var(--success); border-radius:7px; background:color-mix(in srgb,var(--success) 18%,transparent); color:var(--success); font-weight:600; cursor:pointer; }
+            .temp-threshold-apply { width:100%; margin-top:10px; padding:7px 10px; border:1px solid var(--success); border-radius:7px; background:var(--success); color:#fff; font-weight:600; cursor:pointer; }
             .temp-graph-preset { 
                 font-family:inherit; 
                 font-size:11px; 
@@ -16452,7 +16454,7 @@ function mhaOpenHelp() {
                         <path d="M8 7.7v4"/>
                         <path d="M6.4 10.1 8 11.7l1.6-1.6"/>
                     </svg>
-                    <span data-i18n="text.export_pdf">Export PDF</span>
+                    <span id="temp-graph-export-label" data-i18n="text.export_pdf">Export PDF</span>
                 </button>
             </div>
             <div class="temp-graph-charts">
@@ -16982,6 +16984,7 @@ function mhaOpenHelp() {
         const smoothToggle = document.getElementById('temp-graph-smooth-toggle');
         const battBtn = document.getElementById('temp-graph-batt-btn');
         const altBtn = document.getElementById('temp-graph-alt-btn');
+        const exportBtn = document.getElementById('temp-graph-export');
         
         if (smoothToggle) smoothToggle.checked = true;
         if (smoothToggle) smoothToggle.onchange = () => { if (_tempGraphData) buildChart(_tempGraphData); };
@@ -17011,6 +17014,86 @@ function mhaOpenHelp() {
                 _tempGraphChart.update();
             }
         };
+
+        if (exportBtn) exportBtn.onclick = exportTemperaturePdf;
+    }
+
+    function temperatureChartImage() {
+        const source = document.getElementById('temp-graph-canvas');
+        if (!source || !source.width || !source.height) throw new Error('Temperature chart is not ready');
+        const canvas = document.createElement('canvas');
+        canvas.width = source.width;
+        canvas.height = source.height;
+        const context = canvas.getContext('2d');
+        const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+        context.fillStyle = dark ? '#151922' : '#ffffff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(source, 0, 0);
+        return canvas.toDataURL('image/png', 1);
+    }
+
+    function exportTemperaturePdf() {
+        const exportBtn = document.getElementById('temp-graph-export');
+        const label = document.getElementById('temp-graph-export-label');
+        const originalLabel = label?.textContent || 'Export PDF';
+        if (!window.jspdf?.jsPDF || !_tempGraphChart || !_tempGraphData?.length) return;
+        exportBtn.disabled = true;
+        if (label) label.textContent = 'Preparing...';
+        try {
+            const {jsPDF} = window.jspdf;
+            const pdf = new jsPDF({orientation: 'landscape', unit: 'mm', format: 'a4'});
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const scope = _temperatureSelection || _zoomView || {
+                from: _tempGraphData[0].x,
+                to: _tempGraphData[_tempGraphData.length - 1].x,
+            };
+            const formatDate = timestamp => new Date(timestamp).toLocaleString();
+            const stats = {
+                temperature: document.getElementById('temp-stat-temp')?.textContent || '-',
+                range: document.getElementById('temp-stat-range')?.textContent || '-',
+                reports: document.getElementById('temp-stat-count')?.textContent || '-',
+                coverage: document.getElementById('temp-stat-coverage')?.textContent || '-',
+            };
+
+            pdf.setFont('helvetica', 'bold');
+            pdf.setFontSize(18);
+            pdf.text('Temperature Report', 14, 16);
+            pdf.setFont('helvetica', 'normal');
+            pdf.setFontSize(10);
+            pdf.text(`${_tempGraphTagName || 'Tag'} (${_tempGraphImei || '-'})`, 14, 24);
+            pdf.text(`${formatDate(scope.from)} to ${formatDate(scope.to)}`, 14, 30);
+            pdf.text(`Generated: ${new Date().toLocaleString()}`, pageWidth - 14, 16, {align: 'right'});
+
+            const summary = [
+                `Temperature: ${stats.temperature}`,
+                `Range: ${stats.range}`,
+                `Reports: ${stats.reports}`,
+                `Coverage: ${stats.coverage}`,
+            ];
+            pdf.setFont('helvetica', 'bold');
+            summary.forEach((text, index) => pdf.text(text, 14 + index * 48, 40));
+            pdf.setFont('helvetica', 'normal');
+            const monitoring = _tempThresholdConfig.enabled
+                ? `Monitoring: Low ${Number(_tempThresholdConfig.low_c).toFixed(1)} C / High ${Number(_tempThresholdConfig.high_c).toFixed(1)} C`
+                : 'Monitoring: Off';
+            pdf.text(monitoring, pageWidth - 14, 40, {align: 'right'});
+
+            const image = temperatureChartImage();
+            const source = document.getElementById('temp-graph-canvas');
+            const maxWidth = pageWidth - 28;
+            const maxHeight = 135;
+            const ratio = Math.min(maxWidth / source.width, maxHeight / source.height);
+            const width = source.width * ratio;
+            const height = source.height * ratio;
+            pdf.addImage(image, 'PNG', 14, 48, width, height, undefined, 'FAST');
+            pdf.save(`temperature-${String(_tempGraphImei || 'tag').replace(/[^a-z0-9_-]/gi, '-')}.pdf`);
+        } catch (error) {
+            console.error('[TEMP GRAPH] PDF export failed:', error);
+            alert(`PDF export failed: ${error.message}`);
+        } finally {
+            exportBtn.disabled = false;
+            if (label) label.textContent = originalLabel;
+        }
     }
 
     function renderTemperatureThresholds() {
