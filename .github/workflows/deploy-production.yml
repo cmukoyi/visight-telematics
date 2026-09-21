@@ -537,7 +537,7 @@ jobs:
             docker compose build flutter-web admin-portal
 
             echo "━━━ Building backend services ━━━"
-            docker compose build backend customer
+            docker compose build backend worker customer
 
             echo "━━━ Stopping old containers ━━━"
             docker compose down --remove-orphans || true
