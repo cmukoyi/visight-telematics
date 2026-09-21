@@ -42,7 +42,7 @@ State Machine:
                  Last 3 points within R → open stop candidate (v2.1)
                  Candidate holds ≥ settle_min_dwell_min → confirm stop, STATIONARY (v2.1)
                  Candidate leaves R before settling → discard, continue leg (v2.1)
-                 Gap timeout → force close leg, STATIONARY
+                 Reporting gap → bridge movement or break on low displacement
 
 Rules:
     - Geometry-based (not time-based) confirmation
@@ -97,7 +97,7 @@ from app.services.airport_lookup import near_commercial_airport
 logger = logging.getLogger(__name__)
 
 # ── Engine Version (v2.2.0 - Fix Register) ────────────────────────────────
-ENGINE_VERSION = "2.1.26"  # v2.1.26: Signature-based flight detection (airport-pair + displacement + gap, not speed-only)
+ENGINE_VERSION = "2.1.27"  # v2.1.27: Extend displacement-aware gap handling to Jimi devices
 
 # ── Verbose Debug Logging for Specific Devices ────────────────────────────
 VERBOSE_DEBUG_DEVICES = {
@@ -114,6 +114,8 @@ DEFAULT_MIN_LEG_DISTANCE_M = 300
 DEFAULT_MOVE_CONFIRM_M = 150
 DEFAULT_MAX_SPEED_KMH = 200
 DEFAULT_GAP_TIMEOUT_MIN = 30
+GAP_BRIDGE_MIN_DISP_M = DEFAULT_MIN_LEG_DISTANCE_M
+GAP_BRIDGE_SPEED_GATE_KMH = DEFAULT_MAX_SPEED_KMH
 DEFAULT_AIR_SPEED_KMH = 300
 DEFAULT_AIR_MIN_DISTANCE_KM = 150
 DEFAULT_JOURNEY_BREAK_DWELL_MIN = 30
@@ -165,8 +167,8 @@ WEBHOOK_PROFILE = {
     "air_min_distance_km": 150,
     
     # Gap handling (DISPLACEMENT-BASED, not time-based)
-    "gap_bridge_min_disp_m": 300,  # Bridge if displacement >= 300m (== min_leg_distance)
-    "speed_gate_kmh": 200,  # Don't bridge if implied speed > 200 km/h (teleport protection)
+    "gap_bridge_min_disp_m": GAP_BRIDGE_MIN_DISP_M,
+    "speed_gate_kmh": GAP_BRIDGE_SPEED_GATE_KMH,
     
     # Stationary detection (QUALITY FLOOR to prevent 1-point spam)
     "stationary_min_dwell_s": 60,  # Must dwell >= 60s
@@ -2279,12 +2281,13 @@ class TripEngine:
             self.context.anchor_points = [(lat, lng, observed_at, position_id)]
             # else: not a flight — leave as-is, falls through to gap handling below
 
-        # Step 2: Gap handling (device-type-specific)
-        # v2.1.22: Webhook devices use DISPLACEMENT-aware gap logic
-        #          Jimi devices use TIME-based gap timeout (30 min)
-        
-        if self.is_webhook and self.context.current_state == "MOVE":
-            # WEBHOOK DEVICE: Displacement-aware gap handling
+        # Step 2: Displacement-aware gap handling
+        is_reporting_gap = (
+            self.is_webhook
+            or time_diff_seconds > self.config.gap_timeout_min * 60
+        )
+
+        if self.context.current_state == "MOVE" and is_reporting_gap:
             # Decision: Bridge vs Break based on DISPLACEMENT across the gap (not time)
             # 
             # Rationale: Minew devices have large gaps during normal transit (ferry,
@@ -2299,11 +2302,11 @@ class TripEngine:
             gap_speed_kmh = implied_speed_kmh
             
             # Apply displacement-aware decision
-            if gap_displacement_m < WEBHOOK_PROFILE["gap_bridge_min_disp_m"]:
+            if gap_displacement_m < GAP_BRIDGE_MIN_DISP_M:
                 # Device did NOT move meaningfully during the gap → genuine stop
                 logger.info(
-                    "🛑 IMEI %s (webhook): Gap BREAK - low displacement (%.0f m < %.0f m) → genuine stop",
-                    self.device_imei, gap_displacement_m, WEBHOOK_PROFILE["gap_bridge_min_disp_m"]
+                    "🛑 IMEI %s: Gap BREAK - low displacement (%.0f m < %.0f m) → genuine stop",
+                    self.device_imei, gap_displacement_m, GAP_BRIDGE_MIN_DISP_M
                 )
                 
                 # Close current leg
@@ -2321,7 +2324,7 @@ class TripEngine:
                      self.context.last_position_time, None),
                     (lat, lng, observed_at, position_id)
                 ]
-                stationary = self._create_stationary(gap_stationary_points, reason="gap_break_webhook")
+                stationary = self._create_stationary(gap_stationary_points, reason="gap_break_displacement")
                 if stationary:
                     result['stationary_created'] = True
                     if self.context.journey_just_created:
@@ -2334,11 +2337,11 @@ class TripEngine:
                 self.context.anchor_points = [(lat, lng, observed_at, position_id)]
                 self.context.leg_buffer = []
             
-            elif gap_speed_kmh > WEBHOOK_PROFILE["speed_gate_kmh"]:
+            elif gap_speed_kmh > GAP_BRIDGE_SPEED_GATE_KMH:
                 # Teleport protection: implied speed > 200 km/h suggests bad fix, not real transit
                 logger.warning(
-                    "⚠️  IMEI %s (webhook): Gap BREAK - speed gate exceeded (%.0f km/h > %.0f km/h) → likely teleport",
-                    self.device_imei, gap_speed_kmh, WEBHOOK_PROFILE["speed_gate_kmh"]
+                    "⚠️  IMEI %s: Gap BREAK - speed gate exceeded (%.0f km/h > %.0f km/h) → likely teleport",
+                    self.device_imei, gap_speed_kmh, GAP_BRIDGE_SPEED_GATE_KMH
                 )
                 
                 # Treat as break (same as low-displacement case above)
@@ -2355,7 +2358,7 @@ class TripEngine:
                      self.context.last_position_time, None),
                     (lat, lng, observed_at, position_id)
                 ]
-                stationary = self._create_stationary(gap_stationary_points, reason="gap_break_webhook_speed_gate")
+                stationary = self._create_stationary(gap_stationary_points, reason="gap_break_speed_gate")
                 if stationary:
                     result['stationary_created'] = True
                     if self.context.journey_just_created:
@@ -2371,47 +2374,12 @@ class TripEngine:
                 # BRIDGE: Device demonstrably travelled during the gap (displacement >= 300m, speed <= 200 km/h)
                 # Continue current leg straight through the gap
                 logger.info(
-                    "🌉 IMEI %s (webhook): Gap BRIDGE - transit detected (%.0f m @ %.0f km/h over %.0f min) → continue leg",
+                    "🌉 IMEI %s: Gap BRIDGE - transit detected (%.0f m @ %.0f km/h over %.0f min) → continue leg",
                     self.device_imei, gap_displacement_m, gap_speed_kmh, time_diff_seconds / 60
                 )
                 # Continue MOVE state - current leg stays open, no stationary created
                 # The gap becomes a segment in the leg (prev_point → current_point)
                 pass
-        
-        elif not self.is_webhook and self.context.current_state == "MOVE" and time_diff_seconds > self.config.gap_timeout_min * 60:
-            # JIMI DEVICE: Time-based gap timeout (existing 30-minute logic)
-            logger.info(
-                "⏱️  IMEI %s: Gap timeout (%.0f min) → force close leg",
-                self.device_imei, time_diff_seconds / 60
-            )
-            # Close current leg
-            if len(self.context.leg_buffer) >= 2:
-                leg = self._create_leg(self.context.leg_buffer, is_air_leg=False)
-                if leg:
-                    result['leg_created'] = True
-                    if self.context.journey_just_created:
-                        result['journey_created'] = True
-                # CRITICAL: Clear leg_buffer immediately to prevent re-entrancy in _create_stationary
-                self.context.leg_buffer = []
-            
-            # Create stationary from last position until now
-            gap_stationary_points = [
-                (self.context.last_position_lat, self.context.last_position_lng, 
-                 self.context.last_position_time, None),
-                (lat, lng, observed_at, position_id)
-            ]
-            stationary = self._create_stationary(gap_stationary_points, reason="gap_timeout")
-            if stationary:
-                result['stationary_created'] = True
-                if self.context.journey_just_created:
-                    result['journey_created'] = True
-            
-            # Return to STATIONARY state (ANCHOR ASSIGNMENT #2 of 3)
-            self.context.current_state = "STATIONARY"
-            self.context.anchor_lat = lat  # ← ASSIGNMENT #2
-            self.context.anchor_lng = lng  # ← ASSIGNMENT #2
-            self.context.anchor_points = [(lat, lng, observed_at, position_id)]
-            self.context.leg_buffer = []
         
         # Step 3: State-specific logic
         if self.context.current_state == "STATIONARY":
