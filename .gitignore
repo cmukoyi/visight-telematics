@@ -186,6 +186,16 @@ fix_duplicate_journeys.sql
 fix_overlap_violations.sql
 all_translation_keys.txt
 
+# i18n migration pipeline (find -> phase1 -> phase2 -> bulk translate).
+# The autofix scripts rewrite HTML with regex and can corrupt inline
+# attributes; kept local for reference only, do not re-run blindly.
+find_untranslatable_text.py
+autofix_translations_phase1.py
+auto_fix_phase2.py
+bulk_translate_all.py
+untranslatable_index.csv
+*.phase2.backup
+
 # Manual/documentation files
 HIVE Tracking UI.html
 HIVE_User_Manual.html
