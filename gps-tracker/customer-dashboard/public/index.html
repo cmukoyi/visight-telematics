@@ -4404,7 +4404,7 @@ input.hive-range::-moz-range-track {
             <p style="margin:12px 0 6px;font-size:13px">Email: <strong id="newUserEmail"></strong></p>
             <div style="display:flex;align-items:center;gap:8px">
                 <code id="newUserPwd" style="flex:1;padding:8px 12px;background:#f3f4f6;border-radius:6px;font-size:14px;letter-spacing:1px;color:#111"></code>
-                <button class="btn btn-secondary btn-small" id="copyPwdBtn" onclick="navigator.clipboard.writeText(document.getElementById('newUserPwd').textContent).then(()=>{const b=document.get<span data-i18n="buttons.elementbyidcopypwdbtnbtextcontentcopiedbstylecolor">ElementById('copyPwdBtn');b.textContent='Copied!';b.style.color='var(--success,#10b981)';setTimeout(()=>{b.textContent='Copy';b.style.color='';},2000)})">Copy</span></button>
+                <button type="button" class="btn btn-secondary btn-small" id="copyPwdBtn" onclick="copyTempPassword()">Copy</button>
             </div>
             <div style="text-align:right;margin-top:16px">
                 <button class="btn btn-primary" onclick="closeModal('addUserModal');loadUsers()"><span data-i18n="buttons.done">Done</span></button>
@@ -5681,7 +5681,10 @@ function switchTab(name) {
 // Modals
 // ══════════════════════════════════════════
 function openModal(id) {
-    document.getElementById(id).classList.add('active');
+    const el = document.getElementById(id);
+    el.classList.add('active');
+    // Lets modals reset their own state each time they are reopened.
+    el.dispatchEvent(new CustomEvent('show'));
 }
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
@@ -10545,6 +10548,16 @@ async function submitAddUser(e) {
     }
 }
 
+function copyTempPassword() {
+    const pwd = document.getElementById('newUserPwd').textContent;
+    navigator.clipboard.writeText(pwd).then(() => {
+        const btn = document.getElementById('copyPwdBtn');
+        btn.textContent = t('buttons.copied', 'Copied!');
+        btn.style.color = 'var(--success,#10b981)';
+        setTimeout(() => { btn.textContent = t('buttons.copy', 'Copy'); btn.style.color = ''; }, 2000);
+    }).catch(() => {});
+}
+
 function _auToggleCustomFeatures() {
     const isCustom = document.getElementById('auRole').value === 'custom';
     document.getElementById('auCustomPanel').style.display = isCustom ? 'block' : 'none';
@@ -10617,7 +10630,9 @@ async function sysAdminResetPassword(userId, userEmail, userName) {
     document.getElementById('addUserModal').addEventListener('show', () => {
         document.getElementById('addUserForm').style.display   = 'block';
         document.getElementById('addUserResult').style.display = 'none';
+        document.getElementById('addUserAlert').style.display  = 'none';
         // Reset form state
+        ['auFirst', 'auLast', 'auEmail'].forEach(id => { document.getElementById(id).value = ''; });
         const roleEl = document.getElementById('auRole');
         if (roleEl) roleEl.value = 'admin';
         _auToggleCustomFeatures();
