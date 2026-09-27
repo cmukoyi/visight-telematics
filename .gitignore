@@ -195,6 +195,20 @@ auto_fix_phase2.py
 bulk_translate_all.py
 untranslatable_index.csv
 *.phase2.backup
+translation_keys_phase2.txt
+
+# Ad-hoc data fixes, diagnostics and point-in-time assessments.
+# Keep these local; beacon_backup.sh / beacon_rollback.sh stay tracked
+# because BEACON_DEPLOYMENT_RUNBOOK.md deploys them.
+fix_migration_state.sh
+diagnose_device_subscriptions.sql
+verify_usergroup.sql
+FEATURE_CHERRY_PICK_ASSESSMENT.md
+MOVEMENT_ANALYTICS_PROMOTION_ASSESSMENT.md
+diagnose_*.sql
+verify_*.sql
+fix_*.sh
+*_ASSESSMENT.md
 
 # Manual/documentation files
 HIVE Tracking UI.html
