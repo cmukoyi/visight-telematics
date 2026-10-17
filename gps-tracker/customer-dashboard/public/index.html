@@ -18,7 +18,6 @@
          these generic placeholders with tenant-specific BRAND_* values on each request. -->
     <meta property="og:type" content="website">
     <meta property="og:title" content="Customer Portal — Asset Tracking">
-    <meta property="og:description" content="Live asset tracking, geofencing, and reporting for your fleet of GPS and BLE-tagged assets.">
     <meta property="og:url" content="__OG_URL__">
     <meta property="og:site_name" content="Customer Portal">
     <meta property="og:image" content="__OG_IMAGE__">
@@ -6370,13 +6369,6 @@ async function settingsSaveLanguage(lang) {
     // Refresh dynamic content that rendered translated text with t().
     try { if(typeof locRenderAll==='function') locRenderAll(); } catch(e){}
     try {
-        if (_liveMap && _lmTags.length && typeof _lmPlaceMarkers === 'function') {
-            _lmPlaceMarkers();
-            const selectedTag = _lmTags.find(tag => tag.imei === _lmSelected);
-            if (selectedTag && typeof _lmRenderDetail === 'function') _lmRenderDetail(selectedTag);
-        }
-    } catch(e){}
-    try {
         const wizard = document.getElementById('hive-screen-wizard');
         if (wizard?.style.display !== 'none' && typeof hiveWizRender === 'function') {
             hiveWizRender();
@@ -11049,7 +11041,7 @@ function _lmPlaceMarkers() {
                 ${sensorSnippet}
                 <div style="display:flex;gap:5px;margin-top:2px">
                     <button class="btn-popup-hist" onclick="lmOpenHistory('${esc(tag.imei)}')">
-                        <i class='fa-solid fa-route'></i> ${t('trips.history', 'History')}
+                        <i class='fa-solid fa-route'></i> ${t('trips.history', 'Trip History')}
                     </button>
                     <button class="btn-popup-share" onclick="lmShareTag('${esc(tag.imei)}',event)">
                         <i class='fa-solid fa-share-nodes'></i> ${t('common.share', 'Share')}
@@ -11065,6 +11057,18 @@ function _lmPlaceMarkers() {
         _liveMap.fitBounds(bounds, { padding: [40,40], maxZoom: 16 });
     }
 }
+
+document.addEventListener('portal-language-changed', () => {
+    if (typeof _liveMap === 'undefined' || !_liveMap || !_lmTags.length) return;
+    const center = _liveMap.getCenter();
+    const zoom = _liveMap.getZoom();
+    const openPopupImei = Object.keys(_lmMarkers).find(imei => _lmMarkers[imei].isPopupOpen());
+    _lmPlaceMarkers();
+    if (center) _liveMap.setView(center, zoom, {animate: false});
+    if (openPopupImei && _lmMarkers[openPopupImei]) _lmMarkers[openPopupImei].openPopup();
+    const selectedTag = _lmTags.find(tag => tag.imei === _lmSelected);
+    if (selectedTag && typeof _lmRenderDetail === 'function') _lmRenderDetail(selectedTag);
+});
 
 // ── Asset Tracking (QR/NFC markers) ────────────────────────────────────
 async function _lmLoadAssets() {
@@ -16401,7 +16405,7 @@ function mhaOpenHelp() {
             </div>
             <div class="temp-graph-meta" id="temp-graph-meta"></div>
             <div class="temp-graph-spacer"></div>
-            <button class="btn btn-ghost btn-sm temp-graph-threshold-btn" id="temp-threshold-btn" type="button" aria-expanded="false" aria-label="Temperature thresholds"><i class="fa-solid fa-sliders"></i></button>
+            <button class="btn btn-ghost btn-sm temp-graph-threshold-btn" id="temp-threshold-btn" type="button" aria-expanded="false" aria-label="Temperature thresholds" data-i18n-title="temp_graph.thresholds" title="Temperature thresholds"><i class="fa-solid fa-sliders"></i></button>
             <div style="display:flex; gap:5px;" id="temp-graph-presets"></div>
             <label class="temp-graph-smooth">
                 <input type="checkbox" id="temp-graph-smooth-toggle" checked>
@@ -16424,19 +16428,19 @@ function mhaOpenHelp() {
                 <label class="temp-threshold-label"><input type="checkbox" id="temp-threshold-enabled"> <span data-i18n="settings.temperature_monitoring">Enable monitoring</span></label>
                 <button class="temp-graph-close" id="temp-threshold-close" type="button" aria-label="Close">&times;</button>
             </div>
-            <div class="temp-threshold-row"><span class="temp-threshold-label">High threshold</span><output class="temp-threshold-value" id="temp-threshold-high-value">35.0°C</output></div>
+            <div class="temp-threshold-row"><span class="temp-threshold-label" data-i18n="temp_graph.high_threshold">High threshold</span><output class="temp-threshold-value" id="temp-threshold-high-value">35.0°C</output></div>
             <input class="temp-threshold-range" id="temp-threshold-high" type="range" min="-15" max="45" step="0.5" value="35">
-            <div class="temp-threshold-row"><span class="temp-threshold-label">Low threshold</span><output class="temp-threshold-value" id="temp-threshold-low-value">2.0°C</output></div>
+            <div class="temp-threshold-row"><span class="temp-threshold-label" data-i18n="temp_graph.low_threshold">Low threshold</span><output class="temp-threshold-value" id="temp-threshold-low-value">2.0°C</output></div>
             <input class="temp-threshold-range" id="temp-threshold-low" type="range" min="-15" max="45" step="0.5" value="2">
-            <div class="temp-threshold-label">Apply to</div>
-            <div class="temp-threshold-scope"><button type="button" class="active" data-temp-scope="tag">This tag only</button><button type="button" data-temp-scope="series5">All Series 5</button></div>
-            <button class="temp-threshold-apply" id="temp-threshold-apply" type="button">Apply thresholds</button>
+            <div class="temp-threshold-label" data-i18n="temp_graph.apply_to">Apply to</div>
+            <div class="temp-threshold-scope"><button type="button" class="active" data-temp-scope="tag" data-i18n="temp_graph.this_tag_only">This tag only</button><button type="button" data-temp-scope="series5" data-i18n="temp_graph.all_series5">All Series 5</button></div>
+            <button class="temp-threshold-apply" id="temp-threshold-apply" type="button" data-i18n="temp_graph.apply_thresholds">Apply thresholds</button>
             <div id="temp-threshold-status" class="temp-threshold-label" style="margin-top:8px"></div>
         </div>
         
         <div id="temp-graph-loading" class="temp-graph-loading" style="display:none">
             <i class="fa-solid fa-spinner fa-spin" style="font-size:32px;margin-right:12px"></i>
-            <span>Loading temperature data...</span>
+            <span data-i18n="temp_graph.loading">Loading temperature data...</span>
         </div>
         
         <div id="temp-graph-error" class="temp-graph-error" style="display:none">
@@ -16469,7 +16473,7 @@ function mhaOpenHelp() {
                         <path d="M8 7.7v4"/>
                         <path d="M6.4 10.1 8 11.7l1.6-1.6"/>
                     </svg>
-                    <span id="temp-graph-export-label" data-i18n="text.export_pdf">Export PDF</span>
+                    <span id="temp-graph-export-label" data-i18n="temp_graph.export_pdf">Export PDF</span>
                 </button>
             </div>
             <div class="temp-graph-charts">
@@ -16481,7 +16485,7 @@ function mhaOpenHelp() {
                         <canvas id="temp-graph-ov-canvas"></canvas>
                     </div>
                     <div class="temp-graph-ov-bar">
-                        <span class="temp-graph-ov-hint">Drag the window to pan, drag its edges to zoom</span>
+                        <span class="temp-graph-ov-hint" data-i18n="temp_graph.drag_hint">Drag the window to pan, drag its edges to zoom</span>
                         <button class="temp-graph-reset" id="temp-graph-reset"><span data-i18n="buttons.reset_zoom">Reset zoom</span></button>
                     </div>
                 </div>
@@ -16492,7 +16496,7 @@ function mhaOpenHelp() {
                     </span>
                     <span class="temp-graph-legend" id="temp-graph-batt-legend" style="display:none;">
                         <span class="d" style="background:var(--primary);"></span>
-                        <span>Battery %</span>
+                        <span data-i18n="temp_graph.battery_percent">Battery %</span>
                     </span>
                     <span class="temp-graph-legend" id="temp-graph-alt-legend" style="display:none;">
                         <span class="d" style="background:var(--warning);"></span>
@@ -16704,7 +16708,7 @@ function mhaOpenHelp() {
                 });
                 ctx.setLineDash([]);
 
-                const label = `No reports ${formatDuration(g.ms)}`;
+                const label = `${t('temp_graph.no_reports_gap', 'No reports')} ${formatDuration(g.ms)}`;
                 ctx.font = '600 11px Inter, sans-serif';
                 const labelWidth = ctx.measureText(label).width + 12;
                 if (x2 - x1 >= labelWidth) {
@@ -16959,7 +16963,7 @@ function mhaOpenHelp() {
             const {ctx, chartArea, scales} = chart;
             if (!chartArea || !scales.y) return;
             ctx.save();
-            [[_tempThresholdConfig.high_c, '#ef4444', 'High'], [_tempThresholdConfig.low_c, '#3b82f6', 'Low']].forEach(([value, color, label]) => {
+            [[_tempThresholdConfig.high_c, '#ef4444', t('temp_graph.high', 'High')], [_tempThresholdConfig.low_c, '#3b82f6', t('temp_graph.low', 'Low')]].forEach(([value, color, label]) => {
                 const y = scales.y.getPixelForValue(value);
                 if (y < chartArea.top || y > chartArea.bottom) return;
                 ctx.strokeStyle = color;
@@ -16988,11 +16992,29 @@ function mhaOpenHelp() {
             const btn = document.createElement('button');
             btn.className = 'temp-graph-preset' + (days === 1 ? ' active' : '');
             btn.dataset.days = days;
-            btn.textContent = days === 1 ? '24h' : days === 7 ? '7d' : days === 30 ? '30d' : 'All';
+            btn.textContent = days === 1 ? '24h' : days === 7 ? '7d' : days === 30 ? '30d' : t('common.all', 'All');
             btn.onclick = () => loadTemperatureRange(days);
             presetsEl.appendChild(btn);
         });
     }
+
+    function refreshTemperatureGraphLanguage() {
+        const thresholdLabel = t('temp_graph.thresholds', 'Temperature thresholds');
+        document.getElementById('temp-threshold-btn')?.setAttribute('aria-label', thresholdLabel);
+        document.getElementById('temp-threshold-pop')?.setAttribute('aria-label', thresholdLabel);
+        document.getElementById('temp-graph-canvas')?.setAttribute('aria-label', t('temp_graph.temperature_over_time', 'Temperature over time'));
+        const allPreset = document.querySelector('.temp-graph-preset[data-days="90"]');
+        if (allPreset) allPreset.textContent = t('common.all', 'All');
+        if (!_tempGraphOpen) return;
+
+        const shortId = (_tempGraphTagId || _tempGraphImei || '').toString().substring(0, 8);
+        document.getElementById('temp-graph-tag-name').textContent = `${t('temp_graph.last_known_temperature', 'Last Known Temperature')} - ${_tempGraphTagName || t('common.tag', 'Tag')} · ${shortId}`;
+        if (_tempGraphData) updateStats(_tempGraphData, _tempGraphGaps);
+        _tempGraphChart?.update();
+        _tempGraphOverviewChart?.update();
+    }
+
+    document.addEventListener('portal-language-changed', refreshTemperatureGraphLanguage);
     
     // Initialize toggle buttons
     function initToggles() {
@@ -17167,12 +17189,31 @@ function mhaOpenHelp() {
                 body: JSON.stringify({..._tempThresholdConfig, scope: _tempThresholdScope, skip_configured: true}),
             });
             const status = document.getElementById('temp-threshold-status');
-            if (!response.ok) { status.textContent = 'Could not save thresholds.'; return; }
+            if (!response.ok) { status.textContent = t('temp_graph.save_thresholds_failed', 'Could not save thresholds.'); return; }
             const result = await response.json();
-            status.textContent = `${result.updated} tag${result.updated === 1 ? '' : 's'} updated.`;
+            status.textContent = t('temp_graph.thresholds_updated', '{count} tag(s) updated.')
+                .replace('{count}', result.updated);
         };
     }
     
+    function refreshTemperatureGraphLanguage() {
+        const thresholdLabel = t('temp_graph.thresholds', 'Temperature thresholds');
+        document.getElementById('temp-threshold-btn')?.setAttribute('aria-label', thresholdLabel);
+        document.getElementById('temp-threshold-pop')?.setAttribute('aria-label', thresholdLabel);
+        document.getElementById('temp-graph-canvas')?.setAttribute('aria-label', t('temp_graph.temperature_over_time', 'Temperature over time'));
+        const allPreset = document.querySelector('.temp-graph-preset[data-days="90"]');
+        if (allPreset) allPreset.textContent = t('common.all', 'All');
+        if (!_tempGraphOpen) return;
+
+        const shortId = (_tempGraphTagId || _tempGraphImei || '').toString().substring(0, 8);
+        document.getElementById('temp-graph-tag-name').textContent = `${t('temp_graph.last_known_temperature', 'Last Known Temperature')} - ${_tempGraphTagName || t('common.tag', 'Tag')} · ${shortId}`;
+        if (_tempGraphData) updateStats(_tempGraphData, _tempGraphGaps);
+        _tempGraphChart?.update();
+        _tempGraphOverviewChart?.update();
+    }
+
+    document.addEventListener('portal-language-changed', refreshTemperatureGraphLanguage);
+
     // Toggle temperature graph panel
     window.toggleTemperatureGraph = function(imei, tagName) {
         console.log('[TEMP GRAPH] toggleTemperatureGraph called for', imei, tagName);
@@ -17199,7 +17240,8 @@ function mhaOpenHelp() {
         
         // Update UI
         const shortId = (tag.id || imei).toString().substring(0, 8);
-        document.getElementById('temp-graph-tag-name').textContent = `Last Known Temperature - ${tagName || 'Tag'} · ${shortId}`;
+        document.getElementById('temp-graph-tag-name').textContent = `${t('temp_graph.last_known_temperature', 'Last Known Temperature')} - ${tagName || t('common.tag', 'Tag')} · ${shortId}`;
+        refreshTemperatureGraphLanguage();
         document.getElementById('temp-graph-meta').textContent = '';
         
         // Initialize presets and toggles
@@ -17213,6 +17255,7 @@ function mhaOpenHelp() {
         const panel = document.getElementById('temp-graph-panel');
         panel.classList.add('open');
         _tempGraphOpen = true;
+        refreshTemperatureGraphLanguage();
         loadTemperatureThresholds();
         
         // Adjust map area height to make room for graph (50-50 split)
@@ -17304,18 +17347,18 @@ function mhaOpenHelp() {
             const res = await apiFetch(`/api/portal/tags/${tagId}/temperature?days=${days}`);
             if (!res.ok) {
                 const errData = await res.json();
-                throw new Error(errData.detail || errData.error || 'Failed to load temperature data');
+                throw new Error(errData.detail || errData.error || t('temp_graph.load_failed', 'Failed to load temperature data'));
             }
             
             const data = await res.json();
             console.log('[TEMP GRAPH] Received data:', data);
             
             if (!data.success) {
-                throw new Error(data.error || 'Failed to load temperature data');
+                throw new Error(data.error || t('temp_graph.load_failed', 'Failed to load temperature data'));
             }
             
             if (!data.points || data.points.length === 0) {
-                showError('No temperature data available for this period');
+                showError(t('temp_graph.no_temperature_data', 'No temperature data available for this period'));
                 return;
             }
             
@@ -17331,7 +17374,7 @@ function mhaOpenHelp() {
             
         } catch (err) {
             console.error('[TEMP GRAPH] Error loading data:', err);
-            showError(err.message || 'Failed to load temperature data');
+            showError(err.message || t('temp_graph.load_failed', 'Failed to load temperature data'));
         }
     }
     
@@ -17371,7 +17414,7 @@ function mhaOpenHelp() {
         
         const datasets = [
             {
-                label: 'Temperature (°C)',
+                label: `${t('temp_graph.temperature_dataset', 'Temperature')} (°C)`,
                 id: 'temperature',
                 data: segmentPoints(points, GAP_THRESHOLD_MS, 'temp'),
                 borderColor: 'rgb(34, 197, 94)',
@@ -17384,7 +17427,7 @@ function mhaOpenHelp() {
                 fill: true
             },
             {
-                label: 'Battery (%)',
+                label: `${t('temp_graph.battery_dataset', 'Battery')} (%)`,
                 id: 'battery',
                 data: segmentPoints(points, GAP_THRESHOLD_MS, 'batt'),
                 borderColor: 'rgb(59, 130, 246)',
@@ -17397,7 +17440,7 @@ function mhaOpenHelp() {
                 yAxisID: 'y1'
             },
             {
-                label: 'Altitude (m)',
+                label: `${t('temp_graph.altitude_dataset', 'Altitude')} (m)`,
                 id: 'altitude',
                 data: segmentPoints(points, GAP_THRESHOLD_MS, 'alt'),
                 borderColor: 'rgb(245, 158, 11)',
@@ -17410,17 +17453,17 @@ function mhaOpenHelp() {
                 yAxisID: 'y2'
             },
             ...gapBridgePoints(points, GAP_THRESHOLD_MS, 'temp').map(data => ({
-                label: 'Temperature gap', id: 'temperature-gap', data,
+                label: t('temp_graph.temperature_gap', 'Temperature gap'), id: 'temperature-gap', data,
                 borderColor: 'rgb(34, 197, 94)', borderWidth: 2, borderDash: [7, 5],
                 pointRadius: 0, tension: 0, fill: false, yAxisID: 'y',
             })),
             ...gapBridgePoints(points, GAP_THRESHOLD_MS, 'batt').map(data => ({
-                label: 'Battery gap', id: 'battery-gap', data,
+                label: t('temp_graph.battery_gap', 'Battery gap'), id: 'battery-gap', data,
                 borderColor: 'rgb(59, 130, 246)', borderWidth: 1.5, borderDash: [7, 5],
                 pointRadius: 0, tension: 0, fill: false, hidden: !_showBattery, yAxisID: 'y1',
             })),
             ...gapBridgePoints(points, GAP_THRESHOLD_MS, 'alt').map(data => ({
-                label: 'Altitude gap', id: 'altitude-gap', data,
+                label: t('temp_graph.altitude_gap', 'Altitude gap'), id: 'altitude-gap', data,
                 borderColor: 'rgb(245, 158, 11)', borderWidth: 1.5, borderDash: [7, 5],
                 pointRadius: 0, tension: 0, fill: false, hidden: !_showAltitude, yAxisID: 'y2',
             }))
@@ -17445,7 +17488,7 @@ function mhaOpenHelp() {
                         backgroundColor: 'rgba(0, 0, 0, 0.8)',
                         filter: ctx => !ctx.dataset.id.endsWith('-gap'),
                         callbacks: {
-                            title: ctx => ctx.length ? new Date(ctx[0].parsed.x).toLocaleString() : '',
+                            title: ctx => ctx.length ? new Date(ctx[0].parsed.x).toLocaleString(currentLocale()) : '',
                             label: ctx => {
                                 let label = ctx.dataset.label || '';
                                 if (ctx.parsed.y !== null) {
@@ -17467,7 +17510,7 @@ function mhaOpenHelp() {
                         grid: {color: 'rgba(0,0,0,0.05)'},
                         ticks: {
                             maxRotation: 0,
-                            callback: value => new Date(value).toLocaleString([], _tempGraphDays <= 1
+                            callback: value => new Date(value).toLocaleString(currentLocale(), _tempGraphDays <= 1
                                 ? { hour: '2-digit', minute: '2-digit' }
                                 : { month: 'short', day: 'numeric' })
                         }
