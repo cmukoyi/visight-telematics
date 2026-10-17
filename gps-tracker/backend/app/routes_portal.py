@@ -277,7 +277,10 @@ def _delete_tag_with_cleanup(db: Session, tag: BLETag, logger_prefix: str = "TAG
     Raises:
         Exception if deletion fails (caller should handle rollback)
     """
-    from app.models import DevicePosition, Journey, Leg, Stationary, EngineState, DeviceState
+    from app.models import (
+        DevicePosition, Journey, Leg, Stationary, EngineState, DeviceState,
+        HiveTagMembership, POITrackerLink, GeofenceAlert, PortalAlert,
+    )
     import logging
     
     logger = logging.getLogger(__name__)
@@ -291,42 +294,62 @@ def _delete_tag_with_cleanup(db: Session, tag: BLETag, logger_prefix: str = "TAG
         
         deleted_counts = {}
         
-        # 1. Device positions (no foreign key dependencies)
+        # 1. Remove tag-owned links before deleting the tag itself.
+        # Hive membership is a one-tag-per-hive FK and must not require a user
+        # to manually dismantle a Hive before deleting an asset.
+        deleted_counts['hive_memberships'] = db.query(HiveTagMembership).filter(
+            HiveTagMembership.tag_id == tag.id
+        ).delete(synchronize_session=False)
+        deleted_counts['poi_links'] = db.query(POITrackerLink).filter(
+            POITrackerLink.tracker_id == tag.id
+        ).delete(synchronize_session=False)
+        deleted_counts['geofence_alerts'] = db.query(GeofenceAlert).filter(
+            GeofenceAlert.tracker_id == tag.id
+        ).delete(synchronize_session=False)
+        deleted_counts['alerts_detached'] = db.query(PortalAlert).filter(
+            PortalAlert.tag_id == tag.id
+        ).update({PortalAlert.tag_id: None}, synchronize_session=False)
+
+        # 2. Device positions (no foreign key dependencies)
         deleted_counts['positions'] = db.query(DevicePosition).filter(
             DevicePosition.device_imei == device_imei
         ).delete(synchronize_session=False)
         
-        # 2. Journeys (referenced by legs/stationaries)
+        # 3. Journeys (referenced by legs/stationaries)
         deleted_counts['journeys'] = db.query(Journey).filter(
             Journey.device_imei == device_imei
         ).delete(synchronize_session=False)
         
-        # 3. Legs (no children)
+        # 4. Legs (no children)
         deleted_counts['legs'] = db.query(Leg).filter(
             Leg.device_imei == device_imei
         ).delete(synchronize_session=False)
         
-        # 4. Stationaries (no children)
+        # 5. Stationaries (no children)
         deleted_counts['stationaries'] = db.query(Stationary).filter(
             Stationary.device_imei == device_imei
         ).delete(synchronize_session=False)
         
-        # 5. Engine state (no children)
+        # 6. Engine state (no children)
         deleted_counts['engine_state'] = db.query(EngineState).filter(
             EngineState.device_imei == device_imei
         ).delete(synchronize_session=False)
         
-        # 6. Device state (no children)
+        # 7. Device state (no children)
         deleted_counts['device_state'] = db.query(DeviceState).filter(
             DeviceState.device_imei == device_imei
         ).delete(synchronize_session=False)
         
-        # 7. Finally delete the tag itself
+        # 8. Finally delete the tag itself
         db.delete(tag)
         db.flush()  # Ensure deletion happens before commit
         
         logger.info(
             f"{logger_prefix}: Device {device_imei} cleanup complete - "
+            f"hive_memberships={deleted_counts['hive_memberships']}, "
+            f"poi_links={deleted_counts['poi_links']}, "
+            f"geofence_alerts={deleted_counts['geofence_alerts']}, "
+            f"alerts_detached={deleted_counts['alerts_detached']}, "
             f"positions={deleted_counts['positions']}, "
             f"journeys={deleted_counts['journeys']}, "
             f"legs={deleted_counts['legs']}, "

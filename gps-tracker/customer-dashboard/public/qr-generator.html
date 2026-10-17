@@ -729,6 +729,9 @@ function qrT(key, fallback) {
   }
 }
 
+const qrTextSources = new WeakMap();
+const qrAttributeSources = new WeakMap();
+
 function translateQrGenerator() {
   const normalize = value => value.replace(/\s+/g, ' ').trim();
   const lookup = new Map([
@@ -739,10 +742,12 @@ function translateQrGenerator() {
   const nodes = [];
   while (walker.nextNode()) nodes.push(walker.currentNode);
   nodes.forEach(node => {
-    const text = node.nodeValue.trim();
+    const original = qrTextSources.get(node) || node.nodeValue;
+    const text = original.trim();
     const key = lookup.get(normalize(text));
     if (key) {
-      const translated = node.nodeValue.replace(text, qrT(key, text));
+      qrTextSources.set(node, original);
+      const translated = original.replace(text, qrT(key, QR_ENGLISH[key] || text));
       if (translated !== node.nodeValue) node.nodeValue = translated;
     }
   });
@@ -753,12 +758,15 @@ function translateQrGenerator() {
     if (el.textContent !== translated) el.textContent = translated;
   });
   document.querySelectorAll('[title], [placeholder]').forEach(el => {
+    const originals = qrAttributeSources.get(el) || {};
     ['title', 'placeholder'].forEach(attribute => {
-      const value = el.getAttribute(attribute);
+      const value = originals[attribute] || el.getAttribute(attribute);
       const key = lookup.get(value);
       if (key) {
+        originals[attribute] = value;
+        qrAttributeSources.set(el, originals);
         const translated = qrT(key, value);
-        if (translated !== value) el.setAttribute(attribute, translated);
+        if (translated !== el.getAttribute(attribute)) el.setAttribute(attribute, translated);
       }
     });
   });
