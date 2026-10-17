@@ -98,6 +98,7 @@ logger = logging.getLogger(__name__)
 
 # ── Engine Version (v2.2.0 - Fix Register) ────────────────────────────────
 ENGINE_VERSION = "2.1.27"  # v2.1.27: Extend displacement-aware gap handling to Jimi devices
+FUTURE_POSITION_TOLERANCE = timedelta(minutes=5)
 
 # ── Verbose Debug Logging for Specific Devices ────────────────────────────
 VERBOSE_DEBUG_DEVICES = {
@@ -1931,6 +1932,40 @@ class TripEngine:
         """
         # Load engine state
         self.context = self._load_state()
+        server_now = datetime.now(timezone.utc)
+        processing_cutoff = server_now + FUTURE_POSITION_TOLERANCE
+
+        latest_valid_received_at = self.db.execute(
+            select(func.max(DevicePosition.received_at)).where(
+                and_(
+                    DevicePosition.device_imei == self.device_imei,
+                    DevicePosition.received_at <= processing_cutoff,
+                )
+            )
+        ).scalar_one()
+        if (
+            self.context.last_received_at is not None
+            and (
+                (
+                    latest_valid_received_at is not None
+                    and self.context.last_received_at > latest_valid_received_at
+                )
+                or (
+                    latest_valid_received_at is None
+                    and self.context.last_received_at > processing_cutoff
+                )
+            )
+        ):
+            previous_watermark = self.context.last_received_at
+            self.context.last_received_at = latest_valid_received_at
+            logger.warning(
+                "watermark: self-corrected — was ahead of latest eligible position "
+                "for IMEI %s (previous=%s, corrected=%s)",
+                self.device_imei,
+                previous_watermark.isoformat(),
+                latest_valid_received_at.isoformat() if latest_valid_received_at else None,
+            )
+            self._save_state(self.context)
         
         # FIX 2a: Invalid-state self-correct (recovers already-wedged devices)
         # Check if current_journey is ended (invalid state)
@@ -1985,6 +2020,20 @@ class TripEngine:
                 )
             )
         
+        future_positions = self.db.execute(
+            query.where(DevicePosition.received_at > processing_cutoff)
+        ).scalars().all()
+        for position in future_positions:
+            logger.warning(
+                "watermark: future-dated position rejected for IMEI %s "
+                "(position_received_at=%s, server_now=%s)",
+                position.device_imei,
+                position.received_at.isoformat(),
+                server_now.isoformat(),
+            )
+
+        query = query.where(DevicePosition.received_at <= processing_cutoff)
+
         # Process in observed_at order (chronological), but checkpoint on received_at
         query = query.order_by(DevicePosition.observed_at)
         
@@ -2068,7 +2117,8 @@ class TripEngine:
                 rebuild_query = select(DevicePosition).where(
                     and_(
                         DevicePosition.device_imei == self.device_imei,
-                        DevicePosition.observed_at >= rebuild_from
+                        DevicePosition.observed_at >= rebuild_from,
+                        DevicePosition.received_at <= processing_cutoff,
                     )
                 ).order_by(DevicePosition.observed_at)
                 

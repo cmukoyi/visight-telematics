@@ -257,6 +257,16 @@ class TripEngineWorkerPool:
         WHERE ds.trip_subscribed = true
         GROUP BY ds.device_imei, es.last_received_at
         HAVING COUNT(dp.id) > 0
+            OR es.last_received_at > NOW() + INTERVAL '5 minutes'
+            OR (
+                es.last_received_at IS NOT NULL
+                AND es.last_received_at > (
+                    SELECT MAX(latest.received_at)
+                    FROM device_positions latest
+                    WHERE latest.device_imei = ds.device_imei
+                      AND latest.received_at <= NOW() + INTERVAL '5 minutes'
+                )
+            )
         ORDER BY age_seconds ASC  -- Oldest data first
         """)
         
