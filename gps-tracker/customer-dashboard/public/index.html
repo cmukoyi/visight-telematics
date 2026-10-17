@@ -16998,24 +16998,6 @@ function mhaOpenHelp() {
         });
     }
 
-    function refreshTemperatureGraphLanguage() {
-        const thresholdLabel = t('temp_graph.thresholds', 'Temperature thresholds');
-        document.getElementById('temp-threshold-btn')?.setAttribute('aria-label', thresholdLabel);
-        document.getElementById('temp-threshold-pop')?.setAttribute('aria-label', thresholdLabel);
-        document.getElementById('temp-graph-canvas')?.setAttribute('aria-label', t('temp_graph.temperature_over_time', 'Temperature over time'));
-        const allPreset = document.querySelector('.temp-graph-preset[data-days="90"]');
-        if (allPreset) allPreset.textContent = t('common.all', 'All');
-        if (!_tempGraphOpen) return;
-
-        const shortId = (_tempGraphTagId || _tempGraphImei || '').toString().substring(0, 8);
-        document.getElementById('temp-graph-tag-name').textContent = `${t('temp_graph.last_known_temperature', 'Last Known Temperature')} - ${_tempGraphTagName || t('common.tag', 'Tag')} · ${shortId}`;
-        if (_tempGraphData) updateStats(_tempGraphData, _tempGraphGaps);
-        _tempGraphChart?.update();
-        _tempGraphOverviewChart?.update();
-    }
-
-    document.addEventListener('portal-language-changed', refreshTemperatureGraphLanguage);
-    
     // Initialize toggle buttons
     function initToggles() {
         const smoothToggle = document.getElementById('temp-graph-smooth-toggle');
@@ -17206,8 +17188,23 @@ function mhaOpenHelp() {
         if (!_tempGraphOpen) return;
 
         const shortId = (_tempGraphTagId || _tempGraphImei || '').toString().substring(0, 8);
-        document.getElementById('temp-graph-tag-name').textContent = `${t('temp_graph.last_known_temperature', 'Last Known Temperature')} - ${_tempGraphTagName || t('common.tag', 'Tag')} · ${shortId}`;
+        document.getElementById('temp-graph-tag-name').textContent = `${t('temp_graph.last_known_temperature', 'Last Known Temperature')} - ${_tempGraphTagName || t('temp_graph.unnamed_tag', 'Tag')} · ${shortId}`;
         if (_tempGraphData) updateStats(_tempGraphData, _tempGraphGaps);
+        _tempGraphChart?.data.datasets.forEach(dataset => {
+            const labels = {
+                temperature: t('temp_graph.temperature_dataset', 'Temperature'),
+                battery: t('temp_graph.battery_dataset', 'Battery'),
+                altitude: t('temp_graph.altitude_dataset', 'Altitude'),
+                'temperature-gap': t('temp_graph.temperature_gap', 'Temperature gap'),
+                'battery-gap': t('temp_graph.battery_gap', 'Battery gap'),
+                'altitude-gap': t('temp_graph.altitude_gap', 'Altitude gap'),
+            };
+            if (labels[dataset.id]) dataset.label = labels[dataset.id] + (
+                dataset.id === 'temperature' ? ' (°C)' :
+                dataset.id === 'battery' ? ' (%)' :
+                dataset.id === 'altitude' ? ' (m)' : ''
+            );
+        });
         _tempGraphChart?.update();
         _tempGraphOverviewChart?.update();
     }
@@ -17240,8 +17237,7 @@ function mhaOpenHelp() {
         
         // Update UI
         const shortId = (tag.id || imei).toString().substring(0, 8);
-        document.getElementById('temp-graph-tag-name').textContent = `${t('temp_graph.last_known_temperature', 'Last Known Temperature')} - ${tagName || t('common.tag', 'Tag')} · ${shortId}`;
-        refreshTemperatureGraphLanguage();
+        document.getElementById('temp-graph-tag-name').textContent = `${t('temp_graph.last_known_temperature', 'Last Known Temperature')} - ${tagName || t('temp_graph.unnamed_tag', 'Tag')} · ${shortId}`;
         document.getElementById('temp-graph-meta').textContent = '';
         
         // Initialize presets and toggles
