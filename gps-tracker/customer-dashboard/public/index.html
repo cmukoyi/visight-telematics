@@ -4351,6 +4351,13 @@ input.hive-range::-moz-range-track {
                     <option value="series_5" data-i18n="options.series_5_hubble">Series 5 (Hubble)</option>
                 </select>
             </div>
+            <div id="tagMgmtStickerTagGroup" class="form-group" style="display:none">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0">
+                    <input type="checkbox" id="tagMgmtStickerTag" style="cursor:pointer">
+                    <span style="font-weight:600">Sticker Tag (MTB02)</span>
+                </label>
+                <p style="font-size:12px;color:var(--text-secondary);margin:6px 0 0 24px">MTB02 reports battery voltage, not percentage. Enable voltage-based battery readings for this tag.</p>
+            </div>
             <div id="tagMgmtCategoryGroup" class="form-group">
                 <label data-i18n="labels.category">Category</label>
                 <select id="tagMgmtCategory">
@@ -5916,6 +5923,11 @@ function _updateImeiLabelForTagType() {
     const tagType = document.getElementById('tagMgmtType').value;
     const label = document.getElementById('tagMgmtImeiLabel');
     const input = document.getElementById('tagMgmtImei');
+    const stickerGroup = document.getElementById('tagMgmtStickerTagGroup');
+    const stickerCheckbox = document.getElementById('tagMgmtStickerTag');
+    const isSeries5 = ['series_5', 'series5', 'hubble'].includes(tagType);
+    stickerGroup.style.display = isSeries5 ? '' : 'none';
+    if (!isSeries5) stickerCheckbox.checked = false;
     
     if (tagType === 'series_4' || tagType === 'series4') {
         label.textContent = 'MAC Address *';
@@ -5948,6 +5960,7 @@ async function openAddTagModal() {
     imeiInput.style.color = '';
     imeiInput.setAttribute('required', '');
     document.getElementById('tagMgmtDesc').value = '';
+    document.getElementById('tagMgmtStickerTag').checked = false;
     
     // Filter tag type options based on usergroup permissions AND tenant features
     const _typeSelAdd = document.getElementById('tagMgmtType');
@@ -5996,6 +6009,7 @@ async function openAssignTagModal(tagId, currentOwner) {
     document.getElementById('tagMgmtImeiGroup').style.display = 'none';
     document.getElementById('tagMgmtDescGroup').style.display = 'none';
     document.getElementById('tagMgmtTypeGroup').style.display = 'none';
+    document.getElementById('tagMgmtStickerTagGroup').style.display = 'none';
     document.getElementById('tagMgmtAlert').style.display = 'none';
     openModal('tagMgmtModal');
     await _loadMobileUsersIntoSelect();
@@ -6066,6 +6080,7 @@ async function openTagMgmtModal(mode, imei) {
     
     // Update IMEI label based on tag type (even though field is readonly)
     _updateImeiLabelForTagType();
+    document.getElementById('tagMgmtStickerTag').checked = tag.attributes?._sticker_tag_mtb02 === true;
 
     // Category
     document.getElementById('tagMgmtCategoryGroup').style.display = '';
@@ -6245,6 +6260,7 @@ async function submitTagForm(e) {
                     category: categoryName,
                     package_id: _pkgVal || null,
                     trip_subscribed: document.getElementById('tagMgmtTripSubscribed').checked,
+                    sticker_tag: document.getElementById('tagMgmtStickerTag').checked,
                 }),
             });
         } else if (tagId) {
@@ -6271,6 +6287,7 @@ async function submitTagForm(e) {
                     package_id: packageId,
                     category: categoryName,
                     trip_subscribed: document.getElementById('tagMgmtTripSubscribed').checked,
+                    sticker_tag: document.getElementById('tagMgmtStickerTag').checked,
                 }),
             });
         }
@@ -11281,6 +11298,18 @@ function lmShareTag(imei, ev) {
     }, 10);
 }
 
+function _tagBatteryHtml(tag, compact = false) {
+    const voltage = tag.attributes?.['Battery Voltage']?.value;
+    if (voltage) {
+        const value = esc(voltage);
+        return `<span class="battery-wrap"><i class="fa-solid fa-battery-half"></i> ${compact ? `<small>${value}</small>` : value}</span>`;
+    }
+    if (tag.battery_level == null) return '';
+    const battery = Number(tag.battery_level);
+    const batteryClass = battery > 20 ? 'good' : 'low';
+    return `<span class="battery-wrap ${batteryClass}"><i class="fa-solid fa-battery-full"></i> ${compact ? `<small>${battery}%</small>` : `${battery}%`}</span>`;
+}
+
 function _lmRenderList(query) {
     query = (query || document.getElementById('lm-search')?.value || '').toLowerCase();
     const list = _lmTags.filter(t => {
@@ -11315,10 +11344,7 @@ function _lmRenderList(query) {
         const iconBg  = `${statusColors[status]}20`;
         const iconClr = statusColors[status];
         const faIcon  = hasGPS ? 'fa-location-dot' : 'fa-tag';
-        const batPct  = t.battery_level;
-        const batCls  = batPct == null ? '' : batPct > 20 ? 'good' : 'low';
-        const battery = batPct != null
-            ? `<span class="battery-wrap ${batCls}"><i class="fa-solid fa-battery-full"></i> <small>${batPct}%</small></span>` : '';
+        const battery = _tagBatteryHtml(t, true);
         
         // Time badge (last seen)
         const {text: timeText, cssClass: timeClass} = mhaGetTimeBadge(t.last_seen);
@@ -11459,6 +11485,7 @@ function _lmRenderSensorData(tag) {
         { key: 'Altitude', label: t('text.altitude', 'Altitude'), icon: 'fa-mountain', color: 'var(--success)' },
         { key: 'RSSI', label: 'RSSI', icon: 'fa-signal', color: 'var(--warning)' },
         { key: 'GPS_Accuracy', label: t('assets.gps_accuracy', 'GPS Accuracy'), icon: 'fa-bullseye', color: 'var(--text-3)' },
+        { key: 'Battery Voltage', label: t('assets.battery_voltage', 'Battery Voltage'), icon: 'fa-battery-half', color: 'var(--success)' },
         { key: 'Battery', label: t('text.battery', 'Battery'), icon: 'fa-battery-half', color: 'var(--success)' }
     ];
     
@@ -11678,10 +11705,7 @@ function alRenderTable() {
         const owner  = esc((tag.owner_email || '').split('@')[0] || '—');
         const typeLabel = _tagTypeLabel(tag.tag_type);
         const typeColor = typeLabel === 'Series 1' ? 'var(--primary)' : typeLabel === 'Series 2' ? 'var(--warning,#f59e0b)' : 'var(--text-3)';
-        const batPct = tag.battery_level != null ? tag.battery_level : null;
-        const batCls = batPct == null ? '' : batPct > 20 ? 'good' : 'low';
-        const batHtml= batPct != null
-            ? `<span class="battery-wrap ${batCls}"><i class="fa-solid fa-battery-full"></i> <small>${batPct}%</small></span>` : '—';
+        const batHtml = _tagBatteryHtml(tag, true) || '—';
         const hasGPS = !!(tag.latitude && tag.longitude);
         const locHtml = hasGPS
             ? `<span style="color:var(--success);font-size:.78rem"><i class="fa-solid fa-location-dot"></i> ${esc(tag.location_description || '—')}</span>`
@@ -12197,10 +12221,7 @@ function amRenderCards() {
         } else if (daysLeft) {
             expiryDisplay = daysLeft;
         }
-        const batPct   = tag.battery_level;
-        const batCls   = batPct == null ? '' : batPct > 20 ? 'good' : 'low';
-        const batHtml  = batPct != null
-            ? `<span class="battery-wrap ${batCls}"><i class="fa-solid fa-battery-full"></i> ${batPct}%</span>` : '—';
+        const batHtml  = _tagBatteryHtml(tag) || '—';
         return `<div class="asset-card">
             <div class="asset-card-header" style="border-top:3px solid ${color}">
                 <div class="asset-card-icon" style="background:${color}20;color:${color}">

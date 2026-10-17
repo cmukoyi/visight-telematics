@@ -25,6 +25,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
 
 
+def _is_mtb02_sticker_tag(tracker: BLETag) -> bool:
+    return (
+        (tracker.tag_type or "").lower() == "hubble"
+        and (tracker.attributes or {}).get("_sticker_tag_mtb02") is True
+    )
+
+
 @router.post("/hubble")
 async def hubble_webhook(
     request: Request,
@@ -135,6 +142,8 @@ async def hubble_webhook(
             if not tracker:
                 logger.warning(f"⚠️  Device {device_id} not found in database (queried imei='{device_id}', tag_type='hubble')")
                 continue
+
+            sticker_tag_mtb02 = _is_mtb02_sticker_tag(tracker)
             
             try:
                 # Extract data from packet
@@ -172,7 +181,9 @@ async def hubble_webhook(
                 payload_b64 = device_info.get("payload")
                 sensor_data_pre = {}
                 if payload_b64:
-                    sensor_data_pre = HubbleTagProvider.decode_minew_payload(payload_b64)
+                    sensor_data_pre = HubbleTagProvider.decode_minew_payload(
+                        payload_b64, sticker_tag_mtb02=sticker_tag_mtb02
+                    )
                 
                 position_data = {
                     'device_imei': device_id,
@@ -186,7 +197,7 @@ async def hubble_webhook(
                     'source': 'webhook',  # Mark as webhook-sourced (vs 'batch' for TrackSolid)
                     # Sensor data (canonical units: °C, %, meters, dBm)
                     'temperature': sensor_data_pre.get('temperature'),  # °C
-                    'battery_pct': sensor_data_pre.get('battery'),      # %
+                    'battery_pct': sensor_data_pre.get('battery'),      # %; NULL for MTB02 voltage mode
                     'altitude': location.get('altitude'),                # meters
                     'rssi': device_info.get('rssi'),                     # dBm
                 }
@@ -224,7 +235,9 @@ async def hubble_webhook(
                 payload_b64 = device_info.get("payload")
                 sensor_data = {}
                 if payload_b64:
-                    sensor_data = HubbleTagProvider.decode_minew_payload(payload_b64)
+                    sensor_data = HubbleTagProvider.decode_minew_payload(
+                        payload_b64, sticker_tag_mtb02=sticker_tag_mtb02
+                    )
                 
                 # Build attributes dict
                 attrs = tracker.attributes or {}
@@ -240,11 +253,22 @@ async def hubble_webhook(
                     attrs["Temperature"] = {"value": f"{temperature}°C", "show_on_map": True}
                     check_temperature_alert(db, tracker, float(temperature))
                 
-                # Battery
-                battery = sensor_data.get("battery")
-                if battery is not None:
-                    tracker.battery_level = battery
-                    attrs["Battery"] = {"value": f"{battery}%", "show_on_map": True}
+                # MTB02 sticker tags report voltage; never persist it as battery percent.
+                if sticker_tag_mtb02:
+                    tracker.battery_level = None
+                    attrs.pop("Battery", None)
+                    battery_voltage = sensor_data.get("battery_voltage")
+                    if battery_voltage is not None:
+                        attrs["Battery Voltage"] = {
+                            "value": f"{battery_voltage:.5f} V",
+                            "show_on_map": True,
+                        }
+                else:
+                    attrs.pop("Battery Voltage", None)
+                    battery = sensor_data.get("battery")
+                    if battery is not None:
+                        tracker.battery_level = battery
+                        attrs["Battery"] = {"value": f"{battery}%", "show_on_map": True}
                 
                 # Altitude
                 altitude = location.get("altitude")

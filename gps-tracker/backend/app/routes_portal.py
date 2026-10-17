@@ -2441,6 +2441,7 @@ class PortalTagCreate(BaseModel):
     package_id: UUID  # mandatory — must select a package when adding a tag
     category: Optional[str] = None  # category name to store in attributes
     trip_subscribed: Optional[bool] = False  # subscribe to Advanced Trip Analysis
+    sticker_tag: Optional[bool] = False  # MTB02 sticker tag; battery payload is voltage
 
 
 class PortalTagAssign(BaseModel):
@@ -2595,6 +2596,7 @@ class PortalTagUpdate(BaseModel):
     category: Optional[str] = None  # category name; empty string clears it
     package_id: Optional[str] = None  # UUID string; empty string clears package
     trip_subscribed: Optional[bool] = None  # subscribe to Advanced Trip Analysis
+    sticker_tag: Optional[bool] = None  # MTB02 sticker tag; battery payload is voltage
 
 
 @router.put("/tags/{tag_id}", response_model=PortalTagOut)
@@ -2631,6 +2633,17 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
     if data.tag_type is not None:
         # Normalise UI aliases ('series1'/'series2') to canonical DB values ('scope'/'tracksolid')
         tag.tag_type = _TAG_TYPE_ALIAS.get(data.tag_type.lower(), data.tag_type.lower())
+    if data.sticker_tag is not None:
+        tag_type = (tag.tag_type or '').lower()
+        if data.sticker_tag and tag_type != 'hubble':
+            raise HTTPException(status_code=400, detail="Sticker Tag battery mode is only valid for Series 5 (Hubble) tags")
+        attrs = dict(tag.attributes or {})
+        if data.sticker_tag:
+            attrs['_sticker_tag_mtb02'] = True
+        else:
+            attrs.pop('_sticker_tag_mtb02', None)
+            attrs.pop('Battery Voltage', None)
+        tag.attributes = attrs or None
     fields_set = getattr(data, "model_fields_set", getattr(data, "__fields_set__", set()))
     if "user_id" in fields_set:
         if data.user_id:
@@ -2769,6 +2782,8 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
     
     # Validate IMEI/MAC against the vendor platform before persisting
     canonical_type = _TAG_TYPE_ALIAS.get((data.tag_type or "scope").lower(), (data.tag_type or "scope").lower())
+    if data.sticker_tag and canonical_type != "hubble":
+        raise HTTPException(status_code=400, detail="Sticker Tag battery mode is only valid for Series 5 (Hubble) tags")
     try:
         provider = DeviceProviderFactory.get_provider(canonical_type)
         validation = await provider.validate_tag(imei)
@@ -2806,6 +2821,8 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
     init_attrs: dict = {}
     if data.category:
         init_attrs['category'] = {'value': data.category}
+    if data.sticker_tag:
+        init_attrs['_sticker_tag_mtb02'] = True
     if data.description:
         init_attrs['_user_named'] = True
     init_attrs['_created_usergroup_id'] = str(group.id)

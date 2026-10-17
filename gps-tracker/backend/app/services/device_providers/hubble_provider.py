@@ -66,18 +66,19 @@ class HubbleTagProvider(DeviceTagProvider):
         return "hubble"
 
     @staticmethod
-    def decode_minew_payload(payload_b64: str) -> Dict[str, Any]:
+    def decode_minew_payload(payload_b64: str, *, sticker_tag_mtb02: bool = False) -> Dict[str, Any]:
         """
         Decode Hubble Minew beacon payload per official Hubble documentation.
         
         Official Hubble Payload Format (Custom Payload / Hubble Frame):
-          Byte 0:    Battery Level (0-100%)
+          Byte 0:    Battery level (0-100%), or MTB02 sticker-tag voltage byte
           Bytes 1-2: Temperature (big-endian uint16, divide by 100 for °C)
         
         Example:
           Base64: "ZApd"
           Decoded HEX: 64 0A 5D
-          Battery: 0x64 = 100 decimal = 100%
+          Battery: 0x64 = 100 decimal = 100% on standard Hubble tags
+          MTB02 sticker battery: raw byte × 0.03125 V (0x2F = 1.46875 V)
           Temperature: 0x0A5D = 2653 decimal = 2653/100 = 26.53°C
         
         Reference: Hubble Platform API Documentation
@@ -90,6 +91,7 @@ class HubbleTagProvider(DeviceTagProvider):
             {
                 "temperature": float or None,  # °C (divide by 100)
                 "battery": int or None,        # % (0-100)
+                "battery_voltage": float or None,  # V (MTB02 sticker tags only)
                 "raw_hex": str,                # Raw hex string for debugging
             }
         """
@@ -98,6 +100,7 @@ class HubbleTagProvider(DeviceTagProvider):
         result = {
             "temperature": None,
             "battery": None,
+            "battery_voltage": None,
             "raw_hex": None,
         }
         
@@ -105,18 +108,29 @@ class HubbleTagProvider(DeviceTagProvider):
             payload_bytes = base64.b64decode(payload_b64)
             result["raw_hex"] = payload_bytes.hex()
             
-            # Minimum 3 bytes required: 1 byte battery + 2 bytes temperature
-            if len(payload_bytes) < 3:
-                logger.debug(f"decode_minew_payload: payload too short ({len(payload_bytes)} bytes), expected >= 3")
+            if not payload_bytes:
+                logger.debug("decode_minew_payload: empty payload")
                 return result
             
-            # Byte 0: Battery Level (0-100%)
-            battery = payload_bytes[0]
-            if 0 <= battery <= 100:
-                result["battery"] = int(battery)
-                logger.debug(f"decode_minew_payload: battery={battery}%")
+            # MTB02 sticker tags report voltage in byte 0, not a percentage.
+            battery_byte = payload_bytes[0]
+            if sticker_tag_mtb02:
+                result["battery_voltage"] = battery_byte * 0.03125
+                logger.debug("decode_minew_payload: MTB02 battery=%sV", result["battery_voltage"])
             else:
-                logger.warning(f"decode_minew_payload: battery value out of range: {battery}")
+                # Preserve existing standard-device behavior: require battery + temperature bytes.
+                if len(payload_bytes) < 3:
+                    logger.debug(f"decode_minew_payload: payload too short ({len(payload_bytes)} bytes), expected >= 3")
+                    return result
+                if battery_byte <= 100:
+                    result["battery"] = int(battery_byte)
+                    logger.debug(f"decode_minew_payload: battery={battery_byte}%")
+                else:
+                    logger.warning(f"decode_minew_payload: battery value out of range: {battery_byte}")
+
+            if len(payload_bytes) < 3:
+                logger.debug(f"decode_minew_payload: payload too short for temperature ({len(payload_bytes)} bytes), expected >= 3")
+                return result
             
             # Bytes 1-2: Temperature (big-endian uint16, divide by 100)
             # Example: 0x0A 0x5D = (10 << 8) | 93 = 2653 → 26.53°C
