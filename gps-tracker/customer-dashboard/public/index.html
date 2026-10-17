@@ -10159,11 +10159,11 @@ async function loadUsers() {
         } else {
             const roleBadge = r => {
                 const map = {
-                    system_admin: ['badge-danger',  'Built-in System Admin'],
-                    admin:        ['badge-info',    'Admin'],
-                    manager:      ['badge-primary', 'Manager'],
-                    reporter:     ['badge-success', 'Reporter'],
-                    custom:       ['badge-warning', 'Custom'],
+                    system_admin: ['badge-danger',  t('auth.built_in_system_admin', 'Built-in System Admin')],
+                    admin:        ['badge-info',    t('users.admin', 'Admin')],
+                    manager:      ['badge-primary', t('users.manager', 'Manager')],
+                    reporter:     ['badge-success', t('users.reporter', 'Reporter')],
+                    custom:       ['badge-warning', t('users.custom', 'Custom')],
                 };
                 const [cls, label] = map[r] || ['badge-secondary', r || 'User'];
                 return `<span class="badge ${cls}">${label}</span>`;
@@ -10180,17 +10180,17 @@ async function loadUsers() {
                 const meIsSysAdmin = me?.role === 'system_admin';
                 const canModifyAdmin = meIsAdmin || !targetIsAdmin;
                 const resetBtn = (meIsSysAdmin && !isSelf) ? `<button class="btn btn-ghost btn-sm" onclick="sysAdminResetPassword('${esc(u.id)}','${esc(u.email)}','${esc(name)}')" data-i18n-title="tooltips.reset_this_users_password" title="Reset this user's password">
-                        <i class="fa-solid fa-key"></i> Reset Pwd
+                    <i class="fa-solid fa-key"></i> ${t('users.reset_password', 'Reset Pwd')}
                     </button>` : '';
-                const actions = isSelf ? '<span style="color:var(--text-3);font-size:12px">You</span>' : isSystemAdmin ? `<span style="color:var(--text-3);font-size:12px;margin-right:6px">Built-in</span>${resetBtn}` : `
+                const actions = isSelf ? `<span style="color:var(--text-3);font-size:12px">${t('common.you', 'You')}</span>` : isSystemAdmin ? `<span style="color:var(--text-3);font-size:12px;margin-right:6px">${t('users.built_in', 'Built-in')}</span>${resetBtn}` : `
                     <button class="btn btn-ghost btn-sm" onclick="openEditRoleModal('${esc(u.id)}','${esc(name)}','${esc(u.role||'admin')}',${esc(JSON.stringify(u.custom_features||[]))})" data-i18n-title="tooltips.change_role" title="Change role">
-                        <i class="fa-solid fa-shield-halved"></i> Role
+                        <i class="fa-solid fa-shield-halved"></i> ${t('auth.role', 'Role')}
                     </button>
-                    ${canModifyAdmin ? `<button class="btn btn-ghost btn-sm" onclick="toggleUserActive('${esc(u.id)}',${u.is_active},'${esc(name)}')" title="${u.is_active ? 'Deactivate' : 'Activate'} user">
-                        <i class="fa-solid fa-${u.is_active ? 'user-slash' : 'user-check'}"></i> ${u.is_active ? 'Deactivate' : 'Activate'}
+                    ${canModifyAdmin ? `<button class="btn btn-ghost btn-sm" onclick="toggleUserActive('${esc(u.id)}',${u.is_active},'${esc(name)}')" title="${t(u.is_active ? 'tooltips.deactivate_user' : 'tooltips.activate_user', u.is_active ? 'Deactivate user' : 'Activate user')}">
+                        <i class="fa-solid fa-${u.is_active ? 'user-slash' : 'user-check'}"></i> ${t(u.is_active ? 'tooltips.deactivate_user' : 'tooltips.activate_user', u.is_active ? 'Deactivate' : 'Activate')}
                     </button>` : ''}
                     ${canModifyAdmin ? `<button class="btn btn-ghost btn-sm" onclick="openUserExpiryModal('${esc(u.id)}','${esc(name)}','${esc(u.expires_at||'')}')">
-                        <i class="fa-solid fa-clock"></i> Expiry
+                        <i class="fa-solid fa-clock"></i> ${t('auth.expiry', 'Expiry')}
                     </button>` : ''}
                     ${resetBtn}
                 `;
@@ -10283,19 +10283,19 @@ function _euRender(users) {
                 ${u.portal_linked
                     ? `<button class="btn-sm btn-outline-warn" data-i18n-title="tooltips.remove_portal_access" title="Remove portal access"
                             onclick="_euRevokePortalAccess('${esc(String(u.id))}','${esc(name)}')">
-                            <i class="fa-solid fa-user-minus" style="font-size:.78rem"></i> Remove Portal Access
+                            <i class="fa-solid fa-user-minus" style="font-size:.78rem"></i> ${t('users.remove_portal_access', 'Remove Portal Access')}
                        </button>`
                     : `<button class="btn-sm btn-outline-ok" data-i18n-title="tooltips.promote_to_portal" title="Promote to portal user"
                             onclick="_euPromoteToPortal('${esc(String(u.id))}','${esc(name)}')">
-                            <i class="fa-solid fa-user-shield" style="font-size:.78rem"></i> Promote to Portal
+                            <i class="fa-solid fa-user-shield" style="font-size:.78rem"></i> ${t('users.promote_to_portal', 'Promote to Portal')}
                        </button>`
                 }
                 ${isActive
                     ? `<button class="btn-sm btn-outline-warn" data-i18n-title="tooltips.deactivate_user" title="Deactivate user" onclick="_euSetActive('${esc(String(u.id))}',false,'${esc(name)}')">
-                            <i class="fa-solid fa-ban" style="font-size:.78rem"></i> Deactivate
+                            <i class="fa-solid fa-ban" style="font-size:.78rem"></i> ${t('tooltips.deactivate_user', 'Deactivate user')}
                        </button>`
                     : `<button class="btn-sm btn-outline-ok" data-i18n-title="tooltips.activate_user" title="Activate user" onclick="_euSetActive('${esc(String(u.id))}',true,'${esc(name)}')">
-                            <i class="fa-solid fa-circle-check" style="font-size:.78rem"></i> Activate
+                            <i class="fa-solid fa-circle-check" style="font-size:.78rem"></i> ${t('tooltips.activate_user', 'Activate user')}
                        </button>`
                 }
                 <button class="btn-sm btn-outline-danger" data-i18n-title="tooltips.delete_user_permanently" title="Delete user permanently"
@@ -10719,6 +10719,8 @@ let _lmSelected     = null;      // currently selected imei
 let _lmCatFilter    = 'all';     // 'all' | category UUID from _categoriesCache
 let _lmStatusFilter = 'all';     // 'all' | 'active' | 'inactive' | 'stock'
 let _lmAlertMarkers = [];        // temporary markers from alert navigation
+let _lmAlertCoordinates = [];     // plotted alert locations, retained across tag refreshes
+let _lmAlertFocus = null;         // most recently plotted alert location
 
 // Asset tracking (QR/NFC scanned assets)
 let _lmAssetMarkers = {};        // asset_id → L.marker
@@ -11052,7 +11054,10 @@ function _lmPlaceMarkers() {
         m.on('click', () => _lmSelectTag(tag.imei));
         _lmMarkers[tag.imei] = m;
     });
-    if (located.length > 0) {
+    _lmEnsureAlertMarkers();
+    if (_lmAlertFocus) {
+        _liveMap.setView([_lmAlertFocus.lat, _lmAlertFocus.lng], _lmAlertFocus.zoom, { animate: false });
+    } else if (located.length > 0) {
         const bounds = L.latLngBounds(located.map(t => [parseFloat(t.latitude), parseFloat(t.longitude)]));
         _liveMap.fitBounds(bounds, { padding: [40,40], maxZoom: 16 });
     }
@@ -11427,11 +11432,23 @@ function lmSelectFromList(imei) {
 }
 
 function lmCenterOnCoords(lat, lng) {
-    // Center map on specific coordinates (used for alert navigation)
-    if (_liveMap && lat != null && lng != null) {
-        _liveMap.flyTo([lat, lng], 16, { duration: 0.8 });
-        // Add a permanent marker for this alert location
-        const marker = L.marker([lat, lng], {
+    const latitude = Number(lat);
+    const longitude = Number(lng);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+
+    _lmAlertCoordinates.push({ lat: latitude, lng: longitude });
+    _lmAlertFocus = { lat: latitude, lng: longitude, zoom: 16 };
+    if (!_liveMap) return;
+
+    _lmEnsureAlertMarkers();
+    _liveMap.flyTo([latitude, longitude], _lmAlertFocus.zoom, { duration: 0.8 });
+}
+
+function _lmEnsureAlertMarkers() {
+    if (!_liveMap) return;
+    while (_lmAlertMarkers.length < _lmAlertCoordinates.length) {
+        const point = _lmAlertCoordinates[_lmAlertMarkers.length];
+        const marker = L.marker([point.lat, point.lng], {
             icon: L.divIcon({
                 className: 'temp-alert-marker',
                 html: '<div style="width:24px;height:24px;border-radius:50%;background:var(--danger);border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3)"></div>',
@@ -11439,7 +11456,6 @@ function lmCenterOnCoords(lat, lng) {
                 iconAnchor: [12, 12]
             })
         }).addTo(_liveMap);
-        // Store marker so it can be cleared later
         _lmAlertMarkers.push(marker);
     }
 }
@@ -11448,6 +11464,8 @@ function lmClearAlertMarkers() {
     // Remove all alert markers from the map
     _lmAlertMarkers.forEach(marker => marker.remove());
     _lmAlertMarkers = [];
+    _lmAlertCoordinates = [];
+    _lmAlertFocus = null;
     
     // Also remove all tag markers
     Object.values(_lmMarkers).forEach(m => m.remove());
