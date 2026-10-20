@@ -5,7 +5,7 @@ name: Deploy to Production
 # ─────────────────────────────────────────────────────────────────────────────
 # One workflow ships any tenant. The tenant is selected by the branch:
 #
-#   main         → tenant=pinplot → environment=production         → /root/pinplot
+#   main         → tenant=pinplot → environment=production         → /home/deploy/pinplot
 #   prod/beacon  → tenant=beacon  → environment=production-beacon  → /root/beacon-telematics
 #
 # Per-tenant values (server path, display name, db user, container prefix,
@@ -365,7 +365,7 @@ jobs:
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.8.0
         with:
-          ssh-private-key: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Add server to known hosts
         run: |
@@ -376,6 +376,31 @@ jobs:
           # Ensure SSH never fails on host key mismatch for this server
           printf 'Host %s\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n' "${{ secrets.DO_SERVER_IP }}" >> ~/.ssh/config
           chmod 600 ~/.ssh/config
+
+      - name: Verify first-deploy prerequisites
+        env:
+          DO_SERVER_IP: ${{ secrets.DO_SERVER_IP }}
+          DO_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -euo pipefail
+          SERVER=$(echo "$DO_SERVER_IP" | tr -d '[:space:]')
+          USER=$(echo "$DO_USER" | tr -d '[:space:]')
+          if [ -z "$SERVER" ] || [ -z "$USER" ]; then
+            echo "❌ DO_SERVER_IP and SSH_USER are required in the production environment"
+            exit 1
+          fi
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "$USER@$SERVER" "set -eu; \
+              mkdir -p '${SERVER_DIR}/gps-tracker'; \
+              test -w '${SERVER_DIR}/gps-tracker' || { echo '❌ deploy directory is not writable'; exit 1; }; \
+              command -v docker >/dev/null || { echo '❌ Docker is not installed'; exit 1; }; \
+              docker compose version >/dev/null || { echo '❌ Docker Compose is unavailable'; exit 1; }; \
+              docker info >/dev/null 2>&1 || { echo '❌ deploy user cannot access Docker'; exit 1; }; \
+              sudo -n true || { echo '❌ deploy user needs passwordless sudo for system setup'; exit 1; }; \
+              test -s '${SERVER_DIR}/gps-tracker/backend/.env' || { echo '❌ install and configure backend/.env before first deploy'; exit 1; }; \
+              test -s /etc/letsencrypt/live/track.visighttelematics.co.za/fullchain.pem || { echo '❌ TLS certificate missing for track.visighttelematics.co.za'; exit 1; }; \
+              test -s /etc/letsencrypt/live/track.visighttelematics.co.za/privkey.pem || { echo '❌ TLS private key missing for track.visighttelematics.co.za'; exit 1; }; \
+              echo '✅ deploy host prerequisites verified'"
 
       # ─────────────────────────────────────────────────────────────
       # .env PROTECTION — three independent guards, fail loud:
@@ -388,7 +413,7 @@ jobs:
       - name: Snapshot server .env files (pre-rsync)
         env:
           DO_SERVER_IP: ${{ secrets.DO_SERVER_IP }}
-          DO_USER: ${{ secrets.DO_USER }}
+          DO_USER: ${{ secrets.SSH_USER }}
         run: |
           SERVER=$(echo "$DO_SERVER_IP" | tr -d '[:space:]')
           USER=$(echo "$DO_USER" | tr -d '[:space:]')
@@ -421,7 +446,7 @@ jobs:
       - name: Sync code to server
         env:
           DO_SERVER_IP: ${{ secrets.DO_SERVER_IP }}
-          DO_USER: ${{ secrets.DO_USER }}
+          DO_USER: ${{ secrets.SSH_USER }}
         run: |
           # Strip any accidental whitespace/CR from secret values
           SERVER=$(echo "$DO_SERVER_IP" | tr -d '[:space:]')
@@ -462,7 +487,7 @@ jobs:
       - name: Verify .env files unchanged (post-rsync)
         env:
           DO_SERVER_IP: ${{ secrets.DO_SERVER_IP }}
-          DO_USER: ${{ secrets.DO_USER }}
+          DO_USER: ${{ secrets.SSH_USER }}
         run: |
           SERVER=$(echo "$DO_SERVER_IP" | tr -d '[:space:]')
           USER=$(echo "$DO_USER" | tr -d '[:space:]')
@@ -488,7 +513,7 @@ jobs:
       - name: Verify Alembic migration chain on server (fail fast)
         env:
           DO_SERVER_IP: ${{ secrets.DO_SERVER_IP }}
-          DO_USER: ${{ secrets.DO_USER }}
+          DO_USER: ${{ secrets.SSH_USER }}
         run: |
           SERVER=$(echo "$DO_SERVER_IP" | tr -d '[:space:]')
           USER=$(echo "$DO_USER" | tr -d '[:space:]')
@@ -509,7 +534,7 @@ jobs:
       - name: Login to Docker Hub on server
         env:
           DO_SERVER_IP: ${{ secrets.DO_SERVER_IP }}
-          DO_USER: ${{ secrets.DO_USER }}
+          DO_USER: ${{ secrets.SSH_USER }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
@@ -520,7 +545,7 @@ jobs:
       - name: Deploy containers
         env:
           DO_SERVER_IP: ${{ secrets.DO_SERVER_IP }}
-          DO_USER: ${{ secrets.DO_USER }}
+          DO_USER: ${{ secrets.SSH_USER }}
         run: |
           # Pass tenant-specific server path through to remote shell
           ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 -o TCPKeepAlive=yes \
@@ -560,7 +585,7 @@ jobs:
       - name: Run database migrations
         env:
           DO_SERVER_IP: ${{ secrets.DO_SERVER_IP }}
-          DO_USER: ${{ secrets.DO_USER }}
+          DO_USER: ${{ secrets.SSH_USER }}
         run: |
           ssh "$DO_USER@$DO_SERVER_IP" \
               "SERVER_DIR='${SERVER_DIR}' \
@@ -614,7 +639,7 @@ jobs:
       - name: Install daily Docker cleanup cron
         env:
           DO_SERVER_IP: ${{ secrets.DO_SERVER_IP }}
-          DO_USER: ${{ secrets.DO_USER }}
+          DO_USER: ${{ secrets.SSH_USER }}
         run: |
           SERVER=$(echo "$DO_SERVER_IP" | tr -d '[:space:]')
           USER=$(echo "$DO_USER" | tr -d '[:space:]')
@@ -622,23 +647,22 @@ jobs:
           # Upload the cleanup script from the checked-out repo
           scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             deploy/docker-daily-cleanup.sh \
-            "${USER}@${SERVER}:/usr/local/bin/docker-daily-cleanup.sh"
+            "${USER}@${SERVER}:~/docker-daily-cleanup.sh"
 
           # Make executable and register as a cron job (03:00 daily).
           # Same script handles both tenants — it operates on Docker globally.
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             "${USER}@${SERVER}" \
-            'chmod +x /usr/local/bin/docker-daily-cleanup.sh && \
-             printf "0 3 * * * root /usr/local/bin/docker-daily-cleanup.sh\n" \
-               > /etc/cron.d/docker-cleanup && \
-             chmod 0644 /etc/cron.d/docker-cleanup && \
+            'sudo -n install -o root -g root -m 0755 ~/docker-daily-cleanup.sh /usr/local/bin/docker-daily-cleanup.sh && \
+             printf "0 3 * * * root /usr/local/bin/docker-daily-cleanup.sh\n" | sudo -n tee /etc/cron.d/docker-cleanup >/dev/null && \
+             sudo -n chmod 0644 /etc/cron.d/docker-cleanup && \
              echo "✅ Cron job installed: 03:00 daily → /usr/local/bin/docker-daily-cleanup.sh"'
 
       # ── Health checks ─────────────────────────────────────────────
       - name: Verify deployment
         env:
           DO_SERVER_IP: ${{ secrets.DO_SERVER_IP }}
-          DO_USER: ${{ secrets.DO_USER }}
+          DO_USER: ${{ secrets.SSH_USER }}
         run: |
           echo "Verifying containers are running..."
           ssh "$DO_USER@$DO_SERVER_IP" "cd ${SERVER_DIR}/gps-tracker && docker compose ps"

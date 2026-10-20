@@ -21,7 +21,7 @@ jobs:
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.8.0
         with:
-          ssh-private-key: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Add server to known hosts
         run: |
@@ -47,7 +47,7 @@ jobs:
       - name: Sync code to server (no .env write — secrets preserved)
         env:
           DO_SERVER_IP: ${{ secrets.DO_SERVER_IP }}
-          DO_USER: ${{ secrets.DO_USER }}
+          DO_USER: ${{ secrets.SSH_USER }}
         run: |
           rsync -avz --delete \
             --exclude '.git' \
@@ -65,7 +65,7 @@ jobs:
       - name: Rebuild and restart containers
         env:
           DO_SERVER_IP: ${{ secrets.DO_SERVER_IP }}
-          DO_USER: ${{ secrets.DO_USER }}
+          DO_USER: ${{ secrets.SSH_USER }}
         run: |
           ssh $DO_USER@$DO_SERVER_IP 'bash -s' << 'SSHEOF'
             set -e
