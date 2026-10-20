@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 /// 
 /// ✅ AUTOMATIC MODE SELECTION (No manual configuration needed!):
 /// - `flutter run` → Debug mode → localhost:8001
-/// - `flutter build web --release` → Release mode → https://pinplot.me
+/// - `flutter build web --release` → Release mode → https://track.visighttelematics.co.za
 /// - No flags needed, no manual changes, no confusion!
 /// 
 /// 🔒 DEPLOYMENT SAFETY:
@@ -19,7 +19,7 @@ import 'package:flutter/foundation.dart';
 
 class Environment {
   // 🔒 PRODUCTION URL - Safe to commit, used for all release builds
-  static const String _productionUrl = 'https://pinplot.me';
+  static const String _productionUrl = 'https://track.visighttelematics.co.za';
   
   // 🛠️ DEVELOPMENT URL - Safe to commit, only active in debug mode
   static const String _developmentUrl = 'http://localhost:8001';
@@ -69,7 +69,7 @@ class Environment {
     if (kDebugMode) {
       return 'Development (localhost:8001)';
     } else {
-      return 'Production (/pinplot.me)';
+      return 'Production (track.visighttelematics.co.za)';
     }
   }
 }

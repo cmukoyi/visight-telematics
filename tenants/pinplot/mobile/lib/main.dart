@@ -19,7 +19,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ActivityMonitor(
       child: MaterialApp(
-        title: 'Pinplot',
+        title: 'ViSight Telematics',
         theme: AppTheme.lightTheme,
         debugShowCheckedModeBanner: false,
         home: const SplashScreen(),

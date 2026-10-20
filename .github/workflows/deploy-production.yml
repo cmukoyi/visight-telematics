@@ -259,7 +259,7 @@ jobs:
   # JOB 3 — Deploy to Production (per-tenant)
   # ─────────────────────────────────────────────────────────────────
   deploy-production:
-    name: Deploy ${{ (github.ref_name == 'prod/beacon' || github.ref_name == 'deploy/beacon-analytics') && 'Beacon' || 'Pinplot' }} to Production
+    name: Deploy ${{ (github.ref_name == 'prod/beacon' || github.ref_name == 'deploy/beacon-analytics') && 'Beacon' || 'ViSight Telematics' }} to Production
     runs-on: ubuntu-latest
     needs: build-flutter
     # Per-tenant Environment binds the right reviewers/secrets to the run.

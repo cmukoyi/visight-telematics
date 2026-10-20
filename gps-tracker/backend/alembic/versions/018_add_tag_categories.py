@@ -11,6 +11,7 @@ this migration makes it explicit and idempotent.
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy import text
+from sqlalchemy.dialects.postgresql import UUID
 
 
 revision = '018'
@@ -47,8 +48,8 @@ def upgrade():
     if not _table_exists(conn, "tag_categories"):
         op.create_table(
             "tag_categories",
-            sa.Column("id",           sa.String(36),  primary_key=True),
-            sa.Column("usergroup_id", sa.String(36),  sa.ForeignKey("user_groups.id"), nullable=False),
+            sa.Column("id",           UUID(as_uuid=True), primary_key=True),
+            sa.Column("usergroup_id", UUID(as_uuid=True), sa.ForeignKey("user_groups.id"), nullable=False),
             sa.Column("name",         sa.String(100), nullable=False),
             sa.Column("icon",         sa.String(50),  nullable=True),
             sa.Column("color",        sa.String(20),  nullable=True),
