@@ -172,8 +172,6 @@
             <button class="btn btn-ghost"   onclick="doLogs('pinplot_backend',200)">📋 API Logs</button>
             <button class="btn btn-ghost"   onclick="doLogs('pinplot_db',150)">🗄️ DB Logs</button>
             <button class="btn btn-ghost"   onclick="doLogs('pinplot_nginx',100)">🌐 Nginx Logs</button>
-            <button class="btn btn-ghost"   onclick="doLogs('pinplot_mqtt_bridge',100)">📡 MQTT Bridge Logs</button>
-            <button class="btn btn-ghost"   onclick="doLogs('pinplot_mosquitto',100)">🔌 Mosquitto Logs</button>
             <button class="btn btn-ghost"   onclick="doLogs('pinplot_customer',100)">👤 Customer Logs</button>
             <button class="btn btn-danger"  onclick="restartAll()">⚠️ Restart All Services</button>
         </div>
@@ -221,8 +219,6 @@ const ICON = {
     pinplot_admin:       '🛡️',
     pinplot_customer:    '👤',
     pinplot_flutter_web: '📱',
-    pinplot_mosquitto:   '📡',
-    pinplot_mqtt_bridge: '🔌',
 };
 const LABEL = {
     pinplot_backend:     'API Backend',
@@ -231,8 +227,6 @@ const LABEL = {
     pinplot_admin:       'Admin Portal',
     pinplot_customer:    'Customer Portal',
     pinplot_flutter_web: 'Flutter Web App',
-    pinplot_mosquitto:   'Mosquitto MQTT',
-    pinplot_mqtt_bridge: 'MQTT Bridge',
 };
 
 // ── Console helpers ──────────────────────────────────────────────────────────

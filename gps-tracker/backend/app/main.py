@@ -264,10 +264,6 @@ app.include_router(ops_router, include_in_schema=False)
 from app.routes_hive import router as hive_router  # noqa: E402
 app.include_router(hive_router, include_in_schema=False)
 
-# Include Floor Plan router (BLE indoor tracking - hidden)
-from app.routes_floorplan import router as floorplan_router  # noqa: E402
-app.include_router(floorplan_router, include_in_schema=False)
-
 # Include Asset Tracking routers (QR/NFC scanning - hidden)
 from app.routes_assets import router as assets_router  # noqa: E402
 app.include_router(assets_router, include_in_schema=False)
@@ -305,12 +301,6 @@ logger = logging.getLogger(__name__)
 # Enable with PORTAL_VERBOSE_LOGGING=1 and tune threshold with PORTAL_VERBOSE_SLOW_MS.
 _PORTAL_VERBOSE_LOGGING = os.getenv("PORTAL_VERBOSE_LOGGING", "0").strip().lower() in ("1", "true", "yes", "on")
 _PORTAL_VERBOSE_SLOW_MS = int(os.getenv("PORTAL_VERBOSE_SLOW_MS", "800"))
-
-# Floorplan bridge runtime circuit-breaker.
-# Set FLOORPLAN_BRIDGE_ENABLED=0 to keep the API up while disabling the
-# background Pareto bridge tasks (useful for incident mitigation).
-_FLOORPLAN_BRIDGE_ENABLED = os.getenv("FLOORPLAN_BRIDGE_ENABLED", "1").strip().lower() in ("1", "true", "yes", "on")
-
 
 def _is_verbose_path(path: str) -> bool:
     return path.startswith("/api/portal/") or path.startswith("/api/assets")
@@ -425,19 +415,6 @@ async def startup_event():
     _hive_svc.start_sweeper()
     print("🛡️  HIVE sweeper started (2-minute freshness sweep)")
 
-    # Start Pareto Anywhere bridge for floor-plan BLE indoor tracking.
-    # Guarded by an env flag and fail-safe so bridge issues cannot crash app startup.
-    if _FLOORPLAN_BRIDGE_ENABLED:
-        try:
-            from app.services import pareto_bridge as _pareto
-            _pareto.start_bridge()
-            print(f"📡 Pareto bridge started (url={_pareto.PARETO_URL})")
-        except Exception:
-            logger.exception("pareto_bridge: startup failed; continuing with bridge disabled")
-            print("⚠️ Pareto bridge failed to start; continuing without floorplan bridge")
-    else:
-        print("⏭️ Pareto bridge disabled by FLOORPLAN_BRIDGE_ENABLED")
-
     # Start GDPR cleanup task (runs daily)
     asyncio.create_task(_gdpr_cleanup_loop())
     print("📜 GDPR cleanup task started (runs every 24 h)")
@@ -476,17 +453,6 @@ async def shutdown_event():
     location_poller.stop()
     from app.services import hive_service as _hive_svc
     _hive_svc.stop_sweeper()
-    
-    # Stop Pareto bridge if enabled
-    if _FLOORPLAN_BRIDGE_ENABLED:
-        try:
-            from app.services import pareto_bridge as _pareto
-            await _pareto.stop_bridge()
-            print("🛑 Pareto bridge stopped")
-        except Exception:
-            logger.exception("pareto_bridge: shutdown encountered an error")
-    else:
-        print("⏭️ Pareto bridge stop skipped (disabled by FLOORPLAN_BRIDGE_ENABLED)")
     
     # Gracefully stop worker pool if enabled
     if _WORKER_POOL_ENABLED:

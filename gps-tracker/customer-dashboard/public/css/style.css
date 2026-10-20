@@ -1864,8 +1864,6 @@ tbody tr:hover { background: var(--bg-3); }
 /* QR tab: #qr-root already handles overflow-y:auto+height:100%, tab stays hidden */
 
 /* ── Floorplan Sketch tab — iframe fills all available space ── */
-#tab-building.active { padding: 0; overflow: hidden; }
-#tab-building iframe { flex: 1; min-height: 0; }
 
 /* ── Live Map tab — full-bleed flex-row (no padding) ── */
 .content.live-map-active {
@@ -2022,21 +2020,6 @@ tr:hover td { background: var(--bg-3); }
 }
 .drop-zone .dz-icon { font-size: 36px; margin-bottom: 10px; }
 .drop-zone p { font-size: 14px; }
-
-/* ── Floor plan ──────────────────────────────────────────── */
-.floor-plan-area {
-  min-height: 400px;
-  background: var(--bg-3);
-  border-radius: var(--radius);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 12px;
-  color: var(--text-3);
-  border: 1px solid var(--border);
-}
-.floor-plan-area .fp-icon { font-size: 56px; }
 
 /* ── Empty state ─────────────────────────────────────────── */
 .empty-state { text-align: center; padding: 60px 40px; color: var(--text-3); }

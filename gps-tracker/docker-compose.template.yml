@@ -161,54 +161,6 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
-  mosquitto:
-    image: eclipse-mosquitto:2.0
-    container_name: __TENANT_PREFIX___mosquitto
-    volumes:
-      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
-      - mosquitto_data:/mosquitto/data
-    networks:
-      - __TENANT_PREFIX___network
-    restart: unless-stopped
-    logging: *default-logging
-
-  pareto-anywhere:
-    image: reelyactive/pareto-anywhere:1.24.5
-    container_name: __TENANT_PREFIX___pareto_anywhere
-    networks:
-      - __TENANT_PREFIX___network
-    restart: unless-stopped
-    logging: *default-logging
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3001"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-
-  mqtt-bridge:
-    build:
-      context: ./mqtt-bridge
-      dockerfile: Dockerfile
-    container_name: __TENANT_PREFIX___mqtt_bridge
-    environment:
-      # URL of the Pareto Anywhere Socket.IO server (container must be on this network)
-      - PARETO_URL=http://pareto-anywhere:3001
-      # Internal MQTT broker
-      - MQTT_URL=mqtt://mosquitto:1883
-      # Backend API — gateway positions fetched from here every 60 s
-      - BACKEND_URL=http://backend:8000
-      # Shared secret for /api/portal/gateways (must match BRIDGE_API_KEY in backend .env)
-      - BRIDGE_API_KEY=${BRIDGE_API_KEY:-bridge-key-change-me}
-      # JSON fallback positions used if API is unreachable (optional)
-      - GATEWAY_POSITIONS={}
-    depends_on:
-      - mosquitto
-      - pareto-anywhere
-    networks:
-      - __TENANT_PREFIX___network
-    restart: unless-stopped
-    logging: *default-logging
-
   nginx:
     image: nginx:alpine
     container_name: __TENANT_PREFIX___nginx
@@ -224,8 +176,6 @@ services:
       - admin-portal
       - customer
       - flutter-web
-      - mosquitto
-      - pareto-anywhere
     networks:
       - __TENANT_PREFIX___network
     restart: unless-stopped
@@ -236,9 +186,6 @@ volumes:
     driver: local
   nginx_logs:
     driver: local
-  mosquitto_data:
-    driver: local
-
 networks:
   __TENANT_PREFIX___network:
     name: __TENANT_PREFIX___network   # explicit name prevents docker-compose project prefix
