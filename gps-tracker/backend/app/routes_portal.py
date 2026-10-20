@@ -31,8 +31,6 @@ _email_svc_portal = _EmailService()
 _TAG_TYPE_ALIAS = {
     "series1": "scope",
     "series2": "tracksolid",
-    "series3": "series_3",
-    "series_3": "series_3",
     "series4": "ble",       # Series 4 (DX-Smart indoor BLE tags)
     "series_4": "ble",
     "ble": "ble",           # Allow 'ble' to map to itself
@@ -115,8 +113,8 @@ def _login_record_success(ip: str) -> None:
 # ---------------------------------------------------------------------------
 
 SECTION_FEATURES: dict = {
-    "tracking":   ["livemap", "assets", "history", "history-advanced", "hive"],
-    "management": ["asset-mgmt", "users", "qr", "locations", "settings"],
+    "tracking":   ["livemap", "assets", "history", "history-advanced"],
+    "management": ["asset-mgmt", "users", "locations", "settings"],
     "reports":    [
         "reports-subscriptions", "reports-activity", "reports-trips",
         "reports-battery", "reports-alerts", "reports-geofence",
@@ -133,9 +131,8 @@ TENANT_FEATURE_TABS: dict = {
     "alerts": ["reports-alerts"],
     "geofences": ["reports-geofence"],
     "reports": ["reports-subscriptions", "reports-activity", "reports-trips", "reports-battery"],
-    "management": ["asset-mgmt", "users", "qr", "locations", "settings"],
+    "management": ["asset-mgmt", "users", "locations", "settings"],
     "settings": ["settings"],
-    "hive": ["hive"],
     "developers": ["api-tokens"],  # Developers section (API Tokens tab)
 }
 
@@ -151,7 +148,7 @@ STANDALONE_TENANT_FEATURES: set = {
 # feature keys that should be hidden from the portal *and* refused at the API
 # boundary, regardless of role/group config. Used to ship the same code to
 # multiple tenants while keeping certain features dark on some of them.
-# Example:  TENANT_DISABLED_FEATURES=hive
+# Example:  TENANT_DISABLED_FEATURES=floorplan
 _DISABLED_FEATURES: set = {
     f.strip() for f in os.getenv("TENANT_DISABLED_FEATURES", "").split(",") if f.strip()
 }
@@ -160,7 +157,7 @@ if _DISABLED_FEATURES:
 
 
 def require_feature_enabled(feature: str):
-    """FastAPI dependency factory. Use as `dependencies=[Depends(require_feature_enabled('hive'))]`
+    """FastAPI dependency factory. Use as `dependencies=[Depends(require_feature_enabled('history-advanced'))]`
     on a router to make every endpoint in it return 404 when the tenant has
     disabled that feature. We return 404 rather than 403 so the API doesn't
     even leak that the feature exists."""
@@ -851,7 +848,6 @@ class NotificationPrefsOut(BaseModel):
     notify_geofence_exit: bool
     notify_battery_low: bool
     notify_offline: bool
-    notify_hive_breach: bool = True
     notify_temperature: bool = True
     notify_via_email: bool
     notification_emails: Optional[List[str]] = None   # extra notification addresses
@@ -861,7 +857,6 @@ class NotificationPrefsOut(BaseModel):
     notify_geofence_sms: bool = True
     notify_battery_sms: bool = True
     notify_offline_sms: bool = True
-    notify_hive_breach_sms: bool = True
     # Whether the group has SMS enabled (read-only, for UI gating)
     group_sms_enabled: bool = False
 
@@ -874,7 +869,6 @@ class NotificationPrefsUpdate(BaseModel):
     notify_geofence_exit: Optional[bool] = None
     notify_battery_low: Optional[bool] = None
     notify_offline: Optional[bool] = None
-    notify_hive_breach: Optional[bool] = None
     notify_temperature: Optional[bool] = None
     notify_via_email: Optional[bool] = None
     notification_emails: Optional[List[str]] = None   # None = do not change; [] = clear all extra
@@ -884,7 +878,6 @@ class NotificationPrefsUpdate(BaseModel):
     notify_geofence_sms: Optional[bool] = None
     notify_battery_sms: Optional[bool] = None
     notify_offline_sms: Optional[bool] = None
-    notify_hive_breach_sms: Optional[bool] = None
 
 
 @router.get("/notifications", response_model=NotificationPrefsOut)
@@ -913,8 +906,6 @@ def update_notification_prefs(
         me.notify_battery_low = data.notify_battery_low
     if data.notify_offline is not None:
         me.notify_offline = data.notify_offline
-    if data.notify_hive_breach is not None:
-        me.notify_hive_breach = data.notify_hive_breach
     if data.notify_temperature is not None:
         me.notify_temperature = data.notify_temperature
     if data.notify_via_email is not None:
@@ -944,8 +935,6 @@ def update_notification_prefs(
         me.notify_battery_sms = data.notify_battery_sms
     if data.notify_offline_sms is not None:
         me.notify_offline_sms = data.notify_offline_sms
-    if data.notify_hive_breach_sms is not None:
-        me.notify_hive_breach_sms = data.notify_hive_breach_sms
     db.commit()
     db.refresh(me)
     group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
@@ -1132,7 +1121,6 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
     Includes tags from:
     1. Users whose email matches the group's email_domain (auto-assigned)
     2. Users with a PortalUser record in this group (manually assigned)
-    3. Tags created via portal QR/NFC registration for this group
     
     Returns an empty list (not an error) when no users are in the group.
     """
@@ -1183,6 +1171,7 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
         .filter(
             tag_scope_filter,
             BLETag.is_active == True,
+            or_(BLETag.tag_type.is_(None), BLETag.tag_type.notin_(("series3", "series_3"))),
         )
         .order_by(BLETag.added_at.desc())
         .all()
@@ -1231,10 +1220,6 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
             owner_email = "unknown@unknown"
         pkg = pkg_map.get(str(tag.package_id)) if tag.package_id else None
         effective_expiry = tag.expiry_date
-        if not effective_expiry and pkg and (tag.tag_type or "").lower() in ("series3", "series_3"):
-            base = tag.activation_date or tag.added_at
-            if base:
-                effective_expiry = base + timedelta(days=pkg.validity_days)
         days_remaining = None
         if effective_expiry:
             days_remaining = (effective_expiry.replace(tzinfo=None) - datetime.utcnow()).days
@@ -1247,8 +1232,7 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
             if match:
                 cat_id, cat_name = match
             else:
-                # Keep QR/NFC categories human-friendly in the UI.
-                cat_name = "QR/NFC" if raw_cat_name.lower() in ("series_3", "series3") else raw_cat_name
+                cat_name = raw_cat_name
         result.append(PortalTagOut(
             id=tag.id,
             imei=tag.imei,
@@ -1335,7 +1319,6 @@ def list_supported_tag_types(request: Request, db: Session = Depends(get_db)):
     all_types = [
         {"value": "series1", "label": "Series 1 (GPS)", "description": "Scope GPS tracker"},
         {"value": "series2", "label": "Series 2 (GPS)", "description": "TrackSolid GPS tracker"},
-        {"value": "series_3", "label": "Series 3 (QR Code)", "description": "QR code asset tracking"},
         {"value": "series_4", "label": "Series 4 (BLE Indoor)", "description": "DX-Smart BLE indoor tracking (CP27/CP28/CP29)"},
         {"value": "series_5", "label": "Series 5 (Hubble)", "description": "Hubble Platform BLE tracking"},
     ]
@@ -1612,10 +1595,6 @@ def _build_tag_out(tag: BLETag, owner_email: str, db: Optional[Session] = None) 
     if tag.package_id and db:
         pkg = db.query(TagPackage).filter(TagPackage.id == str(tag.package_id)).first()
     effective_expiry = tag.expiry_date
-    if not effective_expiry and pkg and (tag.tag_type or "").lower() in ("series3", "series_3"):
-        base = tag.activation_date or tag.added_at
-        if base:
-            effective_expiry = base + timedelta(days=pkg.validity_days)
     days_remaining = None
     if effective_expiry:
         days_remaining = (effective_expiry.replace(tzinfo=None) - datetime.utcnow()).days
@@ -1696,7 +1675,6 @@ def _group_tag_scope_filter(group: UserGroup, all_owner_ids: list):
 
     Includes:
     1. Tags owned by users in all_owner_ids (domain-matched + manually assigned)
-    2. Tags created via QR/NFC registration for this group
     
     Args:
         group: UserGroup object
@@ -1846,9 +1824,6 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
                     # Renewal or first assignment: extend from now
                     base = datetime.utcnow()
                     tag.expiry_date = base + timedelta(days=pkg.validity_days)
-                    # For QR/NFC tags, set activation_date if not already set
-                    if not tag.activation_date and (tag.tag_type or "").lower() in ("series3", "series_3"):
-                        tag.activation_date = base
                 else:
                     # Package changed but not expired: calculate from activation_date
                     base = tag.activation_date.replace(tzinfo=None)

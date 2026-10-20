@@ -60,8 +60,6 @@ _EMAIL_NOTIFY_FLAG_BY_ALERT = {
     "geofence_entry": "notify_geofence_exit",
     "geofence_exit": "notify_geofence_exit",
     "gdpr_deletion_warning": "alerts_enabled",
-    "hive_breach": "notify_hive_breach",
-    "hive_breach_cleared": "notify_hive_breach",
 }
 
 
@@ -971,138 +969,6 @@ async def get_container_logs(
     return result
 
 
-# ---------------------------------------------------------------------------
-# HIVE Logs Export
-# ---------------------------------------------------------------------------
-
-@router.get("/hive-logs/export")
-async def export_hive_logs(
-    request: Request,
-    db: Session = Depends(get_db),
-    days: int = Query(7, ge=1, le=90, description="Number of days of logs to export"),
-):
-    """
-    Export HIVE logs and database data as a downloadable tar.gz bundle.
-    Includes backend logs, evaluations, events, and current hive state.
-    """
-    from fastapi.responses import StreamingResponse
-    import subprocess
-    import tempfile
-    import os
-    import tarfile
-    from io import BytesIO
-    
-    admin = get_admin_from_request(request, db)
-    if not check_role_permission(admin.role, "manager"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires manager role")
-    
-    cutoff = datetime.utcnow() - timedelta(days=days)
-    timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-    
-    # Create in-memory tar.gz
-    buffer = BytesIO()
-    
-    with tarfile.open(fileobj=buffer, mode='w:gz') as tar:
-        # 1. Backend HIVE logs (from docker logs)
-        try:
-            result = subprocess.run(
-                ['docker', 'logs', '--since', f'{days}d', 'pinplot_backend'],
-                capture_output=True, text=True, timeout=30
-            )
-            logs = result.stdout + result.stderr
-            # Filter for HIVE-related lines
-            hive_lines = [line for line in logs.split('\n') if any(x in line for x in ['🔍', '🛡️', 'HIVE', 'hive_service'])]
-            hive_log_content = '\n'.join(hive_lines).encode('utf-8')
-            
-            info = tarfile.TarInfo(name='backend-hive-logs.log')
-            info.size = len(hive_log_content)
-            info.mtime = datetime.utcnow().timestamp()
-            tar.addfile(info, BytesIO(hive_log_content))
-        except Exception as e:
-            logger.error(f"Failed to extract backend logs: {e}")
-        
-        # 2. Hives table
-        from app.models import Hive
-        hives = db.query(Hive).all()
-        hives_data = f"Total hives: {len(hives)}\n\n"
-        for h in hives:
-            alert_state = h.live_state.alert_state if h.live_state else "N/A"
-            hives_data += f"ID: {h.id}\nName: {h.name}\nCreated By: {h.created_by or 'N/A'}\nAlert State: {alert_state}\n"
-            hives_data += f"Created: {h.created_at}\nArchived: {h.archived_at}\nStatus: {h.status}\n\n"
-        
-        info = tarfile.TarInfo(name='hives.txt')
-        info.size = len(hives_data.encode('utf-8'))
-        info.mtime = datetime.utcnow().timestamp()
-        tar.addfile(info, BytesIO(hives_data.encode('utf-8')))
-        
-        # 3. Recent evaluations
-        from app.models import HiveEvaluation
-        evals = db.query(HiveEvaluation).filter(
-            HiveEvaluation.evaluated_at >= cutoff
-        ).order_by(HiveEvaluation.evaluated_at.desc()).limit(500).all()
-        
-        evals_data = f"Recent evaluations (last {days} days): {len(evals)}\n\n"
-        for e in evals:
-            evals_data += f"Hive: {e.hive_id}\nTime: {e.evaluated_at}\n"
-            evals_data += f"State: {e.alert_state}\nDiameter: {e.diameter_m}m\nThreshold: {e.threshold_m}m\n"
-            evals_data += f"Config V: {e.config_version_number}\nMotion: {e.motion_state or 'N/A'}\n"
-            evals_data += f"Outlier: {e.outlier_tag_id or 'N/A'}\n"
-            evals_data += f"Outlier reason: {getattr(e, 'outlier_selection_reason', None) or 'none'}\n"
-            evals_data += f"Breaching pair counts: {getattr(e, 'breaching_pair_counts', None) or '{}'}\n"
-            evals_data += f"Pairwise detail: {getattr(e, 'pairwise_detail', None) or 'N/A'}\n"
-            evals_data += f"Positions used: {e.positions_used or 'N/A'}\n"
-            evals_data += f"Max pair dt (s): {e.max_pair_dt_s if e.max_pair_dt_s is not None else 'N/A'}\n"
-            evals_data += f"Coherent pairs: {e.coherent_pair_count if e.coherent_pair_count is not None else 'N/A'}\n"
-            evals_data += f"Incoherent pairs: {e.incoherent_pair_count if e.incoherent_pair_count is not None else 'N/A'}\n"
-            evals_data += f"Breach evidence: {e.breach_evidence or 'N/A'}\n\n"
-        
-        info = tarfile.TarInfo(name='hive-evaluations.txt')
-        info.size = len(evals_data.encode('utf-8'))
-        info.mtime = datetime.utcnow().timestamp()
-        tar.addfile(info, BytesIO(evals_data.encode('utf-8')))
-        
-        # 4. Recent events
-        from app.models import HiveEvent
-        events = db.query(HiveEvent).filter(
-            HiveEvent.occurred_at >= cutoff
-        ).order_by(HiveEvent.occurred_at.desc()).limit(200).all()
-        
-        events_data = f"Recent events (last {days} days): {len(events)}\n\n"
-        for ev in events:
-            events_data += f"Hive: {ev.hive_id}\nTime: {ev.occurred_at}\n"
-            events_data += f"Type: {ev.event_type}\nFrom: {ev.from_state} To: {ev.to_state}\n"
-            events_data += f"Details: {ev.details}\n\n"
-        
-        info = tarfile.TarInfo(name='hive-events.txt')
-        info.size = len(events_data.encode('utf-8'))
-        info.mtime = datetime.utcnow().timestamp()
-        tar.addfile(info, BytesIO(events_data.encode('utf-8')))
-        
-        # 5. Tag membership
-        from app.models import HiveTagMembership
-        members = db.query(HiveTagMembership).all()
-        
-        members_data = f"Total tag memberships: {len(members)}\n\n"
-        for m in members:
-            members_data += f"Hive: {m.hive_id}\nTag: {m.tag_id}\n\n"
-        
-        info = tarfile.TarInfo(name='hive-tag-membership.txt')
-        info.size = len(members_data.encode('utf-8'))
-        info.mtime = datetime.utcnow().timestamp()
-        tar.addfile(info, BytesIO(members_data.encode('utf-8')))
-    
-    buffer.seek(0)
-    
-    return StreamingResponse(
-        buffer,
-        media_type='application/gzip',
-        headers={
-            'Content-Disposition': f'attachment; filename="hive-logs-{timestamp}.tar.gz"'
-        }
-    )
-
-
-# ---------------------------------------------------------------------------
 # Trip Engine Logs Export
 # ---------------------------------------------------------------------------
 
@@ -2157,7 +2023,7 @@ def update_usergroup(
     # allowed_tag_types: use model_fields_set so explicit null = "reset to all"
     if "allowed_tag_types" in data.model_fields_set:
         tag_types = data.allowed_tag_types
-        valid = {"series1", "series2", "series3", "series_4", "series_5"}
+        valid = {"series1", "series2", "series_4", "series_5"}
         if tag_types is not None:
             bad = [t for t in tag_types if t not in valid]
             if bad:

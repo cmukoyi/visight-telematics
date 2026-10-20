@@ -15,8 +15,6 @@ sys.path.insert(0, str(APP_ROOT))
 from app.sync_dashboard_translation_keys import (
     dashboard_path,
     extract_defaults,
-    extract_qr_defaults,
-    qr_generator_path,
 )
 
 
@@ -28,7 +26,6 @@ def main() -> int:
     args = parser.parse_args()
 
     defaults = extract_defaults(dashboard_path().read_text(encoding="utf-8"))
-    defaults.update(extract_qr_defaults(qr_generator_path().read_text(encoding="utf-8")))
     if args.translations_file:
         translations = json.loads(args.translations_file.read_text(encoding="utf-8"))
     else:

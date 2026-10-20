@@ -98,8 +98,6 @@ NEW_KEYS = [
     ('settings.battery_low_hint', 'settings', 'Alert when a tag\'s battery drops below 20%.'),
     ('settings.offline_7_days', 'settings', 'Alert when a tag hasn\'t been reported a location in last 7 days'),
     ('settings.offline_7_days_hint', 'settings', 'Alert when a tag hasn\'t been detected for an extended period.'),
-    ('settings.hive_breach', 'settings', 'Hive breach detected'),
-    ('settings.hive_breach_hint', 'settings', 'Alert when a tag separates from its HIVE group beyond the configured threshold.'),
     ('settings.temperature_monitoring', 'settings', 'Temperature threshold'),
     ('settings.temperature_monitoring_hint', 'settings', 'Alert when a monitored tag crosses its configured high or low temperature limit.'),
     ('settings.how_to_notify', 'settings', 'How to notify me'),
@@ -117,7 +115,6 @@ NEW_KEYS = [
     ('settings.geofence_sms', 'settings', 'Geofence entry / exit alerts'),
     ('settings.battery_sms', 'settings', 'Battery low alerts'),
     ('settings.offline_sms', 'settings', 'Tag offline alerts'),
-    ('settings.hive_sms', 'settings', 'Hive breach alerts'),
 ]
 
 

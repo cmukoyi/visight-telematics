@@ -81,61 +81,6 @@ app.get('/help/movement-analytics', (req, res) => {
   }
 });
 
-// Pretty route for QR/NFC guide
-app.get('/help/qr-nfc', (req, res) => {
-  const brandName = process.env.BRAND_NAME || 'PinPlot';
-  const isBeacon = process.env.CUSTOMER_TENANT === 'beacon_telematics'
-    || brandName.toLowerCase().includes('beacon');
-  const language = String(req.query.lang || 'en').toLowerCase().split('-')[0];
-  const beaconGuides = {
-    de: 'QR_NFC_Guide_Beacon_DE.html',
-    en: 'QR_NFC_Guide_Beacon_EN.html',
-    es: 'QR_NFC_Guide_Beacon_ES.html',
-    fr: 'QR_NFC_Guide_Beacon_FR.html',
-    it: 'QR_NFC_Guide_Beacon_IT.html',
-    nl: 'QR_NFC_Guide_Beacon_NL.html',
-  };
-  const filename = isBeacon
-    ? (beaconGuides[language] || beaconGuides.en)
-    : 'QR_NFC_Guide_Pinplot.html';
-  
-  const filePath = path.join(publicDir, 'help', filename);
-  
-  if (fs.existsSync(filePath)) {
-    res.sendFile(filePath);
-  } else {
-    res.status(404).json({ 
-      error: 'Guide not found',
-      tenant: brandName,
-      expectedFile: filename 
-    });
-  }
-});
-
-// Pretty route for HIVE manual
-app.get('/help/hive', (req, res) => {
-  const isBeacon = process.env.CUSTOMER_TENANT === 'beacon_telematics';
-  const language = String(req.query.lang || 'en').toLowerCase().split('-')[0];
-  const beaconManuals = {
-    de: 'HIVE_Benutzerhandbuch_v2_1_Beacon_DE.html',
-    en: 'HIVE_User_Manual_v2_1_Beacon_EN.html',
-    es: 'HIVE_Manual_Usuario_v2_1_Beacon_ES.html',
-    fr: 'HIVE_Manuel_Utilisateur_v2_1_Beacon_FR.html',
-    it: 'HIVE_Manuale_Utente_v2_1_Beacon_IT.html',
-    nl: 'HIVE_Gebruikershandleiding_v2_1_Beacon_NL.html',
-  };
-  const filename = isBeacon
-    ? (beaconManuals[language] || beaconManuals.en)
-    : 'HIVE_User_Manual.html';
-  const filePath = path.join(publicDir, 'help', filename);
-  
-  if (fs.existsSync(filePath)) {
-    res.sendFile(filePath);
-  } else {
-    res.status(404).json({ error: 'HIVE manual not found' });
-  }
-});
-
 // Manifest endpoint
 app.get('/api/manifest', (req, res) => {
   const files = fs.existsSync(publicDir) ? fs.readdirSync(publicDir) : [];

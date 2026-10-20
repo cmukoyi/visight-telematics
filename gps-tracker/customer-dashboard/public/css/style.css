@@ -1861,7 +1861,6 @@ tbody tr:hover { background: var(--bg-3); }
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
-/* QR tab: #qr-root already handles overflow-y:auto+height:100%, tab stays hidden */
 
 /* ── Floorplan Sketch tab — iframe fills all available space ── */
 
@@ -2099,9 +2098,8 @@ select option { background: var(--bg-3); }
 
 /* Range slider — explicit cross-browser styles so the thumb / track are
    always visible against dark and light backgrounds (native defaults
-   render dark-on-dark in some Chrome/Firefox versions, which made the
-   hive Distance Threshold slider effectively invisible). */
-input[type="range"], .hive-range {
+  render dark-on-dark in some Chrome/Firefox versions). */
+input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
@@ -2112,8 +2110,7 @@ input[type="range"], .hive-range {
   cursor: pointer;
   margin: 6px 0;
 }
-input[type="range"]::-webkit-slider-thumb,
-.hive-range::-webkit-slider-thumb {
+input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 18px; height: 18px;
@@ -2123,8 +2120,7 @@ input[type="range"]::-webkit-slider-thumb,
   box-shadow: 0 0 0 1px var(--primary), 0 0 8px var(--primary-glow);
   cursor: pointer;
 }
-input[type="range"]::-moz-range-thumb,
-.hive-range::-moz-range-thumb {
+input[type="range"]::-moz-range-thumb {
   width: 18px; height: 18px;
   border-radius: 50%;
   background: var(--primary);
@@ -2132,8 +2128,7 @@ input[type="range"]::-moz-range-thumb,
   box-shadow: 0 0 0 1px var(--primary), 0 0 8px var(--primary-glow);
   cursor: pointer;
 }
-input[type="range"]::-moz-range-track,
-.hive-range::-moz-range-track {
+input[type="range"]::-moz-range-track {
   height: 6px; background: var(--border); border-radius: 999px;
 }
 
@@ -2154,24 +2149,6 @@ input[type="range"]::-moz-range-track,
   padding: 12px 16px;
   margin-bottom: 14px;
 }
-
-/* ── QR Code view ────────────────────────────────────────── */
-#view-qr { flex-direction: column; }
-.qr-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding: 40px;
-}
-#qr-canvas-wrap {
-  background: white;
-  padding: 20px;
-  border-radius: var(--radius);
-  display: inline-block;
-}
-#qr-canvas { display: block; }
-.qr-info { text-align: center; color: var(--text-3); font-size: 13px; }
 
 /* ── MQTT status dot ─────────────────────────────────────── */
 #mqttDot { width: 10px; height: 10px; border-radius: 50%; background: var(--bg-4); display: inline-block; }

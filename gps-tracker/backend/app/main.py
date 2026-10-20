@@ -1,7 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional
@@ -204,7 +203,6 @@ Complete asset tracking platform with BLE tag monitoring, geofencing, and moveme
 |----------|-------------|
 | `GET /api/v2/devices` | List all devices with last known positions |
 | `GET /api/v2/movement-history/{imei}` | Get position history by date range |
-| `GET /api/v2/hive-breaches` | Get Hive breach events |
 | `GET /api/v2/geofences` | List all geofences (POIs) |
 | `GET /api/v2/alerts` | Get alerts by type and date range |
 
@@ -260,38 +258,11 @@ app.include_router(beacons_router, include_in_schema=False)
 from app.routes_ops import router as ops_router  # noqa: E402
 app.include_router(ops_router, include_in_schema=False)
 
-# Include HIVE tracking router (hidden from public API docs)
-from app.routes_hive import router as hive_router  # noqa: E402
-app.include_router(hive_router, include_in_schema=False)
-
-# Include Asset Tracking routers (QR/NFC scanning - hidden)
-from app.routes_assets import router as assets_router  # noqa: E402
-app.include_router(assets_router, include_in_schema=False)
-
-from app.routes_scan import router as scan_router  # noqa: E402
-app.include_router(scan_router, include_in_schema=False)
-
 from app.routes_i18n import router as i18n_router  # noqa: E402
 app.include_router(i18n_router, include_in_schema=False)
 
 from app.routes_admin_i18n import router as admin_i18n_router  # noqa: E402
 app.include_router(admin_i18n_router, include_in_schema=False)
-
-# Static files for asset tracking (baked into Docker image at build time)
-static_dir = "/app/static"
-app.mount("/static", StaticFiles(directory=static_dir), name="static")
-
-# Asset landing page route (when QR code is scanned)
-@app.get("/asset/{asset_id}", include_in_schema=False)
-async def asset_landing_page(asset_id: str):
-    """Serve the phone scan landing page for QR/NFC scans"""
-    return FileResponse(os.path.join(static_dir, "asset.html"))
-
-# Scanner tool route
-@app.get("/scanner.html", include_in_schema=False)
-async def scanner_tool():
-    """Serve the bulk scanner tool for stocktake operations"""
-    return FileResponse(os.path.join(static_dir, "scanner.html"))
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -410,11 +381,6 @@ async def startup_event():
     asyncio.create_task(location_poller.start())
     print("🚀 Location Poller Service started (60-second interval)")
 
-    # Start HIVE proximity tracking sweeper
-    from app.services import hive_service as _hive_svc
-    _hive_svc.start_sweeper()
-    print("🛡️  HIVE sweeper started (2-minute freshness sweep)")
-
     # Start GDPR cleanup task (runs daily)
     asyncio.create_task(_gdpr_cleanup_loop())
     print("📜 GDPR cleanup task started (runs every 24 h)")
@@ -451,9 +417,6 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     location_poller.stop()
-    from app.services import hive_service as _hive_svc
-    _hive_svc.stop_sweeper()
-    
     # Gracefully stop worker pool if enabled
     if _WORKER_POOL_ENABLED:
         try:
@@ -465,7 +428,6 @@ async def shutdown_event():
     
     critical_service_alerts.stop()
     print("🛑 Location Poller Service stopped")
-    print("🛑 HIVE sweeper stopped")
 
 
 # ---------------------------------------------------------------------------

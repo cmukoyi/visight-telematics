@@ -12,7 +12,7 @@ from pydantic import BaseModel
 import logging
 
 from app.database import get_db
-from app.models import BLETag, DevicePosition, PortalUser, HiveEvent, Hive, POI, PortalAlert, User, UserGroup
+from app.models import BLETag, DevicePosition, PortalUser, POI, PortalAlert, User, UserGroup
 from app.routes_portal import get_portal_user_from_request
 from sqlalchemy import or_
 
@@ -93,6 +93,7 @@ def _get_usergroup_device_imeis(usergroup_id: str, db: Session) -> List[str]:
             BLETag.is_active == True,
             BLETag.imei.isnot(None),
             BLETag.imei != "",
+            or_(BLETag.tag_type.is_(None), BLETag.tag_type.notin_(("series3", "series_3"))),
         )
         .distinct()
         .all()
@@ -147,21 +148,6 @@ class MovementHistoryResponse(BaseModel):
     start_date: datetime
     end_date: datetime
     positions: List[MovementHistoryItem]
-
-
-class HiveBreachResponse(BaseModel):
-    """Hive breach event."""
-    hive_id: str
-    hive_name: str
-    tag_id: str
-    tag_name: str
-    breach_start: datetime
-    breach_end: Optional[datetime]
-    duration_seconds: Optional[int]
-    is_active: bool
-
-    class Config:
-        from_attributes = True
 
 
 class GeofenceResponse(BaseModel):
@@ -377,65 +363,6 @@ def get_movement_history(
     )
 
 
-@router.get("/hive-breaches", response_model=List[HiveBreachResponse])
-def get_hive_breaches(
-    active_only: bool = Query(False, description="Only return active breaches"),
-    start_date: Optional[datetime] = Query(None, description="Filter breaches after this date"),
-    end_date: Optional[datetime] = Query(None, description="Filter breaches before this date"),
-    user: PortalUser = Depends(get_current_portal_user),
-    db: Session = Depends(get_db),
-):
-    """
-    Get Hive breach events for the user's usergroup.
-    
-    **Authentication:** Bearer token required  
-    **Scope:** Only returns breaches from Hives in the user's usergroup
-    
-    **Example:**
-    ```bash
-    curl -X GET "https://pinplot.me/api/v2/hive-breaches?active_only=true" \\
-      -H "Authorization: Bearer YOUR_TOKEN"
-    ```
-    """
-    # Build query for Hive events
-    query = db.query(HiveEvent).join(Hive).filter(
-        Hive.usergroup_id == user.usergroup_id,
-        HiveEvent.event_type.in_(['breach', 'breach_start', 'breach_end'])
-    )
-    
-    # Note: active_only filter removed (HiveEvent doesn't track breach end)
-    
-    if start_date:
-        query = query.filter(HiveEvent.occurred_at >= start_date)
-    
-    if end_date:
-        query = query.filter(HiveEvent.occurred_at <= end_date)
-    
-    events = query.order_by(HiveEvent.occurred_at.desc()).all()
-    
-    breaches = []
-    for event in events:
-        # Get tag info
-        tag = None
-        if event.triggering_tag_id:
-            tag = db.query(BLETag).filter(BLETag.id == event.triggering_tag_id).first()
-        
-        hive = db.query(Hive).filter(Hive.id == event.hive_id).first()
-        
-        breaches.append(HiveBreachResponse(
-            hive_id=str(event.hive_id),
-            hive_name=hive.name if hive else "Unknown",
-            tag_id=str(event.triggering_tag_id) if event.triggering_tag_id else "unknown",
-            tag_name=tag.device_name if tag else "Unknown",
-            breach_start=event.occurred_at,
-            breach_end=None,  # HiveEvent stores individual events, not paired start/end
-            duration_seconds=None,
-            is_active=event.event_type == 'breach_start'
-        ))
-    
-    return breaches
-
-
 @router.get("/geofences", response_model=List[GeofenceResponse])
 def get_geofences(
     armed_only: bool = Query(False, description="Only return armed geofences"),
@@ -480,7 +407,7 @@ def get_geofences(
 
 @router.get("/alerts", response_model=List[AlertResponse])
 def get_alerts(
-    alert_type: Optional[str] = Query(None, description="Filter by type: geofence_exit, battery_low, offline, hive_breach"),
+    alert_type: Optional[str] = Query(None, description="Filter by type: geofence_exit, battery_low, offline"),
     start_date: Optional[datetime] = Query(None, description="Filter alerts after this date"),
     end_date: Optional[datetime] = Query(None, description="Filter alerts before this date"),
     unread_only: bool = Query(False, description="Only return unread alerts"),
@@ -498,7 +425,6 @@ def get_alerts(
     - `geofence_exit` - Asset left a geofence
     - `battery_low` - Asset battery is low
     - `offline` - Asset went offline
-    - `hive_breach` - Hive was breached
     
     **Example:**
     ```bash

@@ -1228,7 +1228,6 @@
                             <button class="tab"         id="logsrc-backend"  onclick="switchLogSource('backend')">⚙️ Backend</button>
                             <button class="tab"         id="logsrc-nginx-access" onclick="switchLogSource('nginx-access')">🌐 Nginx Access</button>
                             <button class="tab"         id="logsrc-nginx-error"  onclick="switchLogSource('nginx-error')">🚨 Nginx Error</button>
-                            <button class="tab"         id="logsrc-hive"  onclick="switchLogSource('hive')">🛡️ Hive Logs</button>
                             <button class="tab"         id="logsrc-trip"  onclick="switchLogSource('trip')">🚗 Trip Engine Logs</button>
                         </div>
 
@@ -1318,46 +1317,6 @@
                                 <span style="color:#555;">Loading...</span>
                             </div>
                             <div style="color:var(--gray);font-size:12px;margin-top:8px;" id="containerLogMeta"></div>
-                        </div>
-
-                        <!-- HIVE LOGS EXPORT -->
-                        <div id="logview-hive" style="display:none;" class="card">
-                            <div style="margin-bottom:20px;padding:20px;background:var(--surface);border-radius:8px;border-left:4px solid var(--primary);">
-                                <h3 style="margin:0 0 12px 0;font-size:16px;">📦 Export HIVE Logs & Data</h3>
-                                <p style="margin:0 0 16px 0;color:var(--gray);font-size:14px;">
-                                    Download a complete bundle of HIVE logs and database data including evaluations, events, and current state.
-                                </p>
-                                <div class="filters" style="margin-bottom:16px;">
-                                    <div class="filter-group">
-                                        <label>Time Range</label>
-                                        <select id="hiveDaysFilter">
-                                            <option value="1" data-i18n="options.last_24_hours">Last 24 hours</option>
-                                            <option value="3" data-i18n="options.last_3_days">Last 3 days</option>
-                                            <option value="7" selected data-i18n="options.last_7_days">Last 7 days</option>
-                                            <option value="14" data-i18n="options.last_14_days">Last 14 days</option>
-                                            <option value="30" data-i18n="options.last_30_days">Last 30 days</option>
-                                            <option value="90" data-i18n="options.last_90_days">Last 90 days</option>
-                                        </select>
-                                    </div>
-                                    <div class="filter-group">
-                                        <button class="btn btn-primary" onclick="exportHiveLogs()" id="hiveExportBtn">
-                                            <i class="fa-solid fa-download"></i> Export Logs
-                                        </button>
-                                    </div>
-                                </div>
-                                <div id="hiveExportStatus" style="display:none;padding:12px;background:var(--background);border-radius:4px;font-size:13px;"></div>
-                            </div>
-
-                            <div style="padding:20px;background:var(--surface);border-radius:8px;">
-                                <h4 style="margin:0 0 12px 0;font-size:14px;color:var(--gray);">📋 Export Contents</h4>
-                                <ul style="margin:0;padding-left:20px;color:var(--gray);font-size:13px;line-height:1.8;">
-                                    <li><strong>backend-hive-logs.log</strong> — Backend logs with HIVE evaluations and alerts</li>
-                                    <li><strong>hives.txt</strong> — All HIVE configurations and current state</li>
-                                    <li><strong>hive-evaluations.txt</strong> — Recent evaluation results</li>
-                                    <li><strong>hive-events.txt</strong> — State change events and triggers</li>
-                                    <li><strong>hive-tag-membership.txt</strong> — Tag to HIVE associations</li>
-                                </ul>
-                            </div>
                         </div>
 
                         <!-- TRIP ENGINE LOGS EXPORT -->
@@ -1648,10 +1607,6 @@
                                                 <span>Series 2 (TrackSolid)</span>
                                             </label>
                                             <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-                                                <input type="checkbox" id="cgTypeSeries3" value="series3">
-                                                <span>Series 3 (QR/NFC)</span>
-                                            </label>
-                                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
                                                 <input type="checkbox" id="cgTypeSeries4" value="series_4">
                                                 <span>Series 4 (BLE Indoor)</span>
                                             </label>
@@ -1748,10 +1703,6 @@
                                             <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
                                                 <input type="checkbox" id="egTypeSeries2" value="series2" checked>
                                                 <span>Series 2 (TrackSolid)</span>
-                                            </label>
-                                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-                                                <input type="checkbox" id="egTypeSeries3" value="series3" checked>
-                                                <span>Series 3 (QR/NFC)</span>
                                             </label>
                                             <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
                                                 <input type="checkbox" id="egTypeSeries4" value="series_4" checked>
@@ -1944,14 +1895,6 @@
                                     <div>
                                         <div class="feature-name">⚙️ Settings</div>
                                         <div class="feature-desc">User settings and preferences</div>
-                                    </div>
-                                </label>
-
-                                <label class="feature-checkbox-item">
-                                    <input type="checkbox" id="tf_hive" data-feature="hive">
-                                    <div>
-                                        <div class="feature-name">🛡️ HIVE</div>
-                                        <div class="feature-desc">HIVE tracking UI for asset monitoring</div>
                                     </div>
                                 </label>
 
@@ -2508,8 +2451,6 @@
                                         <option value="geofence_entry" data-i18n="options.geofence_entry">geofence_entry</option>
                                         <option value="geofence_exit" data-i18n="options.geofence_exit">geofence_exit</option>
                                         <option value="gdpr_deletion_warning" data-i18n="options.gdpr_deletion_warning">gdpr_deletion_warning</option>
-                                        <option value="hive_breach" data-i18n="options.hive_breach">hive_breach</option>
-                                        <option value="hive_breach_cleared" data-i18n="options.hive_breach_cleared">hive_breach_cleared</option>
                                         <option value="critical_service_failure" data-i18n="options.critical_service_failure">critical_service_failure</option>
                                     </select>
                                 </div>
@@ -4223,16 +4164,15 @@ dashboard.welcome,Bienvenue</pre>
 
         function switchLogSource(src) {
             currentLogSource = src;
-            ['app','backend','nginx-access','nginx-error','hive','trip'].forEach(function(k) {
+            ['app','backend','nginx-access','nginx-error','trip'].forEach(function(k) {
                 var el = document.getElementById('logsrc-' + k);
                 if (el) el.classList.toggle('active', k === src);
             });
             document.getElementById('logview-app').style.display = src === 'app' ? '' : 'none';
-            document.getElementById('logview-container').style.display = (src !== 'app' && src !== 'hive' && src !== 'trip') ? '' : 'none';
-            document.getElementById('logview-hive').style.display = src === 'hive' ? '' : 'none';
+            document.getElementById('logview-container').style.display = (src !== 'app' && src !== 'trip') ? '' : 'none';
             document.getElementById('logview-trip').style.display = src === 'trip' ? '' : 'none';
             if (src === 'app') { loadLogs(); } 
-            else if (src === 'hive' || src === 'trip') { /* Export on demand, nothing to auto-load */ }
+            else if (src === 'trip') { /* Export on demand, nothing to auto-load */ }
             else { loadContainerLogs(); }
         }
 
@@ -4360,69 +4300,6 @@ dashboard.welcome,Bienvenue</pre>
             const on = document.getElementById('autoRefreshToggle').checked;
             if (on) { autoRefreshTimer = setInterval(loadContainerLogs, 10000); }
             else    { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
-        }
-
-        // HIVE LOGS EXPORT
-        async function exportHiveLogs() {
-            const authToken = localStorage.getItem('adminToken');
-            if (!authToken) {
-                alert('Please log in first');
-                return;
-            }
-            
-            const daysEl = document.getElementById('hiveDaysFilter');
-            const days = daysEl ? daysEl.value : '7';
-            const statusEl = document.getElementById('hiveExportStatus');
-            const btnEl = document.getElementById('hiveExportBtn');
-            
-            if (btnEl) btnEl.disabled = true;
-            if (statusEl) {
-                statusEl.style.display = 'block';
-                statusEl.style.color = 'var(--gray)';
-                statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Extracting HIVE logs and database data...';
-            }
-
-            try {
-                const url = API_URL + '/api/admin/hive-logs/export?days=' + days;
-                const response = await fetch(url, { 
-                    headers: { 'Authorization': 'Bearer ' + authToken }
-                });
-                
-                if (!response.ok) {
-                    const err = await response.json().catch(() => ({}));
-                    throw new Error(err.detail || response.statusText);
-                }
-
-                // Download the file
-                const blob = await response.blob();
-                const contentDisposition = response.headers.get('Content-Disposition');
-                let filename = 'hive-logs.tar.gz';
-                if (contentDisposition) {
-                    const matches = /filename="([^"]+)"/.exec(contentDisposition);
-                    if (matches && matches[1]) filename = matches[1];
-                }
-
-                const downloadUrl = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = downloadUrl;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(downloadUrl);
-
-                if (statusEl) {
-                    statusEl.style.color = '#86efac';
-                    statusEl.innerHTML = '<i class="fa-solid fa-check-circle"></i> Export completed! Check your downloads folder for <strong>' + filename + '</strong>';
-                }
-            } catch (error) {
-                if (statusEl) {
-                    statusEl.style.color = '#f87171';
-                    statusEl.innerHTML = '<i class="fa-solid fa-exclamation-circle"></i> Export failed: ' + error.message;
-                }
-            } finally {
-                if (btnEl) btnEl.disabled = false;
-            }
         }
 
         // TRIP ENGINE LOGS EXPORT
@@ -4834,7 +4711,6 @@ dashboard.welcome,Bienvenue</pre>
             const allowedTypes = [];
             if (document.getElementById('cgTypeSeries1').checked) allowedTypes.push('series1');
             if (document.getElementById('cgTypeSeries2').checked) allowedTypes.push('series2');
-            if (document.getElementById('cgTypeSeries3').checked) allowedTypes.push('series3');
             if (document.getElementById('cgTypeSeries4').checked) allowedTypes.push('series_4');
             if (document.getElementById('cgTypeSeries5').checked) allowedTypes.push('series_5');
             
@@ -5042,10 +4918,9 @@ dashboard.welcome,Bienvenue</pre>
             document.getElementById('egFeatManagement').checked = secs.includes('management');
             document.getElementById('egFeatReports').checked    = secs.includes('reports');
             // Populate tag type checkboxes — null means all allowed
-            const types = allowedTagTypes || ['series1', 'series2', 'series3', 'series_4', 'series_5'];
+            const types = allowedTagTypes || ['series1', 'series2', 'series_4', 'series_5'];
             document.getElementById('egTypeSeries1').checked = types.includes('series1');
             document.getElementById('egTypeSeries2').checked = types.includes('series2');
-            document.getElementById('egTypeSeries3').checked = types.includes('series3');
             document.getElementById('egTypeSeries4').checked = types.includes('series_4');
             document.getElementById('egTypeSeries5').checked = types.includes('series_5');
             // Populate language dropdown
@@ -5179,7 +5054,6 @@ dashboard.welcome,Bienvenue</pre>
             const allowedTagTypes = [];
             if (document.getElementById('egTypeSeries1').checked) allowedTagTypes.push('series1');
             if (document.getElementById('egTypeSeries2').checked) allowedTagTypes.push('series2');
-            if (document.getElementById('egTypeSeries3').checked) allowedTagTypes.push('series3');
             if (document.getElementById('egTypeSeries4').checked) allowedTagTypes.push('series_4');
             if (document.getElementById('egTypeSeries5').checked) allowedTagTypes.push('series_5');
             try {
@@ -8385,7 +8259,7 @@ dashboard.welcome,Bienvenue</pre>
             });
 
             // Update checkboxes
-            ['livemap', 'history', 'history-advanced', 'alerts', 'geofences', 'reports', 'management', 'floorplan', 'settings', 'hive', 'developers', 'temperature-graph', 'hubble'].forEach(feature => {
+            ['livemap', 'history', 'history-advanced', 'alerts', 'geofences', 'reports', 'management', 'floorplan', 'settings', 'developers', 'temperature-graph', 'hubble'].forEach(feature => {
                 const checkbox = document.getElementById(`tf_${feature}`);
                 if (checkbox) {
                     checkbox.checked = enabledMap[feature] !== false; // Default to true if missing
@@ -8412,7 +8286,7 @@ dashboard.welcome,Bienvenue</pre>
 
         try {
             const features = {};
-            ['livemap', 'history', 'history-advanced', 'alerts', 'geofences', 'reports', 'management', 'floorplan', 'settings', 'hive', 'developers', 'temperature-graph', 'hubble'].forEach(feature => {
+            ['livemap', 'history', 'history-advanced', 'alerts', 'geofences', 'reports', 'management', 'floorplan', 'settings', 'developers', 'temperature-graph', 'hubble'].forEach(feature => {
                 const checkbox = document.getElementById(`tf_${feature}`);
                 if (checkbox) {
                     features[feature] = checkbox.checked;

@@ -2,7 +2,7 @@
 Background service that polls MZone API every 10 seconds to:
 1. Update tracker positions in database
 2. Check geofences automatically
-3. Enable real-time alerts without manual refresh (critical for HIVE breach detection)
+3. Enable real-time alerts without manual refresh
 
 TrackSolid tags are polled via the TrackSolid getMonitorInfo endpoint instead
 of MZone, and their battery level is refreshed at the same interval.
@@ -17,6 +17,7 @@ import logging
 import os
 from datetime import datetime, timedelta
 from typing import List
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models import BLETag, User, HiveTagMembership, POITrackerLink, GeofenceAlert, PortalAlert
@@ -107,7 +108,10 @@ class LocationPollerService:
             db.commit()
 
             # Get all active trackers across all users
-            trackers = db.query(BLETag).filter(BLETag.is_active == True).all()
+            trackers = db.query(BLETag).filter(
+                BLETag.is_active == True,
+                or_(BLETag.tag_type.is_(None), BLETag.tag_type.notin_(("series3", "series_3"))),
+            ).all()
 
             # ── Expiry enforcement: skip tags whose package has expired ──
             def _is_expired(tag: BLETag) -> bool:
@@ -130,7 +134,6 @@ class LocationPollerService:
             # tags added by any client version are polled correctly.
             _SERIES2_KEYS = {"series2", "tracksolid"}
             _SERIES1_KEYS = {"series1", "scope"}
-            _SERIES3_KEYS = {"series3"}
             _SERIES4_KEYS = {"series4", "ble"}  # Series 4 (DX-Smart indoor BLE)
             _SERIES5_KEYS = {"series5", "hubble"}  # Series 5 (Hubble Platform BLE)
 
@@ -139,11 +142,10 @@ class LocationPollerService:
 
             series2_trackers = [t for t in live_trackers if _tag_key(t) in _SERIES2_KEYS]
             series1_trackers = [t for t in live_trackers if _tag_key(t) in _SERIES1_KEYS]
-            series3_trackers = [t for t in live_trackers if _tag_key(t) in _SERIES3_KEYS]
             series4_trackers = [t for t in live_trackers if _tag_key(t) in _SERIES4_KEYS]
             series5_trackers = [t for t in live_trackers if _tag_key(t) in _SERIES5_KEYS]
             unknown_trackers = [t for t in live_trackers
-                                   if _tag_key(t) not in _SERIES2_KEYS | _SERIES1_KEYS | _SERIES3_KEYS | _SERIES4_KEYS | _SERIES5_KEYS]
+                                   if _tag_key(t) not in _SERIES2_KEYS | _SERIES1_KEYS | _SERIES4_KEYS | _SERIES5_KEYS]
             for t in unknown_trackers:
                 logger.warning("⚠️  Tracker IMEI %s has unrecognised tag_type '%s' — skipping", t.imei, t.tag_type)
 
@@ -356,45 +358,11 @@ class LocationPollerService:
 
                     updated_count += 1
 
-            # ── Reverse-geocode Series 3 (QR/NFC) tags ─────────────────────
-            # Series 3 tags get GPS from mobile app scans. If they have coordinates
-            # but no location_description, reverse geocode them.
-            for tracker in series3_trackers:
-                if not tracker.latitude or not tracker.longitude:
-                    continue
-                try:
-                    lat = float(tracker.latitude)
-                    lng = float(tracker.longitude)
-                except (ValueError, TypeError):
-                    logger.warning("⚠️  Series 3 IMEI %s has invalid coordinates", tracker.imei)
-                    continue
-                
-                # Skip if already has a location description
-                if tracker.location_description:
-                    continue
-                
-                try:
-                    geo_result = self.geocode_service.reverse_geocode(
-                        device_imei=tracker.imei,
-                        lat=lat,
-                        lng=lng
-                    )
-                    tracker.location_description = geo_result["address"]
-                    updated_count += 1
-                    if geo_result.get("cached"):
-                        logger.debug("📍 Series 3 IMEI %s: cached geocode (moved %.1fm)", 
-                                   tracker.imei, geo_result.get("distance_moved", 0))
-                    else:
-                        logger.info("📍 Series 3 IMEI %s: reverse geocoded to '%s'", 
-                                  tracker.imei, geo_result["address"])
-                except Exception as exc:
-                    logger.warning("⚠️  Series 3 IMEI %s geocode failed: %s", tracker.imei, exc)
-
             # Commit all updates
             db.commit()
             logger.info(f"✅ Updated {updated_count} tracker positions and checked geofences "
                         f"({len(series2_trackers)} Series 2 / TrackSolid, {len(series1_trackers)} Series 1 / MZone, "
-                        f"{len(series3_trackers)} Series 3 / QR-NFC, {len(series4_trackers)} Series 4 / BLE Indoor, "
+                        f"{len(series4_trackers)} Series 4 / BLE Indoor, "
                         f"{len(series5_trackers)} Series 5 / Hubble webhook-only)")
 
             # ── Generate battery-low and offline portal alerts ─────────────
