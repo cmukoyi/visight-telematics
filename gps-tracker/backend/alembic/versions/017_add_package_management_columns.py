@@ -61,7 +61,7 @@ def upgrade():
     if not _table_exists(conn, "tag_packages"):
         op.create_table(
             "tag_packages",
-            sa.Column("id",               sa.String(36),  primary_key=True),
+            sa.Column("id",               UUID(as_uuid=False), primary_key=True),
             sa.Column("name",             sa.String(100), nullable=False, unique=True),
             sa.Column("description",      sa.Text(),      nullable=True),
             sa.Column("validity_days",    sa.Integer(),   nullable=False),

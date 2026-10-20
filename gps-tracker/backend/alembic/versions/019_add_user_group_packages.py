@@ -40,6 +40,25 @@ def _column_exists(conn, table_name: str, column_name: str) -> bool:
 def upgrade():
     conn = op.get_bind()
 
+    # Older installs may have created this table from revision 017 while its
+    # primary key was still VARCHAR(36). The model and join-table FK use UUID.
+    if _table_exists(conn, "tag_packages"):
+        package_id_type = conn.execute(
+            text(
+                "SELECT data_type FROM information_schema.columns "
+                "WHERE table_schema = current_schema() "
+                "AND table_name = 'tag_packages' AND column_name = 'id'"
+            )
+        ).scalar()
+        if package_id_type != "uuid":
+            op.alter_column(
+                "tag_packages",
+                "id",
+                existing_type=sa.String(length=36),
+                type_=UUID(as_uuid=False),
+                postgresql_using="id::uuid",
+            )
+
     # 1. Create user_group_packages join table
     if not _table_exists(conn, "user_group_packages"):
         op.create_table(
