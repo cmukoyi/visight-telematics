@@ -398,8 +398,8 @@ jobs:
               docker info >/dev/null 2>&1 || { echo '❌ deploy user cannot access Docker'; exit 1; }; \
               sudo -n true || { echo '❌ deploy user needs passwordless sudo for system setup'; exit 1; }; \
               test -s '${SERVER_DIR}/gps-tracker/backend/.env' || { echo '❌ install and configure backend/.env before first deploy'; exit 1; }; \
-              test -s /etc/letsencrypt/live/track.visighttelematics.co.za/fullchain.pem || { echo '❌ TLS certificate missing for track.visighttelematics.co.za'; exit 1; }; \
-              test -s /etc/letsencrypt/live/track.visighttelematics.co.za/privkey.pem || { echo '❌ TLS private key missing for track.visighttelematics.co.za'; exit 1; }; \
+              sudo -n /usr/bin/test -s /etc/letsencrypt/live/track.visighttelematics.co.za/fullchain.pem || { echo '❌ TLS certificate missing or not verifiable for track.visighttelematics.co.za'; exit 1; }; \
+              sudo -n /usr/bin/test -s /etc/letsencrypt/live/track.visighttelematics.co.za/privkey.pem || { echo '❌ TLS private key missing or not verifiable for track.visighttelematics.co.za'; exit 1; }; \
               echo '✅ deploy host prerequisites verified'"
 
       # ─────────────────────────────────────────────────────────────
