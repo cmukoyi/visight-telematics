@@ -5,7 +5,7 @@ name: Deploy to Production
 # ─────────────────────────────────────────────────────────────────────────────
 # One workflow ships any tenant. The tenant is selected by the branch:
 #
-#   main         → tenant=pinplot → environment=production         → /home/deploy/pinplot
+#   main         → tenant=pinplot → environment=production         → /home/deploy/visght-telematics
 #   prod/beacon  → tenant=beacon  → environment=production-beacon  → /root/beacon-telematics
 #
 # Per-tenant values (server path, display name, db user, container prefix,
