@@ -2671,53 +2671,6 @@
 
                     <!-- END USERS TAB -->
 
-                    <div id="editEndUserModal" class="modal">
-                        <div class="modal-content" style="max-width:640px">
-                            <div class="modal-header">
-                                <h3 class="modal-title">Edit End User</h3>
-                                <button class="modal-close" onclick="closeModal('editEndUserModal')">×</button>
-                            </div>
-                            <div id="euAlert" class="alert" style="display:none"><span id="euAlertText"></span></div>
-                            <form id="editEndUserForm" onsubmit="submitEndUserEdit(event)">
-                                <input type="hidden" id="euUserId">
-                                <div class="form-group">
-                                    <label class="form-label">Email</label>
-                                    <input type="email" id="euEmail" class="form-input" disabled>
-                                </div>
-                                <div style="display:flex;gap:12px">
-                                    <div class="form-group" style="flex:1">
-                                        <label class="form-label">First Name</label>
-                                        <input type="text" id="euFirstName" class="form-input" data-i18n-placeholder="placeholders.first_name" placeholder="First name">
-                                    </div>
-                                    <div class="form-group" style="flex:1">
-                                        <label class="form-label">Last Name</label>
-                                        <input type="text" id="euLastName" class="form-input" data-i18n-placeholder="placeholders.last_name" placeholder="Last name">
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Phone</label>
-                                    <input type="text" id="euPhone" class="form-input" data-i18n-placeholder="placeholders.phone_number" placeholder="Phone number">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Assign User Group <span style="font-weight:normal;color:var(--text-secondary)">(optional)</span></label>
-                                    <select id="euUsergroup" class="form-input">
-                                        <option value="__keep__" data-i18n="options.keep_current_group">Keep current group</option>
-                                    </select>
-                                    <p id="euUsergroupHelp" style="font-size:12px;color:var(--text-secondary);margin-top:6px">Choose a group only if you want to link this user to a customer tenant.</p>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Assign Unassigned IMEIs <span style="font-weight:normal;color:var(--text-secondary)">(optional)</span></label>
-                                    <select id="euTag" class="form-input" multiple size="8">
-                                    </select>
-                                    <p style="font-size:12px;color:var(--text-secondary);margin-top:6px">Only IMEIs with no owner are listed here. Hold Command or Ctrl to select multiple.</p>
-                                </div>
-                                <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:8px">
-                                    <button type="button" class="btn btn-secondary" onclick="closeModal('editEndUserModal')">Cancel</button>
-                                    <button type="submit" class="btn btn-primary" id="euSubmitBtn">Save Changes</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
                     <!-- END END USERS TAB -->
 
 

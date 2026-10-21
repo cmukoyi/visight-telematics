@@ -2244,7 +2244,6 @@ window._lmFilterListD       = _ppDebFn('lmFilterList');
 window._alRenderTableD      = _ppDebFn('alRenderTable');
 window._amRenderCardsD      = _ppDebFn('amRenderCards');
 window._fpFilterAssetsD     = _ppDebounce((v) => { try { window.FP && FP.filterAssets(v); } catch (_) {} }, 175);
-window._euFilterD           = _ppDebFn('_euFilter');
 window._rptSubFilterD       = _ppDebFn('rptSubFilter');
 window._rptActFilterD       = _ppDebFn('rptActFilter');
 
@@ -3301,14 +3300,13 @@ function settingsSaveUnits(value){
     setUnits(value);
     // Re-render any visible views that care about units
     try { if(typeof locRenderAll==='function') locRenderAll(); } catch(e){}
-    try { if(typeof renderHistoryDetail==='function') renderHistoryDetail(); } catch(e){}
-    showToast && showToast(`Units set to ${value}`);
+    typeof showToast === 'function' && showToast(`Units set to ${value}`);
 }
 
 async function settingsSaveLanguage(lang) {
     const ts = TranslationService.getInstance();
     await ts.setLanguage(lang);
-    showToast && showToast(`Language changed to ${lang.toUpperCase()}`);
+    typeof showToast === 'function' && showToast(`Language changed to ${lang.toUpperCase()}`);
     // Refresh dynamic content that rendered translated text with t().
     try { if(typeof locRenderAll==='function') locRenderAll(); } catch(e){}
     try {
@@ -6093,7 +6091,6 @@ async function loadCategories() {
     renderLmCategoryFilters();
     alRenderCategoryChips();
     // Refresh Movement Analytics category pills
-    if (typeof mhaRenderCategoryPills === 'function') mhaRenderCategoryPills();
 }
 
 function renderCategoriesList() {
@@ -6491,142 +6488,6 @@ async function loadUsers() {
     } catch (err) {
         tb.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--gray)">${esc(err.message)}</td></tr>`;
     }
-}
-
-// ── End User App Users ─────────────────────────────────────────────────────
-let _euAllUsers = [];   // cache for client-side filtering
-
-
-function _euFilter(q) {
-    const term = (q || '').toLowerCase().trim();
-    const filtered = term
-        ? _euAllUsers.filter(u => {
-            const name = [u.first_name, u.last_name].filter(Boolean).join(' ').toLowerCase();
-            return name.includes(term) || (u.email||'').toLowerCase().includes(term);
-          })
-        : _euAllUsers;
-    _euRender(filtered);
-}
-
-function _euRender(users) {
-    const tb = document.getElementById('endUsersTableBody');
-    if (!tb) return;
-    if (!users.length) {
-        tb.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-3)">No end users found.</td></tr>';
-        return;
-    }
-    let rows = '';
-    users.forEach((u, idx) => {
-        const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || '—';
-        const tagCount = (u.tags || []).length;
-        const expandId = `eu-expand-${idx}`;
-        const hasExpanded = tagCount > 0;
-        const isActive = u.is_active !== false;
-        const regDate = u.created_at
-            ? new Date(u.created_at).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'})
-            : '—';
-        const rowFade = isActive ? '' : 'opacity:.55;';
-
-        rows += `<tr class="eu-user-row" data-expand="${hasExpanded ? expandId : ''}"
-                    data-uid="${esc(String(u.id))}"
-                    data-name="${esc(name)}"
-                    data-active="${isActive}"
-                    style="cursor:${hasExpanded?'pointer':'default'};${rowFade}">
-            <td style="text-align:center;width:32px">
-                ${hasExpanded ? `<span class="eu-chevron" id="chev-${idx}">&#8250;</span>` : ''}
-            </td>
-            <td style="font-weight:500">
-                ${esc(name)}
-                ${!isActive ? '<span style="margin-left:6px;font-size:.72rem;background:rgba(107,114,128,.15);color:var(--text-3);padding:1px 6px;border-radius:8px;vertical-align:middle" data-i18n="text.deactivated">Deactivated</span>' : ''}
-            </td>
-            <td style="color:var(--text-2)">${esc(u.email)}</td>
-            <td style="color:var(--text-3);font-size:.84rem;white-space:nowrap">${regDate}</td>
-            <td style="text-align:center">
-                ${tagCount > 0
-                    ? `<span style="background:color-mix(in srgb,var(--primary) 12%,transparent);color:var(--primary);padding:2px 9px;border-radius:12px;font-size:.78rem;font-weight:600">${tagCount}</span>`
-                    : `<span style="color:var(--text-3);font-size:.78rem">—</span>`
-                }
-            </td>
-            <td style="text-align:center;white-space:nowrap" onclick="event.stopPropagation()">
-                ${u.portal_linked
-                    ? `<button class="btn-sm btn-outline-warn" data-i18n-title="tooltips.remove_portal_access" title="Remove portal access"
-                            onclick="_euRevokePortalAccess('${esc(String(u.id))}','${esc(name)}')">
-                            <i class="fa-solid fa-user-minus" style="font-size:.78rem"></i> ${t('users.remove_portal_access', 'Remove Portal Access')}
-                       </button>`
-                    : `<button class="btn-sm btn-outline-ok" data-i18n-title="tooltips.promote_to_portal" title="Promote to portal user"
-                            onclick="_euPromoteToPortal('${esc(String(u.id))}','${esc(name)}')">
-                            <i class="fa-solid fa-user-shield" style="font-size:.78rem"></i> ${t('users.promote_to_portal', 'Promote to Portal')}
-                       </button>`
-                }
-                ${isActive
-                    ? `<button class="btn-sm btn-outline-warn" data-i18n-title="tooltips.deactivate_user" title="Deactivate user" onclick="_euSetActive('${esc(String(u.id))}',false,'${esc(name)}')">
-                            <i class="fa-solid fa-ban" style="font-size:.78rem"></i> ${t('tooltips.deactivate_user', 'Deactivate user')}
-                       </button>`
-                    : `<button class="btn-sm btn-outline-ok" data-i18n-title="tooltips.activate_user" title="Activate user" onclick="_euSetActive('${esc(String(u.id))}',true,'${esc(name)}')">
-                            <i class="fa-solid fa-circle-check" style="font-size:.78rem"></i> ${t('tooltips.activate_user', 'Activate user')}
-                       </button>`
-                }
-                <button class="btn-sm btn-outline-danger" data-i18n-title="tooltips.delete_user_permanently" title="Delete user permanently"
-                        style="margin-left:4px"
-                        onclick="_euDelete('${esc(String(u.id))}','${esc(name)}')">
-                    <i class="fa-solid fa-trash" style="font-size:.78rem"></i>
-                </button>
-            </td>
-        </tr>`;
-
-        if (hasExpanded) {
-            rows += `<tr class="eu-imei-row" id="${expandId}" style="display:none">
-                <td colspan="6" style="padding:0">
-                    <table style="width:100%;border-collapse:collapse;background:var(--bg-2,var(--bg));font-size:.83rem">
-                        <thead>
-                            <tr style="background:var(--bg-3,var(--bg-2))">
-                                <th style="padding:8px 12px 8px 40px;font-weight:500;color:var(--text-3);text-align:left" data-i18n="table.imei">IMEI</th>
-                                <th style="padding:8px 12px;font-weight:500;color:var(--text-3);text-align:left" data-i18n="table.description">Description</th>
-                                <th style="padding:8px 12px;font-weight:500;color:var(--text-3);text-align:left" data-i18n="table.package">Package</th>
-                                <th style="padding:8px 12px;font-weight:500;color:var(--text-3);text-align:left" data-i18n="table.activated">Activated</th>
-                                <th style="padding:8px 12px;font-weight:500;color:var(--text-3);text-align:left" data-i18n="table.expires">Expires</th>
-                                <th style="padding:8px 12px;font-weight:500;color:var(--text-3);text-align:center" data-i18n="table.status">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${(u.tags||[]).map(t => {
-                                const actDate = t.activation_date ? new Date(t.activation_date).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—';
-                                const expDate = t.expiry_date     ? new Date(t.expiry_date).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—';
-                                const dr = t.days_remaining;
-                                let badge;
-                                if (!t.is_active)                      badge = `<span style="background:rgba(107,114,128,.15);color:var(--text-3);padding:2px 8px;border-radius:10px" data-i18n="text.inactive">Inactive</span>`;
-                                else if (dr === null || dr === undefined) badge = `<span style="background:rgba(59,130,246,.12);color:#3b82f6;padding:2px 8px;border-radius:10px" data-i18n="text.no_package">No package</span>`;
-                                else if (dr < 0)                        badge = `<span style="background:rgba(239,68,68,.12);color:var(--danger);padding:2px 8px;border-radius:10px" data-i18n="text.expired">Expired</span>`;
-                                else if (dr <= 30)                      badge = `<span style="background:rgba(245,158,11,.12);color:#f59e0b;padding:2px 8px;border-radius:10px">${dr}d left</span>`;
-                                else                                    badge = `<span style="background:color-mix(in srgb,var(--primary) 12%,transparent);color:var(--primary);padding:2px 8px;border-radius:10px">${dr}d left</span>`;
-                                return `<tr style="border-top:1px solid var(--border)">
-                                    <td style="padding:8px 12px 8px 40px;font-family:monospace;font-size:.82rem;color:var(--text-2)">${esc(t.imei)}</td>
-                                    <td style="padding:8px 12px">${esc(t.description||'—')}</td>
-                                    <td style="padding:8px 12px">${esc(t.package_name||'—')}</td>
-                                    <td style="padding:8px 12px">${actDate}</td>
-                                    <td style="padding:8px 12px">${expDate}</td>
-                                    <td style="padding:8px 12px;text-align:center">${badge}</td>
-                                </tr>`;
-                            }).join('')}
-                        </tbody>
-                    </table>
-                </td>
-            </tr>`;
-        }
-    });
-    tb.innerHTML = rows;
-    // Wire expand/collapse clicks — only on rows with a non-empty data-expand
-    tb.querySelectorAll('.eu-user-row[data-expand]:not([data-expand=""])').forEach(row => {
-        row.addEventListener('click', () => {
-            const expandEl = document.getElementById(row.dataset.expand);
-            if (!expandEl) return;
-            const chevId = 'chev-' + row.dataset.expand.replace('eu-expand-', '');
-            const chevEl = document.getElementById(chevId);
-            const open = expandEl.style.display !== 'table-row';
-            expandEl.style.display = open ? 'table-row' : 'none';
-            if (chevEl) chevEl.style.transform = open ? 'rotate(90deg)' : '';
-        });
-    });
 }
 
 
@@ -7353,6 +7214,21 @@ function _tagBatteryHtml(tag, compact = false) {
     return `<span class="battery-wrap ${batteryClass}"><i class="fa-solid fa-battery-full"></i> ${compact ? `<small>${battery}%</small>` : `${battery}%`}</span>`;
 }
 
+// Last-seen badge for the Live Assets list: {text, cssClass} → .lm-time-<cssClass>
+function lmGetTimeBadge(lastSeen) {
+    if (!lastSeen) return {text: 'offline', cssClass: 'offline'};
+    const diff = Date.now() - new Date(lastSeen).getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+    if (minutes <= 15) return {text: `${minutes}m`, cssClass: 'fresh'};
+    if (minutes < 60)  return {text: `${minutes}m`, cssClass: 'recent'};
+    if (hours <= 3)    return {text: `${hours}h`, cssClass: 'recent'};
+    if (hours < 24)    return {text: `${hours}h`, cssClass: 'old'};
+    if (days < 7)      return {text: `${days}d`, cssClass: 'offline'};
+    return {text: 'offline', cssClass: 'offline'};
+}
+
 function _lmRenderList(query) {
     query = (query || document.getElementById('lm-search')?.value || '').toLowerCase();
     const list = _lmTags.filter(t => {
@@ -7389,7 +7265,7 @@ function _lmRenderList(query) {
         const battery = _tagBatteryHtml(t, true);
         
         // Time badge (last seen)
-        const {text: timeText, cssClass: timeClass} = mhaGetTimeBadge(t.last_seen);
+        const {text: timeText, cssClass: timeClass} = lmGetTimeBadge(t.last_seen);
         const timeBadge = `<span class="lm-time-badge lm-time-${timeClass}">${timeText}</span>`;
         
         return `<div class="asset-row${cls}" data-imei="${esc(t.imei)}" onclick="lmSelectFromList('${esc(t.imei)}')">
