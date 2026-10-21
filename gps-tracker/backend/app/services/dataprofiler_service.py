@@ -7,7 +7,7 @@ and the phase 2 event decoder will call it on a device's first event.
 """
 import logging
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -117,11 +117,11 @@ def route_device(db: Session, device: ResellerDevice) -> str:
         tag = BLETag(
             imei=device.imei,
             device_name=device.label or None,
-            device_model=device.device_model or None,
+            device_model=device.unit_type.name if device.unit_type else None,
             tag_type=TELTONIKA_TAG_TYPE,
             is_active=True,
             package_id=str(pkg.id),
-            expiry_date=now + timedelta(days=pkg.validity_days),
+            expiry_date=pkg.expiry_from(now),
             attributes={
                 "_created_usergroup_id": group_id,
                 "_reseller_id": str(reseller.id),

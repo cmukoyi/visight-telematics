@@ -1,7 +1,6 @@
 """DataProfiler models — resellers, their data exchanges and device inventory.
 
-A Reseller is a technology provider (e.g. a Teltonika supplier) that owns a
-pool of IMEIs. Each Reseller has exactly one DataExchange, which is linked 1:1
+A Reseller owns a pool of IMEIs, each of a known UnitType (e.g. Teltonika FMC125). Each Reseller has exactly one DataExchange, which is linked 1:1
 to the main UserGroup on the customer dashboard. When a device is routed
 through the exchange it is provisioned on the customer dashboard as a BLETag
 in that group, carrying a TagPackage that sets its validity and visible events.
@@ -26,7 +25,6 @@ class Reseller(Base):
     id                 = get_uuid_column()
     name               = Column(String(200), nullable=False, unique=True)
     code               = Column(String(50), nullable=False, unique=True)   # short URL-safe identifier
-    provider           = Column(String(50), nullable=False, default="teltonika")  # device technology provider
     contact_name       = Column(String(200), nullable=True)
     contact_email      = Column(String(255), nullable=True)
     contact_phone      = Column(String(50), nullable=True)
@@ -71,6 +69,27 @@ class DataExchange(Base):
     usergroup = relationship("UserGroup")
 
 
+class UnitType(Base):
+    """A device make/model the platform can ingest, e.g. Teltonika FMC125.
+
+    Managed under DataProfiler → Unit Types and chosen when IMEIs are added.
+    """
+    __tablename__ = "unit_types"
+    __table_args__ = (Index("uq_unit_types_manufacturer_model", "manufacturer", "model", unique=True),)
+
+    id           = get_uuid_column()
+    manufacturer = Column(String(100), nullable=False)   # e.g. Teltonika
+    model        = Column(String(100), nullable=False)   # e.g. FMC125
+    description  = Column(Text, nullable=True)
+    is_active    = Column(Boolean, nullable=False, default=True)
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at   = Column(DateTime(timezone=True), onupdate=func.now())
+
+    @property
+    def name(self) -> str:
+        return f"{self.manufacturer} {self.model}"
+
+
 class ResellerDevice(Base):
     """One IMEI in a reseller's inventory and its routing state.
 
@@ -85,7 +104,7 @@ class ResellerDevice(Base):
     reseller_id     = get_uuid_fk("resellers.id")
     imei            = Column(String(50), nullable=False, unique=True, index=True)
     label           = Column(String(100), nullable=True)
-    device_model    = Column(String(100), nullable=True)   # e.g. FMC130
+    unit_type_id    = get_uuid_fk_nullable("unit_types.id")
     package_id      = get_uuid_fk_nullable("tag_packages.id")  # NULL = use reseller default
     status          = Column(String(20), nullable=False, default="pending")
     status_detail   = Column(String(255), nullable=True)
@@ -96,4 +115,5 @@ class ResellerDevice(Base):
     created_at      = Column(DateTime(timezone=True), server_default=func.now())
     updated_at      = Column(DateTime(timezone=True), onupdate=func.now())
 
-    reseller = relationship("Reseller", back_populates="devices")
+    reseller  = relationship("Reseller", back_populates="devices")
+    unit_type = relationship("UnitType")

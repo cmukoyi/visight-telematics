@@ -1,4 +1,4 @@
-"""DataProfiler admin API — resellers, their data exchange and IMEI inventory.
+"""DataProfiler admin API — unit types, resellers, data exchanges and IMEI inventory.
 
 Mounted under /api/admin/dataprofiler and protected by the admin auth
 dependency, like the rest of the admin portal API. Reads need viewer,
@@ -18,7 +18,7 @@ from app.admin_auth import check_role_permission, get_current_admin_user
 from app.database import get_db
 from app.models import UserGroup
 from app.models_admin import AdminUser, TagPackage
-from app.models_dataprofiler import DataExchange, Reseller, ResellerDevice
+from app.models_dataprofiler import DataExchange, Reseller, ResellerDevice, UnitType
 from app.routes_admin import get_admin_from_request, log_audit
 from app.services import dataprofiler_service as dp
 
@@ -44,6 +44,13 @@ def _get_reseller(db: Session, reseller_id: str) -> Reseller:
     if not reseller:
         raise HTTPException(status_code=404, detail="Reseller not found")
     return reseller
+
+
+def _check_unit_type(db: Session, unit_type_id: Optional[str]) -> None:
+    if unit_type_id and not db.query(UnitType).filter(
+        UnitType.id == unit_type_id, UnitType.is_active == True
+    ).first():
+        raise HTTPException(status_code=400, detail="Unit type not found or inactive")
 
 
 def _check_package(db: Session, package_id: Optional[str]) -> None:
@@ -81,7 +88,6 @@ class ResellerOut(_UUIDOut):
     id: str
     name: str
     code: str
-    provider: str
     contact_name: Optional[str] = None
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
@@ -101,7 +107,6 @@ class ResellerCreated(ResellerOut):
 class ResellerCreate(BaseModel):
     name: str
     code: str
-    provider: str = "teltonika"
     contact_name: Optional[str] = None
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
@@ -111,7 +116,6 @@ class ResellerCreate(BaseModel):
 
 class ResellerUpdate(BaseModel):
     name: Optional[str] = None
-    provider: Optional[str] = None
     contact_name: Optional[str] = None
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
@@ -127,25 +131,50 @@ class LinkRequest(BaseModel):
 class DeviceRow(BaseModel):
     imei: str
     label: Optional[str] = None
-    device_model: Optional[str] = None
 
 
 class DevicesAdd(BaseModel):
     devices: List[DeviceRow]
+    unit_type_id: str
     package_id: Optional[str] = None  # NULL = reseller default
 
 
 class DeviceUpdate(BaseModel):
     label: Optional[str] = None
-    device_model: Optional[str] = None
+    unit_type_id: Optional[str] = None
     package_id: Optional[str] = None
+
+
+class UnitTypeIn(BaseModel):
+    manufacturer: str
+    model: str
+    description: Optional[str] = None
+
+
+class UnitTypeUpdate(BaseModel):
+    manufacturer: Optional[str] = None
+    model: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class UnitTypeOut(_UUIDOut):
+    id: str
+    manufacturer: str
+    model: str
+    name: str
+    description: Optional[str] = None
+    is_active: bool
+    device_count: int = 0
+    created_at: Optional[datetime] = None
 
 
 class DeviceOut(_UUIDOut):
     id: str
     imei: str
     label: Optional[str] = None
-    device_model: Optional[str] = None
+    unit_type_id: Optional[str] = None
+    unit_type_name: Optional[str] = None
     package_id: Optional[str] = None
     package_name: Optional[str] = None
     status: str
@@ -186,7 +215,7 @@ def _reseller_out(db: Session, r: Reseller, pkg_names: dict, counts: dict) -> Re
             linked_at=ex.linked_at, linked_by=ex.linked_by,
         )
     return ResellerOut(
-        id=r.id, name=r.name, code=r.code, provider=r.provider,
+        id=r.id, name=r.name, code=r.code,
         contact_name=r.contact_name, contact_email=r.contact_email,
         contact_phone=r.contact_phone, notes=r.notes,
         default_package_id=r.default_package_id,
@@ -200,7 +229,8 @@ def _reseller_out(db: Session, r: Reseller, pkg_names: dict, counts: dict) -> Re
 def _device_out(d: ResellerDevice, pkg_names: dict, reseller: Reseller) -> DeviceOut:
     effective = d.package_id or reseller.default_package_id
     return DeviceOut(
-        id=d.id, imei=d.imei, label=d.label, device_model=d.device_model,
+        id=d.id, imei=d.imei, label=d.label,
+        unit_type_id=d.unit_type_id, unit_type_name=d.unit_type.name if d.unit_type else None,
         package_id=d.package_id,
         package_name=pkg_names.get(str(effective)) if effective else None,
         status=d.status, status_detail=d.status_detail, ble_tag_id=d.ble_tag_id,
@@ -234,6 +264,99 @@ def overview(request: Request, db: Session = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
+# Unit types
+# ---------------------------------------------------------------------------
+
+def _unit_type_out(u: UnitType, counts: dict) -> UnitTypeOut:
+    return UnitTypeOut(
+        id=u.id, manufacturer=u.manufacturer, model=u.model, name=u.name,
+        description=u.description, is_active=u.is_active,
+        device_count=counts.get(str(u.id), 0), created_at=u.created_at,
+    )
+
+
+def _unit_type_counts(db: Session) -> dict:
+    return {
+        str(uid): n for uid, n in
+        db.query(ResellerDevice.unit_type_id, func.count())
+        .filter(ResellerDevice.unit_type_id.isnot(None))
+        .group_by(ResellerDevice.unit_type_id).all()
+    }
+
+
+def _clean_unit_type_fields(db: Session, manufacturer: str, model: str, exclude_id=None) -> tuple:
+    manufacturer, model = (manufacturer or "").strip(), (model or "").strip()
+    if not manufacturer or not model:
+        raise HTTPException(status_code=400, detail="Manufacturer and model are required")
+    q = db.query(UnitType).filter(
+        func.lower(UnitType.manufacturer) == manufacturer.lower(),
+        func.lower(UnitType.model) == model.lower(),
+    )
+    if exclude_id:
+        q = q.filter(UnitType.id != exclude_id)
+    if q.first():
+        raise HTTPException(status_code=409, detail=f"{manufacturer} {model} already exists")
+    return manufacturer, model
+
+
+@router.get("/unit-types", response_model=List[UnitTypeOut])
+def list_unit_types(request: Request, db: Session = Depends(get_db)):
+    _require(request, db, "viewer")
+    counts = _unit_type_counts(db)
+    types = db.query(UnitType).order_by(UnitType.manufacturer, UnitType.model).all()
+    return [_unit_type_out(u, counts) for u in types]
+
+
+@router.post("/unit-types", response_model=UnitTypeOut, status_code=201)
+def create_unit_type(data: UnitTypeIn, request: Request, db: Session = Depends(get_db)):
+    admin = _require(request, db, "manager")
+    manufacturer, model = _clean_unit_type_fields(db, data.manufacturer, data.model)
+    u = UnitType(manufacturer=manufacturer, model=model,
+                 description=(data.description or "").strip() or None, is_active=True)
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    log_audit(db, str(admin.id), "create_unit_type", "UnitType", str(u.id), new_value={"name": u.name})
+    return _unit_type_out(u, {})
+
+
+@router.put("/unit-types/{unit_type_id}", response_model=UnitTypeOut)
+def update_unit_type(unit_type_id: str, data: UnitTypeUpdate, request: Request, db: Session = Depends(get_db)):
+    admin = _require(request, db, "manager")
+    u = db.query(UnitType).filter(UnitType.id == unit_type_id).first()
+    if not u:
+        raise HTTPException(status_code=404, detail="Unit type not found")
+    changes = data.model_dump(exclude_unset=True)
+    if "manufacturer" in changes or "model" in changes:
+        changes["manufacturer"], changes["model"] = _clean_unit_type_fields(
+            db, changes.get("manufacturer", u.manufacturer), changes.get("model", u.model), exclude_id=u.id)
+    if "description" in changes:
+        changes["description"] = (changes["description"] or "").strip() or None
+    for field, val in changes.items():
+        setattr(u, field, val)
+    db.commit()
+    db.refresh(u)
+    log_audit(db, str(admin.id), "update_unit_type", "UnitType", str(u.id),
+              new_value={k: str(v) for k, v in changes.items()})
+    return _unit_type_out(u, _unit_type_counts(db))
+
+
+@router.delete("/unit-types/{unit_type_id}", status_code=204)
+def delete_unit_type(unit_type_id: str, request: Request, db: Session = Depends(get_db)):
+    """Delete an unused unit type (manager+). Deactivate it instead if devices use it."""
+    admin = _require(request, db, "manager")
+    u = db.query(UnitType).filter(UnitType.id == unit_type_id).first()
+    if not u:
+        raise HTTPException(status_code=404, detail="Unit type not found")
+    if db.query(ResellerDevice).filter(ResellerDevice.unit_type_id == u.id).first():
+        raise HTTPException(status_code=409, detail="Devices use this unit type — deactivate it instead")
+    name = u.name
+    db.delete(u)
+    db.commit()
+    log_audit(db, str(admin.id), "delete_unit_type", "UnitType", unit_type_id, old_value={"name": name})
+
+
+# ---------------------------------------------------------------------------
 # Resellers
 # ---------------------------------------------------------------------------
 
@@ -261,7 +384,7 @@ def create_reseller(data: ResellerCreate, request: Request, db: Session = Depend
     _check_package(db, data.default_package_id)
 
     reseller = Reseller(
-        name=name, code=code, provider=(data.provider or "teltonika").strip().lower(),
+        name=name, code=code,
         contact_name=data.contact_name, contact_email=data.contact_email,
         contact_phone=data.contact_phone, notes=data.notes,
         default_package_id=data.default_package_id or None, is_active=True,
@@ -387,6 +510,9 @@ def add_devices(reseller_id: str, data: DevicesAdd, request: Request, db: Sessio
     admin = _require(request, db, "manager")
     r = _get_reseller(db, reseller_id)
     _check_package(db, data.package_id)
+    if not data.unit_type_id:
+        raise HTTPException(status_code=400, detail="Choose a unit type")
+    _check_unit_type(db, data.unit_type_id)
     if not (data.package_id or r.default_package_id):
         raise HTTPException(status_code=400, detail="Choose a package or set a default package on the reseller first")
 
@@ -409,7 +535,7 @@ def add_devices(reseller_id: str, data: DevicesAdd, request: Request, db: Sessio
         device = ResellerDevice(
             reseller_id=r.id, imei=imei,
             label=(row.label or "").strip() or None,
-            device_model=(row.device_model or "").strip() or None,
+            unit_type_id=data.unit_type_id,
             package_id=data.package_id or None, status="pending",
         )
         db.add(device)
@@ -428,7 +554,7 @@ def add_devices(reseller_id: str, data: DevicesAdd, request: Request, db: Sessio
 
 @router.put("/resellers/{reseller_id}/devices/{device_id}", response_model=DeviceOut)
 def update_device(reseller_id: str, device_id: str, data: DeviceUpdate, request: Request, db: Session = Depends(get_db)):
-    """Edit a device's label/model/package override (manager+).
+    """Edit a device's label, unit type or package override (manager+).
 
     Package changes apply to the inventory record; a device already routed keeps
     the package and expiry it was provisioned with on the dashboard.
@@ -442,6 +568,10 @@ def update_device(reseller_id: str, device_id: str, data: DeviceUpdate, request:
     if "package_id" in changes:
         changes["package_id"] = changes["package_id"] or None
         _check_package(db, changes["package_id"])
+    if "unit_type_id" in changes:
+        if not changes["unit_type_id"]:
+            raise HTTPException(status_code=400, detail="Unit type is required")
+        _check_unit_type(db, changes["unit_type_id"])
     for field, val in changes.items():
         setattr(d, field, val)
     db.commit()

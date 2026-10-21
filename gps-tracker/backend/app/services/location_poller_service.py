@@ -229,7 +229,7 @@ class LocationPollerService:
                         if tracker.package_id:
                             pkg = db.query(TagPackage).filter(TagPackage.id == str(tracker.package_id)).first()
                             if pkg:
-                                tracker.expiry_date = tracker.activation_date + timedelta(days=pkg.validity_days)
+                                tracker.expiry_date = pkg.expiry_from(tracker.activation_date)
                                 logger.info("📅 Tag %s activated — expiry set to %s", tracker.imei, tracker.expiry_date)
 
                     # Refresh battery level and attributes dict if available
@@ -323,7 +323,7 @@ class LocationPollerService:
                         if tracker.package_id:
                             pkg = db.query(TagPackage).filter(TagPackage.id == str(tracker.package_id)).first()
                             if pkg:
-                                tracker.expiry_date = tracker.activation_date + timedelta(days=pkg.validity_days)
+                                tracker.expiry_date = pkg.expiry_from(tracker.activation_date)
                                 logger.info("📅 Tag %s activated — expiry set to %s", tracker.imei, tracker.expiry_date)
 
                     mzone_vehicle_id = vehicle.get('id')

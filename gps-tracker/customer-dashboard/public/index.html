@@ -4297,7 +4297,7 @@ async function _loadPackagesIntoSelect() {
         }
         sel.innerHTML = '<option value="" data-i18n="options._select_package_">— Select package —</option>' +
             pkgs.map(p => {
-                const label = `${p.name} (${p.validity_days} days)${p.is_default ? ' ✓ default' : ''}`;
+                const label = `${p.name} (${p.validity_label})${p.is_default ? ' ✓ default' : ''}`;
                 return `<option value="${esc(String(p.id))}"${p.is_default ? ' selected' : ''}>${esc(label)}</option>`;
             }).join('');
     } catch (err) {

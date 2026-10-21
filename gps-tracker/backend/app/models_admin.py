@@ -4,7 +4,9 @@ Admin-specific database models: Admin Users, Logs, Billing
 from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, Float, Text, Enum, JSON, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+import calendar
 import uuid
+from datetime import datetime, timedelta
 from app.database import Base
 import os
 import enum
@@ -140,11 +142,13 @@ class BillingTransaction(Base):
 class TagPackage(Base):
     """Subscription package that gates how long a BLE tag may report location data.
 
-    Admin creates packages (e.g. 'Basic 80', validity_days=80).
+    Admin creates packages (e.g. 'Fleet 12', validity_months=12).
     A package is assigned to a BLETag when the tag is added via the portal.
     Self-registered mobile-app tags get the package marked is_default=True.
 
-    expiry_date on the tag = added_at + validity_days.
+    Validity is in calendar months. Packages created before months were
+    introduced keep validity_days until edited; expiry_from() handles both.
+    expiry_date on the tag = expiry_from(added_at or activation_date).
     After expiry, location updates are blocked.
     After expiry + GDPR_GRACE_DAYS (40), beacon sighting rows are purged automatically.
     """
@@ -153,7 +157,8 @@ class TagPackage(Base):
     id            = get_uuid_column()
     name          = Column(String(100), nullable=False, unique=True)
     description   = Column(Text, nullable=True)
-    validity_days = Column(Integer, nullable=False)   # e.g. 80, 120, 300
+    validity_months = Column(Integer, nullable=True)  # e.g. 1, 6, 12 — authoritative when set
+    validity_days = Column(Integer, nullable=True)    # legacy day-based packages (80, 120, 300)
     auto_delete_days = Column(Integer, nullable=True)  # days after expiry to hard-delete tag; NULL = never
     is_default    = Column(Boolean, nullable=False, default=False)  # applied to self-registered tags
     is_active     = Column(Boolean, nullable=False, default=True)
@@ -163,6 +168,29 @@ class TagPackage(Base):
     allowed_event_types = Column(JSON, nullable=True)
     created_at    = Column(DateTime(timezone=True), server_default=func.now())
     updated_at    = Column(DateTime(timezone=True), onupdate=func.now())
+
+    def expiry_from(self, start: datetime) -> datetime:
+        """Return the expiry for a tag whose validity starts at `start`."""
+        if self.validity_months:
+            return add_months(start, self.validity_months)
+        return start + timedelta(days=self.validity_days or 0)
+
+    @property
+    def validity_label(self) -> str:
+        if self.validity_months:
+            return f"{self.validity_months} month{'s' if self.validity_months != 1 else ''}"
+        return f"{self.validity_days or 0} days"
+
+    @property
+    def validity_sort_key(self) -> float:
+        return self.validity_months * 30.44 if self.validity_months else float(self.validity_days or 0)
+
+
+def add_months(start: datetime, months: int) -> datetime:
+    """Add calendar months, clamping to the month's last day (Jan 31 + 1 → Feb 28/29)."""
+    month_index = start.month - 1 + months
+    year, month = start.year + month_index // 12, month_index % 12 + 1
+    return start.replace(year=year, month=month, day=min(start.day, calendar.monthrange(year, month)[1]))
 
 
 class CriticalServiceCategory(str, enum.Enum):

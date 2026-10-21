@@ -1351,7 +1351,9 @@ class PackageOut(BaseModel):
     id: UUID
     name: str
     description: Optional[str]
-    validity_days: int
+    validity_days: Optional[int] = None
+    validity_months: Optional[int] = None
+    validity_label: str
     is_default: bool
 
     class Config:
@@ -1367,14 +1369,11 @@ def list_active_packages(request: Request, db: Session = Depends(get_db)):
     assigned = db.query(UserGroupPackage).filter(UserGroupPackage.usergroup_id == me.usergroup_id).all()
     if assigned:
         pkg_ids = [str(r.package_id) for r in assigned]
-        return (
-            db.query(TagPackage)
-            .filter(TagPackage.id.in_(pkg_ids), TagPackage.is_active == True)
-            .order_by(TagPackage.validity_days)
-            .all()
-        )
-    # Fallback: no explicit assignments — return all active packages
-    return db.query(TagPackage).filter(TagPackage.is_active == True).order_by(TagPackage.validity_days).all()
+        pkgs = db.query(TagPackage).filter(TagPackage.id.in_(pkg_ids), TagPackage.is_active == True).all()
+    else:
+        # Fallback: no explicit assignments — return all active packages
+        pkgs = db.query(TagPackage).filter(TagPackage.is_active == True).all()
+    return sorted(pkgs, key=lambda p: p.validity_sort_key)
 
 
 @router.get("/tag-types")
@@ -1887,20 +1886,20 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
             
             if should_recalculate:
                 tag.package_id = new_pkg_id
-                # Expiry = base_date + validity_days.
+                # Expiry = base_date + package validity.
                 # For renewals/extensions, always use NOW as base so expiry extends into the future.
                 # For new assignments or package changes with valid activation_date, use activation_date.
                 if is_expired or not tag.activation_date:
                     # Renewal or first assignment: extend from now
                     base = datetime.utcnow()
-                    tag.expiry_date = base + timedelta(days=pkg.validity_days)
+                    tag.expiry_date = pkg.expiry_from(base)
                 else:
                     # Package changed but not expired: calculate from activation_date
                     base = tag.activation_date.replace(tzinfo=None)
-                    candidate = base + timedelta(days=pkg.validity_days)
+                    candidate = pkg.expiry_from(base)
                     if candidate <= datetime.utcnow():
                         base = datetime.utcnow()
-                    tag.expiry_date = base + timedelta(days=pkg.validity_days)
+                    tag.expiry_date = pkg.expiry_from(base)
 
     # Handle trip subscription (DeviceState management)
     if data.trip_subscribed is not None:
@@ -2034,7 +2033,7 @@ async def create_tag(data: PortalTagCreate, request: Request, db: Session = Depe
         tag_type=canonical_type,
         is_active=True,
         package_id=str(data.package_id),
-        expiry_date=now + timedelta(days=pkg.validity_days),
+        expiry_date=pkg.expiry_from(now),
         attributes=init_attrs or None,
     )
     db.add(tag)
@@ -2180,7 +2179,7 @@ def bulk_create_tags(rows: List[BulkTagRow], request: Request, db: Session = Dep
         raise HTTPException(status_code=400, detail="The group's default package is no longer active")
 
     now = datetime.utcnow()
-    expiry_date = now + timedelta(days=pkg.validity_days)
+    expiry_date = pkg.expiry_from(now)
 
     results: List[BulkTagResult] = []
     for row in rows:

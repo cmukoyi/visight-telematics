@@ -977,6 +977,12 @@
                                     <span>Resellers</span>
                                 </button>
                             </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('unit-types')">
+                                    <span>📟</span>
+                                    <span>Unit Types</span>
+                                </button>
+                            </li>
                         </ul>
                     </li>
 
@@ -1968,7 +1974,7 @@
                                         <tr>
                                             <th data-i18n="table.name">Name</th>
                                             <th data-i18n="table.description">Description</th>
-                                            <th data-i18n="table.validity_days">Validity (days)</th>
+                                            <th data-i18n="table.validity">Validity</th>
                                             <th data-i18n="table.autodelete_days">Auto-Delete (days)</th>
                                             <th data-i18n="table.default">Default</th>
                                             <th data-i18n="table.sms_addon">SMS Add-on</th>
@@ -2003,8 +2009,9 @@
                                         <input type="text" id="pkgDesc" class="form-input" data-i18n-placeholder="placeholders.optional_description" placeholder="Optional description">
                                     </div>
                                     <div class="form-group">
-                                        <label class="form-label">Validity (days) *</label>
-                                        <input type="number" id="pkgDays" class="form-input" data-i18n-placeholder="placeholders.eg_80" placeholder="e.g. 80" min="1" required>
+                                        <label class="form-label">Validity (months) *</label>
+                                        <input type="number" id="pkgMonths" class="form-input" placeholder="e.g. 12" min="1" required>
+                                        <p id="pkgLegacyDays" style="display:none;font-size:12px;color:var(--text-secondary);margin:4px 0 0"></p>
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">Auto-delete (days after expiry)</label>
@@ -2038,7 +2045,7 @@
                     <div id="resellers" class="tab-content">
                         <div class="page-header">
                             <h2 class="page-title">Resellers</h2>
-                            <p class="page-subtitle">Technology providers and their IMEIs. Each reseller has one Data Exchange that routes its devices to a user group on the customer dashboard; packages set how long devices stay active and which events customers see.</p>
+                            <p class="page-subtitle">Resellers and their IMEIs. Each reseller has one Data Exchange that routes its devices to a user group on the customer dashboard; packages set how long devices stay active and which events customers see.</p>
                             <button class="btn btn-primary" onclick="dpOpenResellerModal()">+ New Reseller</button>
                         </div>
 
@@ -2078,7 +2085,6 @@
                                 <thead>
                                     <tr>
                                         <th>Reseller</th>
-                                        <th>Provider</th>
                                         <th>Exchange</th>
                                         <th>User Group</th>
                                         <th>Default Package</th>
@@ -2087,7 +2093,7 @@
                                     </tr>
                                 </thead>
                                 <tbody id="dpResellerTable">
-                                    <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-secondary)">Loading…</td></tr>
+                                    <tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-secondary)">Loading…</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -2149,7 +2155,7 @@
                                         <tr>
                                             <th>IMEI</th>
                                             <th>Label</th>
-                                            <th>Model</th>
+                                            <th>Unit type</th>
                                             <th>Package</th>
                                             <th>Status</th>
                                             <th>First routed</th>
@@ -2179,12 +2185,6 @@
                                         <label class="form-label">Code *</label>
                                         <input type="text" id="dpResCode" class="form-input" placeholder="e.g. acme-telematics" pattern="[a-z0-9][a-z0-9\-]{1,48}[a-z0-9]" required>
                                         <p style="font-size:12px;color:var(--text-secondary);margin:4px 0 0">Lowercase letters, digits and dashes. Cannot be changed later.</p>
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Technology provider</label>
-                                        <select id="dpResProvider" class="form-input">
-                                            <option value="teltonika">Teltonika</option>
-                                        </select>
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">Default package</label>
@@ -2226,8 +2226,12 @@
                                 <form onsubmit="dpSubmitDevices(event)">
                                     <div class="form-group">
                                         <label class="form-label">IMEIs *</label>
-                                        <textarea id="dpDevicesInput" class="form-input" rows="8" style="font-family:monospace" placeholder="One per line: IMEI, label, model&#10;356307042441013, Truck 12, FMC130&#10;356307042441014" required></textarea>
-                                        <p style="font-size:12px;color:var(--text-secondary);margin:4px 0 0">Label and model are optional. Separate columns with commas or tabs (paste from a spreadsheet works).</p>
+                                        <textarea id="dpDevicesInput" class="form-input" rows="8" style="font-family:monospace" placeholder="One per line: IMEI, label&#10;356307042441013, Truck 12&#10;356307042441014" required></textarea>
+                                        <p style="font-size:12px;color:var(--text-secondary);margin:4px 0 0">Label is optional. Separate columns with a comma or tab (paste from a spreadsheet works).</p>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Unit type *</label>
+                                        <select id="dpDevicesUnitType" class="form-input" required></select>
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">Package</label>
@@ -2259,6 +2263,66 @@
                                     <div style="display:flex;gap:8px"><input type="text" id="dpSecretValue" class="form-input" readonly style="font-family:monospace"><button class="btn btn-secondary btn-small" onclick="dpCopy(document.getElementById('dpSecretValue').value)">Copy</button></div>
                                 </div>
                                 <div style="display:flex;justify-content:flex-end"><button class="btn btn-primary" onclick="closeModal('dpSecretModal')">Done</button></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <!-- DATAPROFILER · UNIT TYPES TAB                       -->
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <div id="unit-types" class="tab-content">
+                        <div class="page-header">
+                            <h2 class="page-title">Unit Types</h2>
+                            <p class="page-subtitle">Device makes and models that resellers' IMEIs can be registered as, e.g. Teltonika FMC125.</p>
+                            <button class="btn btn-primary" onclick="utOpenModal()">+ Add Unit Type</button>
+                        </div>
+
+                        <div id="utAlert" class="alert" style="display:none"><span id="utAlertText"></span></div>
+
+                        <div class="card">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Manufacturer</th>
+                                        <th>Model</th>
+                                        <th>Description</th>
+                                        <th style="text-align:center">Devices</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="utTable">
+                                    <tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-secondary)">Loading…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div id="utModal" class="modal">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h3 class="modal-title" id="utModalTitle">Add Unit Type</h3>
+                                    <button class="modal-close" onclick="closeModal('utModal')">×</button>
+                                </div>
+                                <div id="utModalAlert" class="alert alert-danger" style="display:none"><span id="utModalAlertText"></span></div>
+                                <form onsubmit="utSubmit(event)">
+                                    <input type="hidden" id="utId">
+                                    <div class="form-group">
+                                        <label class="form-label">Manufacturer *</label>
+                                        <input type="text" id="utManufacturer" class="form-input" placeholder="e.g. Teltonika" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Model *</label>
+                                        <input type="text" id="utModel" class="form-input" placeholder="e.g. FMC125" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Description</label>
+                                        <input type="text" id="utDescription" class="form-input" placeholder="Optional, e.g. 4G LTE Cat 1 tracker with RS232">
+                                    </div>
+                                    <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:8px">
+                                        <button type="button" class="btn btn-secondary" onclick="closeModal('utModal')">Cancel</button>
+                                        <button type="submit" class="btn btn-primary" id="utSubmitBtn">Add Unit Type</button>
+                                    </div>
+                                </form>
                             </div>
                         </div>
                     </div>
@@ -4043,7 +4107,8 @@ dashboard.welcome,Bienvenue</pre>
                 'device-management': 'Device Management',
                 'webhook-logs': 'Webhook Logs',
                 'jobs': 'Background Jobs',
-                'resellers': 'DataProfiler · Resellers'
+                'resellers': 'DataProfiler · Resellers',
+                'unit-types': 'DataProfiler · Unit Types'
             };
             document.getElementById('pageTitle').textContent = titles[tabName];
 
@@ -4075,6 +4140,7 @@ dashboard.welcome,Bienvenue</pre>
             }
             if (tabName === 'jobs') { loadJobs(); }
             if (tabName === 'resellers') { dpLoad(); }
+            if (tabName === 'unit-types') { utLoad(); }
         }
 
         // ── BLE TAGS ─────────────────────────────────────────────────────────
@@ -4930,7 +4996,7 @@ dashboard.welcome,Bienvenue</pre>
                     pkgs.filter(p => p.is_active).forEach(p => {
                         const opt = document.createElement('option');
                         opt.value = p.id;
-                        opt.textContent = `${p.name} (${p.validity_days} days)`;
+                        opt.textContent = `${p.name} (${p.validity_label})`;
                         sel.appendChild(opt);
                     });
                 }
@@ -5219,7 +5285,7 @@ dashboard.welcome,Bienvenue</pre>
                     tbody.innerHTML = groupPkgs.map(p => `
                         <tr id="egpkg-${p.package_id}" style="border-bottom:1px solid var(--border-color)">
                             <td style="padding:7px 10px">${p.package_name}</td>
-                            <td style="padding:7px 10px">${p.validity_days}d</td>
+                            <td style="padding:7px 10px">${p.validity_label}</td>
                             <td style="padding:7px 10px">
                                 ${p.is_default
                                     ? '<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:9px;font-size:11px;font-weight:600">Default</span>'
@@ -5238,7 +5304,7 @@ dashboard.welcome,Bienvenue</pre>
                     if (!assignedIds.has(p.id)) {
                         const opt = document.createElement('option');
                         opt.value = p.id;
-                        opt.textContent = `${p.name} (${p.validity_days}d)`;
+                        opt.textContent = `${p.name} (${p.validity_label})`;
                         sel.appendChild(opt);
                     }
                 });
@@ -5405,7 +5471,7 @@ dashboard.welcome,Bienvenue</pre>
                     <tr>
                         <td><strong>${p.name}</strong></td>
                         <td>${p.description || '<span style="color:var(--text-secondary)">—</span>'}</td>
-                        <td style="text-align:center">${p.validity_days}</td>
+                        <td style="text-align:center">${p.validity_label}</td>
                         <td style="text-align:center">${p.auto_delete_days != null ? p.auto_delete_days : '<span style="color:var(--text-secondary)">Never</span>'}</td>
                         <td style="text-align:center">${p.is_default ? '<span class="badge badge-success">Default</span>' : ''}</td>
                         <td style="text-align:center"><span class="badge ${p.is_active ? 'badge-success' : 'badge-danger'}">${p.is_active ? 'Active' : 'Inactive'}</span></td>
@@ -5429,7 +5495,8 @@ dashboard.welcome,Bienvenue</pre>
             document.getElementById('pkgEditId').value = '';
             document.getElementById('pkgName').value = '';
             document.getElementById('pkgDesc').value = '';
-            document.getElementById('pkgDays').value = '';
+            document.getElementById('pkgMonths').value = '';
+            document.getElementById('pkgLegacyDays').style.display = 'none';
             document.getElementById('pkgAutoDelete').value = '';
             document.getElementById('pkgIsDefault').checked = false;
             document.getElementById('pkgSmsAddon').checked = false;
@@ -5452,7 +5519,10 @@ dashboard.welcome,Bienvenue</pre>
                     document.getElementById('pkgEditId').value = id;
                     document.getElementById('pkgName').value = p.name;
                     document.getElementById('pkgDesc').value = p.description || '';
-                    document.getElementById('pkgDays').value = p.validity_days;
+                    document.getElementById('pkgMonths').value = p.validity_months || '';
+                    const legacy = document.getElementById('pkgLegacyDays');
+                    legacy.textContent = p.validity_months ? '' : `Currently ${p.validity_days} days — enter months to convert this package. Existing tags keep their current expiry.`;
+                    legacy.style.display = p.validity_months ? 'none' : 'block';
                     document.getElementById('pkgAutoDelete').value = p.auto_delete_days != null ? p.auto_delete_days : '';
                     document.getElementById('pkgIsDefault').checked = p.is_default;
                     document.getElementById('pkgSmsAddon').checked = p.sms_addon || false;
@@ -5469,7 +5539,7 @@ dashboard.welcome,Bienvenue</pre>
             const body = {
                 name: document.getElementById('pkgName').value.trim(),
                 description: document.getElementById('pkgDesc').value.trim() || null,
-                validity_days: parseInt(document.getElementById('pkgDays').value),
+                validity_months: parseInt(document.getElementById('pkgMonths').value),
                 auto_delete_days: autoDeleteRaw ? parseInt(autoDeleteRaw) : null,
                 is_default: document.getElementById('pkgIsDefault').checked,
                 sms_addon: document.getElementById('pkgSmsAddon').checked,
@@ -5559,6 +5629,7 @@ dashboard.welcome,Bienvenue</pre>
         let dpDevices   = [];
         let dpPackages  = [];
         let dpGroups    = [];
+        let dpUnitTypes = [];
 
         function dpEsc(v) {
             return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -5597,13 +5668,15 @@ dashboard.welcome,Bienvenue</pre>
 
         async function dpLoad() {
             try {
-                const [overview, resellers, packages, groups] = await Promise.all([
+                const [overview, resellers, packages, groups, unitTypes] = await Promise.all([
                     dpApi('/overview'),
                     dpApi('/resellers'),
                     fetch(`${API_URL}/api/admin/packages`, { headers: { 'Authorization': `Bearer ${authToken}` } }).then(r => r.json()),
                     fetch(`${API_URL}/api/admin/usergroups`, { headers: { 'Authorization': `Bearer ${authToken}` } }).then(r => r.json()),
+                    dpApi('/unit-types'),
                 ]);
                 dpResellers = resellers;
+                dpUnitTypes = unitTypes;
                 dpPackages  = (packages || []).filter(p => p.is_active);
                 dpGroups    = groups || [];
                 dpRenderOverview(overview);
@@ -5616,7 +5689,7 @@ dashboard.welcome,Bienvenue</pre>
                 }
             } catch (e) {
                 document.getElementById('dpResellerTable').innerHTML =
-                    `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--danger)">Error: ${dpEsc(e.message)}</td></tr>`;
+                    `<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--danger)">Error: ${dpEsc(e.message)}</td></tr>`;
             }
         }
 
@@ -5637,7 +5710,7 @@ dashboard.welcome,Bienvenue</pre>
 
             const tb = document.getElementById('dpResellerTable');
             if (!dpResellers.length) {
-                tb.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-secondary)">No resellers yet. Click "New Reseller" to add one.</td></tr>';
+                tb.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-secondary)">No resellers yet. Click "New Reseller" to add one.</td></tr>';
                 return;
             }
             tb.innerHTML = dpResellers.map(r => {
@@ -5646,7 +5719,6 @@ dashboard.welcome,Bienvenue</pre>
                 return `
                 <tr style="cursor:pointer;${r.id === dpSelected ? 'background:var(--bg-secondary)' : ''}" onclick="dpSelectReseller('${r.id}')">
                     <td><strong>${dpEsc(r.name)}</strong><div style="font-size:12px;color:var(--text-secondary)">${dpEsc(r.code)}</div></td>
-                    <td>${dpEsc(r.provider)}</td>
                     <td>${ex.status ? dpStatusBadge(ex.status) : '—'}</td>
                     <td>${ex.usergroup_name ? dpEsc(ex.usergroup_name) : '<span style="color:var(--text-secondary)">Not linked</span>'}</td>
                     <td>${r.default_package_name ? dpEsc(r.default_package_name) : '<span style="color:var(--text-secondary)">—</span>'}</td>
@@ -5666,7 +5738,7 @@ dashboard.welcome,Bienvenue</pre>
             detail.style.display = '';
 
             document.getElementById('dpDetailName').textContent = r.name;
-            document.getElementById('dpDetailMeta').textContent = `${r.code} · ${r.provider}${r.is_active ? '' : ' · inactive'}`;
+            document.getElementById('dpDetailMeta').textContent = `${r.code}${r.is_active ? '' : ' · inactive'}`;
             document.getElementById('dpToggleActiveBtn').textContent = r.is_active ? 'Deactivate' : 'Activate';
             const info = [
                 ['Default package', r.default_package_name || '—'],
@@ -5718,7 +5790,7 @@ dashboard.welcome,Bienvenue</pre>
                 <tr>
                     <td style="font-family:monospace">${dpEsc(d.imei)}</td>
                     <td>${dpEsc(d.label || '—')}</td>
-                    <td>${dpEsc(d.device_model || '—')}</td>
+                    <td>${dpEsc(d.unit_type_name || '—')}</td>
                     <td>${dpEsc(d.package_name || '—')}${d.package_id ? '' : ' <span style="font-size:11px;color:var(--text-secondary)">(default)</span>'}</td>
                     <td>${dpStatusBadge(d.status)}${d.status_detail ? `<div style="font-size:11px;color:var(--text-secondary)">${dpEsc(d.status_detail)}</div>` : ''}</td>
                     <td>${d.first_routed_at ? new Date(d.first_routed_at).toLocaleString() : '—'}</td>
@@ -5728,7 +5800,7 @@ dashboard.welcome,Bienvenue</pre>
 
         function dpPackageOptions(selectedId, emptyLabel) {
             return `<option value="">${emptyLabel}</option>` + dpPackages.map(p =>
-                `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${dpEsc(p.name)} (${p.validity_days} days)</option>`).join('');
+                `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${dpEsc(p.name)} (${dpEsc(p.validity_label)})</option>`).join('');
         }
 
         function dpOpenResellerModal(id) {
@@ -5740,7 +5812,6 @@ dashboard.welcome,Bienvenue</pre>
             const code = document.getElementById('dpResCode');
             code.value = r ? r.code : '';
             code.disabled = !!r;
-            document.getElementById('dpResProvider').value = r ? r.provider : 'teltonika';
             document.getElementById('dpResPackage').innerHTML = dpPackageOptions(r?.default_package_id, '— None —');
             document.getElementById('dpResContactName').value = r?.contact_name || '';
             document.getElementById('dpResContactEmail').value = r?.contact_email || '';
@@ -5755,7 +5826,6 @@ dashboard.welcome,Bienvenue</pre>
             const id = document.getElementById('dpResId').value;
             const body = {
                 name: document.getElementById('dpResName').value.trim(),
-                provider: document.getElementById('dpResProvider').value,
                 default_package_id: document.getElementById('dpResPackage').value || null,
                 contact_name: document.getElementById('dpResContactName').value.trim() || null,
                 contact_email: document.getElementById('dpResContactEmail').value.trim() || null,
@@ -5832,6 +5902,10 @@ dashboard.welcome,Bienvenue</pre>
         function dpOpenDevicesModal() {
             const r = dpResellers.find(x => x.id === dpSelected);
             document.getElementById('dpDevicesInput').value = '';
+            const types = dpUnitTypes.filter(u => u.is_active);
+            document.getElementById('dpDevicesUnitType').innerHTML = types.length
+                ? '<option value="">— Select unit type —</option>' + types.map(u => `<option value="${u.id}">${dpEsc(u.name)}</option>`).join('')
+                : '<option value="">No unit types — add one under DataProfiler → Unit Types</option>';
             document.getElementById('dpDevicesPackage').innerHTML = dpPackageOptions(null,
                 r?.default_package_name ? `Reseller default — ${r.default_package_name}` : '— Select a package —');
             document.getElementById('dpDevicesResults').style.display = 'none';
@@ -5844,8 +5918,8 @@ dashboard.welcome,Bienvenue</pre>
             const devices = document.getElementById('dpDevicesInput').value.split(/\r?\n/)
                 .map(line => line.trim()).filter(Boolean)
                 .map(line => {
-                    const [imei, label, device_model] = line.split(/\t|,/).map(x => (x || '').trim());
-                    return { imei, label: label || null, device_model: device_model || null };
+                    const [imei, label] = line.split(/\t|,/).map(x => (x || '').trim());
+                    return { imei, label: label || null };
                 });
             if (!devices.length) return;
             const btn = document.getElementById('dpDevicesSubmitBtn');
@@ -5854,7 +5928,11 @@ dashboard.welcome,Bienvenue</pre>
             try {
                 const out = await dpApi(`/resellers/${dpSelected}/devices`, {
                     method: 'POST',
-                    body: JSON.stringify({ devices, package_id: document.getElementById('dpDevicesPackage').value || null }),
+                    body: JSON.stringify({
+                        devices,
+                        unit_type_id: document.getElementById('dpDevicesUnitType').value,
+                        package_id: document.getElementById('dpDevicesPackage').value || null,
+                    }),
                 });
                 const failed = out.results.filter(x => !x.ok);
                 document.getElementById('dpDevicesModalAlertText').textContent =
@@ -5883,6 +5961,95 @@ dashboard.welcome,Bienvenue</pre>
                 await dpApi(`/resellers/${dpSelected}/devices/${id}`, { method: 'DELETE' });
                 await dpLoad();
             } catch (err) { dpShowAlert(err.message); }
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // DATAPROFILER · UNIT TYPES
+        // ─────────────────────────────────────────────────────────────────────
+        let utTypes = [];
+
+        function utShowAlert(message, type = 'danger') {
+            const el = document.getElementById('utAlert');
+            document.getElementById('utAlertText').textContent = message;
+            el.className = `alert alert-${type}`;
+            el.style.display = 'block';
+            clearTimeout(utShowAlert._t);
+            utShowAlert._t = setTimeout(() => { el.style.display = 'none'; }, 6000);
+        }
+
+        async function utLoad() {
+            const tb = document.getElementById('utTable');
+            try {
+                utTypes = await dpApi('/unit-types');
+            } catch (e) {
+                tb.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--danger)">Error: ${dpEsc(e.message)}</td></tr>`;
+                return;
+            }
+            if (!utTypes.length) {
+                tb.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-secondary)">No unit types yet. Click "Add Unit Type" to add one.</td></tr>';
+                return;
+            }
+            tb.innerHTML = utTypes.map(u => `
+                <tr>
+                    <td><strong>${dpEsc(u.manufacturer)}</strong></td>
+                    <td>${dpEsc(u.model)}</td>
+                    <td>${u.description ? dpEsc(u.description) : '<span style="color:var(--text-secondary)">—</span>'}</td>
+                    <td style="text-align:center">${u.device_count}</td>
+                    <td><span class="badge ${u.is_active ? 'badge-success' : 'badge-danger'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary" onclick="utOpenModal('${u.id}')">Edit</button>
+                        <button class="btn btn-sm btn-secondary" style="margin-left:4px" onclick="utToggleActive('${u.id}')">${u.is_active ? 'Deactivate' : 'Activate'}</button>
+                        ${u.device_count ? '' : `<button class="btn btn-sm btn-danger" style="margin-left:4px" onclick="utDelete('${u.id}')">Delete</button>`}
+                    </td>
+                </tr>`).join('');
+        }
+
+        function utOpenModal(id) {
+            const u = id ? utTypes.find(x => x.id === id) : null;
+            document.getElementById('utModalTitle').textContent = u ? 'Edit Unit Type' : 'Add Unit Type';
+            document.getElementById('utSubmitBtn').textContent = u ? 'Save Changes' : 'Add Unit Type';
+            document.getElementById('utId').value = u ? u.id : '';
+            document.getElementById('utManufacturer').value = u ? u.manufacturer : '';
+            document.getElementById('utModel').value = u ? u.model : '';
+            document.getElementById('utDescription').value = u?.description || '';
+            document.getElementById('utModalAlert').style.display = 'none';
+            openModal('utModal');
+        }
+
+        async function utSubmit(e) {
+            e.preventDefault();
+            const id = document.getElementById('utId').value;
+            const body = {
+                manufacturer: document.getElementById('utManufacturer').value.trim(),
+                model: document.getElementById('utModel').value.trim(),
+                description: document.getElementById('utDescription').value.trim() || null,
+            };
+            try {
+                await dpApi(id ? `/unit-types/${id}` : '/unit-types', { method: id ? 'PUT' : 'POST', body: JSON.stringify(body) });
+                closeModal('utModal');
+                await utLoad();
+            } catch (err) {
+                document.getElementById('utModalAlertText').textContent = err.message;
+                document.getElementById('utModalAlert').style.display = 'block';
+            }
+        }
+
+        async function utToggleActive(id) {
+            const u = utTypes.find(x => x.id === id);
+            if (!u) return;
+            try {
+                await dpApi(`/unit-types/${id}`, { method: 'PUT', body: JSON.stringify({ is_active: !u.is_active }) });
+                await utLoad();
+            } catch (err) { utShowAlert(err.message); }
+        }
+
+        async function utDelete(id) {
+            const u = utTypes.find(x => x.id === id);
+            if (!u || !confirm(`Delete unit type "${u.name}"?`)) return;
+            try {
+                await dpApi(`/unit-types/${id}`, { method: 'DELETE' });
+                await utLoad();
+            } catch (err) { utShowAlert(err.message); }
         }
 
         async function loadBuildings() {

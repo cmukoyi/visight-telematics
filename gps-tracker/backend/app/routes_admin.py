@@ -1714,7 +1714,9 @@ class PortalUserOut(BaseModel):
 class GroupPackageOut(BaseModel):
     package_id: str
     package_name: str
-    validity_days: int
+    validity_days: Optional[int] = None
+    validity_months: Optional[int] = None
+    validity_label: str = ""
     is_default: bool
 
     class Config:
@@ -1757,6 +1759,8 @@ class UserGroupOut(BaseModel):
                 package_id=str(gp.package_id),
                 package_name=pkg.name,
                 validity_days=pkg.validity_days,
+                validity_months=pkg.validity_months,
+                validity_label=pkg.validity_label,
                 is_default=gp.is_default,
             ))
             if gp.is_default:
@@ -2234,7 +2238,9 @@ def list_group_packages(
         GroupPackageOut(
             package_id=str(r.package_id),
             package_name=pkg_map[str(r.package_id)].name if str(r.package_id) in pkg_map else "Unknown",
-            validity_days=pkg_map[str(r.package_id)].validity_days if str(r.package_id) in pkg_map else 0,
+            validity_days=pkg_map[str(r.package_id)].validity_days if str(r.package_id) in pkg_map else None,
+            validity_months=pkg_map[str(r.package_id)].validity_months if str(r.package_id) in pkg_map else None,
+            validity_label=pkg_map[str(r.package_id)].validity_label if str(r.package_id) in pkg_map else "",
             is_default=r.is_default,
         )
         for r in rows
@@ -2283,6 +2289,8 @@ def add_package_to_group(
         package_id=str(pkg.id),
         package_name=pkg.name,
         validity_days=pkg.validity_days,
+        validity_months=pkg.validity_months,
+        validity_label=pkg.validity_label,
         is_default=make_default,
     )
 
@@ -2369,7 +2377,7 @@ from app.models_admin import TagPackage as _TagPackage
 class PackageCreate(BaseModel):
     name: str
     description: Optional[str] = None
-    validity_days: int          # e.g. 80, 120, 300
+    validity_months: int        # e.g. 1, 6, 12
     auto_delete_days: Optional[int] = None  # days after expiry to auto-delete tag
     is_default: bool = False
     sms_addon: bool = False     # whether this package includes SMS alerts
@@ -2379,7 +2387,7 @@ class PackageCreate(BaseModel):
 class PackageUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
-    validity_days: Optional[int] = None
+    validity_months: Optional[int] = None  # setting this converts a legacy day-based package
     auto_delete_days: Optional[int] = None
     is_default: Optional[bool] = None
     is_active: Optional[bool] = None
@@ -2398,7 +2406,9 @@ class PackageOut(BaseModel):
     id: UUID
     name: str
     description: Optional[str]
-    validity_days: int
+    validity_days: Optional[int] = None
+    validity_months: Optional[int] = None
+    validity_label: str
     auto_delete_days: Optional[int] = None
     is_default: bool
     is_active: bool
@@ -2425,6 +2435,8 @@ def create_package(data: PackageCreate, request: Request, db: Session = Depends(
     if db.query(_TagPackage).filter(_TagPackage.name == data.name).first():
         raise HTTPException(status_code=409, detail="A package with that name already exists")
     _check_event_types(data.allowed_event_types)
+    if data.validity_months < 1:
+        raise HTTPException(status_code=400, detail="Validity must be at least 1 month")
 
     if data.is_default:
         # Clear any previous default
@@ -2433,7 +2445,7 @@ def create_package(data: PackageCreate, request: Request, db: Session = Depends(
     pkg = _TagPackage(
         name=data.name.strip(),
         description=data.description,
-        validity_days=data.validity_days,
+        validity_months=data.validity_months,
         auto_delete_days=data.auto_delete_days,
         is_default=data.is_default,
         sms_addon=data.sms_addon,
@@ -2444,7 +2456,7 @@ def create_package(data: PackageCreate, request: Request, db: Session = Depends(
     db.commit()
     db.refresh(pkg)
     log_audit(db, str(admin.id), "create_package", "TagPackage", str(pkg.id),
-              new_value={"name": pkg.name, "validity_days": pkg.validity_days})
+              new_value={"name": pkg.name, "validity_months": pkg.validity_months})
     return pkg
 
 
@@ -2472,7 +2484,12 @@ def update_package(pkg_id: str, data: PackageUpdate, request: Request, db: Sessi
         db.query(_TagPackage).filter(_TagPackage.id != pkg_id, _TagPackage.is_default == True).update({"is_default": False})
     _check_event_types(data.allowed_event_types)
 
-    for field, val in data.model_dump(exclude_unset=True).items():
+    changes = data.model_dump(exclude_unset=True)
+    if "validity_months" in changes:
+        if not changes["validity_months"] or changes["validity_months"] < 1:
+            raise HTTPException(status_code=400, detail="Validity must be at least 1 month")
+        changes["validity_days"] = None
+    for field, val in changes.items():
         setattr(pkg, field, val)
     db.commit()
     db.refresh(pkg)

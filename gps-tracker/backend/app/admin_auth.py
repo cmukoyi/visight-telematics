@@ -12,6 +12,8 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
+from app.database import get_db
+
 # Admin JWT Configuration
 # Required — must be set in gps-tracker/backend/.env. Raises KeyError at
 # import if unset (intentional: better to fail container start than to sign
@@ -87,17 +89,18 @@ admin_security = HTTPBearer()
 
 
 def get_current_admin_user(
-    credentials: HTTPAuthorizationCredentials = Depends(admin_security)
+    credentials: HTTPAuthorizationCredentials = Depends(admin_security),
+    db: Session = Depends(get_db),
 ):
     """
     FastAPI dependency: Get current authenticated admin user from JWT token.
     Requires 'Authorization: Bearer <token>' header.
     
-    Returns the AdminUser model instance.
+    Returns the AdminUser model instance. Uses the request-scoped session so
+    FastAPI closes it when the request ends.
     """
     # Import here to avoid circular dependency at module load time
     from app.models_admin import AdminUser
-    from app.database import get_db
     
     token = credentials.credentials
     payload = decode_admin_token(token)
@@ -116,9 +119,6 @@ def get_current_admin_user(
             detail="Invalid token payload",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    # Get a database session
-    db = next(get_db())
     
     admin_user = db.query(AdminUser).filter(AdminUser.id == admin_id).first()
     if admin_user is None:
