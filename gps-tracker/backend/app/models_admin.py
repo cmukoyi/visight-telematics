@@ -49,7 +49,7 @@ class AdminUser(Base):
 
 
 class AppLog(Base):
-    """Centralized application logging from mobile app"""
+    """Centralized application logging (backend WARNING+ via db_log_handler)"""
     __tablename__ = "app_logs"
     
     id = get_uuid_column()

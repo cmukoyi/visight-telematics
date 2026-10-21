@@ -43,6 +43,8 @@ services:
     build:
       context: .
       dockerfile: ./backend/Dockerfile
+    # Also run by the DataProfiler pipeline services below (built once).
+    image: visight-track-backend:latest
     container_name: __TENANT_PREFIX___backend
     env_file:
       - ./backend/.env
@@ -71,31 +73,9 @@ services:
       - ENVIRONMENT=production
       # FROM_EMAIL/BRAND_* are loaded from backend/.env — keep tenant-specific
       # values out of the committed compose file.
-    # One worker — the background location poller must not run in multiple processes
-    # (multiple workers each start their own poller → duplicate alerts).
-    # The poller is async/I-O-bound; a single worker event loop handles it well.
+    # One worker — background housekeeping (offline alerts, package expiry)
+    # must not run in multiple processes or alerts would be duplicated.
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
-
-  worker:
-    build:
-      context: .
-      dockerfile: ./backend/Dockerfile
-    container_name: __TENANT_PREFIX___worker
-    env_file:
-      - ./backend/.env
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - __TENANT_PREFIX___network
-    restart: unless-stopped
-    logging: *default-logging
-    environment:
-      - DEBUG=False
-      - ENVIRONMENT=production
-    # Background job worker for Trip Engine v2.2 batch operations
-    # Polls async_jobs table every 5s and processes batch backfill/reprocess
-    command: python -m app.services.async_job_worker
 
   admin-portal:
     build:
@@ -140,20 +120,6 @@ services:
       # ./customer-dashboard/tenant-assets/ on the host; served by nginx at
       # /customer/tenant-assets/.
       - ./customer-dashboard/tenant-assets:/app/public/tenant-assets:ro
-    depends_on:
-      - backend
-    networks:
-      - __TENANT_PREFIX___network
-    restart: unless-stopped
-    logging: *default-logging
-
-  flutter-web:
-    build:
-      context: ./mobile-app
-      dockerfile: Dockerfile
-    container_name: __TENANT_PREFIX___flutter_web
-    ports:
-      - "3012:80"
     depends_on:
       - backend
     networks:
@@ -212,9 +178,8 @@ services:
       retries: 5
 
   gprs-listener:
-    build:
-      context: .
-      dockerfile: ./backend/Dockerfile
+    image: visight-track-backend:latest   # built by the backend service
+    pull_policy: never
     profiles: ["dataprofiler"]
     container_name: __TENANT_PREFIX___gprs_listener
     env_file:
@@ -237,9 +202,8 @@ services:
     logging: *default-logging
 
   event-writer:
-    build:
-      context: .
-      dockerfile: ./backend/Dockerfile
+    image: visight-track-backend:latest   # built by the backend service
+    pull_policy: never
     profiles: ["dataprofiler"]
     container_name: __TENANT_PREFIX___event_writer
     env_file:
@@ -257,9 +221,8 @@ services:
     logging: *default-logging
 
   event-decoder:
-    build:
-      context: .
-      dockerfile: ./backend/Dockerfile
+    image: visight-track-backend:latest   # built by the backend service
+    pull_policy: never
     profiles: ["dataprofiler"]
     container_name: __TENANT_PREFIX___event_decoder
     env_file:
@@ -281,9 +244,8 @@ services:
   # Customer-dashboard side: drains each linked Data Exchange queue into the
   # main database (kept permanently). Messages wait in the queue while it's down.
   dashboard-ingest:
-    build:
-      context: .
-      dockerfile: ./backend/Dockerfile
+    image: visight-track-backend:latest   # built by the backend service
+    pull_policy: never
     profiles: ["dataprofiler"]
     container_name: __TENANT_PREFIX___dashboard_ingest
     env_file:
@@ -314,7 +276,6 @@ services:
       - backend
       - admin-portal
       - customer
-      - flutter-web
     networks:
       - __TENANT_PREFIX___network
     restart: unless-stopped

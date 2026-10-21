@@ -164,7 +164,7 @@ def login(
             detail="This account has expired"
         )
     if credential_user and not credential_user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Mobile app account is inactive")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Linked account is inactive")
     
     # Verify usergroup is active
     group = db.query(UserGroup).filter(

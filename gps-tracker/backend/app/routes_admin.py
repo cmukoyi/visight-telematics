@@ -93,15 +93,6 @@ class AdminToken(BaseModel):
     admin: AdminResponse
 
 
-class AppLogRequest(BaseModel):
-    level: str  # DEBUG, INFO, WARNING, ERROR
-    category: str  # auth, location, api, ui, device
-    message: str
-    context: Optional[Dict] = None
-    stack_trace: Optional[str] = None
-    source: Optional[str] = None
-
-
 class AppLogResponse(BaseModel):
     id: str
     user_id: Optional[str]
@@ -498,41 +489,6 @@ async def update_admin_user(
 
 
 # LOGGING ENDPOINTS
-@public_router.post("/logs")
-async def submit_app_log(log_data: AppLogRequest, request: Request, db: Session = Depends(get_db)):
-    """Submit log from mobile app - PUBLIC (no auth required)"""
-    # Sanitize the log (remove sensitive data)
-    sanitized_message = log_data.message
-    sanitized_context = log_data.context or {}
-    
-    # Remove sensitive keys
-    sensitive_keys = ["password", "token", "secret", "api_key", "credit_card"]
-    for key in sensitive_keys:
-        if key in sanitized_context:
-            sanitized_context[key] = "***REDACTED***"
-    
-    # Create a system admin user for app logs (created on startup)
-    system_admin = db.query(AdminUser).filter(AdminUser.username == "system").first()
-    if not system_admin:
-        system_admin = db.query(AdminUser).first()  # Fallback to first admin
-    
-    if system_admin:
-        app_log = AppLog(
-            user_id=log_data.context.get("user_id") if log_data.context else None,
-            admin_user_id=str(system_admin.id),
-            level=log_data.level,
-            category=log_data.category,
-            message=sanitized_message,
-            context=sanitized_context,
-            stack_trace=log_data.stack_trace,
-            source=log_data.source,
-            ip_address=request.client.host if request.client else None,
-            created_at=datetime.utcnow()
-        )
-        db.add(app_log)
-        db.commit()
-    
-    return {"status": "logged"}
 
 
 @router.get("/logs", response_model=List[AppLogResponse])
@@ -859,8 +815,6 @@ async def get_container_logs(
         result = [r for r in result if search_lower in r["message"].lower()]
 
     return result
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -1991,7 +1945,6 @@ def health_system(request: Request, db: Session = Depends(get_db)):
         result["table_counts"] = {}
 
     return result
-
 
 
 # ─────────────────────────────────────────────────────────────────────────────

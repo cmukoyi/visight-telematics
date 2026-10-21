@@ -121,61 +121,12 @@ jobs:
           echo "✅ No hardcoded secrets / env-fallback literals in backend code"
 
   # ─────────────────────────────────────────────────────────────────
-  # JOB 1 — Build Flutter Web (per-tenant overlay)
-  #
-  # NOTE: backend unit tests (tests/test_admin_auth.py) were deliberately
-  # removed. They tested PyJWT/hashlib round-trips, not our code, and
-  # were green throughout the months-long period when beacon was signing
-  # JWTs with the public-git literal 'your-secret-key-change-this'.
-  # To be replaced by a post-deploy smoke test that hits the live
-  # container's auth endpoint.
-  # ─────────────────────────────────────────────────────────────────
-  build-flutter:
-    name: Build Flutter Web
-    runs-on: ubuntu-latest
-    needs: lint-workflow
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.41.2'
-          channel: 'stable'
-          cache: true
-
-      - name: Assemble tenant overlay (materializes gitignored Flutter files)
-        run: |
-          if [ ! -d "tenants/${TENANT}" ]; then
-            echo "❌ tenants/${TENANT} not found in repo"
-            exit 1
-          fi
-          bash scripts/build.sh "${TENANT}"
-          # Verify the gitignored entrypoint now exists on disk
-          test -f gps-tracker/mobile-app/ble_tracker_app/lib/main.dart \
-            || { echo "❌ overlay did not produce lib/main.dart"; exit 1; }
-
-      - name: Build Flutter Web
-        run: |
-          cd gps-tracker/mobile-app/ble_tracker_app
-          flutter pub get
-          flutter build web --release --no-tree-shake-icons
-          echo "✅ Flutter build complete"
-          ls -lh build/web/main.dart.js
-
-      - name: Upload Flutter build
-        uses: actions/upload-artifact@v4
-        with:
-          name: flutter-web-build
-          path: gps-tracker/mobile-app/ble_tracker_app/build/web/
-          retention-days: 1
-
-  # ─────────────────────────────────────────────────────────────────
-  # JOB 3 — Deploy to Production (per-tenant)
+  # JOB 1 — Deploy to Production
   # ─────────────────────────────────────────────────────────────────
   deploy-production:
     name: Deploy ViSight Track to Production
     runs-on: ubuntu-latest
-    needs: build-flutter
+    needs: lint-workflow
     # The GitHub Environment holding the production server secrets.
     environment: production
 
@@ -223,20 +174,6 @@ jobs:
           echo "   DB_CONTAINER       = ${TENANT_PREFIX}_db"
           echo "   BACKEND_CONTAINER  = ${TENANT_PREFIX}_backend"
 
-      - name: Download Flutter build
-        uses: actions/download-artifact@v4
-        with:
-          name: flutter-web-build
-          path: gps-tracker/mobile-app/ble_tracker_app/build/web/
-
-      - name: Verify Flutter artifacts
-        run: |
-          if [ ! -f "gps-tracker/mobile-app/ble_tracker_app/build/web/main.dart.js" ]; then
-            echo "❌ Flutter build artifacts missing"
-            exit 1
-          fi
-          echo "✅ Flutter artifacts ready"
-
       # ── Assemble per-tenant overlay into gps-tracker/ ────────────
       - name: Assemble tenant overlay
         run: |
@@ -258,7 +195,7 @@ jobs:
             "gps-tracker/admin-portal/assets/logo.png"
             "gps-tracker/customer-dashboard/public/assets/logo.png"
             "gps-tracker/nginx/nginx.conf"
-            "gps-tracker/mobile-app/ble_tracker_app/web/favicon.ico"
+            "gps-tracker/customer-dashboard/public/favicon.ico"
             "gps-tracker/docker-compose.yml"
           )
           missing=0
@@ -393,12 +330,6 @@ jobs:
             --filter='protect .env.*' \
             ./gps-tracker/ "${USER}@${SERVER}:${SERVER_DIR}/gps-tracker/"
 
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            "${USER}@${SERVER}" \
-            "test -f ${SERVER_DIR}/gps-tracker/mobile-app/ble_tracker_app/build/web/main.dart.js \
-             && echo '✅ Flutter artifacts on server' \
-             || (echo '❌ Flutter artifacts missing on server' && exit 1)"
-
       - name: Verify .env files unchanged (post-rsync)
         env:
           DO_SERVER_IP: ${{ secrets.DO_SERVER_IP }}
@@ -484,16 +415,9 @@ jobs:
             docker container prune -f
             df -h / | awk 'NR==2{print "  Disk: "$3"/"$2" ("$5" used)"}'
 
-            echo "━━━ Building UI services ━━━"
-            docker compose build flutter-web admin-portal
-
-            echo "━━━ Building backend services ━━━"
-            docker compose build backend worker customer
-
-            if [[ ",${COMPOSE_PROFILES}," == *",dataprofiler,"* ]]; then
-              echo "━━━ Building DataProfiler pipeline services ━━━"
-              docker compose build gprs-listener event-writer event-decoder dashboard-ingest
-            fi
+            echo "━━━ Building services ━━━"
+            # The backend image is shared by the DataProfiler pipeline services.
+            docker compose build admin-portal backend customer
 
             echo "━━━ Stopping old containers ━━━"
             docker compose down --remove-orphans || true
@@ -609,6 +533,5 @@ jobs:
           echo "========================================"
           echo "Backend API : http://${{ secrets.DO_SERVER_IP }}:8001"
           echo "Admin Portal: http://${{ secrets.DO_SERVER_IP }}:3010"
-          echo "Flutter Web : http://${{ secrets.DO_SERVER_IP }}:3012"
           echo "Customer UI : http://${{ secrets.DO_SERVER_IP }}:3011"
           echo "========================================"

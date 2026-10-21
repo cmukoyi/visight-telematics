@@ -72,36 +72,18 @@ logs/
 *.log
 
 # ─── Tenant-managed files (assembled by scripts/build.sh) ───────────
+customer-dashboard/public/favicon.ico
+customer-dashboard/public/favicon-16x16.png
+customer-dashboard/public/favicon-32x32.png
+customer-dashboard/public/apple-touch-icon.png
+customer-dashboard/public/android-chrome-192x192.png
+customer-dashboard/public/android-chrome-512x512.png
 # Source of truth lives in tenants/<TENANT>/. These paths are written
 # at build time by scripts/build.sh on the CI runner. Do not commit
 # them by hand — edit the tenant source instead.
 admin-portal/assets/logo.png
 customer-dashboard/public/assets/logo.png
 customer-dashboard/public/custom/activated.html
-customer-dashboard/public/help/HIVE_User_Manual.html
-customer-dashboard/public/help/QR_NFC_Guide_Pinplot.html
-customer-dashboard/public/help/QR_NFC_Guide_Beacon.html
-customer-dashboard/public/help/Movement_Analytics_User_Manual_v2_1_Pinplot.html
-customer-dashboard/public/help/Movement_Analytics_User_Manual_v2_1_Beacon.html
-customer-dashboard/public/help/Movement_Analytics_*_Beacon_*.html
-customer-dashboard/public/help/HIVE_*_Beacon_*.html
-customer-dashboard/public/help/QR_NFC_Guide_Beacon_*.html
-mobile-app/ble_tracker_app/assets/MainLogo.png
-mobile-app/ble_tracker_app/assets/FullLogowhite.png
-mobile-app/ble_tracker_app/web/favicon.ico
-mobile-app/ble_tracker_app/web/favicon.png
-mobile-app/ble_tracker_app/web/favicon-16x16.png
-mobile-app/ble_tracker_app/web/favicon-32x32.png
-mobile-app/ble_tracker_app/web/apple-touch-icon.png
-mobile-app/ble_tracker_app/web/android-chrome-192x192.png
-mobile-app/ble_tracker_app/web/android-chrome-512x512.png
-# Tenant-overlayed Flutter source (per-tenant brand divergence)
-mobile-app/ble_tracker_app/lib/theme/app_theme.dart
-mobile-app/ble_tracker_app/lib/config/environment.dart
-mobile-app/ble_tracker_app/lib/main.dart
-mobile-app/ble_tracker_app/lib/screens/scan_screen.dart
-mobile-app/ble_tracker_app/web/index.html
-mobile-app/ble_tracker_app/ios/Runner/Info.plist
 nginx/nginx.conf
 .tenant
 # Rendered from docker-compose.template.yml + tenants/<tenant>/tenant.env

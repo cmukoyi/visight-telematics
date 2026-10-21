@@ -2,7 +2,7 @@
 Public i18n API endpoints — language and translation retrieval.
 
 Routes are mounted at /api (public access).
-Used by Customer Dashboard and Flutter app to fetch translations.
+Used by the customer dashboard and admin portal to fetch translations.
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
