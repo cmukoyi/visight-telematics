@@ -56,7 +56,7 @@ jobs:
             --exclude '__pycache__' \
             --exclude '*.pyc' \
             --exclude '.dart_tool' \
-            --exclude 'pinplot_postgres_data' \
+            --exclude 'visight_telematics_postgres_data' \
             --exclude 'backend/.env' \
             --exclude '.env' \
             ./gps-tracker/ $DO_USER@$DO_SERVER_IP:/home/deploy/visght-telematics/gps-tracker/
@@ -83,7 +83,7 @@ jobs:
         if: always()
         run: |
           echo "========================================"
-          echo "⏪ Pinplot — Rollback Complete"
+          echo "⏪ ViSight Track — Rollback Complete"
           echo "Target  : ${{ inputs.version || 'previous tag' }}"
           echo "Commit  : $(git rev-parse --short HEAD)"
           echo "========================================"

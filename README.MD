@@ -1,19 +1,11 @@
-# PinPlot
+# ViSight Track
 
-Welcome to the **PinPlot Project**!
+Telematics platform for Teltonika devices: device events arrive on the GPRS
+listener, are queued, stored and decoded by DataProfiler, and delivered per
+Data Exchange to the customer dashboard.
 
-This repository is the home of PinPlot, where we’re building and experimenting with code, scripts, and workflows.  
-Feel free to explore, contribute, and help improve the project.
-
-## Getting Started
-- Clone the repository
-- Follow instructions in the documentation to run or test components
-
-## Contributing
-Pull requests are welcome. For major changes, please open an issue first to discuss what you’d like to change.
-
----
-
-Enjoy working with PinPlot!
-
-
+- `gps-tracker/backend` — FastAPI backend, DataProfiler pipeline (`app/dataprofiler`)
+- `gps-tracker/admin-portal` — admin portal (`/admin`)
+- `gps-tracker/customer-dashboard` — customer dashboard (`/customer`)
+- `tenants/visight` — deployment config, branding and nginx for track.visighttelematics.co.za
+- `.github/workflows/deploy-production.yml` — deploys `main` to production

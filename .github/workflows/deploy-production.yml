@@ -1,27 +1,19 @@
 name: Deploy to Production
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Unified multi-tenant production deployment (Phase 4)
+# ViSight Track production deployment
 # ─────────────────────────────────────────────────────────────────────────────
-# One workflow ships any tenant. The tenant is selected by the branch:
+#   main → tenant=visight → environment=production → /home/deploy/visght-telematics
 #
-#   main         → tenant=pinplot → environment=production         → /home/deploy/visght-telematics
-#   prod/beacon  → tenant=beacon  → environment=production-beacon  → /root/beacon-telematics
-#
-# Per-tenant values (server path, display name, db user, container prefix,
-# postgres volume name) come from tenants/<tenant>/tenant.env, NOT from
-# inline YAML. Adding a third tenant requires:
-#   1. tenants/<slug>/tenant.env  (with SERVER_DIR + DISPLAY_NAME)
-#   2. add the branch to the on:push triggers
-#   3. extend the TENANT / environment / concurrency expressions
+# Deployment values (server path, display name, db user, container prefix,
+# postgres volume name, compose profiles) come from tenants/visight/tenant.env,
+# NOT from inline YAML.
 # ─────────────────────────────────────────────────────────────────────────────
 
 on:
   push:
     branches:
       - main
-      - prod/beacon
-      - deploy/beacon-analytics  # Temporary: deploy main to Beacon for Movement Analytics migration
   workflow_dispatch:
     inputs:
       reason:
@@ -29,21 +21,20 @@ on:
         required: false
         default: 'Manual trigger'
 
-# Per-tenant concurrency: pinplot and beacon deploys never block each other.
 concurrency:
-  group: deploy-${{ (github.ref_name == 'prod/beacon' || github.ref_name == 'deploy/beacon-analytics') && 'beacon' || 'pinplot' }}
+  group: deploy-visight
   cancel-in-progress: false
 
-# Workflow-level TENANT — derived from branch, available to ALL jobs.
+# Workflow-level TENANT — the tenants/<slug> directory, available to ALL jobs.
 env:
-  TENANT: ${{ (github.ref_name == 'prod/beacon' || github.ref_name == 'deploy/beacon-analytics') && 'beacon' || 'pinplot' }}
+  TENANT: visight
 
 jobs:
   # ─────────────────────────────────────────────────────────────────
-  # JOB 0 — Lint: reject dangerous commands + tenant brand drift
+  # JOB 0 — Lint: reject dangerous commands + overlay/secret hygiene
   # ─────────────────────────────────────────────────────────────────
   lint-workflow:
-    name: Lint — workflow + tenant drift
+    name: Lint — workflow + hygiene
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -89,82 +80,6 @@ jobs:
             exit 1
           fi
           echo "✅ All ${#DESTS[@]} overlay destinations correctly gitignored"
-
-      - name: Tenant brand-string drift ratchet
-        run: |
-          # Block NEW occurrences of tenant-specific brand strings in
-          # tracked shared code (i.e., outside tenants/). The current count
-          # is grandfathered; any PR that increases it must either move the
-          # string to tenants/<slug>/ or bump the ratchet here with a
-          # reasoned explanation.
-          #
-          # Patterns intentionally exclude generic words like "PinPlot" in
-          # backend env defaults (which are the env-driven fallback and OK).
-          set -e
-          PATTERNS='Beacon Telematics|beacontelematics\.co\.uk|0xFF173D64|0xFF1f4f7e|0xFFE3EEF9'
-
-          # Count only in git-tracked files outside tenants/.
-          # Excludes:
-          #   - tenants/                       — legitimate per-tenant brand content
-          #   - features_dev/                  — tenant-branded source files (copied to tenants/)
-          #   - DEPLOY_RUNBOOK                 — local-only operator doc (gitignored anyway)
-          #   - this workflow                  — self-reference; PATTERNS would match itself
-          #   - .github/copilot-instructions.md — documents the banned strings as examples
-          #   - beacon_*.sh                    — operational backup/rollback scripts
-          #   - *_ASSESSMENT.md, *_RUNBOOK.md  — operational documentation
-          actual=$(
-            git ls-files \
-              | grep -v '^tenants/' \
-              | grep -v '^features_dev/' \
-              | grep -v '^DEPLOY_RUNBOOK\.md$' \
-              | grep -v '^\.github/workflows/deploy-production\.yml$' \
-              | grep -v '^\.github/copilot-instructions\.md$' \
-              | grep -v '^beacon_.*\.sh$' \
-              | grep -v '_ASSESSMENT\.md$' \
-              | grep -v '_RUNBOOK\.md$' \
-              | xargs -I{} grep -EnH "$PATTERNS" {} 2>/dev/null \
-              | wc -l \
-              | tr -d ' '
-          )
-
-          # Ratchet — grandfathered count as of phase-4 complete.
-          # As of 2026-06-29: All tenant-specific strings removed from shared code.
-          # - Removed beacon-specific deploy scripts
-          # - Removed backup files with tenant branding
-          # - Replaced hardcoded tenant URLs/emails with generic examples or env vars
-          # - Updated manifest.json to use generic branding
-          # - Parameterized deploy scripts to use environment variables
-          # New occurrences are blocked. To maintain zero drift:
-          # move tenant values to tenants/<slug>/ + scripts/build.sh MAP, or
-          # parameterize via env var.
-          expected=0
-
-          echo "Tenant brand strings in shared code: actual=$actual, ratchet=$expected"
-          if [ "$actual" -gt "$expected" ]; then
-            echo ""
-            echo "❌ Tenant brand drift increased ($expected → $actual)."
-            echo "   New occurrences of beacon-specific strings in shared code:"
-            git ls-files \
-              | grep -v '^tenants/' \
-              | grep -v '^features_dev/' \
-              | grep -v '^DEPLOY_RUNBOOK\.md$' \
-              | grep -v '^\.github/workflows/deploy-production\.yml$' \
-              | grep -v '^\.github/copilot-instructions\.md$' \
-              | grep -v '^beacon_.*\.sh$' \
-              | grep -v '_ASSESSMENT\.md$' \
-              | grep -v '_RUNBOOK\.md$' \
-              | xargs -I{} grep -EnH "$PATTERNS" {} 2>/dev/null \
-              | sort
-            echo ""
-            echo "   Move the strings to tenants/<slug>/ and add the file to"
-            echo "   scripts/build.sh MAP + gps-tracker/.gitignore, OR bump the"
-            echo "   ratchet in this workflow with a comment explaining why."
-            exit 1
-          fi
-          if [ "$actual" -lt "$expected" ]; then
-            echo "ℹ️  Brand drift decreased ($expected → $actual) — please lower the ratchet to $actual."
-          fi
-          echo "✅ Tenant brand-string ratchet OK"
 
       - name: No hardcoded secrets / env-fallback literals in backend code
         run: |
@@ -216,7 +131,7 @@ jobs:
   # container's auth endpoint.
   # ─────────────────────────────────────────────────────────────────
   build-flutter:
-    name: Build Flutter Web (${{ (github.ref_name == 'prod/beacon' || github.ref_name == 'deploy/beacon-analytics') && 'beacon' || 'pinplot' }})
+    name: Build Flutter Web
     runs-on: ubuntu-latest
     needs: lint-workflow
     steps:
@@ -258,11 +173,11 @@ jobs:
   # JOB 3 — Deploy to Production (per-tenant)
   # ─────────────────────────────────────────────────────────────────
   deploy-production:
-    name: Deploy ${{ (github.ref_name == 'prod/beacon' || github.ref_name == 'deploy/beacon-analytics') && 'Beacon' || 'ViSight Telematics' }} to Production
+    name: Deploy ViSight Track to Production
     runs-on: ubuntu-latest
     needs: build-flutter
-    # Per-tenant Environment binds the right reviewers/secrets to the run.
-    environment: ${{ (github.ref_name == 'prod/beacon' || github.ref_name == 'deploy/beacon-analytics') && 'production-beacon' || 'production' }}
+    # The GitHub Environment holding the production server secrets.
+    environment: production
 
     steps:
       - uses: actions/checkout@v4
