@@ -451,6 +451,29 @@
             .dp-page .page-header > .btn { grid-column: 1; grid-row: auto; justify-self: start; margin-top: 12px; }
         }
 
+        /* DATAPROFILER · PIPELINE chart (light-mode categorical slots 1–2, validated) */
+        .pl-viz {
+            --series-1: #2a78d6;
+            --series-2: #eb6834;
+            --grid: #e7ebed;
+            --axis-text: var(--gray);
+            position: relative;
+        }
+        .pl-viz svg { display: block; width: 100%; height: 260px; overflow: visible; }
+        .pl-legend { display: flex; gap: 16px; font-size: 13px; color: var(--dark); margin-bottom: 8px; }
+        .pl-legend span { display: inline-flex; align-items: center; gap: 6px; }
+        .pl-legend i { width: 14px; height: 2px; border-radius: 1px; display: inline-block; }
+        .pl-tip {
+            position: absolute; pointer-events: none; display: none;
+            background: #fff; border: 1px solid var(--border); border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,.08); padding: 8px 10px; font-size: 12px;
+            color: var(--dark); white-space: nowrap; z-index: 2;
+        }
+        .pl-tip .row { display: flex; align-items: center; gap: 6px; }
+        .pl-tip i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .pl-sub { font-size: 12px; color: var(--gray); margin-top: 4px; }
+        .pl-health { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+
         /* TABS */
         .tabs {
             display: flex;
@@ -1025,6 +1048,12 @@
                                 <button class="sidebar-link" onclick="switchTab('unit-types')">
                                     <span>📟</span>
                                     <span>Unit Types</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('pipeline')">
+                                    <span>📈</span>
+                                    <span>Pipeline</span>
                                 </button>
                             </li>
                         </ul>
@@ -2368,6 +2397,78 @@
                                     </div>
                                 </form>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <!-- DATAPROFILER · PIPELINE TAB                         -->
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <div id="pipeline" class="tab-content dp-page">
+                        <div class="page-header">
+                            <h2 class="page-title">Pipeline</h2>
+                            <p class="page-subtitle">Device events flowing GPRS listener → queue → events store → decoder → customer dashboard. Refreshes every 15 seconds.</p>
+                            <button class="btn btn-secondary" onclick="plLoad()">Refresh</button>
+                        </div>
+
+                        <div id="plAlert" class="alert alert-warning" style="display:none"><span id="plAlertText"></span></div>
+
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-label">Ingest rate</div>
+                                <div class="stat-value" id="plRate">-</div>
+                                <div class="stat-change" id="plRateSub">packets / second into the queue</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Queue depth</div>
+                                <div class="stat-value" id="plQueue">-</div>
+                                <div class="stat-change" id="plQueueSub">&nbsp;</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Decode backlog</div>
+                                <div class="stat-value" id="plBacklog">-</div>
+                                <div class="stat-change" id="plBacklogSub">&nbsp;</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Failed packets (24h)</div>
+                                <div class="stat-value" id="plFailed">-</div>
+                                <div class="stat-change" id="plFailedSub">&nbsp;</div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <div>
+                                    <div class="card-title">Records per minute</div>
+                                    <div class="pl-sub" id="plChartSub">Last 60 minutes</div>
+                                </div>
+                                <button class="btn btn-secondary btn-sm" id="plTableToggle" onclick="plToggleTable()">View as table</button>
+                            </div>
+                            <div class="pl-viz" id="plViz">
+                                <div class="pl-legend">
+                                    <span><i style="background:var(--series-1)"></i>Received</span>
+                                    <span><i style="background:var(--series-2)"></i>Decoded</span>
+                                </div>
+                                <svg id="plChart" role="img" aria-label="Records received and decoded per minute over the last 60 minutes"></svg>
+                                <div class="pl-tip" id="plTip"></div>
+                            </div>
+                            <div id="plTableWrap" style="display:none;max-height:320px;overflow:auto">
+                                <table class="data-table">
+                                    <thead><tr><th>Minute</th><th style="text-align:right">Received</th><th style="text-align:right">Decoded</th></tr></thead>
+                                    <tbody id="plTable"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-title">Recent failed packets</div>
+                            </div>
+                            <table class="data-table">
+                                <thead><tr><th>Received</th><th>IMEI</th><th>Status</th><th>Error</th></tr></thead>
+                                <tbody id="plFailures">
+                                    <tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-secondary)">Loading…</td></tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
@@ -4152,7 +4253,8 @@ dashboard.welcome,Bienvenue</pre>
                 'webhook-logs': 'Webhook Logs',
                 'jobs': 'Background Jobs',
                 'resellers': 'DataProfiler · Resellers',
-                'unit-types': 'DataProfiler · Unit Types'
+                'unit-types': 'DataProfiler · Unit Types',
+                'pipeline': 'DataProfiler · Pipeline'
             };
             document.getElementById('pageTitle').textContent = titles[tabName];
 
@@ -4185,6 +4287,7 @@ dashboard.welcome,Bienvenue</pre>
             if (tabName === 'jobs') { loadJobs(); }
             if (tabName === 'resellers') { dpLoad(); }
             if (tabName === 'unit-types') { utLoad(); }
+            plSetAutoRefresh(tabName === 'pipeline');
         }
 
         // ── BLE TAGS ─────────────────────────────────────────────────────────
@@ -6005,6 +6108,148 @@ dashboard.welcome,Bienvenue</pre>
                 await dpApi(`/resellers/${dpSelected}/devices/${id}`, { method: 'DELETE' });
                 await dpLoad();
             } catch (err) { dpShowAlert(err.message); }
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // DATAPROFILER · PIPELINE
+        // ─────────────────────────────────────────────────────────────────────
+        let plTimer = null;
+        let plSeries = [];
+
+        function plSetAutoRefresh(on) {
+            clearInterval(plTimer);
+            plTimer = null;
+            if (on) { plLoad(); plTimer = setInterval(plLoad, 15000); }
+        }
+
+        function plFmtAge(s) {
+            if (s == null) return 'nothing waiting';
+            if (s < 60) return `oldest ${s}s`;
+            if (s < 3600) return `oldest ${Math.round(s / 60)} min`;
+            return `oldest ${(s / 3600).toFixed(1)} h`;
+        }
+
+        async function plLoad() {
+            let data;
+            try {
+                data = await dpApi('/pipeline');
+            } catch (e) {
+                document.getElementById('plAlertText').textContent = e.message;
+                document.getElementById('plAlert').style.display = 'block';
+                return;
+            }
+            const q = data.queue || {}, ev = data.events || {}, t = ev.totals || {};
+            const problems = [q.error, ev.error].filter(Boolean);
+            document.getElementById('plAlertText').textContent = problems.join(' · ');
+            document.getElementById('plAlert').style.display = problems.length ? 'block' : 'none';
+
+            document.getElementById('plRate').textContent = q.error ? '—' : `${q.publish_rate}/s`;
+            document.getElementById('plRateSub').textContent = q.error ? 'queue unavailable'
+                : `${t.active_devices_10m ?? 0} devices active · ${t.records_1h ?? 0} records last hour`;
+            document.getElementById('plQueue').textContent = q.error ? '—' : (q.ready + q.unacked);
+            document.getElementById('plQueueSub').textContent = q.error ? '\u00a0'
+                : `${q.consumers} writer${q.consumers === 1 ? '' : 's'} · ${q.ack_rate}/s written`;
+            document.getElementById('plBacklog').textContent = ev.error ? '—' : t.backlog;
+            document.getElementById('plBacklogSub').textContent = ev.error ? '\u00a0'
+                : `${plFmtAge(t.oldest_new_s)} · ${t.forward_backlog} to forward`;
+            document.getElementById('plFailed').textContent = ev.error ? '—' : t.failed_24h;
+            document.getElementById('plFailedSub').textContent = ev.error ? '\u00a0'
+                : `${t.unsupported_24h} unsupported codec`;
+
+            plSeries = ev.series || [];
+            plRenderChart();
+            plRenderTable();
+            const fb = document.getElementById('plFailures');
+            const failures = ev.failures || [];
+            fb.innerHTML = failures.length ? failures.map(f => `
+                <tr>
+                    <td>${new Date(f.received_at).toLocaleString()}</td>
+                    <td style="font-family:monospace">${dpEsc(f.imei)}</td>
+                    <td><span class="badge ${f.status === 'failed' ? 'badge-danger' : 'badge-warning'}">${dpEsc(f.status)}</span></td>
+                    <td>${dpEsc(f.error || '—')}</td>
+                </tr>`).join('')
+                : '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-secondary)">No failed packets.</td></tr>';
+        }
+
+        function plNiceMax(v) {
+            if (v <= 5) return 5;
+            const p = Math.pow(10, Math.floor(Math.log10(v)));
+            return [1, 2, 2.5, 5, 10].map(m => m * p).find(m => m >= v);
+        }
+
+        function plRenderChart() {
+            const svg = document.getElementById('plChart');
+            const W = svg.clientWidth || 800, H = 260, m = { t: 12, r: 72, b: 26, l: 40 };
+            const iw = W - m.l - m.r, ih = H - m.t - m.b;
+            svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+            if (!plSeries.length) { svg.innerHTML = ''; return; }
+            const max = plNiceMax(Math.max(1, ...plSeries.map(d => Math.max(d.received, d.decoded))));
+            const x = i => m.l + (iw * i) / (plSeries.length - 1);
+            const y = v => m.t + ih - (ih * v) / max;
+            const path = key => plSeries.map((d, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(d[key]).toFixed(1)}`).join('');
+            const ticks = [0, max / 2, max];
+            const time = d => new Date(d.minute).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const last = plSeries[plSeries.length - 1];
+            // Keep the two end labels from colliding
+            let yr = y(last.received), yd = y(last.decoded);
+            if (Math.abs(yr - yd) < 14) { const mid = (yr + yd) / 2; yr = mid - 7; yd = mid + 7; }
+
+            svg.innerHTML = `
+                ${ticks.map(v => `
+                    <line x1="${m.l}" x2="${m.l + iw}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/>
+                    <text x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--axis-text)">${v}</text>`).join('')}
+                ${[0, 30, 59].map(i => `
+                    <text x="${x(i)}" y="${H - 6}" text-anchor="${i === 0 ? 'start' : i === 59 ? 'end' : 'middle'}" font-size="11" fill="var(--axis-text)">${time(plSeries[i])}</text>`).join('')}
+                <path d="${path('received')}" fill="none" stroke="var(--series-1)" stroke-width="2" stroke-linejoin="round"/>
+                <path d="${path('decoded')}" fill="none" stroke="var(--series-2)" stroke-width="2" stroke-linejoin="round"/>
+                <text x="${m.l + iw + 8}" y="${yr + 4}" font-size="12" fill="var(--dark)">Received</text>
+                <text x="${m.l + iw + 8}" y="${yd + 4}" font-size="12" fill="var(--dark)">Decoded</text>
+                <g id="plHover" style="display:none">
+                    <line id="plCross" y1="${m.t}" y2="${m.t + ih}" stroke="var(--gray)" stroke-width="1" stroke-dasharray="3 3"/>
+                    <circle id="plDotR" r="4" fill="var(--series-1)" stroke="#fff" stroke-width="2"/>
+                    <circle id="plDotD" r="4" fill="var(--series-2)" stroke="#fff" stroke-width="2"/>
+                </g>
+                <rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent" id="plHit"/>`;
+
+            const tip = document.getElementById('plTip');
+            const hit = document.getElementById('plHit'), hover = document.getElementById('plHover');
+            const show = evt => {
+                const rect = svg.getBoundingClientRect();
+                const px = (evt.clientX - rect.left) * (W / rect.width);
+                const i = Math.max(0, Math.min(plSeries.length - 1, Math.round(((px - m.l) / iw) * (plSeries.length - 1))));
+                const d = plSeries[i];
+                hover.style.display = '';
+                document.getElementById('plCross').setAttribute('x1', x(i));
+                document.getElementById('plCross').setAttribute('x2', x(i));
+                document.getElementById('plDotR').setAttribute('cx', x(i));
+                document.getElementById('plDotR').setAttribute('cy', y(d.received));
+                document.getElementById('plDotD').setAttribute('cx', x(i));
+                document.getElementById('plDotD').setAttribute('cy', y(d.decoded));
+                tip.innerHTML = `<div style="font-weight:600;margin-bottom:4px">${time(d)}</div>
+                    <div class="row"><i style="background:var(--series-1)"></i>Received <strong style="margin-left:auto;padding-left:12px">${d.received}</strong></div>
+                    <div class="row"><i style="background:var(--series-2)"></i>Decoded <strong style="margin-left:auto;padding-left:12px">${d.decoded}</strong></div>`;
+                tip.style.display = 'block';
+                const left = (x(i) / W) * rect.width;
+                tip.style.left = `${Math.min(left + 12, rect.width - tip.offsetWidth)}px`;
+                tip.style.top = '28px';
+            };
+            hit.addEventListener('mousemove', show);
+            hit.addEventListener('mouseleave', () => { hover.style.display = 'none'; tip.style.display = 'none'; });
+        }
+
+        function plRenderTable() {
+            document.getElementById('plTable').innerHTML = [...plSeries].reverse().map(d => `
+                <tr><td>${new Date(d.minute).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                <td style="text-align:right">${d.received}</td><td style="text-align:right">${d.decoded}</td></tr>`).join('');
+        }
+
+        function plToggleTable() {
+            const table = document.getElementById('plTableWrap'), viz = document.getElementById('plViz');
+            const showTable = table.style.display === 'none';
+            table.style.display = showTable ? 'block' : 'none';
+            viz.style.display = showTable ? 'none' : '';
+            document.getElementById('plTableToggle').textContent = showTable ? 'View as chart' : 'View as table';
+            if (!showTable) plRenderChart();
         }
 
         // ─────────────────────────────────────────────────────────────────────

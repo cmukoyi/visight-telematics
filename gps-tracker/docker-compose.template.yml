@@ -161,6 +161,119 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
+  # ── DataProfiler event pipeline ───────────────────────────────────
+  # Enabled per tenant with COMPOSE_PROFILES=dataprofiler (tenants/<t>/tenant.env).
+  # Secrets: EVENTS_DB_PASSWORD and RABBITMQ_PASSWORD in backend/.env. The
+  # broker and events DB read them from that file too (exported under the
+  # names their images expect) so there is a single place to set them.
+  rabbitmq:
+    image: rabbitmq:3.13.7-management-alpine
+    profiles: ["dataprofiler"]
+    container_name: __TENANT_PREFIX___rabbitmq
+    hostname: rabbitmq   # node name (and its data dir) must survive container recreation
+    env_file:
+      - ./backend/.env
+    environment:
+      RABBITMQ_DEFAULT_USER: dataprofiler
+    entrypoint: ["sh", "-c", "export RABBITMQ_DEFAULT_PASS=\"$$RABBITMQ_PASSWORD\"; exec docker-entrypoint.sh rabbitmq-server"]
+    volumes:
+      - __TENANT_PREFIX___rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - __TENANT_PREFIX___network
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  events-db:
+    image: postgres:16.4-alpine
+    profiles: ["dataprofiler"]
+    container_name: __TENANT_PREFIX___events_db
+    env_file:
+      - ./backend/.env
+    environment:
+      POSTGRES_USER: dataprofiler
+      POSTGRES_DB: dataprofiler_events
+    entrypoint: ["sh", "-c", "export POSTGRES_PASSWORD=\"$$EVENTS_DB_PASSWORD\"; exec docker-entrypoint.sh postgres"]
+    volumes:
+      - __TENANT_PREFIX___events_data:/var/lib/postgresql/data
+    networks:
+      - __TENANT_PREFIX___network
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dataprofiler -d dataprofiler_events"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  gprs-listener:
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+    profiles: ["dataprofiler"]
+    container_name: __TENANT_PREFIX___gprs_listener
+    env_file:
+      - ./backend/.env
+    # Skip the backend entrypoint (migrations); the backend runs them and must be healthy first.
+    entrypoint: []
+    command: python -m app.dataprofiler.listener
+    ports:
+      - "0.0.0.0:5027:5027"   # Teltonika devices
+    depends_on:
+      backend:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - __TENANT_PREFIX___network
+    restart: unless-stopped
+    logging: *default-logging
+
+  event-writer:
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+    profiles: ["dataprofiler"]
+    container_name: __TENANT_PREFIX___event_writer
+    env_file:
+      - ./backend/.env
+    entrypoint: []
+    command: python -m app.dataprofiler.writer
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      events-db:
+        condition: service_healthy
+    networks:
+      - __TENANT_PREFIX___network
+    restart: unless-stopped
+    logging: *default-logging
+
+  event-decoder:
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+    profiles: ["dataprofiler"]
+    container_name: __TENANT_PREFIX___event_decoder
+    env_file:
+      - ./backend/.env
+    entrypoint: []
+    command: python -m app.dataprofiler.decoder
+    depends_on:
+      backend:
+        condition: service_healthy
+      events-db:
+        condition: service_healthy
+    networks:
+      - __TENANT_PREFIX___network
+    restart: unless-stopped
+    logging: *default-logging
+
   nginx:
     image: nginx:alpine
     container_name: __TENANT_PREFIX___nginx
@@ -183,6 +296,10 @@ services:
 
 volumes:
   __TENANT_PREFIX___postgres_data:
+    driver: local
+  __TENANT_PREFIX___rabbitmq_data:
+    driver: local
+  __TENANT_PREFIX___events_data:
     driver: local
   nginx_logs:
     driver: local

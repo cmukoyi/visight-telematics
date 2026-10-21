@@ -297,6 +297,7 @@ jobs:
             echo "PG_VOLUME=${TENANT_PREFIX}_postgres_data"
             echo "DB_CONTAINER=${TENANT_PREFIX}_db"
             echo "BACKEND_CONTAINER=${TENANT_PREFIX}_backend"
+            echo "COMPOSE_PROFILES=${COMPOSE_PROFILES:-}"
           } >> "$GITHUB_ENV"
           echo "✅ Tenant config loaded:"
           echo "   TENANT             = $TENANT"
@@ -549,9 +550,20 @@ jobs:
           # Pass tenant-specific server path through to remote shell
           ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 -o TCPKeepAlive=yes \
             "$DO_USER@$DO_SERVER_IP" \
-              "SERVER_DIR='${SERVER_DIR}' bash -s" << 'SSHEOF'
+              "SERVER_DIR='${SERVER_DIR}' COMPOSE_PROFILES='${COMPOSE_PROFILES}' bash -s" << 'SSHEOF'
             set -e
             cd "${SERVER_DIR}/gps-tracker"
+            export COMPOSE_PROFILES
+
+            # DataProfiler pipeline secrets must exist before anything is stopped.
+            if [[ ",${COMPOSE_PROFILES}," == *",dataprofiler,"* ]]; then
+              for var in EVENTS_DB_PASSWORD RABBITMQ_PASSWORD; do
+                grep -Eq "^${var}=.+" backend/.env || {
+                  echo "❌ ${var} missing from backend/.env (required by COMPOSE_PROFILES=dataprofiler)"
+                  exit 1
+                }
+              done
+            fi
 
             echo "━━━ Pre-build disk cleanup (containers only) ━━━"
             docker container prune -f
@@ -562,6 +574,11 @@ jobs:
 
             echo "━━━ Building backend services ━━━"
             docker compose build backend worker customer
+
+            if [[ ",${COMPOSE_PROFILES}," == *",dataprofiler,"* ]]; then
+              echo "━━━ Building DataProfiler pipeline services ━━━"
+              docker compose build gprs-listener event-writer event-decoder
+            fi
 
             echo "━━━ Stopping old containers ━━━"
             docker compose down --remove-orphans || true

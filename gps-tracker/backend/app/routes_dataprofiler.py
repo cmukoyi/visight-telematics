@@ -594,3 +594,92 @@ def remove_device(reseller_id: str, device_id: str, request: Request, db: Sessio
     db.delete(d)
     db.commit()
     log_audit(db, str(admin.id), "remove_reseller_device", "Reseller", str(r.id), old_value={"imei": imei})
+
+
+# ---------------------------------------------------------------------------
+# Pipeline monitoring
+# ---------------------------------------------------------------------------
+
+def _queue_stats() -> dict:
+    """RabbitMQ raw-queue depth and rates from the management API."""
+    import httpx
+    from app.dataprofiler import config as dp_config
+
+    mgmt = dp_config.rabbitmq_management(required=False)
+    if not mgmt:
+        return {"error": "RABBITMQ_PASSWORD not set"}
+    base, user, password = mgmt
+    try:
+        res = httpx.get(f"{base}/queues/%2F/{dp_config.RAW_QUEUE}", auth=(user, password), timeout=3)
+        res.raise_for_status()
+        q = res.json()
+    except Exception as exc:
+        return {"error": f"RabbitMQ unavailable: {exc.__class__.__name__}"}
+    stats = q.get("message_stats", {})
+    return {
+        "ready": q.get("messages_ready", 0),
+        "unacked": q.get("messages_unacknowledged", 0),
+        "consumers": q.get("consumers", 0),
+        "publish_rate": round(stats.get("publish_details", {}).get("rate", 0.0), 2),
+        "ack_rate": round(stats.get("ack_details", {}).get("rate", 0.0), 2),
+    }
+
+
+_PIPELINE_SQL = {
+    "totals": """
+        SELECT
+          (SELECT count(*) FROM events_incoming WHERE received_at > now() - interval '1 hour') AS packets_1h,
+          (SELECT coalesce(sum(record_count), 0) FROM events_incoming WHERE received_at > now() - interval '1 hour') AS records_1h,
+          (SELECT count(*) FROM events_incoming WHERE status = 'new') AS backlog,
+          (SELECT extract(epoch FROM now() - min(received_at)) FROM events_incoming WHERE status = 'new') AS oldest_new_s,
+          (SELECT count(*) FROM events_incoming WHERE status = 'failed' AND received_at > now() - interval '24 hours') AS failed_24h,
+          (SELECT count(*) FROM events_incoming WHERE status = 'unsupported' AND received_at > now() - interval '24 hours') AS unsupported_24h,
+          (SELECT count(DISTINCT imei) FROM events_incoming WHERE received_at > now() - interval '10 minutes') AS active_devices_10m,
+          (SELECT count(*) FROM events_processed WHERE visible AND NOT forwarded) AS forward_backlog
+    """,
+    "received": """
+        SELECT date_trunc('minute', received_at) AS m, sum(record_count) AS n
+        FROM events_incoming WHERE received_at > now() - interval '60 minutes' GROUP BY 1
+    """,
+    "decoded": """
+        SELECT date_trunc('minute', created_at) AS m, count(*) AS n
+        FROM events_processed WHERE created_at > now() - interval '60 minutes' GROUP BY 1
+    """,
+    "failures": """
+        SELECT id, imei, status, error, received_at FROM events_incoming
+        WHERE status IN ('failed', 'unsupported') ORDER BY id DESC LIMIT 10
+    """,
+}
+
+
+def _events_stats() -> dict:
+    from datetime import timedelta, timezone
+    from sqlalchemy import text as _text
+    from app.dataprofiler import config as dp_config
+    from app.dataprofiler.events_db import get_engine
+
+    url = dp_config.events_db_url(required=False)
+    if not url:
+        return {"error": "EVENTS_DB_PASSWORD not set"}
+    try:
+        with get_engine(url).connect() as conn:
+            totals = dict(conn.execute(_text(_PIPELINE_SQL["totals"])).mappings().one())
+            received = {r.m: int(r.n) for r in conn.execute(_text(_PIPELINE_SQL["received"]))}
+            decoded = {r.m: int(r.n) for r in conn.execute(_text(_PIPELINE_SQL["decoded"]))}
+            failures = [dict(r) for r in conn.execute(_text(_PIPELINE_SQL["failures"])).mappings()]
+            now = conn.execute(_text("SELECT date_trunc('minute', now())")).scalar()
+    except Exception as exc:
+        return {"error": f"Events database unavailable: {exc.__class__.__name__}"}
+
+    minutes = [now - timedelta(minutes=i) for i in range(59, -1, -1)]
+    series = [{"minute": m.astimezone(timezone.utc).isoformat(),
+               "received": received.get(m, 0), "decoded": decoded.get(m, 0)} for m in minutes]
+    totals["oldest_new_s"] = round(totals["oldest_new_s"]) if totals["oldest_new_s"] is not None else None
+    return {"totals": totals, "series": series, "failures": failures}
+
+
+@router.get("/pipeline")
+def pipeline_stats(request: Request, db: Session = Depends(get_db)):
+    """Ingest pipeline health for the Pipeline page (viewer+)."""
+    _require(request, db, "viewer")
+    return {"queue": _queue_stats(), "events": _events_stats()}
