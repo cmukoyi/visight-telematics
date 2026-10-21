@@ -4,6 +4,7 @@
   hourly        purge portal alerts past their retention
   daily         package expiry: one deletion warning at expiry, then delete
                 the device and its data TAG_DELETE_GRACE_DAYS later
+  every 5 min   scheduled reports that are due (reports_service.run_due)
 
 delete_tag() is the single place a device and its data are removed; the
 portal, admin and expiry paths all use it.
@@ -90,8 +91,14 @@ async def _every(interval_s: int, name: str, job) -> None:
         await asyncio.sleep(interval_s)
 
 
+def send_due_reports(db: Session) -> int:
+    from app.services import reports_service
+    return reports_service.run_due(db)
+
+
 def start() -> list[asyncio.Task]:
     return [
+        asyncio.create_task(_every(OFFLINE_CHECK_INTERVAL_S, "scheduled reports", send_due_reports)),
         asyncio.create_task(_every(OFFLINE_CHECK_INTERVAL_S, "offline alerts", check_offline)),
         asyncio.create_task(_every(PURGE_INTERVAL_S, "alert purge", portal_alert_service.purge_old_alerts)),
         asyncio.create_task(_every(EXPIRY_INTERVAL_S, "package expiry", enforce_expiry)),

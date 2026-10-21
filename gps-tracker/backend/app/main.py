@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
-from app.models_dataprofiler import Reseller, DataExchange, ResellerDevice, UnitType, DeviceEvent, Trip, TripBuilderState  # noqa: F401 — registers tables
+from app.models_dataprofiler import Reseller, DataExchange, ResellerDevice, UnitType, DeviceEvent, Trip, TripBuilderState, ReportSchedule  # noqa: F401 — registers tables
 from app.routes_admin import router as admin_router, public_router as admin_public_router
 from app.services import housekeeping_service
 from app.services.critical_service_alert_service import critical_service_alerts
@@ -91,6 +91,10 @@ app.include_router(i18n_router, include_in_schema=False)
 
 from app.routes_admin_i18n import router as admin_i18n_router  # noqa: E402
 app.include_router(admin_i18n_router, include_in_schema=False)
+
+# Customer app — dashboard KPIs, workspace events, inbox, reports (portal auth)
+from app.routes_fleet import router as fleet_router  # noqa: E402
+app.include_router(fleet_router, include_in_schema=False)
 
 # DataProfiler — resellers, data exchanges, IMEI routing (admin auth required)
 from app.routes_dataprofiler import router as dataprofiler_router  # noqa: E402
@@ -182,6 +186,7 @@ app.add_middleware(
 
 # Initialize email service
 email_service = EmailService()
+_background_tasks: list = []
 
 
 @app.on_event("startup")
@@ -195,7 +200,7 @@ async def startup_event():
     from app.db_log_handler import setup_db_logging
     setup_db_logging(level=logging.WARNING)
 
-    housekeeping_service.start()
+    _background_tasks.extend(housekeeping_service.start())  # keep references so tasks aren't garbage-collected
     print("🧹 Device housekeeping started (offline alerts, alert purge, package expiry)")
 
     # Critical-service error monitor (subscriptions drive whether emails send)

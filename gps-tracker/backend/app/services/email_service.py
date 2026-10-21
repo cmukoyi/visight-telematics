@@ -585,6 +585,41 @@ Best regards,
             print(f"Error sending portal alert email: {e}")
             return False
 
+    def send_report_email(self, to_email: str, subject: str, text_content: str, html_content: str,
+                          filename: str, content: bytes, mime_type: str) -> bool:
+        """Send an email with one file attached (scheduled reports)."""
+        try:
+            if self.use_sendgrid:
+                import base64
+                from sendgrid.helpers.mail import Attachment, Disposition, FileContent, FileName, FileType
+                message = Mail(from_email=self.from_email, to_emails=to_email, subject=subject,
+                               plain_text_content=text_content, html_content=html_content)
+                message.attachment = Attachment(FileContent(base64.b64encode(content).decode()),
+                                                FileName(filename), FileType(mime_type), Disposition("attachment"))
+                response = SendGridAPIClient(self.email_api_key).send(message)
+                return 200 <= response.status_code < 300
+            from email.mime.application import MIMEApplication
+            msg = MIMEMultipart('mixed')
+            msg['Subject'] = subject
+            msg['From'] = self.from_email
+            msg['To'] = to_email
+            body = MIMEMultipart('alternative')
+            body.attach(MIMEText(text_content, 'plain'))
+            body.attach(MIMEText(html_content, 'html'))
+            msg.attach(body)
+            part = MIMEApplication(content, Name=filename)
+            part['Content-Disposition'] = f'attachment; filename="{filename}"'
+            msg.attach(part)
+            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+                if self.smtp_user and self.smtp_password:
+                    server.starttls()
+                    server.login(self.smtp_user, self.smtp_password)
+                server.sendmail(self.from_email, to_email, msg.as_string())
+            return True
+        except Exception as e:
+            print(f"Error sending report email to {to_email}: {e}")
+            return False
+
     def _send_via_sendgrid(self, to_email: str, subject: str, text_content: str, html_content: str) -> bool:
         """Send email using SendGrid API"""
         try:

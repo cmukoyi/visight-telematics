@@ -200,3 +200,31 @@ class TripBuilderState(Base):
     imei          = Column(String(20), primary_key=True)
     last_event_id = Column(BigInteger, nullable=False, default=0)
     updated_at    = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class ReportSchedule(Base):
+    """A report emailed on a schedule to a list of recipients.
+
+    Each run covers the previous whole period in the schedule's timezone
+    (yesterday / last Monday–Sunday / last month) and is sent at send_hour.
+    """
+    __tablename__ = "report_schedules"
+    __table_args__ = (Index("ix_report_schedules_due", "is_active", "next_run_at"),)
+
+    id             = get_uuid_column()
+    usergroup_id   = get_uuid_fk("user_groups.id")
+    created_by     = get_uuid_fk_nullable("portal_users.id")
+    report_key     = Column(String(40), nullable=False)    # reports_service.REPORTS key
+    name           = Column(String(120), nullable=True)
+    frequency      = Column(String(10), nullable=False)    # daily | weekly | monthly
+    file_format    = Column(String(10), nullable=False, default="xlsx")  # xlsx | csv
+    recipients     = Column(JSON, nullable=False)          # list of emails
+    params         = Column(JSON, nullable=True)           # {"imei": ..., "category": ...}
+    timezone       = Column(String(40), nullable=False, default="Africa/Johannesburg")
+    send_hour      = Column(Integer, nullable=False, default=6)
+    is_active      = Column(Boolean, nullable=False, default=True)
+    next_run_at    = Column(DateTime(timezone=True), nullable=False)
+    last_run_at    = Column(DateTime(timezone=True), nullable=True)
+    last_status    = Column(String(255), nullable=True)
+    created_at     = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at     = Column(DateTime(timezone=True), onupdate=func.now())
