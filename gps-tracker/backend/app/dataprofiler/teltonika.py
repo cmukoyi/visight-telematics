@@ -156,37 +156,7 @@ def decode_avl_packet(raw: bytes) -> tuple[int, list[AvlRecord]]:
     return packet.codec, records
 
 
-# ---------------------------------------------------------------------------
-# Event classification — Teltonika FMB/FMC AVL IDs → DataProfiler event types
-# (keys match dataprofiler_service.EVENT_TYPES)
-# ---------------------------------------------------------------------------
-
-_EVENT_BY_IO = {
-    1: "digital_input", 2: "digital_input", 3: "digital_input",
-    236: "panic",          # Alarm
-    239: "ignition",
-    240: "movement",
-    250: "movement",       # Trip start/stop
-    251: "idling",
-    246: "towing",
-    247: "crash",
-    249: "gnss_jamming",
-    252: "power_cut",      # Unplug
-    255: "overspeed",
-}
-_GEOFENCE_IOS = set(range(155, 175)) | {175}  # Geofence zones 1–20, auto-geofence
-_GREEN_DRIVING_IO = 253
-_GREEN_DRIVING = {1: "harsh_acceleration", 2: "harsh_braking", 3: "harsh_cornering"}
-
-
 def classify_event(record: AvlRecord) -> Optional[str]:
-    """Map a record to a DataProfiler event type. 'position' for periodic records,
-    None for event IDs that have no mapping."""
-    eid = record.event_io_id
-    if eid == 0:
-        return "position"
-    if eid == _GREEN_DRIVING_IO:
-        return _GREEN_DRIVING.get(record.io.get(eid))
-    if eid in _GEOFENCE_IOS:
-        return "geofence"
-    return _EVENT_BY_IO.get(eid)
+    """Our event code for a record (see app.dataprofiler.dictionary.EVENTS)."""
+    from app.dataprofiler.dictionary import classify
+    return classify(record.event_io_id, record.io)

@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
-from app.models_dataprofiler import Reseller, DataExchange, ResellerDevice, UnitType, DeviceEvent  # noqa: F401 — registers tables
+from app.models_dataprofiler import Reseller, DataExchange, ResellerDevice, UnitType, DeviceEvent, Trip, TripBuilderState  # noqa: F401 — registers tables
 from app.routes_admin import router as admin_router, public_router as admin_public_router
 from app.services import housekeeping_service
 from app.services.critical_service_alert_service import critical_service_alerts

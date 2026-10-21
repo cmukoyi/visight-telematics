@@ -99,7 +99,7 @@ def _login_record_success(ip: str) -> None:
 # ---------------------------------------------------------------------------
 
 SECTION_FEATURES: dict = {
-    "tracking":   ["livemap", "assets"],
+    "tracking":   ["livemap", "assets", "trips"],
     "management": ["asset-mgmt", "users", "locations", "settings"],
     "reports":    [
         "reports-subscriptions", "reports-activity",
@@ -111,7 +111,7 @@ ALL_SECTIONS = list(SECTION_FEATURES.keys())
 # Tenant feature → tab name mapping
 # Maps high-level tenant feature names to specific tab keys
 TENANT_FEATURE_TABS: dict = {
-    "livemap": ["livemap", "assets"],
+    "livemap": ["livemap", "assets", "trips"],
     "alerts": ["reports-alerts"],
     "geofences": ["reports-geofence"],
     "reports": ["reports-subscriptions", "reports-activity"],
@@ -2388,3 +2388,77 @@ def list_positions(
 
 
 # ==============================================================================
+
+
+# ==============================================================================
+# TRIPS (built by app/services/trip_builder.py from Teltonika events)
+# ==============================================================================
+
+def _trip_out(trip, names: dict) -> dict:
+    return {
+        "id": str(trip.id), "imei": trip.imei, "device_name": names.get(trip.imei),
+        "status": trip.status, "start_reason": trip.start_reason, "close_reason": trip.close_reason,
+        "started_at": trip.started_at, "ended_at": trip.ended_at, "last_event_at": trip.last_event_at,
+        "start": [trip.start_latitude, trip.start_longitude] if trip.start_latitude is not None else None,
+        "end": [trip.end_latitude, trip.end_longitude] if trip.end_latitude is not None else None,
+        "distance_m": trip.distance_m, "duration_s": trip.duration_s,
+        "max_speed": trip.max_speed, "avg_speed": trip.avg_speed, "point_count": trip.point_count,
+        "speeding_count": trip.speeding_count, "harsh_acceleration_count": trip.harsh_acceleration_count,
+        "harsh_braking_count": trip.harsh_braking_count, "harsh_cornering_count": trip.harsh_cornering_count,
+        "idling_count": trip.idling_count,
+    }
+
+
+def _group_device_names(db: Session, group_id) -> dict:
+    tags = db.query(BLETag.imei, BLETag.description, BLETag.device_name).filter(
+        BLETag.attributes.op("->>")("_created_usergroup_id") == str(group_id)).all()
+    return {imei: (desc or name or imei) for imei, desc, name in tags}
+
+
+@router.get("/trips")
+def list_trips(request: Request, db: Session = Depends(get_db),
+               imei: Optional[str] = None, date_from: Optional[datetime] = None,
+               date_to: Optional[datetime] = None, limit: int = Query(200, ge=1, le=1000)):
+    """Trips for this group's devices, newest first."""
+    from app.models_dataprofiler import Trip
+
+    me = get_portal_user_from_request(request, db)
+    q = db.query(Trip).filter(Trip.usergroup_id == me.usergroup_id)
+    if imei:
+        q = q.filter(Trip.imei == imei.strip())
+    if date_from:
+        q = q.filter(Trip.started_at >= date_from)
+    if date_to:
+        q = q.filter(Trip.started_at < date_to)
+    trips = q.order_by(Trip.started_at.desc()).limit(limit).all()
+    names = _group_device_names(db, me.usergroup_id)
+    return [_trip_out(t, names) for t in trips]
+
+
+@router.get("/trips/{trip_id}")
+def get_trip(trip_id: str, request: Request, db: Session = Depends(get_db)):
+    """One trip with its route points and events (alerts, ignition, start/end)."""
+    from app.dataprofiler.dictionary import EVENTS, describe_io, event_label
+    from app.models_dataprofiler import DeviceEvent, Trip
+
+    me = get_portal_user_from_request(request, db)
+    try:
+        UUID(trip_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Trip not found")
+    trip = db.query(Trip).filter(Trip.id == trip_id, Trip.usergroup_id == me.usergroup_id).first()
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+    events = (db.query(DeviceEvent).filter(DeviceEvent.trip_id == trip.id)
+              .order_by(DeviceEvent.recorded_at, DeviceEvent.id).all())
+    points = [[e.latitude, e.longitude, e.speed, e.recorded_at.isoformat()]
+              for e in events if e.latitude is not None and e.longitude is not None]
+    marked = [{
+        "id": e.id, "code": e.event_type, "label": event_label(e.event_type, e.event_io_id),
+        "kind": EVENTS[e.event_type][2] if e.event_type in EVENTS else "info",
+        "recorded_at": e.recorded_at, "latitude": e.latitude, "longitude": e.longitude, "speed": e.speed,
+        "io": describe_io(e.io or {}),
+    } for e in events if e.event_type not in ("position", "parked_position")]
+    out = _trip_out(trip, _group_device_names(db, me.usergroup_id))
+    out.update(points=points, events=marked)
+    return out

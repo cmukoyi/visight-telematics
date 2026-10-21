@@ -13,6 +13,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.admin_auth import hash_password, verify_password
+from app.dataprofiler.dictionary import CATEGORIES, CATEGORY_KEYS
 from app.models import BLETag, UserGroup
 from app.models_admin import TagPackage
 from app.models_dataprofiler import DataExchange, Reseller, ResellerDevice
@@ -22,27 +23,10 @@ logger = logging.getLogger(__name__)
 # tag_type stored on provisioned tags. Push-only: the location poller skips it.
 TELTONIKA_TAG_TYPE = "teltonika"
 
-# Event types a package can expose to the customer dashboard. Keys are what the
-# phase 2 decoder will emit; labels are for the admin UI.
-EVENT_TYPES = [
-    {"key": "position",           "label": "Position updates"},
-    {"key": "ignition",           "label": "Ignition on/off"},
-    {"key": "movement",           "label": "Movement start/stop"},
-    {"key": "idling",             "label": "Excessive idling"},
-    {"key": "overspeed",          "label": "Overspeeding"},
-    {"key": "harsh_acceleration", "label": "Harsh acceleration"},
-    {"key": "harsh_braking",      "label": "Harsh braking"},
-    {"key": "harsh_cornering",    "label": "Harsh cornering"},
-    {"key": "crash",              "label": "Crash detection"},
-    {"key": "towing",             "label": "Towing detection"},
-    {"key": "power_cut",          "label": "External power disconnected"},
-    {"key": "low_battery",        "label": "Low battery"},
-    {"key": "gnss_jamming",       "label": "GNSS jamming"},
-    {"key": "geofence",           "label": "Geofence (device-side)"},
-    {"key": "panic",              "label": "Panic / SOS button"},
-    {"key": "digital_input",      "label": "Digital input change"},
-]
-EVENT_TYPE_KEYS = {e["key"] for e in EVENT_TYPES}
+# Event categories a package can expose to the customer dashboard
+# (each decoded event code belongs to one; see app.dataprofiler.dictionary).
+EVENT_TYPES = CATEGORIES
+EVENT_TYPE_KEYS = CATEGORY_KEYS
 
 
 def generate_exchange_credentials() -> tuple[str, str]:

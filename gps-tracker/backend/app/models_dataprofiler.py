@@ -147,4 +147,56 @@ class DeviceEvent(Base):
     satellites   = Column(Integer, nullable=True)
     speed        = Column(Integer, nullable=True)
     io           = Column(JSON, nullable=True)
+    trip_id      = get_uuid_fk_nullable("trips.id")  # set by the trip builder
     created_at   = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Trip(Base):
+    """A journey built from a device's events: trip_start … positions/alerts … trip_end.
+
+    Opened by trip_start (or, if that was missed, by the first driving
+    position); closed by trip_end, ignition off, a parked position, or a gap
+    longer than trip_builder.MAX_GAP. status: open | closed.
+    """
+    __tablename__ = "trips"
+    __table_args__ = (
+        Index("ix_trips_imei_started", "imei", "started_at"),
+        Index("ix_trips_group_started", "usergroup_id", "started_at"),
+    )
+
+    id               = get_uuid_column()
+    imei             = Column(String(20), nullable=False)
+    usergroup_id     = get_uuid_fk_nullable("user_groups.id")
+    status           = Column(String(10), nullable=False, default="open")
+    start_reason     = Column(String(20), nullable=False)   # trip_start | implicit
+    close_reason     = Column(String(20), nullable=True)    # trip_end | ignition_off | parked | gap | restarted | stale
+    started_at       = Column(DateTime(timezone=True), nullable=False)
+    ended_at         = Column(DateTime(timezone=True), nullable=True)
+    last_event_at    = Column(DateTime(timezone=True), nullable=False)
+    start_latitude   = Column(Float, nullable=True)
+    start_longitude  = Column(Float, nullable=True)
+    end_latitude     = Column(Float, nullable=True)
+    end_longitude    = Column(Float, nullable=True)
+    start_odometer_m = Column(BigInteger, nullable=True)
+    end_odometer_m   = Column(BigInteger, nullable=True)
+    distance_m       = Column(Integer, nullable=False, default=0)
+    duration_s       = Column(Integer, nullable=False, default=0)
+    max_speed        = Column(Integer, nullable=False, default=0)
+    avg_speed        = Column(Float, nullable=True)
+    point_count      = Column(Integer, nullable=False, default=0)
+    speeding_count   = Column(Integer, nullable=False, default=0)
+    harsh_acceleration_count = Column(Integer, nullable=False, default=0)
+    harsh_braking_count      = Column(Integer, nullable=False, default=0)
+    harsh_cornering_count    = Column(Integer, nullable=False, default=0)
+    idling_count     = Column(Integer, nullable=False, default=0)
+    created_at       = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at       = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class TripBuilderState(Base):
+    """Per-device bookmark: the trip builder has processed device_events up to last_event_id."""
+    __tablename__ = "trip_builder_state"
+
+    imei          = Column(String(20), primary_key=True)
+    last_event_id = Column(BigInteger, nullable=False, default=0)
+    updated_at    = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

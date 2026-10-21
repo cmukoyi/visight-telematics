@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.dataprofiler import config
 from app.dataprofiler.events_db import ensure_schema, get_engine
+from app.dataprofiler.dictionary import category_of
 from app.dataprofiler.teltonika import ProtocolError, SUPPORTED_CODECS, classify_event, decode_avl_packet
 from app.models import BLETag
 from app.models_admin import TagPackage
@@ -89,10 +90,11 @@ def load_device_context(db: Session, imeis: set[str]) -> dict:
 
 
 def is_visible(ctx: Optional[dict], event_type: Optional[str]) -> bool:
+    """Visible when the device is live and its package allows the event's category."""
     if not ctx or not ctx["live"]:
         return False
     allowed = ctx["allowed"]
-    return allowed is None or (event_type is not None and event_type in allowed)
+    return allowed is None or category_of(event_type) in allowed
 
 
 # ---------------------------------------------------------------------------

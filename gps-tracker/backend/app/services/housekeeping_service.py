@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app.models import BLETag, DevicePosition, GeofenceAlert, POITrackerLink, PortalAlert
-from app.models_dataprofiler import DeviceEvent
+from app.models_dataprofiler import DeviceEvent, Trip, TripBuilderState
 from app.services import portal_alert_service
 
 logger = logging.getLogger(__name__)
@@ -42,6 +42,8 @@ def delete_tag(db: Session, tag: BLETag, reason: str = "deleted") -> dict:
                                 .delete(synchronize_session=False)
         counts["events"] = db.query(DeviceEvent).filter(DeviceEvent.imei == tag.imei) \
                              .delete(synchronize_session=False)
+        counts["trips"] = db.query(Trip).filter(Trip.imei == tag.imei).delete(synchronize_session=False)
+        db.query(TripBuilderState).filter(TripBuilderState.imei == tag.imei).delete(synchronize_session=False)
     db.delete(tag)
     logger.info("Device %s %s: %s", tag.imei or tag.id, reason, counts)
     return counts

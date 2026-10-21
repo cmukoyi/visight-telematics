@@ -11,6 +11,9 @@ Stored permanently:
   device_events     every delivered event (deduplicated on dp_event_id)
   device_positions  events with a GPS fix (history / trips)
   ble_tags          the device's live location, and activation on first fix
+
+It also runs the trip builder (app/services/trip_builder.py) every
+TRIP_BUILD_INTERVAL_S, turning stored events into trips.
 """
 import asyncio
 import json
@@ -28,10 +31,12 @@ from app.dataprofiler.decoder import DELIVER_EXCHANGE, exchange_queue
 from app.models import BLETag, DevicePosition
 from app.models_admin import TagPackage
 from app.models_dataprofiler import DeviceEvent
+from app.services import trip_builder
 
 logger = logging.getLogger("dataprofiler.dashboard_ingest")
 
 REFRESH_S = 60
+TRIP_BUILD_INTERVAL_S = 15
 IO_IGNITION = "239"
 
 
@@ -96,6 +101,22 @@ def _store(body: bytes) -> int:
         return n
 
 
+def _build_trips() -> dict:
+    with SessionLocal() as db:
+        return trip_builder.run_once(db)
+
+
+async def trip_builder_loop() -> None:
+    while True:
+        try:
+            result = await asyncio.to_thread(_build_trips)
+            if result["events"] or result["stale_closed"]:
+                logger.info("Trip builder: %s", result)
+        except Exception:
+            logger.exception("Trip builder cycle failed")
+        await asyncio.sleep(TRIP_BUILD_INTERVAL_S)
+
+
 def _linked_exchange_keys() -> set[str]:
     with SessionLocal() as db:
         return set(db.execute(text(
@@ -127,6 +148,7 @@ async def main() -> None:
             logger.info("Stored %d events from %s", new, message.routing_key)
 
     consuming: set[str] = set()
+    trip_task = asyncio.create_task(trip_builder_loop())  # keep a reference so it is not garbage-collected
     logger.info("Dashboard ingest started")
     while True:
         try:

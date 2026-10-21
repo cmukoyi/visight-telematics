@@ -342,6 +342,11 @@
                 <span class="nav-label" data-i18n="assets.asset_list">Asset List</span>
             </button>
 
+            <button class="nav-item" data-tab="trips" onclick="switchTab('trips')">
+                <span class="nav-icon"><i class="fa-solid fa-route"></i></span>
+                <span class="nav-label" data-i18n="trips.trips">Trips</span>
+            </button>
+
 
         </div>
 
@@ -496,6 +501,31 @@
                         </button>
                     </div>
                     <div id="liveMap"></div>
+                </div>
+            </div>
+
+            <!-- ═══ TRIPS ═══ -->
+            <div id="tab-trips" class="tab-content">
+                <aside class="map-sidebar">
+                    <div class="map-sidebar-top">
+                        <h2><i class="fa-solid fa-route" style="color:var(--primary);margin-right:6px"></i> <span data-i18n="trips.trips">Trips</span></h2>
+                        <div class="trp-filters">
+                            <select id="trp-device" onchange="trpLoad()">
+                                <option value="" data-i18n="trips.all_devices">All devices</option>
+                            </select>
+                            <div class="trp-dates">
+                                <input type="date" id="trp-from" onchange="trpLoad()" aria-label="From">
+                                <span>–</span>
+                                <input type="date" id="trp-to" onchange="trpLoad()" aria-label="To">
+                            </div>
+                        </div>
+                    </div>
+                    <div id="trp-summary" class="trp-summary"></div>
+                    <div id="trp-list" class="trp-list"></div>
+                </aside>
+                <div class="map-area">
+                    <div id="trp-detail" class="trp-detail" style="display:none"></div>
+                    <div id="tripsMap"></div>
                 </div>
             </div>
 
@@ -1853,6 +1883,7 @@
                     <p style="margin:0 0 4px;font-size:12px;color:var(--text-secondary)" data-i18n="nav.tracking">Tracking</p>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="livemap" class="au-feat"> Live Map</label>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="assets" class="au-feat"> Asset List</label>
+                    <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="trips" class="au-feat"> Trips</label>
                     <p style="margin:4px 0 4px;font-size:12px;color:var(--text-secondary)" data-i18n="general.management">Management</p>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="asset-mgmt" class="au-feat"> Asset Management</label>
                     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="users" class="au-feat"> User Accounts</label>
@@ -1934,6 +1965,7 @@
                 <p style="margin:0 0 4px;font-size:12px;color:var(--text-secondary)" data-i18n="nav.tracking">Tracking</p>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="livemap" class="er-feat"> Live Map</label>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="assets" class="er-feat"> Asset List</label>
+                <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="trips" class="er-feat"> Trips</label>
                 <p style="margin:4px 0 4px;font-size:12px;color:var(--text-secondary)" data-i18n="general.management">Management</p>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="asset-mgmt" class="er-feat"> Asset Management</label>
                 <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-left:8px"><input type="checkbox" value="users" class="er-feat"> User Accounts</label>
@@ -2685,7 +2717,7 @@ function applyNavFeatures(features) {
     });
     // Section label visibility — hide the label when ALL its tabs are hidden
     const sectionTabs = {
-        'Tracking':   ['livemap', 'assets'],
+        'Tracking':   ['livemap', 'assets', 'trips'],
         'Management': ['asset-mgmt', 'users', 'locations', 'settings'],
         'Reports':    ['reports-subscriptions', 'reports-activity',
                        'reports-battery', 'reports-alerts', 'reports-geofence'],
@@ -2941,7 +2973,7 @@ window.addEventListener('resize', function() {
 // ══════════════════════════════════════════
 // Tab switching
 // ══════════════════════════════════════════
-const TAB_TITLES = { livemap: 'Live Map', assets: 'Asset List', 'asset-mgmt': 'Asset Management', locations: 'Geofences', users: 'User Accounts', settings: 'Settings', 'reports-subscriptions': 'Tag Subscriptions Report', 'reports-activity': 'Asset Activity Summary', 'reports-battery': 'Battery & Offline Report', 'reports-alerts': 'Alerts Inbox', 'reports-geofence': 'Geofence Events' };
+const TAB_TITLES = { livemap: 'Live Map', assets: 'Asset List', trips: 'Trips', 'asset-mgmt': 'Asset Management', locations: 'Geofences', users: 'User Accounts', settings: 'Settings', 'reports-subscriptions': 'Tag Subscriptions Report', 'reports-activity': 'Asset Activity Summary', 'reports-battery': 'Battery & Offline Report', 'reports-alerts': 'Alerts Inbox', 'reports-geofence': 'Geofence Events' };
 let _mapInitialized = false;
 
 function switchTab(name) {
@@ -2969,7 +3001,7 @@ function switchTab(name) {
 
     // Toggle full-bleed mode on the content wrapper for Live Map
     const contentEl = document.querySelector('.content');
-    if (contentEl) contentEl.classList.toggle('live-map-active', name === 'livemap');
+    if (contentEl) contentEl.classList.toggle('live-map-active', name === 'livemap' || name === 'trips');
 
     const _runTabTask = (task, label) => {
         Promise.resolve(task).catch(err => {
@@ -2980,6 +3012,7 @@ function switchTab(name) {
 
     if (name === 'livemap')    _runTabTask(initLiveMap(), 'livemap');
     if (name === 'assets')     _runTabTask(initAssetList(), 'assets');
+    if (name === 'trips')      _runTabTask(initTrips(), 'trips');
     if (name === 'asset-mgmt') _runTabTask(initAssetMgmt(), 'asset-mgmt');
     if (name === 'locations')  _runTabTask(locationsLoad(), 'locations');
     if (name === 'users')      _runTabTask(loadUsers(), 'users');
@@ -7212,6 +7245,194 @@ function _tagBatteryHtml(tag, compact = false) {
     const battery = Number(tag.battery_level);
     const batteryClass = battery > 20 ? 'good' : 'low';
     return `<span class="battery-wrap ${batteryClass}"><i class="fa-solid fa-battery-full"></i> ${compact ? `<small>${battery}%</small>` : `${battery}%`}</span>`;
+}
+
+// ══════════════════════════════════════════
+// TRIPS — built from Teltonika events (trip start → positions/alerts → trip end)
+// ══════════════════════════════════════════
+let _trpMap = null;
+let _trpLayer = null;
+let _trpTrips = [];
+let _trpSelected = null;
+
+// Marker colours by event kind; text always carries the meaning too (label in popup/legend)
+const TRP_EVENT_STYLE = {
+    trip_start:         { color: '#16a34a', icon: 'fa-play' },
+    trip_end:           { color: '#dc2626', icon: 'fa-flag-checkered' },
+    overspeed:          { color: '#ea580c', icon: 'fa-gauge-high' },
+    harsh_braking:      { color: '#b91c1c', icon: 'fa-hand' },
+    harsh_acceleration: { color: '#b91c1c', icon: 'fa-forward' },
+    harsh_cornering:    { color: '#b91c1c', icon: 'fa-rotate' },
+    idling_start:       { color: '#ca8a04', icon: 'fa-hourglass-half' },
+    crash:              { color: '#7f1d1d', icon: 'fa-car-burst' },
+    towing:             { color: '#7c3aed', icon: 'fa-truck-pickup' },
+    power_cut:          { color: '#7c3aed', icon: 'fa-plug-circle-xmark' },
+};
+
+function _trpDate(d) { return d.toISOString().slice(0, 10); }
+function _trpDuration(s) {
+    if (!s) return '0 min';
+    const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60);
+    return h ? `${h} h ${m} min` : `${m} min`;
+}
+function _trpKm(m) { return `${((m || 0) / 1000).toFixed(1)} km`; }
+function _trpTime(ts) { return ts ? new Date(ts).toLocaleTimeString(currentLocale(), { hour: '2-digit', minute: '2-digit' }) : '—'; }
+function _trpDay(ts) { return new Date(ts).toLocaleDateString(currentLocale(), { weekday: 'short', day: 'numeric', month: 'short' }); }
+
+async function initTrips() {
+    if (!_trpMap) {
+        _trpMap = L.map('tripsMap', { zoomControl: true, zoomSnap: 0.25 }).setView([-26.2, 28.05], 11);
+        addBasemap(_trpMap);
+        const to = new Date(), from = new Date(Date.now() - 6 * 86400000);
+        document.getElementById('trp-from').value = _trpDate(from);
+        document.getElementById('trp-to').value = _trpDate(to);
+    }
+    setTimeout(() => _trpMap.invalidateSize(), 50);
+    const sel = document.getElementById('trp-device');
+    if (sel.options.length <= 1) {
+        try {
+            const res = await apiFetch('/api/portal/tags');
+            const tags = res.ok ? await res.json() : [];
+            sel.innerHTML = `<option value="">${t('trips.all_devices', 'All devices')}</option>` + tags.map(tag =>
+                `<option value="${esc(tag.imei)}">${esc(tag.description || tag.device_name || tag.imei)}</option>`).join('');
+        } catch (_) { /* device filter stays "All devices" */ }
+    }
+    await trpLoad();
+}
+
+async function trpLoad() {
+    const list = document.getElementById('trp-list');
+    list.innerHTML = `<div class="trp-empty"><i class="fa-solid fa-spinner fa-spin"></i> ${t('common.loading', 'Loading…')}</div>`;
+    const params = new URLSearchParams();
+    const imei = document.getElementById('trp-device').value;
+    const from = document.getElementById('trp-from').value;
+    const to = document.getElementById('trp-to').value;
+    if (imei) params.set('imei', imei);
+    if (from) params.set('date_from', new Date(from + 'T00:00:00').toISOString());
+    if (to) params.set('date_to', new Date(new Date(to + 'T00:00:00').getTime() + 86400000).toISOString());
+    try {
+        const res = await apiFetch(`/api/portal/trips?${params}`);
+        if (!res.ok) throw new Error(await safeJsonDetail(res, 'Could not load trips'));
+        _trpTrips = await res.json();
+    } catch (err) {
+        list.innerHTML = `<div class="trp-empty">${esc(err.message)}</div>`;
+        return;
+    }
+    trpRenderList();
+    if (_trpTrips.length) trpSelect(_trpTrips[0].id);
+    else { _trpClearMap(); document.getElementById('trp-detail').style.display = 'none'; }
+}
+
+function trpRenderList() {
+    const list = document.getElementById('trp-list');
+    const total = _trpTrips.reduce((a, x) => a + (x.distance_m || 0), 0);
+    const time = _trpTrips.reduce((a, x) => a + (x.duration_s || 0), 0);
+    document.getElementById('trp-summary').innerHTML = _trpTrips.length
+        ? `<span><strong>${_trpTrips.length}</strong> ${t('trips.trips_lower', 'trips')}</span><span><strong>${_trpKm(total)}</strong></span><span><strong>${_trpDuration(time)}</strong> ${t('trips.driving', 'driving')}</span>`
+        : '';
+    if (!_trpTrips.length) {
+        list.innerHTML = `<div class="trp-empty">${t('trips.none', 'No trips in this period.')}</div>`;
+        return;
+    }
+    let lastDay = '';
+    list.innerHTML = _trpTrips.map(tr => {
+        const day = _trpDay(tr.started_at);
+        const header = day !== lastDay ? `<div class="trp-day">${esc(day)}</div>` : '';
+        lastDay = day;
+        const alerts = [
+            tr.speeding_count ? `<span class="trp-badge warn" title="${t('trips.speeding', 'Speeding')}"><i class="fa-solid fa-gauge-high"></i> ${tr.speeding_count}</span>` : '',
+            (tr.harsh_braking_count + tr.harsh_acceleration_count + tr.harsh_cornering_count)
+                ? `<span class="trp-badge danger" title="${t('trips.harsh_driving', 'Harsh driving')}"><i class="fa-solid fa-triangle-exclamation"></i> ${tr.harsh_braking_count + tr.harsh_acceleration_count + tr.harsh_cornering_count}</span>` : '',
+            tr.status === 'open' ? `<span class="trp-badge live">${t('trips.in_progress', 'In progress')}</span>` : '',
+        ].join('');
+        return header + `
+            <div class="trp-item${tr.id === _trpSelected ? ' selected' : ''}" data-id="${esc(tr.id)}" onclick="trpSelect('${esc(tr.id)}')">
+                <div class="trp-item-top">
+                    <span class="trp-times">${_trpTime(tr.started_at)} – ${tr.status === 'open' ? '…' : _trpTime(tr.ended_at)}</span>
+                    <span class="trp-dist">${_trpKm(tr.distance_m)}</span>
+                </div>
+                <div class="trp-item-sub">
+                    <span>${esc(tr.device_name || tr.imei)}</span>
+                    <span>${_trpDuration(tr.duration_s)} · ${t('trips.max', 'max')} ${tr.max_speed} km/h</span>
+                </div>
+                ${alerts ? `<div class="trp-badges">${alerts}</div>` : ''}
+            </div>`;
+    }).join('');
+}
+
+function _trpClearMap() {
+    if (_trpLayer) { _trpLayer.remove(); _trpLayer = null; }
+}
+
+function _trpMarker(ev) {
+    const st = TRP_EVENT_STYLE[ev.code] || { color: '#64748b', icon: 'fa-circle-info' };
+    const icon = L.divIcon({
+        className: 'trp-marker',
+        html: `<span style="background:${st.color}"><i class="fa-solid ${st.icon}"></i></span>`,
+        iconSize: [24, 24], iconAnchor: [12, 12],
+    });
+    const io = (ev.io || []).filter(x => ['Ignition', 'External voltage', 'Over speeding', 'Green driving value', 'Total odometer', 'GSM signal'].includes(x.name))
+        .map(x => `<div><span>${esc(x.name)}</span><strong>${esc(x.display)}</strong></div>`).join('');
+    return L.marker([ev.latitude, ev.longitude], { icon, zIndexOffset: 500 }).bindPopup(`
+        <div class="trp-popup">
+            <strong>${esc(ev.label)}</strong>
+            <div class="trp-popup-meta">${new Date(ev.recorded_at).toLocaleString(currentLocale())} · ${ev.speed ?? 0} km/h</div>
+            ${io ? `<div class="trp-popup-io">${io}</div>` : ''}
+        </div>`);
+}
+
+async function trpSelect(id) {
+    _trpSelected = id;
+    document.querySelectorAll('#trp-list .trp-item').forEach(el => el.classList.toggle('selected', el.dataset.id === id));
+    const detail = document.getElementById('trp-detail');
+    let trip;
+    try {
+        const res = await apiFetch(`/api/portal/trips/${encodeURIComponent(id)}`);
+        if (!res.ok) throw new Error(await safeJsonDetail(res, 'Could not load trip'));
+        trip = await res.json();
+    } catch (err) {
+        detail.innerHTML = esc(err.message);
+        detail.style.display = 'block';
+        return;
+    }
+    if (_trpSelected !== id) return;  // a newer selection won the race
+    _trpClearMap();
+    _trpLayer = L.featureGroup().addTo(_trpMap);
+    const line = trip.points.map(p => [p[0], p[1]]);
+    if (line.length > 1) {
+        L.polyline(line, { color: '#ffffff', weight: 7, opacity: 0.9 }).addTo(_trpLayer);
+        const routeColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#2563eb';
+        L.polyline(line, { color: routeColor, weight: 4 }).addTo(_trpLayer);
+    }
+    trip.events.filter(ev => ev.latitude != null && ev.longitude != null).forEach(ev => _trpMarker(ev).addTo(_trpLayer));
+    if (line.length) {
+        // Leave room for the summary card (top-right) when it fits beside the route
+        const wide = _trpMap.getSize().x > 760;
+        _trpMap.fitBounds(_trpLayer.getBounds(), {
+            paddingTopLeft: [40, wide ? 40 : 200], paddingBottomRight: [wide ? 380 : 40, 40], maxZoom: 16 });
+    }
+
+    const counts = [
+        ['overspeed', t('trips.speeding', 'Speeding'), trip.speeding_count],
+        ['harsh_braking', t('trips.harsh_braking', 'Harsh braking'), trip.harsh_braking_count],
+        ['harsh_acceleration', t('trips.harsh_acceleration', 'Harsh acceleration'), trip.harsh_acceleration_count],
+        ['harsh_cornering', t('trips.harsh_cornering', 'Harsh cornering'), trip.harsh_cornering_count],
+        ['idling_start', t('trips.idling', 'Idling'), trip.idling_count],
+    ].filter(c => c[2]);
+    detail.innerHTML = `
+        <div class="trp-detail-head">
+            <strong>${esc(trip.device_name || trip.imei)}</strong>
+            <span>${_trpDay(trip.started_at)} · ${_trpTime(trip.started_at)} – ${trip.status === 'open' ? t('trips.in_progress', 'In progress') : _trpTime(trip.ended_at)}</span>
+        </div>
+        <div class="trp-stats">
+            <div><span>${t('trips.distance', 'Distance')}</span><strong>${_trpKm(trip.distance_m)}</strong></div>
+            <div><span>${t('trips.duration', 'Duration')}</span><strong>${_trpDuration(trip.duration_s)}</strong></div>
+            <div><span>${t('trips.max_speed', 'Max speed')}</span><strong>${trip.max_speed} km/h</strong></div>
+            <div><span>${t('trips.avg_speed', 'Avg speed')}</span><strong>${trip.avg_speed ?? '—'} km/h</strong></div>
+        </div>
+        ${counts.length ? `<div class="trp-legend">${counts.map(([code, label, n]) =>
+            `<span><i class="trp-dot" style="background:${(TRP_EVENT_STYLE[code] || {}).color}"></i>${esc(label)} <strong>${n}</strong></span>`).join('')}</div>` : ''}`;
+    detail.style.display = 'block';
 }
 
 // Last-seen badge for the Live Assets list: {text, cssClass} → .lm-time-<cssClass>

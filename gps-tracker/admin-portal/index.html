@@ -1066,6 +1066,12 @@
                                 </button>
                             </li>
                             <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('dictionary')">
+                                    <span>📖</span>
+                                    <span>Dictionary</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
                                 <button class="sidebar-link" onclick="switchTab('pipeline')">
                                     <span>📈</span>
                                     <span>Pipeline</span>
@@ -2281,6 +2287,45 @@
                     </div>
 
                     <!-- ═══════════════════════════════════════════════════ -->
+                    <!-- DATAPROFILER · DICTIONARY TAB                       -->
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <div id="dictionary" class="tab-content dp-page">
+                        <div class="page-header">
+                            <h2 class="page-title">Dictionary</h2>
+                            <p class="page-subtitle">How Teltonika records are translated: each record becomes one of our events (which builds trips and drives alerts), and each IO element gets a name, unit and scaling.</p>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <div>
+                                    <div class="card-title">Events we detect</div>
+                                    <div class="pl-sub">Packages show or hide events by category.</div>
+                                </div>
+                            </div>
+                            <table class="data-table">
+                                <thead><tr><th>Event</th><th>Code</th><th>Category</th><th>Kind</th><th>Teltonika source</th></tr></thead>
+                                <tbody id="dicEvents"><tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-secondary)">Loading…</td></tr></tbody>
+                            </table>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <div>
+                                    <div class="card-title">IO elements</div>
+                                    <div class="pl-sub">Shown value = raw value × scale. FMB/FMC device family.</div>
+                                </div>
+                                <div class="dp-actions">
+                                    <input type="search" id="dicIoFilter" class="form-input" placeholder="Filter by ID or name" style="width:200px" oninput="dicRenderIo()">
+                                </div>
+                            </div>
+                            <table class="data-table">
+                                <thead><tr><th style="text-align:right">ID</th><th>Name</th><th>Key</th><th>Unit</th><th style="text-align:right">Scale</th><th>Values</th></tr></thead>
+                                <tbody id="dicIo"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- ═══════════════════════════════════════════════════ -->
                     <!-- DATAPROFILER · EVENTS TAB                           -->
                     <!-- ═══════════════════════════════════════════════════ -->
                     <div id="dp-events" class="tab-content dp-page">
@@ -3151,7 +3196,8 @@ dashboard.welcome,Bienvenue</pre>
                 'unit-types': 'DataProfiler · Unit Types',
                 'pipeline': 'DataProfiler · Pipeline',
                 'connections': 'DataProfiler · Connections',
-                'dp-events': 'DataProfiler · Events'
+                'dp-events': 'DataProfiler · Events',
+                'dictionary': 'DataProfiler · Dictionary'
             };
             document.getElementById('pageTitle').textContent = titles[tabName];
 
@@ -3173,6 +3219,7 @@ dashboard.welcome,Bienvenue</pre>
             plSetAutoRefresh(tabName === 'pipeline');
             cnSetAutoRefresh(tabName === 'connections');
             if (tabName === 'dp-events') { evInit(); }
+            if (tabName === 'dictionary') { dicRender(); }
         }
 
         // ── BLE TAGS ─────────────────────────────────────────────────────────
@@ -4890,6 +4937,49 @@ dashboard.welcome,Bienvenue</pre>
         }
 
         // ─────────────────────────────────────────────────────────────────────
+        // DATAPROFILER · DICTIONARY
+        // ─────────────────────────────────────────────────────────────────────
+        let _dic = null;
+
+        async function dicLoad() {
+            if (!_dic) {
+                try { _dic = await dpApi('/dictionary'); }
+                catch (_) { return { events: [], io_elements: [] }; }
+            }
+            return _dic;
+        }
+
+        const DIC_KIND_BADGE = { trip: 'badge-success', position: 'badge-info', alert: 'badge-danger', info: 'badge-warning' };
+
+        async function dicRender() {
+            const d = await dicLoad();
+            document.getElementById('dicEvents').innerHTML = d.events.length ? d.events.map(e => `
+                <tr>
+                    <td><strong>${dpEsc(e.label)}</strong></td>
+                    <td><code>${dpEsc(e.code)}</code></td>
+                    <td>${dpEsc(e.category_label)}</td>
+                    <td><span class="badge ${DIC_KIND_BADGE[e.kind] || 'badge-info'}">${dpEsc(e.kind)}</span></td>
+                    <td style="font-size:12px">${dpEsc(e.source)}</td>
+                </tr>`).join('')
+                : '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-secondary)">Dictionary unavailable.</td></tr>';
+            dicRenderIo();
+        }
+
+        function dicRenderIo() {
+            const q = (document.getElementById('dicIoFilter').value || '').trim().toLowerCase();
+            const rows = (_dic?.io_elements || []).filter(x => !q || String(x.id) === q || x.name.toLowerCase().includes(q) || x.key.includes(q));
+            document.getElementById('dicIo').innerHTML = rows.map(x => `
+                <tr>
+                    <td style="text-align:right;font-family:monospace">${x.id}</td>
+                    <td>${dpEsc(x.name)}</td>
+                    <td><code>${dpEsc(x.key)}</code></td>
+                    <td>${dpEsc(x.unit || '—')}</td>
+                    <td style="text-align:right">${x.scale ?? '—'}</td>
+                    <td style="font-size:12px">${Object.entries(x.values || {}).map(([k, v]) => `${dpEsc(k)} = ${dpEsc(v)}`).join(' · ') || '—'}</td>
+                </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-secondary)">No matches.</td></tr>';
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
         // DATAPROFILER · EVENTS (raw + processed browser)
         // ─────────────────────────────────────────────────────────────────────
         let evMode = 'raw';
@@ -4897,9 +4987,9 @@ dashboard.welcome,Bienvenue</pre>
         let evNext = null;
 
         async function evInit() {
-            const types = await _dpLoadEventTypes();
+            const dict = await dicLoad();
             document.getElementById('evType').innerHTML = '<option value="">All event types</option>' +
-                types.map(t => `<option value="${dpEsc(t.key)}">${dpEsc(t.label)}</option>`).join('');
+                (dict.events || []).map(e => `<option value="${dpEsc(e.code)}">${dpEsc(e.label)}</option>`).join('');
             try {
                 const conn = await dpApi('/connections');
                 document.getElementById('evImeiList').innerHTML = conn.devices
@@ -4980,18 +5070,19 @@ dashboard.welcome,Bienvenue</pre>
             } else {
                 head.innerHTML = '<tr><th>Device time</th><th>IMEI</th><th>Event</th><th>Position</th><th style="text-align:right">Speed</th><th style="text-align:right">Sats</th><th>IO elements</th><th>Delivery</th></tr>';
                 body.innerHTML = evRows.length ? evRows.map(r => {
-                    const io = Object.entries(r.io || {}).map(([k, v]) => `<span style="white-space:nowrap">${dpEsc(k)}=${dpEsc(v)}</span>`).join(' ');
+                    const io = (r.io_named || []).map(x =>
+                        `<span style="white-space:nowrap" title="IO ${x.id} = ${dpEsc(x.value)}">${dpEsc(x.name)}: <strong>${dpEsc(x.display)}</strong></span>`).join(' · ');
                     const delivery = !r.visible ? '<span style="color:var(--text-secondary)">Hidden by package</span>'
                         : r.delivered ? '<span class="badge badge-success">delivered</span>' : '<span class="badge badge-info">queued</span>';
                     return `
                     <tr>
                         <td style="white-space:nowrap">${fmt(r.recorded_at)}<div style="font-size:11px;color:var(--text-secondary)">received ${fmt(r.received_at)}</div></td>
                         <td style="font-family:monospace">${dpEsc(r.imei)}</td>
-                        <td>${dpEsc(r.event_type || 'unmapped')}<div style="font-size:11px;color:var(--text-secondary)">IO ${r.event_io_id}</div></td>
+                        <td>${dpEsc(r.event_label || r.event_type || 'unmapped')}<div style="font-size:11px;color:var(--text-secondary)">${dpEsc(r.event_type || '—')} · IO ${r.event_io_id}</div></td>
                         <td style="white-space:nowrap">${r.latitude != null ? `${r.latitude.toFixed(5)}, ${r.longitude.toFixed(5)}` : '<span style="color:var(--text-secondary)">no fix</span>'}</td>
                         <td style="text-align:right">${r.speed ?? '—'} km/h</td>
                         <td style="text-align:right">${r.satellites ?? '—'}</td>
-                        <td style="font-family:monospace;font-size:11px;max-width:320px">${io || '—'}</td>
+                        <td style="font-size:11px;max-width:420px;line-height:1.6">${io || '—'}</td>
                         <td>${delivery}</td>
                     </tr>`;
                 }).join('') : '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-secondary)">No decoded records match these filters.</td></tr>';

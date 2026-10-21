@@ -251,6 +251,23 @@ def list_event_types(request: Request, db: Session = Depends(get_db)):
     return dp.EVENT_TYPES
 
 
+@router.get("/dictionary")
+def dictionary(request: Request, db: Session = Depends(get_db)):
+    """Our event codes (with their Teltonika source and package category) and the IO element dictionary."""
+    from app.dataprofiler.dictionary import CATEGORIES, EVENT_SOURCES, EVENTS, IO_ELEMENTS
+
+    _require(request, db, "viewer")
+    cat_labels = {c["key"]: c["label"] for c in CATEGORIES}
+    return {
+        "events": [{"code": code, "label": label, "category": cat, "category_label": cat_labels.get(cat, cat),
+                    "kind": kind, "source": EVENT_SOURCES.get(code, "")}
+                   for code, (label, cat, kind) in EVENTS.items()],
+        "io_elements": [{"id": io_id, "key": key, "name": name, "unit": unit, "scale": scale,
+                         "values": {str(k): v for k, v in (labels or {}).items()}}
+                        for io_id, (key, name, unit, scale, labels) in sorted(IO_ELEMENTS.items())],
+    }
+
+
 @router.get("/overview")
 def overview(request: Request, db: Session = Depends(get_db)):
     """Platform-wide counts for the DataProfiler header cards (viewer+)."""
@@ -830,8 +847,9 @@ def processed_events(request: Request, db: Session = Depends(get_db),
                      imei: Optional[str] = None, date_from: Optional[datetime] = None,
                      date_to: Optional[datetime] = None, event_type: Optional[str] = None,
                      before_id: Optional[int] = None, limit: int = 100):
-    """Decoded records (newest first), filtered by IMEI, device time and event type."""
+    """Decoded records (newest first), filtered by IMEI, device time and event code."""
     from sqlalchemy import text as _text
+    from app.dataprofiler.dictionary import describe_io, event_label
 
     _require(request, db, "viewer")
     where, params = _event_filters(imei, date_from, date_to, before_id, "recorded_at")
@@ -845,4 +863,6 @@ def processed_events(request: Request, db: Session = Depends(get_db),
             f"angle, satellites, speed, event_io_id, event_type, io, visible, exchange_key, delivered "
             f"FROM events_processed {where} ORDER BY id DESC LIMIT :limit"
         ), params).mappings().all()
-    return {"rows": [dict(r) for r in rows], "next_before_id": rows[-1]["id"] if len(rows) == params["limit"] else None}
+    out = [dict(r, event_label=event_label(r["event_type"], r["event_io_id"]), io_named=describe_io(r["io"] or {}))
+           for r in rows]
+    return {"rows": out, "next_before_id": rows[-1]["id"] if len(rows) == params["limit"] else None}
