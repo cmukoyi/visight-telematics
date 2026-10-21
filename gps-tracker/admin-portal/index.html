@@ -423,6 +423,10 @@
             grid-template-columns: 1fr auto;
             column-gap: 24px;
         }
+        .dp-page .page-header > .page-title,
+        .dp-page .page-header > .page-subtitle {
+            grid-column: 1;
+        }
         .dp-page .page-header > .btn {
             grid-column: 2;
             grid-row: 1 / span 2;
@@ -1048,6 +1052,18 @@
                                 <button class="sidebar-link" onclick="switchTab('unit-types')">
                                     <span>📟</span>
                                     <span>Unit Types</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('connections')">
+                                    <span>🟢</span>
+                                    <span>Connections</span>
+                                </button>
+                            </li>
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('dp-events')">
+                                    <span>🧾</span>
+                                    <span>Events</span>
                                 </button>
                             </li>
                             <li class="sidebar-item">
@@ -2230,8 +2246,8 @@
                                             <th>Label</th>
                                             <th>Unit type</th>
                                             <th>Package</th>
-                                            <th>Status</th>
-                                            <th>First routed</th>
+                                            <th>Routing</th>
+                                            <th>Connection</th>
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
@@ -2461,6 +2477,21 @@
 
                         <div class="card">
                             <div class="card-header">
+                                <div>
+                                    <div class="card-title">Data Exchange queues</div>
+                                    <div class="pl-sub">Decoded events waiting for the customer dashboard to collect them</div>
+                                </div>
+                            </div>
+                            <table class="data-table">
+                                <thead><tr><th>Exchange</th><th style="text-align:right">Waiting</th><th style="text-align:right">In flight</th><th>Dashboard consumer</th></tr></thead>
+                                <tbody id="plExchanges">
+                                    <tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-secondary)">Loading…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
                                 <div class="card-title">Recent failed packets</div>
                             </div>
                             <table class="data-table">
@@ -2469,6 +2500,116 @@
                                     <tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-secondary)">Loading…</td></tr>
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <!-- DATAPROFILER · CONNECTIONS TAB                      -->
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <div id="connections" class="tab-content dp-page">
+                        <div class="page-header">
+                            <h2 class="page-title">Connections</h2>
+                            <p class="page-subtitle">Which registered IMEIs are connected to the GPRS listener right now, and which unregistered IMEIs tried to connect. Refreshes every 10 seconds.</p>
+                            <button class="btn btn-secondary" onclick="cnLoad()">Refresh</button>
+                        </div>
+
+                        <div id="cnAlert" class="alert alert-warning" style="display:none"><span id="cnAlertText"></span></div>
+
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-label">Online now</div>
+                                <div class="stat-value" id="cnOnline">-</div>
+                                <div class="stat-change" id="cnOnlineSub">&nbsp;</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Registered IMEIs</div>
+                                <div class="stat-value" id="cnRegistered">-</div>
+                                <div class="stat-change" id="cnNever">&nbsp;</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Rejected IMEIs (24h)</div>
+                                <div class="stat-value" id="cnRejected">-</div>
+                                <div class="stat-change">Tried to connect, not on the platform</div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-title">Registered devices</div>
+                                <div class="dp-actions">
+                                    <input type="search" id="cnFilter" class="form-input" placeholder="Filter IMEI, label or reseller" style="width:220px" oninput="cnRender()">
+                                </div>
+                            </div>
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Connection</th>
+                                        <th>IMEI</th>
+                                        <th>Label</th>
+                                        <th>Reseller</th>
+                                        <th>Unit type</th>
+                                        <th>Session</th>
+                                        <th style="text-align:right">Packets</th>
+                                        <th style="text-align:right">Records</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cnTable">
+                                    <tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-secondary)">Loading…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <div>
+                                    <div class="card-title">Rejected connections (last 24h)</div>
+                                    <div class="pl-sub">Add these IMEIs to a reseller to let them connect.</div>
+                                </div>
+                            </div>
+                            <table class="data-table">
+                                <thead><tr><th>IMEI</th><th style="text-align:right">Attempts</th><th>Last attempt</th><th>From</th><th>Actions</th></tr></thead>
+                                <tbody id="cnRejectedTable"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <!-- DATAPROFILER · EVENTS TAB                           -->
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <div id="dp-events" class="tab-content dp-page">
+                        <div class="page-header">
+                            <h2 class="page-title">Events</h2>
+                            <p class="page-subtitle">Raw packets exactly as received, and the records decoded from them. DataProfiler keeps the last 30 days.</p>
+                        </div>
+
+                        <div id="evAlert" class="alert alert-danger" style="display:none"><span id="evAlertText"></span></div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="dp-actions">
+                                    <button class="btn btn-sm btn-primary" id="evModeRaw" style="transition:none" onclick="evSetMode('raw')">Raw</button>
+                                    <button class="btn btn-sm btn-secondary" id="evModeProcessed" style="transition:none" onclick="evSetMode('processed')">Processed</button>
+                                </div>
+                                <form class="dp-actions" onsubmit="event.preventDefault(); evLoad()">
+                                    <input type="search" id="evImei" class="form-input" placeholder="IMEI" list="evImeiList" style="width:170px;font-family:monospace">
+                                    <datalist id="evImeiList"></datalist>
+                                    <label style="font-size:12px;color:var(--text-secondary)">From</label>
+                                    <input type="datetime-local" id="evFrom" class="form-input">
+                                    <label style="font-size:12px;color:var(--text-secondary)">To</label>
+                                    <input type="datetime-local" id="evTo" class="form-input">
+                                    <select id="evType" class="form-input" style="display:none"><option value="">All event types</option></select>
+                                    <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="evReset()">Reset</button>
+                                </form>
+                            </div>
+                            <table class="data-table">
+                                <thead id="evHead"></thead>
+                                <tbody id="evBody"></tbody>
+                            </table>
+                            <div style="display:flex;justify-content:center;padding-top:12px">
+                                <button class="btn btn-sm btn-secondary" id="evMore" style="display:none" onclick="evLoad(true)">Load older</button>
+                            </div>
                         </div>
                     </div>
 
@@ -4254,7 +4395,9 @@ dashboard.welcome,Bienvenue</pre>
                 'jobs': 'Background Jobs',
                 'resellers': 'DataProfiler · Resellers',
                 'unit-types': 'DataProfiler · Unit Types',
-                'pipeline': 'DataProfiler · Pipeline'
+                'pipeline': 'DataProfiler · Pipeline',
+                'connections': 'DataProfiler · Connections',
+                'dp-events': 'DataProfiler · Events'
             };
             document.getElementById('pageTitle').textContent = titles[tabName];
 
@@ -4288,6 +4431,8 @@ dashboard.welcome,Bienvenue</pre>
             if (tabName === 'resellers') { dpLoad(); }
             if (tabName === 'unit-types') { utLoad(); }
             plSetAutoRefresh(tabName === 'pipeline');
+            cnSetAutoRefresh(tabName === 'connections');
+            if (tabName === 'dp-events') { evInit(); }
         }
 
         // ── BLE TAGS ─────────────────────────────────────────────────────────
@@ -5813,6 +5958,24 @@ dashboard.welcome,Bienvenue</pre>
             return `<span class="badge ${cls}">${dpEsc(status)}</span>`;
         }
 
+        function dpAgo(ts) {
+            if (!ts) return '';
+            const s = Math.max(0, Math.round((Date.now() - new Date(ts).getTime()) / 1000));
+            if (s < 60) return `${s}s ago`;
+            if (s < 3600) return `${Math.round(s / 60)} min ago`;
+            if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+            return `${Math.round(s / 86400)} d ago`;
+        }
+
+        // Connection state: a colored dot always paired with a text label.
+        function dpConn(online, lastPacketAt, labels = { on: 'Online', off: 'Offline', never: 'Never connected' }) {
+            if (online == null) return '<span style="color:var(--text-secondary)">—</span>';
+            const label = online ? labels.on : (lastPacketAt ? labels.off : labels.never);
+            const color = online ? '#1baf7a' : '#9aa5ab';
+            const sub = lastPacketAt ? `<div style="font-size:11px;color:var(--text-secondary)">last data ${dpAgo(lastPacketAt)}</div>` : '';
+            return `<span style="display:inline-flex;align-items:center;gap:6px"><i style="width:8px;height:8px;border-radius:50%;background:${color};display:inline-block"></i>${label}</span>${sub}`;
+        }
+
         async function dpLoad() {
             try {
                 const [overview, resellers, packages, groups, unitTypes] = await Promise.all([
@@ -5940,7 +6103,7 @@ dashboard.welcome,Bienvenue</pre>
                     <td>${dpEsc(d.unit_type_name || '—')}</td>
                     <td>${dpEsc(d.package_name || '—')}${d.package_id ? '' : ' <span style="font-size:11px;color:var(--text-secondary)">(default)</span>'}</td>
                     <td>${dpStatusBadge(d.status)}${d.status_detail ? `<div style="font-size:11px;color:var(--text-secondary)">${dpEsc(d.status_detail)}</div>` : ''}</td>
-                    <td>${d.first_routed_at ? new Date(d.first_routed_at).toLocaleString() : '—'}</td>
+                    <td>${dpConn(d.online, d.last_packet_at)}</td>
                     <td><button class="btn btn-sm btn-secondary" onclick="dpRemoveDevice('${d.id}', '${dpEsc(d.imei)}')">Remove</button></td>
                 </tr>`).join('');
         }
@@ -6151,10 +6314,24 @@ dashboard.welcome,Bienvenue</pre>
                 : `${q.consumers} writer${q.consumers === 1 ? '' : 's'} · ${q.ack_rate}/s written`;
             document.getElementById('plBacklog').textContent = ev.error ? '—' : t.backlog;
             document.getElementById('plBacklogSub').textContent = ev.error ? '\u00a0'
-                : `${plFmtAge(t.oldest_new_s)} · ${t.forward_backlog} to forward`;
+                : `${plFmtAge(t.oldest_new_s)} · ${t.delivery_backlog} awaiting delivery`;
             document.getElementById('plFailed').textContent = ev.error ? '—' : t.failed_24h;
             document.getElementById('plFailedSub').textContent = ev.error ? '\u00a0'
                 : `${t.unsupported_24h} unsupported codec`;
+
+            const exq = q.exchanges || [];
+            const names = Object.fromEntries((typeof dpResellers !== 'undefined' ? dpResellers : [])
+                .filter(r => r.exchange).map(r => [r.exchange.exchange_key, r.name]));
+            document.getElementById('plExchanges').innerHTML = q.error
+                ? '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-secondary)">Queue unavailable</td></tr>'
+                : exq.length ? exq.map(x => `
+                    <tr>
+                        <td><code>${dpEsc(x.exchange_key)}</code>${names[x.exchange_key] ? ` <span style="color:var(--text-secondary)">· ${dpEsc(names[x.exchange_key])}</span>` : ''}</td>
+                        <td style="text-align:right">${x.ready}</td>
+                        <td style="text-align:right">${x.unacked}</td>
+                        <td>${dpConn(x.consumers > 0, null, { on: 'Consuming', never: 'Not consuming' })}</td>
+                    </tr>`).join('')
+                : '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-secondary)">No exchange queues yet — they appear once a linked device sends visible events.</td></tr>';
 
             plSeries = ev.series || [];
             plRenderChart();
@@ -6250,6 +6427,190 @@ dashboard.welcome,Bienvenue</pre>
             viz.style.display = showTable ? 'none' : '';
             document.getElementById('plTableToggle').textContent = showTable ? 'View as chart' : 'View as table';
             if (!showTable) plRenderChart();
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // DATAPROFILER · CONNECTIONS
+        // ─────────────────────────────────────────────────────────────────────
+        let cnTimer = null;
+        let cnData = { devices: [], rejected: [] };
+
+        function cnSetAutoRefresh(on) {
+            clearInterval(cnTimer);
+            cnTimer = null;
+            if (on) { cnLoad(); cnTimer = setInterval(cnLoad, 10000); }
+        }
+
+        async function cnLoad() {
+            try {
+                cnData = await dpApi('/connections');
+                document.getElementById('cnAlert').style.display = 'none';
+            } catch (e) {
+                document.getElementById('cnAlertText').textContent = e.message;
+                document.getElementById('cnAlert').style.display = 'block';
+                return;
+            }
+            const devices = cnData.devices;
+            const online = devices.filter(d => d.online).length;
+            const never = devices.filter(d => !d.connected_at).length;
+            document.getElementById('cnOnline').textContent = online;
+            document.getElementById('cnOnlineSub').textContent = `of ${devices.length} registered`;
+            document.getElementById('cnRegistered').textContent = devices.length;
+            document.getElementById('cnNever').textContent = `${never} never connected`;
+            document.getElementById('cnRejected').textContent = cnData.rejected.length;
+            cnRender();
+        }
+
+        function cnRender() {
+            const q = (document.getElementById('cnFilter').value || '').trim().toLowerCase();
+            const rows = q ? cnData.devices.filter(d => [d.imei, d.label, d.reseller_name].some(v => (v || '').toLowerCase().includes(q)))
+                           : cnData.devices;
+            const tb = document.getElementById('cnTable');
+            tb.innerHTML = rows.length ? rows.map(d => {
+                const session = d.online
+                    ? `since ${new Date(d.connected_at).toLocaleString()}<div style="font-size:11px;color:var(--text-secondary)">${dpEsc(d.remote_addr || '')}</div>`
+                    : d.disconnected_at
+                        ? `ended ${dpAgo(d.disconnected_at)}<div style="font-size:11px;color:var(--text-secondary)">${dpEsc(d.close_reason || '')}</div>`
+                        : '<span style="color:var(--text-secondary)">—</span>';
+                return `
+                <tr>
+                    <td>${dpConn(d.online, d.last_packet_at)}</td>
+                    <td style="font-family:monospace">${dpEsc(d.imei)}</td>
+                    <td>${dpEsc(d.label || '—')}</td>
+                    <td>${dpEsc(d.reseller_name)}</td>
+                    <td>${dpEsc(d.unit_type_name || '—')}</td>
+                    <td>${session}</td>
+                    <td style="text-align:right">${d.packets}</td>
+                    <td style="text-align:right">${d.records}</td>
+                    <td><button class="btn btn-sm btn-secondary" onclick="evOpenFor('${dpEsc(d.imei)}')">Events</button></td>
+                </tr>`;
+            }).join('') : `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-secondary)">${cnData.devices.length ? 'No matches.' : 'No IMEIs registered yet — add them under Resellers.'}</td></tr>`;
+
+            document.getElementById('cnRejectedTable').innerHTML = cnData.rejected.length ? cnData.rejected.map(r => `
+                <tr>
+                    <td style="font-family:monospace">${dpEsc(r.imei)}</td>
+                    <td style="text-align:right">${r.attempts}</td>
+                    <td>${dpAgo(r.last_attempt_at)}</td>
+                    <td>${dpEsc(r.remote_addr || '—')}</td>
+                    <td><button class="btn btn-sm btn-secondary" onclick="dpCopy('${dpEsc(r.imei)}')">Copy IMEI</button></td>
+                </tr>`).join('')
+                : '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-secondary)">No rejected connections.</td></tr>';
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // DATAPROFILER · EVENTS (raw + processed browser)
+        // ─────────────────────────────────────────────────────────────────────
+        let evMode = 'raw';
+        let evRows = [];
+        let evNext = null;
+
+        async function evInit() {
+            const types = await _dpLoadEventTypes();
+            document.getElementById('evType').innerHTML = '<option value="">All event types</option>' +
+                types.map(t => `<option value="${dpEsc(t.key)}">${dpEsc(t.label)}</option>`).join('');
+            try {
+                const conn = await dpApi('/connections');
+                document.getElementById('evImeiList').innerHTML = conn.devices
+                    .map(d => `<option value="${dpEsc(d.imei)}">${dpEsc(d.label || d.reseller_name)}</option>`).join('');
+            } catch (_) { /* suggestions are optional */ }
+            evLoad();
+        }
+
+        function evOpenFor(imei) {
+            document.getElementById('evImei').value = imei;
+            const link = [...document.querySelectorAll('.sidebar-link')].find(b => b.getAttribute('onclick') === "switchTab('dp-events')");
+            link.click();
+        }
+
+        function evSetMode(mode) {
+            evMode = mode;
+            document.getElementById('evModeRaw').className = `btn btn-sm ${mode === 'raw' ? 'btn-primary' : 'btn-secondary'}`;
+            document.getElementById('evModeProcessed').className = `btn btn-sm ${mode === 'processed' ? 'btn-primary' : 'btn-secondary'}`;
+            document.getElementById('evType').style.display = mode === 'processed' ? '' : 'none';
+            evLoad();
+        }
+
+        function evReset() {
+            ['evImei', 'evFrom', 'evTo', 'evType'].forEach(id => { document.getElementById(id).value = ''; });
+            evLoad();
+        }
+
+        async function evLoad(older = false) {
+            const params = new URLSearchParams({ limit: '100' });
+            const imei = document.getElementById('evImei').value.trim();
+            const from = document.getElementById('evFrom').value;
+            const to = document.getElementById('evTo').value;
+            const type = document.getElementById('evType').value;
+            if (imei) params.set('imei', imei);
+            if (from) params.set('date_from', new Date(from).toISOString());
+            if (to) params.set('date_to', new Date(to).toISOString());
+            if (evMode === 'processed' && type) params.set('event_type', type);
+            if (older && evNext) params.set('before_id', evNext);
+            try {
+                const out = await dpApi(`/events/${evMode}?${params}`);
+                evRows = older ? evRows.concat(out.rows) : out.rows;
+                evNext = out.next_before_id;
+                document.getElementById('evAlert').style.display = 'none';
+            } catch (e) {
+                document.getElementById('evAlertText').textContent = e.message;
+                document.getElementById('evAlert').style.display = 'block';
+                evRows = [];
+                evNext = null;
+            }
+            evRender();
+        }
+
+        function evRender() {
+            const head = document.getElementById('evHead'), body = document.getElementById('evBody');
+            document.getElementById('evMore').style.display = evNext ? '' : 'none';
+            const fmt = ts => ts ? new Date(ts).toLocaleString() : '—';
+            if (evMode === 'raw') {
+                head.innerHTML = '<tr><th>Received</th><th>IMEI</th><th>Codec</th><th style="text-align:right">Records</th><th style="text-align:right">Bytes</th><th>Status</th><th>Payload (hex)</th></tr>';
+                body.innerHTML = evRows.length ? evRows.map((r, i) => `
+                    <tr>
+                        <td style="white-space:nowrap">${fmt(r.received_at)}</td>
+                        <td style="font-family:monospace">${dpEsc(r.imei)}</td>
+                        <td><code>0x${r.codec.toString(16).toUpperCase().padStart(2, '0')}</code></td>
+                        <td style="text-align:right">${r.record_count}</td>
+                        <td style="text-align:right">${r.payload_bytes}</td>
+                        <td><span class="badge ${({decoded: 'badge-success', new: 'badge-info', failed: 'badge-danger'})[r.status] || 'badge-warning'}">${dpEsc(r.status)}</span>${r.error ? `<div style="font-size:11px;color:var(--text-secondary)">${dpEsc(r.error)}</div>` : ''}</td>
+                        <td style="max-width:420px">
+                            <div class="dp-actions" style="flex-wrap:nowrap">
+                                <code id="evHex${i}" style="font-size:11px;word-break:break-all;display:block;max-height:3.2em;overflow:hidden">${dpEsc(r.payload_hex)}</code>
+                            </div>
+                            <div class="dp-actions" style="margin-top:4px">
+                                <button class="btn btn-sm btn-secondary" onclick="evToggleHex(${i}, this)">Expand</button>
+                                <button class="btn btn-sm btn-secondary" onclick="dpCopy(evRows[${i}].payload_hex)">Copy</button>
+                            </div>
+                        </td>
+                    </tr>`).join('')
+                    : '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-secondary)">No raw packets match these filters.</td></tr>';
+            } else {
+                head.innerHTML = '<tr><th>Device time</th><th>IMEI</th><th>Event</th><th>Position</th><th style="text-align:right">Speed</th><th style="text-align:right">Sats</th><th>IO elements</th><th>Delivery</th></tr>';
+                body.innerHTML = evRows.length ? evRows.map(r => {
+                    const io = Object.entries(r.io || {}).map(([k, v]) => `<span style="white-space:nowrap">${dpEsc(k)}=${dpEsc(v)}</span>`).join(' ');
+                    const delivery = !r.visible ? '<span style="color:var(--text-secondary)">Hidden by package</span>'
+                        : r.delivered ? '<span class="badge badge-success">delivered</span>' : '<span class="badge badge-info">queued</span>';
+                    return `
+                    <tr>
+                        <td style="white-space:nowrap">${fmt(r.recorded_at)}<div style="font-size:11px;color:var(--text-secondary)">received ${fmt(r.received_at)}</div></td>
+                        <td style="font-family:monospace">${dpEsc(r.imei)}</td>
+                        <td>${dpEsc(r.event_type || 'unmapped')}<div style="font-size:11px;color:var(--text-secondary)">IO ${r.event_io_id}</div></td>
+                        <td style="white-space:nowrap">${r.latitude != null ? `${r.latitude.toFixed(5)}, ${r.longitude.toFixed(5)}` : '<span style="color:var(--text-secondary)">no fix</span>'}</td>
+                        <td style="text-align:right">${r.speed ?? '—'} km/h</td>
+                        <td style="text-align:right">${r.satellites ?? '—'}</td>
+                        <td style="font-family:monospace;font-size:11px;max-width:320px">${io || '—'}</td>
+                        <td>${delivery}</td>
+                    </tr>`;
+                }).join('') : '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-secondary)">No decoded records match these filters.</td></tr>';
+            }
+        }
+
+        function evToggleHex(i, btn) {
+            const el = document.getElementById(`evHex${i}`);
+            const expanded = el.style.maxHeight === 'none';
+            el.style.maxHeight = expanded ? '3.2em' : 'none';
+            btn.textContent = expanded ? 'Expand' : 'Collapse';
         }
 
         // ─────────────────────────────────────────────────────────────────────

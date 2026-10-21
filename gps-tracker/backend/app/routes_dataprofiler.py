@@ -183,6 +183,8 @@ class DeviceOut(_UUIDOut):
     first_routed_at: Optional[datetime] = None
     last_event_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
+    online: Optional[bool] = None            # None = events store unavailable
+    last_packet_at: Optional[datetime] = None
 
 
 def _package_names(db: Session) -> dict:
@@ -501,7 +503,16 @@ def list_devices(reseller_id: str, request: Request, db: Session = Depends(get_d
     r = _get_reseller(db, reseller_id)
     pkg_names = _package_names(db)
     devices = db.query(ResellerDevice).filter(ResellerDevice.reseller_id == r.id).order_by(ResellerDevice.imei).all()
-    return [_device_out(d, pkg_names, r) for d in devices]
+    sessions = _latest_sessions([d.imei for d in devices])
+    out = []
+    for d in devices:
+        row = _device_out(d, pkg_names, r)
+        if sessions is not None:
+            sess = sessions.get(d.imei)
+            row.online = bool(sess and sess["disconnected_at"] is None)
+            row.last_packet_at = sess["last_packet_at"] if sess else None
+        out.append(row)
+    return out
 
 
 @router.post("/resellers/{reseller_id}/devices")
@@ -610,11 +621,12 @@ def _queue_stats() -> dict:
         return {"error": "RABBITMQ_PASSWORD not set"}
     base, user, password = mgmt
     try:
-        res = httpx.get(f"{base}/queues/%2F/{dp_config.RAW_QUEUE}", auth=(user, password), timeout=3)
+        res = httpx.get(f"{base}/queues/%2F", auth=(user, password), timeout=3)
         res.raise_for_status()
-        q = res.json()
+        queues = {q["name"]: q for q in res.json()}
     except Exception as exc:
         return {"error": f"RabbitMQ unavailable: {exc.__class__.__name__}"}
+    q = queues.get(dp_config.RAW_QUEUE, {})
     stats = q.get("message_stats", {})
     return {
         "ready": q.get("messages_ready", 0),
@@ -622,6 +634,13 @@ def _queue_stats() -> dict:
         "consumers": q.get("consumers", 0),
         "publish_rate": round(stats.get("publish_details", {}).get("rate", 0.0), 2),
         "ack_rate": round(stats.get("ack_details", {}).get("rate", 0.0), 2),
+        # One durable queue per Data Exchange, drained by the dashboard ingest consumer
+        "exchanges": sorted(({
+            "exchange_key": name[len("dp.exchange."):],
+            "ready": eq.get("messages_ready", 0),
+            "unacked": eq.get("messages_unacknowledged", 0),
+            "consumers": eq.get("consumers", 0),
+        } for name, eq in queues.items() if name.startswith("dp.exchange.")), key=lambda x: x["exchange_key"]),
     }
 
 
@@ -635,7 +654,8 @@ _PIPELINE_SQL = {
           (SELECT count(*) FROM events_incoming WHERE status = 'failed' AND received_at > now() - interval '24 hours') AS failed_24h,
           (SELECT count(*) FROM events_incoming WHERE status = 'unsupported' AND received_at > now() - interval '24 hours') AS unsupported_24h,
           (SELECT count(DISTINCT imei) FROM events_incoming WHERE received_at > now() - interval '10 minutes') AS active_devices_10m,
-          (SELECT count(*) FROM events_processed WHERE visible AND NOT forwarded) AS forward_backlog
+          (SELECT count(*) FROM events_processed WHERE visible AND NOT delivered) AS delivery_backlog,
+          (SELECT count(*) FROM device_sessions WHERE disconnected_at IS NULL) AS online_devices
     """,
     "received": """
         SELECT date_trunc('minute', received_at) AS m, sum(record_count) AS n
@@ -683,3 +703,146 @@ def pipeline_stats(request: Request, db: Session = Depends(get_db)):
     """Ingest pipeline health for the Pipeline page (viewer+)."""
     _require(request, db, "viewer")
     return {"queue": _queue_stats(), "events": _events_stats()}
+
+
+
+# ---------------------------------------------------------------------------
+# Connections (online devices) and event browsing — read from the events store
+# ---------------------------------------------------------------------------
+
+def _events_engine_or_none():
+    from app.dataprofiler import config as dp_config
+    from app.dataprofiler.events_db import get_engine
+
+    url = dp_config.events_db_url(required=False)
+    return get_engine(url) if url else None
+
+
+def _events_engine():
+    engine = _events_engine_or_none()
+    if engine is None:
+        raise HTTPException(status_code=503, detail="Events store not configured (EVENTS_DB_PASSWORD not set)")
+    return engine
+
+
+def _latest_sessions(imeis: Optional[list] = None) -> Optional[dict]:
+    """Most recent session per IMEI, or None if the events store is unreachable."""
+    from sqlalchemy import text as _text
+
+    engine = _events_engine_or_none()
+    if engine is None:
+        return None
+    sql = ("SELECT DISTINCT ON (imei) imei, remote_addr, connected_at, last_packet_at, packets, records, "
+           "disconnected_at, close_reason FROM device_sessions {where} ORDER BY imei, connected_at DESC")
+    try:
+        with engine.connect() as conn:
+            if imeis is None:
+                rows = conn.execute(_text(sql.format(where="")))
+            elif not imeis:
+                return {}
+            else:
+                rows = conn.execute(_text(sql.format(where="WHERE imei = ANY(:imeis)")), {"imeis": list(imeis)})
+            return {r["imei"]: dict(r) for r in rows.mappings()}
+    except Exception:
+        return None
+
+
+@router.get("/connections")
+def connections(request: Request, db: Session = Depends(get_db)):
+    """Every registered IMEI with its online state, plus rejected (unregistered) IMEIs in the last 24h."""
+    from sqlalchemy import text as _text
+
+    _require(request, db, "viewer")
+    engine = _events_engine()
+    sessions = _latest_sessions()
+    if sessions is None:
+        raise HTTPException(status_code=503, detail="Events store unavailable")
+
+    devices = (db.query(ResellerDevice, Reseller.name)
+               .join(Reseller, Reseller.id == ResellerDevice.reseller_id).all())
+    out = []
+    for d, reseller_name in devices:
+        sess = sessions.get(d.imei) or {}
+        out.append({
+            "imei": d.imei, "label": d.label, "reseller_id": str(d.reseller_id), "reseller_name": reseller_name,
+            "unit_type_name": d.unit_type.name if d.unit_type else None, "routing_status": d.status,
+            "online": bool(sess) and sess.get("disconnected_at") is None,
+            "connected_at": sess.get("connected_at"), "last_packet_at": sess.get("last_packet_at"),
+            "disconnected_at": sess.get("disconnected_at"), "remote_addr": sess.get("remote_addr"),
+            "packets": sess.get("packets", 0), "records": sess.get("records", 0),
+            "close_reason": sess.get("close_reason"),
+        })
+    def _activity(x):
+        ts = x["last_packet_at"] or x["connected_at"]
+        return ts.timestamp() if ts else 0
+
+    out.sort(key=lambda x: (not x["online"], -_activity(x), x["imei"]))  # online first, then most recent
+
+    with engine.connect() as conn:
+        rejected = [dict(r) for r in conn.execute(_text(
+            "SELECT imei, count(*) AS attempts, max(attempted_at) AS last_attempt_at, "
+            "(array_agg(remote_addr ORDER BY attempted_at DESC))[1] AS remote_addr "
+            "FROM rejected_connections WHERE attempted_at > now() - interval '24 hours' "
+            "GROUP BY imei ORDER BY max(attempted_at) DESC LIMIT 50"
+        )).mappings()]
+    return {"devices": out, "rejected": rejected}
+
+
+def _event_filters(imei: Optional[str], date_from: Optional[datetime], date_to: Optional[datetime],
+                   before_id: Optional[int], time_col: str) -> tuple[str, dict]:
+    clauses, params = [], {}
+    if imei:
+        clauses.append("imei = :imei")
+        params["imei"] = imei.strip()
+    if date_from:
+        clauses.append(f"{time_col} >= :date_from")
+        params["date_from"] = date_from
+    if date_to:
+        clauses.append(f"{time_col} < :date_to")
+        params["date_to"] = date_to
+    if before_id:
+        clauses.append("id < :before_id")
+        params["before_id"] = before_id
+    return ("WHERE " + " AND ".join(clauses)) if clauses else "", params
+
+
+@router.get("/events/raw")
+def raw_events(request: Request, db: Session = Depends(get_db),
+               imei: Optional[str] = None, date_from: Optional[datetime] = None,
+               date_to: Optional[datetime] = None, before_id: Optional[int] = None, limit: int = 100):
+    """Raw packets as received (newest first), filtered by IMEI and received time."""
+    from sqlalchemy import text as _text
+
+    _require(request, db, "viewer")
+    where, params = _event_filters(imei, date_from, date_to, before_id, "received_at")
+    params["limit"] = max(1, min(limit, 500))
+    with _events_engine().connect() as conn:
+        rows = conn.execute(_text(
+            f"SELECT id, received_at, imei, codec, record_count, remote_addr, status, error, decoded_at, "
+            f"encode(payload, 'hex') AS payload_hex, length(payload) AS payload_bytes "
+            f"FROM events_incoming {where} ORDER BY id DESC LIMIT :limit"
+        ), params).mappings().all()
+    return {"rows": [dict(r) for r in rows], "next_before_id": rows[-1]["id"] if len(rows) == params["limit"] else None}
+
+
+@router.get("/events/processed")
+def processed_events(request: Request, db: Session = Depends(get_db),
+                     imei: Optional[str] = None, date_from: Optional[datetime] = None,
+                     date_to: Optional[datetime] = None, event_type: Optional[str] = None,
+                     before_id: Optional[int] = None, limit: int = 100):
+    """Decoded records (newest first), filtered by IMEI, device time and event type."""
+    from sqlalchemy import text as _text
+
+    _require(request, db, "viewer")
+    where, params = _event_filters(imei, date_from, date_to, before_id, "recorded_at")
+    if event_type:
+        where += (" AND " if where else "WHERE ") + "event_type = :event_type"
+        params["event_type"] = event_type
+    params["limit"] = max(1, min(limit, 500))
+    with _events_engine().connect() as conn:
+        rows = conn.execute(_text(
+            f"SELECT id, incoming_id, imei, recorded_at, received_at, priority, latitude, longitude, altitude, "
+            f"angle, satellites, speed, event_io_id, event_type, io, visible, exchange_key, delivered "
+            f"FROM events_processed {where} ORDER BY id DESC LIMIT :limit"
+        ), params).mappings().all()
+    return {"rows": [dict(r) for r in rows], "next_before_id": rows[-1]["id"] if len(rows) == params["limit"] else None}

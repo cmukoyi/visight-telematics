@@ -2,10 +2,15 @@
 
     python -m app.dataprofiler.listener
 
-Only IMEIs registered to an active reseller in DataProfiler are accepted.
-Each AVL packet is CRC-checked, published to RabbitMQ with publisher
-confirms, and only then acknowledged to the device. If anything fails before
-the ACK the device keeps the data and resends it, so nothing is lost.
+Only IMEIs registered to an active reseller in DataProfiler are accepted;
+other attempts are logged as rejected connections. Each AVL packet is
+CRC-checked, published to RabbitMQ with publisher confirms, and only then
+acknowledged to the device. If anything fails before the ACK the device keeps
+the data and resends it, so nothing is lost.
+
+Sessions are recorded in the events store (device_sessions) so the admin
+portal can show which IMEIs are online. Tracking is best-effort and never
+blocks or fails the data path.
 """
 import asyncio
 import logging
@@ -18,6 +23,7 @@ from sqlalchemy import text
 
 from app.database import SessionLocal
 from app.dataprofiler import config
+from app.dataprofiler.events_db import ensure_schema, get_engine
 from app.dataprofiler.teltonika import ProtocolError, frame_avl_packet, parse_avl_header, parse_imei
 
 logger = logging.getLogger("dataprofiler.listener")
@@ -58,16 +64,61 @@ class ImeiRegistry:
         return imei in self._imeis
 
 
+class SessionTracker:
+    """Records sessions and rejected IMEIs in the events store. Never raises."""
+
+    def __init__(self, engine):
+        self.engine = engine
+
+    def _exec(self, sql: str, params: dict):
+        with self.engine.begin() as conn:
+            return conn.execute(text(sql), params)
+
+    async def _run(self, sql: str, params: dict):
+        try:
+            return await asyncio.to_thread(self._exec, sql, params)
+        except Exception:
+            logger.exception("Session tracking write failed")
+            return None
+
+    async def close_stale(self) -> None:
+        """Sessions left open by a previous listener process are no longer connected."""
+        await self._run("UPDATE device_sessions SET disconnected_at = now(), close_reason = 'listener restart' "
+                        "WHERE disconnected_at IS NULL", {})
+
+    async def opened(self, imei: str, remote: str):
+        res = await self._run("INSERT INTO device_sessions (imei, remote_addr) VALUES (:i, :r) RETURNING id",
+                              {"i": imei, "r": remote})
+        return res.scalar() if res is not None else None
+
+    async def packet(self, session_id, records: int) -> None:
+        if session_id is not None:
+            await self._run("UPDATE device_sessions SET last_packet_at = now(), packets = packets + 1, "
+                            "records = records + :n WHERE id = :id", {"n": records, "id": session_id})
+
+    async def closed(self, session_id, reason: str) -> None:
+        if session_id is not None:
+            await self._run("UPDATE device_sessions SET disconnected_at = now(), close_reason = :r WHERE id = :id",
+                            {"r": reason[:64], "id": session_id})
+
+    async def rejected(self, imei: str, remote: str) -> None:
+        await self._run("INSERT INTO rejected_connections (imei, remote_addr) VALUES (:i, :r)",
+                        {"i": imei, "r": remote})
+
+
 class Listener:
-    def __init__(self, registry: ImeiRegistry, exchange: aio_pika.abc.AbstractExchange):
+    def __init__(self, registry: ImeiRegistry, exchange: aio_pika.abc.AbstractExchange, tracker: SessionTracker):
         self.registry = registry
         self.exchange = exchange
+        self.tracker = tracker
         self.sessions = 0
 
     async def handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         peer = writer.get_extra_info("peername")
         remote = f"{peer[0]}:{peer[1]}" if peer else "unknown"
         imei = None
+        session_id = None
+        close_reason = "closed by device"
         self.sessions += 1
         try:
             header = await asyncio.wait_for(reader.readexactly(2), HANDSHAKE_TIMEOUT_S)
@@ -80,9 +131,11 @@ class Listener:
                 logger.warning("Rejected unknown IMEI %s from %s", imei, remote)
                 writer.write(b"\x00")
                 await writer.drain()
+                await self.tracker.rejected(imei, remote)
                 return
             writer.write(b"\x01")
             await writer.drain()
+            session_id = await self.tracker.opened(imei, remote)
             logger.info("Session open: IMEI %s from %s", imei, remote)
 
             while True:
@@ -107,15 +160,20 @@ class Listener:
                 # Publisher confirm received — safe to tell the device we have the records.
                 writer.write(struct.pack(">I", packet.record_count))
                 await writer.drain()
+                await self.tracker.packet(session_id, packet.record_count)
         except (asyncio.IncompleteReadError, ConnectionError):
             pass  # device closed the session
         except asyncio.TimeoutError:
+            close_reason = "idle timeout"
             logger.info("Session idle timeout: IMEI %s", imei)
         except ProtocolError as exc:
+            close_reason = f"protocol error: {exc}"
             logger.warning("Protocol error from IMEI %s (%s): %s", imei, remote, exc)
-        except Exception:
+        except Exception as exc:
+            close_reason = f"error: {exc.__class__.__name__}"
             logger.exception("Session failed: IMEI %s (%s)", imei, remote)
         finally:
+            await self.tracker.closed(session_id, close_reason)
             self.sessions -= 1
             writer.close()
             try:
@@ -132,9 +190,14 @@ async def main() -> None:
     queue = await channel.declare_queue(config.RAW_QUEUE, durable=True)
     await queue.bind(exchange, routing_key=config.RAW_QUEUE)
 
+    engine = get_engine()
+    await asyncio.to_thread(ensure_schema, engine)
+    tracker = SessionTracker(engine)
+    await tracker.close_stale()
+
     registry = ImeiRegistry()
     await registry.refresh()
-    listener = Listener(registry, exchange)
+    listener = Listener(registry, exchange, tracker)
     server = await asyncio.start_server(listener.handle, "0.0.0.0", config.LISTENER_PORT)
     logger.info("GPRS listener on port %d", config.LISTENER_PORT)
     async with server:

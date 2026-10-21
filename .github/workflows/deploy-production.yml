@@ -577,7 +577,7 @@ jobs:
 
             if [[ ",${COMPOSE_PROFILES}," == *",dataprofiler,"* ]]; then
               echo "━━━ Building DataProfiler pipeline services ━━━"
-              docker compose build gprs-listener event-writer event-decoder
+              docker compose build gprs-listener event-writer event-decoder dashboard-ingest
             fi
 
             echo "━━━ Stopping old containers ━━━"

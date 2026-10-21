@@ -229,6 +229,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      events-db:
+        condition: service_healthy
     networks:
       - __TENANT_PREFIX___network
     restart: unless-stopped
@@ -267,7 +269,31 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
       events-db:
+        condition: service_healthy
+    networks:
+      - __TENANT_PREFIX___network
+    restart: unless-stopped
+    logging: *default-logging
+
+  # Customer-dashboard side: drains each linked Data Exchange queue into the
+  # main database (kept permanently). Messages wait in the queue while it's down.
+  dashboard-ingest:
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+    profiles: ["dataprofiler"]
+    container_name: __TENANT_PREFIX___dashboard_ingest
+    env_file:
+      - ./backend/.env
+    entrypoint: []
+    command: python -m app.dataprofiler.dashboard_ingest
+    depends_on:
+      backend:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - __TENANT_PREFIX___network

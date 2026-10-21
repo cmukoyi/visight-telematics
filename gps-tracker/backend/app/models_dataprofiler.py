@@ -5,7 +5,7 @@ to the main UserGroup on the customer dashboard. When a device is routed
 through the exchange it is provisioned on the customer dashboard as a BLETag
 in that group, carrying a TagPackage that sets its validity and visible events.
 """
-from sqlalchemy import Column, String, Boolean, DateTime, Text, ForeignKey, Index, text
+from sqlalchemy import Column, String, Boolean, DateTime, Text, ForeignKey, Index, text, BigInteger, Integer, Float, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -117,3 +117,34 @@ class ResellerDevice(Base):
 
     reseller  = relationship("Reseller", back_populates="devices")
     unit_type = relationship("UnitType")
+
+
+class DeviceEvent(Base):
+    """A decoded device event received from a Data Exchange queue — the customer
+    dashboard's permanent copy (DataProfiler itself keeps 30 days).
+
+    dp_event_id is DataProfiler's events_processed.id; it makes delivery idempotent.
+    """
+    __tablename__ = "device_events"
+    __table_args__ = (
+        Index("ix_device_events_imei_time", "imei", "recorded_at"),
+        Index("ix_device_events_group_time", "usergroup_id", "recorded_at"),
+    )
+
+    id           = Column(BigInteger, primary_key=True, autoincrement=True)
+    dp_event_id  = Column(BigInteger, nullable=False, unique=True)
+    imei         = Column(String(20), nullable=False)
+    usergroup_id = get_uuid_fk_nullable("user_groups.id")
+    recorded_at  = Column(DateTime(timezone=True), nullable=False)
+    received_at  = Column(DateTime(timezone=True), nullable=True)
+    event_type   = Column(String(32), nullable=True)
+    event_io_id  = Column(Integer, nullable=False)
+    priority     = Column(Integer, nullable=True)
+    latitude     = Column(Float, nullable=True)
+    longitude    = Column(Float, nullable=True)
+    altitude     = Column(Integer, nullable=True)
+    angle        = Column(Integer, nullable=True)
+    satellites   = Column(Integer, nullable=True)
+    speed        = Column(Integer, nullable=True)
+    io           = Column(JSON, nullable=True)
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
