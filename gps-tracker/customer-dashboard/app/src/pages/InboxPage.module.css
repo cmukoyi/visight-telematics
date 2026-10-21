@@ -1,0 +1,3 @@
+.root { display: flex; flex-direction: column; padding: var(--mantine-spacing-md); min-height: 0; }
+.body { flex: 1; min-height: 420px; overflow: hidden; position: relative; }
+.unread { font-weight: 650; }

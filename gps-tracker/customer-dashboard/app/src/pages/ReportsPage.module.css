@@ -1,0 +1,9 @@
+.root { display: flex; flex-direction: column; }
+.tabs { flex: 1; display: flex; flex-direction: column; }
+.panel { flex: 1; }
+.card { position: relative; overflow: hidden; transition: border-color 120ms ease, transform 120ms ease; }
+.card:hover { border-color: var(--mantine-color-brand-5); transform: translateY(-1px); }
+.cardBody { display: block; width: 100%; padding: var(--mantine-spacing-md); padding-right: 76px; min-height: 92px; }
+.cardActions { position: absolute; top: 8px; right: 8px; }
+.scheduled { height: max(420px, calc(100dvh - 260px)); overflow: hidden; }
+.result { height: calc(100dvh - 240px); min-height: 320px; overflow: hidden; }

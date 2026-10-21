@@ -2776,8 +2776,10 @@ function showDashboard(user, group, effectiveFeatures) {
 
     // Defer map init so the browser has painted the dashboard container
     // and Leaflet can read real pixel dimensions (avoids 0×0 tile issue on login).
+    // The new app links here with #tab=<name> for pages it doesn't have yet.
+    const linkedTab = (location.hash.match(/tab=([\w-]+)/) || [])[1];
     requestAnimationFrame(() => requestAnimationFrame(() => {
-        switchTab('livemap');
+        switchTab(linkedTab && document.getElementById('tab-' + linkedTab) ? linkedTab : 'livemap');
     }));
     // Pre-load categories so filter bars are populated before user opens Settings
     _fetchCategories();

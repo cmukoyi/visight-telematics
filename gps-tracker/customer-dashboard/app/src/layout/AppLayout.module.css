@@ -1,0 +1,32 @@
+.header { backdrop-filter: blur(8px); }
+.navbar {
+  background: linear-gradient(180deg, var(--mantine-color-dark-8) 0%, var(--mantine-color-dark-9) 100%);
+  border-right: 1px solid var(--mantine-color-dark-6);
+  color: var(--mantine-color-dark-0);
+}
+:global([data-mantine-color-scheme='light']) .navbar {
+  background: linear-gradient(180deg, #0f2347 0%, #0a1830 100%);
+}
+.main {
+  height: 100dvh; box-sizing: border-box;
+  overflow: auto; display: flex; flex-direction: column;
+}
+.main > * { flex: 1 0 auto;
+}
+.brand { padding: 4px 8px; }
+.brandName { font-size: 22px; font-weight: 750; letter-spacing: -0.02em; color: #fff; }
+.navItem {
+  border-radius: var(--mantine-radius-md); color: #c9d4e5; font-weight: 500;
+}
+.navItem:hover { background: rgba(255, 255, 255, 0.06); }
+.navItem[data-active] { background: rgba(62, 124, 251, 0.22); color: #fff; }
+.navItem[data-active] svg { color: #9ebfff; }
+.clock {
+  border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--mantine-radius-md); padding: 10px 12px; color: #fff;
+}
+.clockBig { font-size: 28px; font-weight: 300; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.userButton { cursor: pointer; padding: 4px 8px; border-radius: var(--mantine-radius-md); }
+.userButton:hover { background: var(--mantine-color-default-hover); }
+.userText { max-width: 160px; }
+@media (max-width: 48em) { .userText { display: none; } }

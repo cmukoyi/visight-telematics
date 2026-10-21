@@ -1,0 +1,17 @@
+.page {
+  min-height: 100dvh; display: grid; grid-template-columns: 1.1fr 1fr; align-items: center; gap: 48px;
+  padding: 32px clamp(16px, 6vw, 96px);
+  background:
+    radial-gradient(1200px 600px at 10% 10%, rgba(36, 104, 251, 0.35), transparent 60%),
+    radial-gradient(900px 500px at 90% 90%, rgba(20, 94, 252, 0.25), transparent 60%),
+    linear-gradient(160deg, #0b1830, #071226);
+}
+.brandSide { color: #fff; }
+.brandName { font-size: clamp(36px, 5vw, 64px); font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+.tagline { margin-top: 16px; font-size: 18px; color: #a6b5cc; max-width: 460px; }
+.card { width: 100%; max-width: 420px; justify-self: center; }
+@media (max-width: 48em) {
+  .page { grid-template-columns: 1fr; gap: 24px; }
+  .brandSide { text-align: center; }
+  .tagline { margin-inline: auto; }
+}

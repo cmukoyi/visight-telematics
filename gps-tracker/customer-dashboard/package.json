@@ -1,7 +1,7 @@
 {
   "name": "customer-dashboard",
   "version": "1.0.0",
-  "description": "BLE Tracker Customer Dashboard",
+  "description": "ViSight Track customer dashboard",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

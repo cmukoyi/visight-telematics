@@ -1,0 +1,8 @@
+.mapCard { height: min(58vh, 620px); min-height: 360px; overflow: hidden; }
+.kpi {
+  background: linear-gradient(160deg, var(--mantine-color-body) 0%, var(--mantine-color-default) 100%);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.kpi:hover { transform: translateY(-2px); box-shadow: var(--mantine-shadow-md); }
+.kpiValue { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums; }
+.kpiIcon { color: var(--mantine-color-brand-4); }

@@ -6,7 +6,8 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3001;
 const BACKEND_URL = process.env.BACKEND_URL || 'http://backend:8000/api/v1';
-const publicDir = path.join(__dirname, 'public');
+const publicDir = path.join(__dirname, 'public');   // classic dashboard + shared assets
+const appDir = path.join(__dirname, 'dist');        // the React app (built from app/)
 
 console.log('='.repeat(60));
 console.log('🚀 CUSTOMER DASHBOARD STARTING');
@@ -27,18 +28,22 @@ if (fs.existsSync(publicDir)) {
 }
 console.log('='.repeat(60) + '\n');
 
-// Disable cache for all static files
+// Hashed build assets can be cached forever; everything else is always revalidated.
 app.use((req, res, next) => {
-  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0, post-check=0, pre-check=0');
-  res.set('Pragma', 'no-cache');
-  res.set('Expires', '0');
-  res.set('ETag', `"${Date.now()}"`);
+  if (req.path.startsWith('/static/')) {
+    res.set('Cache-Control', 'public, max-age=31536000, immutable');
+  } else {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+  }
   next();
 });
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(publicDir));
+app.use(express.static(appDir, { index: false }));
+app.use(express.static(publicDir, { index: false }));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -67,7 +72,9 @@ app.get('/api/manifest', (req, res) => {
 // Serve index.html with server-side tenant-specific meta tag injection
 // This ensures social media scrapers (WhatsApp, Facebook, Slack) that don't
 // execute JavaScript see the correct tenant branding in Open Graph meta tags.
-app.get('/', (req, res) => {
+// The classic dashboard, kept for the pages the new app doesn't have yet.
+app.get('/classic', (req, res) => {
+  if (!req.path.endsWith('/')) return res.redirect(302, '/customer/classic/');
   const indexPath = path.join(publicDir, 'index.html');
   
   // Read the HTML file
@@ -150,6 +157,12 @@ app.use('/api', async (req, res) => {
     console.error(`❌ API proxy error: ${error.message}`);
     res.status(500).json({ error: 'Failed to reach backend', backendUrl: BACKEND_URL });
   }
+});
+
+// The React app handles every other page route (/dashboard, /workspace, ...)
+app.get('*', (req, res, next) => {
+  if (path.extname(req.path)) return next();
+  res.sendFile(path.join(appDir, 'index.html'));
 });
 
 // 404 handler

@@ -1,0 +1,15 @@
+html, body, #root { height: 100%; }
+body { margin: 0; -webkit-font-smoothing: antialiased; }
+
+/* Dark mode body = deep navy (dark-7 from the navy palette) */
+[data-mantine-color-scheme='dark'] { --mantine-color-body: #0e1d36; }
+
+/* AG Grid themed to match Mantine (both schemes) */
+.vt-grid { --ag-font-family: inherit; --ag-font-size: 13px; --ag-border-radius: 10px; --ag-wrapper-border-radius: 10px; }
+[data-mantine-color-scheme='dark'] .vt-grid {
+  --ag-background-color: #10203b; --ag-foreground-color: #e6ecf5; --ag-header-background-color: #0b1830;
+  --ag-header-foreground-color: #a6b5cc; --ag-odd-row-background-color: #122441; --ag-row-hover-color: #1a3157;
+  --ag-selected-row-background-color: rgba(62, 124, 251, 0.25); --ag-border-color: #1f3354; --ag-input-border-color: #2f4366;
+  --ag-control-panel-background-color: #0b1830; --ag-menu-background-color: #10203b; --ag-secondary-foreground-color: #a6b5cc;
+}
+.vt-grid .ag-header-cell-text { font-weight: 600; }
