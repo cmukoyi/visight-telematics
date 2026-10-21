@@ -964,6 +964,22 @@
                         </ul>
                     </li>
 
+                    <!-- DATAPROFILER -->
+                    <li class="sidebar-category" id="cat-dataprofiler">
+                        <button class="sidebar-category-header" onclick="toggleCategory('dataprofiler')">
+                            <span><span class="sidebar-category-icon">🔀</span>DataProfiler</span>
+                            <span class="sidebar-category-toggle">▶</span>
+                        </button>
+                        <ul class="sidebar-subcategories">
+                            <li class="sidebar-item">
+                                <button class="sidebar-link" onclick="switchTab('resellers')">
+                                    <span>🤝</span>
+                                    <span>Resellers</span>
+                                </button>
+                            </li>
+                        </ul>
+                    </li>
+
                     <!-- USERS & TENANTS -->
                     <li class="sidebar-category" id="cat-users">
                         <button class="sidebar-category-header" onclick="toggleCategory('users')">
@@ -2002,11 +2018,247 @@
                                         <input type="checkbox" id="pkgSmsAddon" style="width:18px;height:18px;cursor:pointer">
                                         <label class="form-label" style="margin:0;cursor:pointer" for="pkgSmsAddon">📱 SMS Add-on — groups with this package can enable SMS alerts</label>
                                     </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Visible events (DataProfiler devices)</label>
+                                        <p style="font-size:12px;color:var(--text-secondary);margin:0 0 8px">Events forwarded to the customer dashboard for devices on this package. Leave all ticked to show every event.</p>
+                                        <div id="pkgEventTypes" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px 12px"></div>
+                                    </div>
                                     <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:8px">
                                         <button type="button" class="btn btn-secondary" onclick="closeModal('createPackageModal')">Cancel</button>
                                         <button type="submit" class="btn btn-primary" id="pkgSubmitBtn">Create Package</button>
                                     </div>
                                 </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <!-- DATAPROFILER · RESELLERS TAB                        -->
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <div id="resellers" class="tab-content">
+                        <div class="page-header">
+                            <h2 class="page-title">Resellers</h2>
+                            <p class="page-subtitle">Technology providers and their IMEIs. Each reseller has one Data Exchange that routes its devices to a user group on the customer dashboard; packages set how long devices stay active and which events customers see.</p>
+                            <button class="btn btn-primary" onclick="dpOpenResellerModal()">+ New Reseller</button>
+                        </div>
+
+                        <div id="dpAlert" class="alert" style="display:none"><span id="dpAlertText"></span></div>
+
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-label">Resellers</div>
+                                <div class="stat-value" id="dpStatResellers">-</div>
+                                <div class="stat-change" id="dpStatResellersActive">&nbsp;</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Linked Exchanges</div>
+                                <div class="stat-value" id="dpStatLinked">-</div>
+                                <div class="stat-change">Routing to a user group</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Devices Routed</div>
+                                <div class="stat-value" id="dpStatRouted">-</div>
+                                <div class="stat-change" id="dpStatDevices">&nbsp;</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Needs Attention</div>
+                                <div class="stat-value" id="dpStatAttention">-</div>
+                                <div class="stat-change">Pending or conflicting IMEIs</div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-title">All Resellers</div>
+                                <select id="dpResellerSelect" class="form-input" style="max-width:280px" onchange="dpSelectReseller(this.value)">
+                                    <option value="">— Select a reseller —</option>
+                                </select>
+                            </div>
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Reseller</th>
+                                        <th>Provider</th>
+                                        <th>Exchange</th>
+                                        <th>User Group</th>
+                                        <th>Default Package</th>
+                                        <th style="text-align:center">Devices</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dpResellerTable">
+                                    <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-secondary)">Loading…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Selected reseller detail -->
+                        <div id="dpDetail" style="display:none">
+                            <div class="card">
+                                <div class="card-header">
+                                    <div>
+                                        <div class="card-title" id="dpDetailName"></div>
+                                        <div style="font-size:13px;color:var(--text-secondary)" id="dpDetailMeta"></div>
+                                    </div>
+                                    <div style="display:flex;gap:8px">
+                                        <button class="btn btn-secondary btn-small" onclick="dpOpenResellerModal(dpSelected)">Edit</button>
+                                        <button class="btn btn-secondary btn-small" id="dpToggleActiveBtn" onclick="dpToggleActive()">Deactivate</button>
+                                    </div>
+                                </div>
+                                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;font-size:14px" id="dpDetailInfo"></div>
+                            </div>
+
+                            <div class="card">
+                                <div class="card-header">
+                                    <div class="card-title">Data Exchange</div>
+                                    <span id="dpExStatus"></span>
+                                </div>
+                                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;align-items:start">
+                                    <div>
+                                        <div class="form-label">Exchange key</div>
+                                        <div style="display:flex;gap:8px;align-items:center">
+                                            <code id="dpExKey" style="font-size:14px;padding:6px 10px;background:var(--bg-secondary,rgba(127,127,127,.12));border-radius:6px"></code>
+                                            <button class="btn btn-secondary btn-small" onclick="dpCopy(document.getElementById('dpExKey').textContent)">Copy</button>
+                                        </div>
+                                        <p style="font-size:12px;color:var(--text-secondary);margin-top:8px">Customers enter this key and its secret under <em>Settings → Data Exchange</em> on the customer dashboard. The secret is only shown when issued.</p>
+                                        <button class="btn btn-secondary btn-small" onclick="dpRotateSecret()">Issue new secret</button>
+                                    </div>
+                                    <div>
+                                        <div class="form-label">Linked user group</div>
+                                        <div id="dpExLinked" style="margin-bottom:10px"></div>
+                                        <div id="dpExLinkForm" style="display:flex;gap:8px">
+                                            <select id="dpExGroupSelect" class="form-input"></select>
+                                            <button class="btn btn-primary btn-small" onclick="dpLinkExchange()">Link</button>
+                                        </div>
+                                        <button class="btn btn-danger btn-small" id="dpExUnlinkBtn" style="display:none" onclick="dpUnlinkExchange()">Unlink</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card">
+                                <div class="card-header">
+                                    <div class="card-title">Devices <span id="dpDeviceCount" style="color:var(--text-secondary);font-weight:400"></span></div>
+                                    <div style="display:flex;gap:8px">
+                                        <input type="search" id="dpDeviceFilter" class="form-input" placeholder="Filter IMEI or label" style="max-width:200px" oninput="dpRenderDevices()">
+                                        <button class="btn btn-secondary btn-small" onclick="dpReroute()" title="Retry routing for pending devices">Retry routing</button>
+                                        <button class="btn btn-primary btn-small" onclick="dpOpenDevicesModal()">+ Add IMEIs</button>
+                                    </div>
+                                </div>
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>IMEI</th>
+                                            <th>Label</th>
+                                            <th>Model</th>
+                                            <th>Package</th>
+                                            <th>Status</th>
+                                            <th>First routed</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="dpDeviceTable"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Create / Edit Reseller Modal -->
+                        <div id="dpResellerModal" class="modal">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h3 class="modal-title" id="dpResellerModalTitle">New Reseller</h3>
+                                    <button class="modal-close" onclick="closeModal('dpResellerModal')">×</button>
+                                </div>
+                                <div id="dpResellerModalAlert" class="alert alert-danger" style="display:none"><span id="dpResellerModalAlertText"></span></div>
+                                <form onsubmit="dpSubmitReseller(event)">
+                                    <input type="hidden" id="dpResId">
+                                    <div class="form-group">
+                                        <label class="form-label">Name *</label>
+                                        <input type="text" id="dpResName" class="form-input" placeholder="e.g. Acme Telematics" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Code *</label>
+                                        <input type="text" id="dpResCode" class="form-input" placeholder="e.g. acme-telematics" pattern="[a-z0-9][a-z0-9\-]{1,48}[a-z0-9]" required>
+                                        <p style="font-size:12px;color:var(--text-secondary);margin:4px 0 0">Lowercase letters, digits and dashes. Cannot be changed later.</p>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Technology provider</label>
+                                        <select id="dpResProvider" class="form-input">
+                                            <option value="teltonika">Teltonika</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Default package</label>
+                                        <select id="dpResPackage" class="form-input"></select>
+                                        <p style="font-size:12px;color:var(--text-secondary);margin:4px 0 0">Applied to new IMEIs unless a different package is chosen when adding them.</p>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Contact name</label>
+                                        <input type="text" id="dpResContactName" class="form-input">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Contact email</label>
+                                        <input type="email" id="dpResContactEmail" class="form-input">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Contact phone</label>
+                                        <input type="text" id="dpResContactPhone" class="form-input">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Notes</label>
+                                        <textarea id="dpResNotes" class="form-input" rows="2"></textarea>
+                                    </div>
+                                    <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:8px">
+                                        <button type="button" class="btn btn-secondary" onclick="closeModal('dpResellerModal')">Cancel</button>
+                                        <button type="submit" class="btn btn-primary" id="dpResSubmitBtn">Create Reseller</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- Add IMEIs Modal -->
+                        <div id="dpDevicesModal" class="modal">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h3 class="modal-title">Add IMEIs</h3>
+                                    <button class="modal-close" onclick="closeModal('dpDevicesModal')">×</button>
+                                </div>
+                                <div id="dpDevicesModalAlert" class="alert" style="display:none"><span id="dpDevicesModalAlertText"></span></div>
+                                <form onsubmit="dpSubmitDevices(event)">
+                                    <div class="form-group">
+                                        <label class="form-label">IMEIs *</label>
+                                        <textarea id="dpDevicesInput" class="form-input" rows="8" style="font-family:monospace" placeholder="One per line: IMEI, label, model&#10;356307042441013, Truck 12, FMC130&#10;356307042441014" required></textarea>
+                                        <p style="font-size:12px;color:var(--text-secondary);margin:4px 0 0">Label and model are optional. Separate columns with commas or tabs (paste from a spreadsheet works).</p>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Package</label>
+                                        <select id="dpDevicesPackage" class="form-input"></select>
+                                    </div>
+                                    <div id="dpDevicesResults" style="display:none;max-height:180px;overflow:auto;font-size:13px;margin-bottom:12px"></div>
+                                    <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:8px">
+                                        <button type="button" class="btn btn-secondary" onclick="closeModal('dpDevicesModal')">Close</button>
+                                        <button type="submit" class="btn btn-primary" id="dpDevicesSubmitBtn">Add IMEIs</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- One-time secret Modal -->
+                        <div id="dpSecretModal" class="modal">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h3 class="modal-title">Exchange credentials</h3>
+                                    <button class="modal-close" onclick="closeModal('dpSecretModal')">×</button>
+                                </div>
+                                <div class="alert alert-warning" style="display:block">Copy the secret now — it won't be shown again. You can issue a new one later.</div>
+                                <div class="form-group">
+                                    <label class="form-label">Exchange key</label>
+                                    <div style="display:flex;gap:8px"><input type="text" id="dpSecretKey" class="form-input" readonly><button class="btn btn-secondary btn-small" onclick="dpCopy(document.getElementById('dpSecretKey').value)">Copy</button></div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Exchange secret</label>
+                                    <div style="display:flex;gap:8px"><input type="text" id="dpSecretValue" class="form-input" readonly style="font-family:monospace"><button class="btn btn-secondary btn-small" onclick="dpCopy(document.getElementById('dpSecretValue').value)">Copy</button></div>
+                                </div>
+                                <div style="display:flex;justify-content:flex-end"><button class="btn btn-primary" onclick="closeModal('dpSecretModal')">Done</button></div>
                             </div>
                         </div>
                     </div>
@@ -3790,7 +4042,8 @@ dashboard.welcome,Bienvenue</pre>
                 'system-settings': 'System Settings',
                 'device-management': 'Device Management',
                 'webhook-logs': 'Webhook Logs',
-                'jobs': 'Background Jobs'
+                'jobs': 'Background Jobs',
+                'resellers': 'DataProfiler · Resellers'
             };
             document.getElementById('pageTitle').textContent = titles[tabName];
 
@@ -3821,6 +4074,7 @@ dashboard.welcome,Bienvenue</pre>
                 loadWebhookLogs(); 
             }
             if (tabName === 'jobs') { loadJobs(); }
+            if (tabName === 'resellers') { dpLoad(); }
         }
 
         // ── BLE TAGS ─────────────────────────────────────────────────────────
@@ -5179,6 +5433,7 @@ dashboard.welcome,Bienvenue</pre>
             document.getElementById('pkgAutoDelete').value = '';
             document.getElementById('pkgIsDefault').checked = false;
             document.getElementById('pkgSmsAddon').checked = false;
+            renderPackageEventTypes(null);
             document.getElementById('pkgModalAlert').style.display = 'none';
             openModal('createPackageModal');
         }
@@ -5201,6 +5456,7 @@ dashboard.welcome,Bienvenue</pre>
                     document.getElementById('pkgAutoDelete').value = p.auto_delete_days != null ? p.auto_delete_days : '';
                     document.getElementById('pkgIsDefault').checked = p.is_default;
                     document.getElementById('pkgSmsAddon').checked = p.sms_addon || false;
+                    renderPackageEventTypes(p.allowed_event_types);
                     document.getElementById('pkgModalAlert').style.display = 'none';
                     openModal('createPackageModal');
                 });
@@ -5217,6 +5473,7 @@ dashboard.welcome,Bienvenue</pre>
                 auto_delete_days: autoDeleteRaw ? parseInt(autoDeleteRaw) : null,
                 is_default: document.getElementById('pkgIsDefault').checked,
                 sms_addon: document.getElementById('pkgSmsAddon').checked,
+                allowed_event_types: collectPackageEventTypes(),
             };
             const url = editId ? `${API_URL}/api/admin/packages/${editId}` : `${API_URL}/api/admin/packages`;
             const method = editId ? 'PUT' : 'POST';
@@ -5263,6 +5520,369 @@ dashboard.welcome,Bienvenue</pre>
                 if (res.status === 401) { handle401(); return; }
                 loadPackages();
             } catch (e) { alert('Error: ' + e.message); }
+        }
+
+        // Package modal: DataProfiler visible-event checkboxes. null = all events.
+        let _dpEventTypes = null;
+        async function _dpLoadEventTypes() {
+            if (_dpEventTypes) return _dpEventTypes;
+            try {
+                _dpEventTypes = await dpApi('/event-types');
+            } catch (e) {
+                _dpEventTypes = [];
+            }
+            return _dpEventTypes;
+        }
+
+        async function renderPackageEventTypes(selected) {
+            const wrap = document.getElementById('pkgEventTypes');
+            const types = await _dpLoadEventTypes();
+            const chosen = selected ? new Set(selected) : null;
+            wrap.innerHTML = types.map(t => `
+                <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+                    <input type="checkbox" class="pkg-event-type" value="${dpEsc(t.key)}" ${!chosen || chosen.has(t.key) ? 'checked' : ''}>
+                    ${dpEsc(t.label)}
+                </label>`).join('');
+        }
+
+        function collectPackageEventTypes() {
+            const boxes = [...document.querySelectorAll('#pkgEventTypes .pkg-event-type')];
+            if (!boxes.length || boxes.every(b => b.checked)) return null;
+            return boxes.filter(b => b.checked).map(b => b.value);
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // DATAPROFILER · RESELLERS
+        // ─────────────────────────────────────────────────────────────────────
+        let dpResellers = [];
+        let dpSelected  = null;   // selected reseller id
+        let dpDevices   = [];
+        let dpPackages  = [];
+        let dpGroups    = [];
+
+        function dpEsc(v) {
+            return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        }
+
+        async function dpApi(path, opts = {}) {
+            const res = await fetch(`${API_URL}/api/admin/dataprofiler${path}`, {
+                ...opts,
+                headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json', ...(opts.headers || {}) },
+            });
+            if (res.status === 401) { handle401(); throw new Error('Session expired'); }
+            if (res.status === 204) return null;
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(body.detail || `HTTP ${res.status}`);
+            return body;
+        }
+
+        function dpShowAlert(message, type = 'danger') {
+            const el = document.getElementById('dpAlert');
+            document.getElementById('dpAlertText').textContent = message;
+            el.className = `alert alert-${type}`;
+            el.style.display = 'block';
+            clearTimeout(dpShowAlert._t);
+            dpShowAlert._t = setTimeout(() => { el.style.display = 'none'; }, 6000);
+        }
+
+        function dpCopy(text) {
+            navigator.clipboard?.writeText(text).then(() => dpShowAlert('Copied to clipboard', 'success'));
+        }
+
+        function dpStatusBadge(status) {
+            const cls = { routed: 'badge-success', linked: 'badge-success', pending: 'badge-warning',
+                          conflict: 'badge-danger', disabled: 'badge-danger' }[status] || 'badge-info';
+            return `<span class="badge ${cls}">${dpEsc(status)}</span>`;
+        }
+
+        async function dpLoad() {
+            try {
+                const [overview, resellers, packages, groups] = await Promise.all([
+                    dpApi('/overview'),
+                    dpApi('/resellers'),
+                    fetch(`${API_URL}/api/admin/packages`, { headers: { 'Authorization': `Bearer ${authToken}` } }).then(r => r.json()),
+                    fetch(`${API_URL}/api/admin/usergroups`, { headers: { 'Authorization': `Bearer ${authToken}` } }).then(r => r.json()),
+                ]);
+                dpResellers = resellers;
+                dpPackages  = (packages || []).filter(p => p.is_active);
+                dpGroups    = groups || [];
+                dpRenderOverview(overview);
+                dpRenderResellers();
+                if (dpSelected && dpResellers.some(r => r.id === dpSelected)) {
+                    await dpSelectReseller(dpSelected);
+                } else {
+                    dpSelected = null;
+                    document.getElementById('dpDetail').style.display = 'none';
+                }
+            } catch (e) {
+                document.getElementById('dpResellerTable').innerHTML =
+                    `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--danger)">Error: ${dpEsc(e.message)}</td></tr>`;
+            }
+        }
+
+        function dpRenderOverview(o) {
+            const st = o.devices_by_status || {};
+            document.getElementById('dpStatResellers').textContent = o.resellers;
+            document.getElementById('dpStatResellersActive').textContent = `${o.active_resellers} active`;
+            document.getElementById('dpStatLinked').textContent = o.linked_exchanges;
+            document.getElementById('dpStatRouted').textContent = st.routed || 0;
+            document.getElementById('dpStatDevices').textContent = `of ${o.devices} IMEIs`;
+            document.getElementById('dpStatAttention').textContent = (st.pending || 0) + (st.conflict || 0);
+        }
+
+        function dpRenderResellers() {
+            const sel = document.getElementById('dpResellerSelect');
+            sel.innerHTML = '<option value="">— Select a reseller —</option>' +
+                dpResellers.map(r => `<option value="${r.id}" ${r.id === dpSelected ? 'selected' : ''}>${dpEsc(r.name)}</option>`).join('');
+
+            const tb = document.getElementById('dpResellerTable');
+            if (!dpResellers.length) {
+                tb.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-secondary)">No resellers yet. Click "New Reseller" to add one.</td></tr>';
+                return;
+            }
+            tb.innerHTML = dpResellers.map(r => {
+                const c = r.device_counts || {};
+                const ex = r.exchange || {};
+                return `
+                <tr style="cursor:pointer;${r.id === dpSelected ? 'background:var(--bg-secondary)' : ''}" onclick="dpSelectReseller('${r.id}')">
+                    <td><strong>${dpEsc(r.name)}</strong><div style="font-size:12px;color:var(--text-secondary)">${dpEsc(r.code)}</div></td>
+                    <td>${dpEsc(r.provider)}</td>
+                    <td>${ex.status ? dpStatusBadge(ex.status) : '—'}</td>
+                    <td>${ex.usergroup_name ? dpEsc(ex.usergroup_name) : '<span style="color:var(--text-secondary)">Not linked</span>'}</td>
+                    <td>${r.default_package_name ? dpEsc(r.default_package_name) : '<span style="color:var(--text-secondary)">—</span>'}</td>
+                    <td style="text-align:center">${c.routed || 0} / ${c.total || 0}</td>
+                    <td><span class="badge ${r.is_active ? 'badge-success' : 'badge-danger'}">${r.is_active ? 'Active' : 'Inactive'}</span></td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function dpSelectReseller(id) {
+            dpSelected = id || null;
+            dpRenderResellers();
+            const detail = document.getElementById('dpDetail');
+            if (!dpSelected) { detail.style.display = 'none'; return; }
+            const r = dpResellers.find(x => x.id === dpSelected);
+            if (!r) return;
+            detail.style.display = '';
+
+            document.getElementById('dpDetailName').textContent = r.name;
+            document.getElementById('dpDetailMeta').textContent = `${r.code} · ${r.provider}${r.is_active ? '' : ' · inactive'}`;
+            document.getElementById('dpToggleActiveBtn').textContent = r.is_active ? 'Deactivate' : 'Activate';
+            const info = [
+                ['Default package', r.default_package_name || '—'],
+                ['Contact', [r.contact_name, r.contact_email, r.contact_phone].filter(Boolean).join(' · ') || '—'],
+                ['Created', r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'],
+                ['Notes', r.notes || '—'],
+            ];
+            document.getElementById('dpDetailInfo').innerHTML = info.map(([k, v]) =>
+                `<div><div style="font-size:12px;color:var(--text-secondary)">${k}</div><div>${dpEsc(v)}</div></div>`).join('');
+
+            const ex = r.exchange || {};
+            document.getElementById('dpExStatus').innerHTML = ex.status ? dpStatusBadge(ex.status) : '';
+            document.getElementById('dpExKey').textContent = ex.exchange_key || '—';
+            const linked = !!ex.usergroup_id;
+            document.getElementById('dpExLinked').innerHTML = linked
+                ? `<strong>${dpEsc(ex.usergroup_name)}</strong><div style="font-size:12px;color:var(--text-secondary)">Linked ${ex.linked_at ? new Date(ex.linked_at).toLocaleString() : ''} by ${dpEsc(ex.linked_by || '—')}</div>`
+                : '<span style="color:var(--text-secondary)">Not linked — devices wait as pending until a user group is linked.</span>';
+            document.getElementById('dpExLinkForm').style.display = linked ? 'none' : 'flex';
+            document.getElementById('dpExUnlinkBtn').style.display = linked ? '' : 'none';
+            const taken = new Set(dpResellers.filter(x => x.id !== r.id && x.exchange?.usergroup_id).map(x => x.exchange.usergroup_id));
+            document.getElementById('dpExGroupSelect').innerHTML = '<option value="">— Select user group —</option>' +
+                dpGroups.filter(g => g.is_active && !taken.has(g.id))
+                    .map(g => `<option value="${g.id}">${dpEsc(g.name)}</option>`).join('');
+
+            await dpLoadDevices();
+        }
+
+        async function dpLoadDevices() {
+            const tb = document.getElementById('dpDeviceTable');
+            tb.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-secondary)">Loading…</td></tr>';
+            try {
+                dpDevices = await dpApi(`/resellers/${dpSelected}/devices`);
+                dpRenderDevices();
+            } catch (e) {
+                tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--danger)">Error: ${dpEsc(e.message)}</td></tr>`;
+            }
+        }
+
+        function dpRenderDevices() {
+            const q = (document.getElementById('dpDeviceFilter').value || '').trim().toLowerCase();
+            const rows = q ? dpDevices.filter(d => d.imei.includes(q) || (d.label || '').toLowerCase().includes(q)) : dpDevices;
+            document.getElementById('dpDeviceCount').textContent = `(${dpDevices.length})`;
+            const tb = document.getElementById('dpDeviceTable');
+            if (!rows.length) {
+                tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-secondary)">${dpDevices.length ? 'No matches.' : 'No IMEIs yet. Click "Add IMEIs".'}</td></tr>`;
+                return;
+            }
+            tb.innerHTML = rows.map(d => `
+                <tr>
+                    <td style="font-family:monospace">${dpEsc(d.imei)}</td>
+                    <td>${dpEsc(d.label || '—')}</td>
+                    <td>${dpEsc(d.device_model || '—')}</td>
+                    <td>${dpEsc(d.package_name || '—')}${d.package_id ? '' : ' <span style="font-size:11px;color:var(--text-secondary)">(default)</span>'}</td>
+                    <td>${dpStatusBadge(d.status)}${d.status_detail ? `<div style="font-size:11px;color:var(--text-secondary)">${dpEsc(d.status_detail)}</div>` : ''}</td>
+                    <td>${d.first_routed_at ? new Date(d.first_routed_at).toLocaleString() : '—'}</td>
+                    <td><button class="btn btn-sm btn-danger" onclick="dpRemoveDevice('${d.id}', '${dpEsc(d.imei)}')">Remove</button></td>
+                </tr>`).join('');
+        }
+
+        function dpPackageOptions(selectedId, emptyLabel) {
+            return `<option value="">${emptyLabel}</option>` + dpPackages.map(p =>
+                `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${dpEsc(p.name)} (${p.validity_days} days)</option>`).join('');
+        }
+
+        function dpOpenResellerModal(id) {
+            const r = id ? dpResellers.find(x => x.id === id) : null;
+            document.getElementById('dpResellerModalTitle').textContent = r ? 'Edit Reseller' : 'New Reseller';
+            document.getElementById('dpResSubmitBtn').textContent = r ? 'Save Changes' : 'Create Reseller';
+            document.getElementById('dpResId').value = r ? r.id : '';
+            document.getElementById('dpResName').value = r ? r.name : '';
+            const code = document.getElementById('dpResCode');
+            code.value = r ? r.code : '';
+            code.disabled = !!r;
+            document.getElementById('dpResProvider').value = r ? r.provider : 'teltonika';
+            document.getElementById('dpResPackage').innerHTML = dpPackageOptions(r?.default_package_id, '— None —');
+            document.getElementById('dpResContactName').value = r?.contact_name || '';
+            document.getElementById('dpResContactEmail').value = r?.contact_email || '';
+            document.getElementById('dpResContactPhone').value = r?.contact_phone || '';
+            document.getElementById('dpResNotes').value = r?.notes || '';
+            document.getElementById('dpResellerModalAlert').style.display = 'none';
+            openModal('dpResellerModal');
+        }
+
+        async function dpSubmitReseller(e) {
+            e.preventDefault();
+            const id = document.getElementById('dpResId').value;
+            const body = {
+                name: document.getElementById('dpResName').value.trim(),
+                provider: document.getElementById('dpResProvider').value,
+                default_package_id: document.getElementById('dpResPackage').value || null,
+                contact_name: document.getElementById('dpResContactName').value.trim() || null,
+                contact_email: document.getElementById('dpResContactEmail').value.trim() || null,
+                contact_phone: document.getElementById('dpResContactPhone').value.trim() || null,
+                notes: document.getElementById('dpResNotes').value.trim() || null,
+            };
+            if (!id) body.code = document.getElementById('dpResCode').value.trim().toLowerCase();
+            try {
+                const out = await dpApi(id ? `/resellers/${id}` : '/resellers', { method: id ? 'PUT' : 'POST', body: JSON.stringify(body) });
+                closeModal('dpResellerModal');
+                dpSelected = out.id;
+                await dpLoad();
+                if (!id) dpShowSecret(out.exchange.exchange_key, out.exchange_secret);
+            } catch (err) {
+                document.getElementById('dpResellerModalAlertText').textContent = err.message;
+                document.getElementById('dpResellerModalAlert').style.display = 'block';
+            }
+        }
+
+        function dpShowSecret(key, secret) {
+            document.getElementById('dpSecretKey').value = key;
+            document.getElementById('dpSecretValue').value = secret;
+            openModal('dpSecretModal');
+        }
+
+        async function dpToggleActive() {
+            const r = dpResellers.find(x => x.id === dpSelected);
+            if (!r) return;
+            if (r.is_active && !confirm(`Deactivate "${r.name}"? Its devices will stop routing to the customer dashboard.`)) return;
+            try {
+                await dpApi(`/resellers/${r.id}`, { method: 'PUT', body: JSON.stringify({ is_active: !r.is_active }) });
+                await dpLoad();
+            } catch (err) { dpShowAlert(err.message); }
+        }
+
+        async function dpRotateSecret() {
+            if (!confirm('Issue a new exchange secret? The old secret stops working for new links (existing links are unaffected).')) return;
+            try {
+                const out = await dpApi(`/resellers/${dpSelected}/exchange/rotate-secret`, { method: 'POST' });
+                dpShowSecret(out.exchange_key, out.exchange_secret);
+            } catch (err) { dpShowAlert(err.message); }
+        }
+
+        async function dpLinkExchange() {
+            const gid = document.getElementById('dpExGroupSelect').value;
+            if (!gid) { dpShowAlert('Select a user group to link'); return; }
+            const name = dpGroups.find(g => g.id === gid)?.name || 'this group';
+            if (!confirm(`Link this exchange to "${name}"? All of the reseller's IMEIs will be created on that group's dashboard.`)) return;
+            try {
+                const out = await dpApi(`/resellers/${dpSelected}/exchange/link`, { method: 'POST', body: JSON.stringify({ usergroup_id: gid }) });
+                const c = out.routing;
+                dpShowAlert(`Linked to ${out.usergroup_name}: ${c.routed} routed, ${c.pending} pending, ${c.conflict} conflicts`, c.conflict || c.pending ? 'warning' : 'success');
+                await dpLoad();
+            } catch (err) { dpShowAlert(err.message); }
+        }
+
+        async function dpUnlinkExchange() {
+            if (!confirm('Unlink this exchange? Devices already on the customer dashboard stay there, but no new devices will be routed.')) return;
+            try {
+                await dpApi(`/resellers/${dpSelected}/exchange/unlink`, { method: 'POST' });
+                await dpLoad();
+            } catch (err) { dpShowAlert(err.message); }
+        }
+
+        async function dpReroute() {
+            try {
+                const out = await dpApi(`/resellers/${dpSelected}/route`, { method: 'POST' });
+                const c = out.routing;
+                dpShowAlert(`Routing retried: ${c.routed} routed, ${c.pending} pending, ${c.conflict} conflicts`, c.conflict || c.pending ? 'warning' : 'success');
+                await dpLoad();
+            } catch (err) { dpShowAlert(err.message); }
+        }
+
+        function dpOpenDevicesModal() {
+            const r = dpResellers.find(x => x.id === dpSelected);
+            document.getElementById('dpDevicesInput').value = '';
+            document.getElementById('dpDevicesPackage').innerHTML = dpPackageOptions(null,
+                r?.default_package_name ? `Reseller default — ${r.default_package_name}` : '— Select a package —');
+            document.getElementById('dpDevicesResults').style.display = 'none';
+            document.getElementById('dpDevicesModalAlert').style.display = 'none';
+            openModal('dpDevicesModal');
+        }
+
+        async function dpSubmitDevices(e) {
+            e.preventDefault();
+            const devices = document.getElementById('dpDevicesInput').value.split(/\r?\n/)
+                .map(line => line.trim()).filter(Boolean)
+                .map(line => {
+                    const [imei, label, device_model] = line.split(/\t|,/).map(x => (x || '').trim());
+                    return { imei, label: label || null, device_model: device_model || null };
+                });
+            if (!devices.length) return;
+            const btn = document.getElementById('dpDevicesSubmitBtn');
+            const alertEl = document.getElementById('dpDevicesModalAlert');
+            btn.disabled = true;
+            try {
+                const out = await dpApi(`/resellers/${dpSelected}/devices`, {
+                    method: 'POST',
+                    body: JSON.stringify({ devices, package_id: document.getElementById('dpDevicesPackage').value || null }),
+                });
+                const failed = out.results.filter(x => !x.ok);
+                document.getElementById('dpDevicesModalAlertText').textContent =
+                    `${out.added} added${failed.length ? `, ${failed.length} skipped` : ''}.`;
+                alertEl.className = `alert alert-${failed.length ? 'warning' : 'success'}`;
+                alertEl.style.display = 'block';
+                const res = document.getElementById('dpDevicesResults');
+                res.innerHTML = out.results.map(x => `<div style="font-family:monospace">${x.ok ? '✓' : '✗'} ${dpEsc(x.imei)} — ${dpEsc(x.ok ? x.status + (x.detail ? ` (${x.detail})` : '') : x.error)}</div>`).join('');
+                res.style.display = 'block';
+                if (out.added) {
+                    document.getElementById('dpDevicesInput').value = failed.map(x => x.imei).join('\n');
+                    await dpLoad();
+                }
+            } catch (err) {
+                document.getElementById('dpDevicesModalAlertText').textContent = err.message;
+                alertEl.className = 'alert alert-danger';
+                alertEl.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function dpRemoveDevice(id, imei) {
+            if (!confirm(`Remove IMEI ${imei} from this reseller? If it's already on the customer dashboard, it stays there.`)) return;
+            try {
+                await dpApi(`/resellers/${dpSelected}/devices/${id}`, { method: 'DELETE' });
+                await dpLoad();
+            } catch (err) { dpShowAlert(err.message); }
         }
 
         async function loadBuildings() {

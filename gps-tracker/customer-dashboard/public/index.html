@@ -1278,6 +1278,60 @@
                         </div>
                     </div>
 
+                    <!-- ─── Data Exchange (DataProfiler) ─── -->
+                    <div class="card" id="settings-exchange-card">
+                        <div class="settings-section-header">
+                            <i class="fa-solid fa-right-left" style="color:var(--primary)"></i>
+                            <div>
+                                <h3 data-i18n="settings.data_exchange">Data Exchange</h3>
+                                <p data-i18n="settings.data_exchange_hint">Connect a DataProfiler exchange so your provider's devices appear here automatically.</p>
+                            </div>
+                        </div>
+                        <div id="exchange-loading" style="padding:24px;text-align:center;color:var(--text-3)">
+                            <i class="fa-solid fa-spinner fa-spin"></i> <span data-i18n="common.loading">Loading…</span>
+                        </div>
+                        <div id="exchange-body" style="display:none">
+                            <div class="settings-row" id="exchange-linked-row" style="display:none">
+                                <div>
+                                    <div class="settings-row-label" id="exchange-provider-name"></div>
+                                    <div class="settings-row-hint" id="exchange-linked-hint"></div>
+                                </div>
+                                <div class="settings-row-control">
+                                    <span class="badge badge-success" data-i18n="settings.exchange_connected">Connected</span>
+                                </div>
+                            </div>
+                            <div id="exchange-unlinked">
+                                <div class="settings-row">
+                                    <div>
+                                        <div class="settings-row-label" data-i18n="settings.exchange_not_connected">Not connected</div>
+                                        <div class="settings-row-hint" data-i18n="settings.exchange_not_connected_hint">Enter the exchange key and secret supplied by your provider.</div>
+                                    </div>
+                                    <div class="settings-row-control">
+                                        <button class="btn btn-secondary btn-small" id="exchange-connect-btn" style="display:none"
+                                                onclick="settingsToggleForm('exchangeForm')">
+                                            <i class="fa-solid fa-plug"></i> <span data-i18n="settings.exchange_connect">Connect</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="settings-inline-edit" id="exchangeForm" style="display:none">
+                                    <div>
+                                        <label for="exchange-key-input" style="font-size:12px;font-weight:600;color:var(--text-3);display:block;margin-bottom:4px" data-i18n="settings.exchange_key">Exchange key</label>
+                                        <input type="text" id="exchange-key-input" placeholder="dx_…" autocomplete="off">
+                                    </div>
+                                    <div>
+                                        <label for="exchange-secret-input" style="font-size:12px;font-weight:600;color:var(--text-3);display:block;margin-bottom:4px" data-i18n="settings.exchange_secret">Exchange secret</label>
+                                        <input type="password" id="exchange-secret-input" autocomplete="off">
+                                    </div>
+                                    <div class="actions">
+                                        <button class="btn btn-primary btn-small" id="exchange-save-btn" onclick="settingsLinkExchange()" data-i18n="settings.exchange_connect">Connect</button>
+                                        <button class="btn btn-secondary btn-small" onclick="settingsToggleForm('exchangeForm')" data-i18n="common.cancel">Cancel</button>
+                                    </div>
+                                    <div class="alert" id="exchange-alert" style="display:none"><span id="exchange-alert-text"></span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- ─── Alerts & Notifications ─── -->
                     <div class="card">
                         <div class="settings-section-header">
@@ -4746,6 +4800,7 @@ async function loadSettings() {
     await Promise.allSettled([
         _loadSettingsTheme(isAdmin),
         _loadSettingsRetention(isAdmin),
+        _loadSettingsDataExchange(isAdmin),
         _loadSettingsNotifications(),
     ]);
     loadCategories();
@@ -5047,6 +5102,65 @@ async function settingsSaveRetention() {
         _themeCache = await res.json();
         _renderRetention(_themeCache.history_retention_days ?? 365);
         settingsToggleForm('retentionForm');
+    } catch (err) {
+        alertTx.textContent   = err.message;
+        alertEl.className     = 'alert alert-error';
+        alertEl.style.display = 'flex';
+    } finally {
+        saveBtn.disabled = false;
+    }
+}
+
+// ─── Data Exchange ────────────────────────────────────────────────────────────
+
+function _renderDataExchange(ex, isAdmin) {
+    const linked = !!ex?.linked;
+    document.getElementById('exchange-linked-row').style.display = linked ? '' : 'none';
+    document.getElementById('exchange-unlinked').style.display = linked ? 'none' : '';
+    document.getElementById('exchange-connect-btn').style.display = isAdmin ? '' : 'none';
+    if (linked) {
+        document.getElementById('exchange-provider-name').textContent = ex.reseller_name || ex.exchange_key;
+        const pending = ex.devices_pending ? ` · ${ex.devices_pending} ${t('settings.exchange_devices_pending', 'pending')}` : '';
+        document.getElementById('exchange-linked-hint').textContent =
+            `${ex.exchange_key} · ${ex.devices_routed} ${t('settings.exchange_devices_routed', 'devices routed')}${pending}`;
+    }
+}
+
+async function _loadSettingsDataExchange(isAdmin) {
+    let ex = { linked: false };
+    try {
+        const res = await apiFetch('/api/portal/data-exchange');
+        if (res.ok) ex = await res.json();
+    } catch (_) { /* show as not connected */ }
+    document.getElementById('exchange-loading').style.display = 'none';
+    document.getElementById('exchange-body').style.display = '';
+    _renderDataExchange(ex, isAdmin);
+}
+
+async function settingsLinkExchange() {
+    const saveBtn = document.getElementById('exchange-save-btn');
+    const alertEl = document.getElementById('exchange-alert');
+    const alertTx = document.getElementById('exchange-alert-text');
+    const key     = document.getElementById('exchange-key-input').value.trim();
+    const secret  = document.getElementById('exchange-secret-input').value.trim();
+    alertEl.style.display = 'none';
+    if (!key || !secret) {
+        alertTx.textContent   = t('settings.exchange_missing_fields', 'Enter both the exchange key and secret.');
+        alertEl.className     = 'alert alert-error';
+        alertEl.style.display = 'flex';
+        return;
+    }
+    saveBtn.disabled = true;
+    try {
+        const res = await apiFetch('/api/portal/data-exchange/link', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ exchange_key: key, exchange_secret: secret }),
+        });
+        if (!res.ok) throw new Error(await safeJsonDetail(res, 'Connection failed'));
+        document.getElementById('exchange-secret-input').value = '';
+        settingsToggleForm('exchangeForm');
+        _renderDataExchange(await res.json(), true);
     } catch (err) {
         alertTx.textContent   = err.message;
         alertEl.className     = 'alert alert-error';

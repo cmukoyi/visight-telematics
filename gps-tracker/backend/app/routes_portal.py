@@ -759,6 +759,76 @@ def update_settings(
 
 
 # ---------------------------------------------------------------------------
+# Data Exchange — link this group to a DataProfiler reseller exchange
+# ---------------------------------------------------------------------------
+
+class DataExchangeLinkRequest(BaseModel):
+    exchange_key: str
+    exchange_secret: str
+
+
+def _data_exchange_status(group_id, db: Session) -> dict:
+    from app.models_dataprofiler import DataExchange, ResellerDevice
+    from sqlalchemy import func as _func
+    ex = db.query(DataExchange).filter(DataExchange.usergroup_id == group_id).first()
+    if not ex:
+        return {"linked": False}
+    counts = dict(
+        db.query(ResellerDevice.status, _func.count())
+        .filter(ResellerDevice.reseller_id == ex.reseller_id)
+        .group_by(ResellerDevice.status).all()
+    )
+    return {
+        "linked": True,
+        "exchange_key": ex.exchange_key,
+        "reseller_name": ex.reseller.name if ex.reseller else None,
+        "linked_at": ex.linked_at,
+        "devices_routed": counts.get("routed", 0),
+        "devices_pending": counts.get("pending", 0) + counts.get("conflict", 0),
+    }
+
+
+@router.get("/data-exchange")
+def get_data_exchange(request: Request, db: Session = Depends(get_db)):
+    """Return the DataProfiler exchange linked to this group, if any."""
+    me = get_portal_user_from_request(request, db)
+    return _data_exchange_status(me.usergroup_id, db)
+
+
+@router.post("/data-exchange/link")
+def link_data_exchange(data: DataExchangeLinkRequest, request: Request, db: Session = Depends(get_db)):
+    """Link this group to an exchange using the key + secret issued in DataProfiler.
+
+    Failed attempts share the portal login lockout so secrets can't be brute-forced.
+    """
+    from app.models_dataprofiler import DataExchange
+    from app.services import dataprofiler_service as dp
+
+    me = get_portal_user_from_request(request, db)
+    if not _user_can_manage(me, "settings"):
+        raise HTTPException(status_code=403, detail="You don't have permission to change settings")
+    ip = _client_ip(request)
+    _login_check_rate(ip)
+
+    ex = db.query(DataExchange).filter(DataExchange.exchange_key == data.exchange_key.strip()).first()
+    if not ex or not dp.verify_exchange_secret(ex, data.exchange_secret.strip()):
+        _login_record_failure(ip)
+        raise HTTPException(status_code=400, detail="Invalid exchange key or secret")
+    _login_record_success(ip)
+
+    group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="User group not found")
+    try:
+        dp.link_exchange(db, ex, group, linked_by=me.email)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc))
+    db.commit()
+    return _data_exchange_status(group.id, db)
+
+
+# ---------------------------------------------------------------------------
 # Theme / Branding
 # ---------------------------------------------------------------------------
 

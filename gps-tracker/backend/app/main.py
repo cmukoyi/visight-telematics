@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db, init_db
 from app.models import User, VerificationPIN, BLETag, POI, POITrackerLink, GeofenceAlert, PasswordResetToken, GeofenceState, AppFeatures, PortalUser, UserGroup
 from app.models_admin import AdminUser, AppLog, AuditLog, BillingData, TagPackage
+from app.models_dataprofiler import Reseller, DataExchange, ResellerDevice  # noqa: F401 — registers tables
 from app.auth import verify_password, get_password_hash, create_access_token, decode_token
 from app.admin_auth import hash_password as admin_hash_password
 from app.services.email_service import EmailService
@@ -263,6 +264,10 @@ app.include_router(i18n_router, include_in_schema=False)
 
 from app.routes_admin_i18n import router as admin_i18n_router  # noqa: E402
 app.include_router(admin_i18n_router, include_in_schema=False)
+
+# DataProfiler — resellers, data exchanges, IMEI routing (admin auth required)
+from app.routes_dataprofiler import router as dataprofiler_router  # noqa: E402
+app.include_router(dataprofiler_router, include_in_schema=False)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

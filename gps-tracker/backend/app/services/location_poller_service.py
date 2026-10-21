@@ -136,6 +136,7 @@ class LocationPollerService:
             _SERIES1_KEYS = {"series1", "scope"}
             _SERIES4_KEYS = {"series4", "ble"}  # Series 4 (DX-Smart indoor BLE)
             _SERIES5_KEYS = {"series5", "hubble"}  # Series 5 (Hubble Platform BLE)
+            _PUSH_KEYS = {"teltonika"}  # DataProfiler: events arrive via the GPRS listener, nothing to poll
 
             def _tag_key(t) -> str:
                 return (t.tag_type or "series1").lower().replace("_", "").replace("-", "")
@@ -145,7 +146,7 @@ class LocationPollerService:
             series4_trackers = [t for t in live_trackers if _tag_key(t) in _SERIES4_KEYS]
             series5_trackers = [t for t in live_trackers if _tag_key(t) in _SERIES5_KEYS]
             unknown_trackers = [t for t in live_trackers
-                                   if _tag_key(t) not in _SERIES2_KEYS | _SERIES1_KEYS | _SERIES4_KEYS | _SERIES5_KEYS]
+                                   if _tag_key(t) not in _SERIES2_KEYS | _SERIES1_KEYS | _SERIES4_KEYS | _SERIES5_KEYS | _PUSH_KEYS]
             for t in unknown_trackers:
                 logger.warning("⚠️  Tracker IMEI %s has unrecognised tag_type '%s' — skipping", t.imei, t.tag_type)
 

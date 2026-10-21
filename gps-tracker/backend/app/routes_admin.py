@@ -2373,6 +2373,7 @@ class PackageCreate(BaseModel):
     auto_delete_days: Optional[int] = None  # days after expiry to auto-delete tag
     is_default: bool = False
     sms_addon: bool = False     # whether this package includes SMS alerts
+    allowed_event_types: Optional[List[str]] = None  # DataProfiler events shown to customers; None = all
 
 
 class PackageUpdate(BaseModel):
@@ -2383,6 +2384,14 @@ class PackageUpdate(BaseModel):
     is_default: Optional[bool] = None
     is_active: Optional[bool] = None
     sms_addon: Optional[bool] = None
+    allowed_event_types: Optional[List[str]] = None
+
+
+def _check_event_types(event_types: Optional[List[str]]) -> None:
+    from app.services.dataprofiler_service import EVENT_TYPE_KEYS
+    unknown = sorted(set(event_types or []) - EVENT_TYPE_KEYS)
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"Unknown event types: {', '.join(unknown)}")
 
 
 class PackageOut(BaseModel):
@@ -2394,6 +2403,7 @@ class PackageOut(BaseModel):
     is_default: bool
     is_active: bool
     sms_addon: bool = False
+    allowed_event_types: Optional[List[str]] = None
     created_at: datetime
 
     @field_validator('id', mode='before')
@@ -2414,6 +2424,7 @@ def create_package(data: PackageCreate, request: Request, db: Session = Depends(
 
     if db.query(_TagPackage).filter(_TagPackage.name == data.name).first():
         raise HTTPException(status_code=409, detail="A package with that name already exists")
+    _check_event_types(data.allowed_event_types)
 
     if data.is_default:
         # Clear any previous default
@@ -2426,6 +2437,7 @@ def create_package(data: PackageCreate, request: Request, db: Session = Depends(
         auto_delete_days=data.auto_delete_days,
         is_default=data.is_default,
         sms_addon=data.sms_addon,
+        allowed_event_types=data.allowed_event_types,
         is_active=True,
     )
     db.add(pkg)
@@ -2458,6 +2470,7 @@ def update_package(pkg_id: str, data: PackageUpdate, request: Request, db: Sessi
 
     if data.is_default is True:
         db.query(_TagPackage).filter(_TagPackage.id != pkg_id, _TagPackage.is_default == True).update({"is_default": False})
+    _check_event_types(data.allowed_event_types)
 
     for field, val in data.model_dump(exclude_unset=True).items():
         setattr(pkg, field, val)

@@ -158,6 +158,9 @@ class TagPackage(Base):
     is_default    = Column(Boolean, nullable=False, default=False)  # applied to self-registered tags
     is_active     = Column(Boolean, nullable=False, default=True)
     sms_addon     = Column(Boolean, nullable=False, default=False)  # whether this package includes SMS alerts
+    # DataProfiler: event types forwarded to the customer dashboard, e.g. ["ignition", "overspeed"].
+    # NULL means all events are visible.
+    allowed_event_types = Column(JSON, nullable=True)
     created_at    = Column(DateTime(timezone=True), server_default=func.now())
     updated_at    = Column(DateTime(timezone=True), onupdate=func.now())
 
