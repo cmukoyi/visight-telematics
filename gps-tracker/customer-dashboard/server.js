@@ -49,45 +49,13 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Pretty help routes - tenant-aware
-// Maps /help/movement-analytics to tenant-specific manual based on branding
-app.get('/help/movement-analytics', (req, res) => {
-  const brandName = process.env.BRAND_NAME || 'PinPlot';
-  const isBeacon = process.env.CUSTOMER_TENANT === 'beacon_telematics'
-    || brandName.toLowerCase().includes('beacon');
-  const language = String(req.query.lang || 'en').toLowerCase().split('-')[0];
-  const beaconManuals = {
-    de: 'Movement_Analytics_Benutzerhandbuch_v2_1_Beacon_DE.html',
-    en: 'Movement_Analytics_User_Manual_v2_1_Beacon_EN.html',
-    es: 'Movement_Analytics_Manual_Usuario_v2_1_Beacon_ES.html',
-    fr: 'Movement_Analytics_Manuel_Utilisateur_v2_1_Beacon_FR.html',
-    it: 'Movement_Analytics_Manuale_Utente_v2_1_Beacon_IT.html',
-    nl: 'Movement_Analytics_Gebruikershandleiding_v2_1_Beacon_NL.html',
-  };
-  const filename = isBeacon
-    ? (beaconManuals[language] || beaconManuals.en)
-    : 'Movement_Analytics_User_Manual_v2_1_Pinplot.html';
-  
-  const filePath = path.join(publicDir, 'help', filename);
-  
-  if (fs.existsSync(filePath)) {
-    res.sendFile(filePath);
-  } else {
-    res.status(404).json({ 
-      error: 'Manual not found',
-      tenant: brandName,
-      expectedFile: filename 
-    });
-  }
-});
-
 // Manifest endpoint
 app.get('/api/manifest', (req, res) => {
   const files = fs.existsSync(publicDir) ? fs.readdirSync(publicDir) : [];
   res.json({
     deployment: {
       timestamp: new Date().toISOString(),
-      version: 'beacon-customer-dashboard'
+      version: 'visight-track-customer-dashboard'
     },
     files: files.map(file => ({
       name: file,
@@ -106,10 +74,10 @@ app.get('/', (req, res) => {
   let html = fs.readFileSync(indexPath, 'utf8');
   
   // Read tenant branding from environment variables (same as /api/branding endpoint)
-  const brandName = process.env.BRAND_NAME || 'PinPlot';
+  const brandName = process.env.BRAND_NAME || 'ViSight Track';
   const brandProduct = process.env.BRAND_PRODUCT || 'Customer Portal — Asset Tracking';
-  const brandDomain = process.env.BRAND_DOMAIN || 'pinplot.me';
-  const brandTagline = process.env.BRAND_TAGLINE || 'Live asset tracking, geofencing, and reporting for your fleet of GPS and BLE-tagged assets.';
+  const brandDomain = process.env.BRAND_DOMAIN || 'track.visighttelematics.co.za';
+  const brandTagline = process.env.BRAND_TAGLINE || 'Live vehicle tracking, geofencing, and reporting for your fleet.';
   
   // Inject tenant-specific values into meta tags
   // These replacements target the generic placeholder values in the static HTML

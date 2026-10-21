@@ -99,10 +99,10 @@ def _login_record_success(ip: str) -> None:
 # ---------------------------------------------------------------------------
 
 SECTION_FEATURES: dict = {
-    "tracking":   ["livemap", "assets", "history", "history-advanced"],
+    "tracking":   ["livemap", "assets"],
     "management": ["asset-mgmt", "users", "locations", "settings"],
     "reports":    [
-        "reports-subscriptions", "reports-activity", "reports-trips",
+        "reports-subscriptions", "reports-activity",
         "reports-battery", "reports-alerts", "reports-geofence",
     ],
 }
@@ -112,8 +112,6 @@ ALL_SECTIONS = list(SECTION_FEATURES.keys())
 # Maps high-level tenant feature names to specific tab keys
 TENANT_FEATURE_TABS: dict = {
     "livemap": ["livemap", "assets"],
-    "history": ["history"],
-    "history-advanced": ["history-advanced"],
     "alerts": ["reports-alerts"],
     "geofences": ["reports-geofence"],
     "reports": ["reports-subscriptions", "reports-activity"],
