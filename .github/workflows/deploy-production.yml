@@ -396,7 +396,7 @@ jobs:
           # Pass tenant-specific server path through to remote shell
           ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 -o TCPKeepAlive=yes \
             "$DO_USER@$DO_SERVER_IP" \
-              "SERVER_DIR='${SERVER_DIR}' COMPOSE_PROFILES='${COMPOSE_PROFILES}' bash -s" << 'SSHEOF'
+              "SERVER_DIR='${SERVER_DIR}' COMPOSE_PROFILES='${COMPOSE_PROFILES}' DB_CONTAINER='${DB_CONTAINER}' TENANT_DB_USER='${TENANT_DB_USER}' bash -s" << 'SSHEOF'
             set -e
             cd "${SERVER_DIR}/gps-tracker"
             export COMPOSE_PROFILES
@@ -418,6 +418,19 @@ jobs:
             echo "━━━ Building services ━━━"
             # The backend image is shared by the DataProfiler pipeline services.
             docker compose build admin-portal backend customer
+
+            echo "━━━ Database backup (before containers restart and migrations run) ━━━"
+            if docker ps --format '{{.Names}}' | grep -qx "${DB_CONTAINER}"; then
+              BACKUP_DIR="$(dirname "${SERVER_DIR}")/db-backups"
+              mkdir -p "${BACKUP_DIR}"
+              BACKUP_FILE="${BACKUP_DIR}/predeploy_$(date +%Y%m%d_%H%M%S).sql.gz"
+              docker exec "${DB_CONTAINER}" pg_dumpall -U "${TENANT_DB_USER}" | gzip > "${BACKUP_FILE}"
+              test -s "${BACKUP_FILE}" || { echo "❌ database backup is empty — aborting deploy"; exit 1; }
+              echo "✅ backup: ${BACKUP_FILE} ($(du -h "${BACKUP_FILE}" | cut -f1))"
+              ls -1t "${BACKUP_DIR}"/predeploy_*.sql.gz | tail -n +11 | xargs -r rm -f   # keep last 10
+            else
+              echo "ℹ️  ${DB_CONTAINER} not running — skipping backup (first deploy?)"
+            fi
 
             echo "━━━ Stopping old containers ━━━"
             docker compose down --remove-orphans || true
