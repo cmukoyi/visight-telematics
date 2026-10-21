@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState }
 import Map, { AttributionControl, Layer, MapRef, Marker, NavigationControl, Popup, ScaleControl, Source } from 'react-map-gl/maplibre';
 import type { StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { SegmentedControl, useComputedColorScheme } from '@mantine/core';
+import { SegmentedControl } from '@mantine/core';
 import { useBranding } from '../api/hooks';
 import { STATUS } from '../theme';
 import classes from './FleetMap.module.css';
@@ -32,6 +32,16 @@ const OSM_FALLBACK: StyleSpecification = {
   layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
 };
 
+type BaseMap = 'streets' | 'osm' | 'satellite';
+const BASEMAP_KEY = 'vt-basemap';
+
+function savedBaseMap(): BaseMap {
+  try {
+    const v = localStorage.getItem(BASEMAP_KEY);
+    return v === 'osm' || v === 'satellite' ? v : 'streets';
+  } catch { return 'streets'; }
+}
+
 function circlePolygon(lat: number, lng: number, radiusM: number, steps = 48): [number, number][] {
   const out: [number, number][] = [];
   const dLat = radiusM / 111320;
@@ -47,17 +57,20 @@ export const FleetMap = forwardRef<FleetMapHandle, Props>(function FleetMap(
   { vehicles = [], routes = [], points = [], places = [], selectedVehicleId, onVehicleClick, fitPadding }, ref,
 ) {
   const mapRef = useRef<MapRef>(null);
-  const scheme = useComputedColorScheme('dark');
   const { data: branding } = useBranding();
-  const [style, setStyle] = useState<'streets' | 'satellite'>('streets');
+  const [style, setStyle] = useState<BaseMap>(savedBaseMap);
+  const chooseStyle = (v: BaseMap) => {
+    setStyle(v);
+    try { localStorage.setItem(BASEMAP_KEY, v); } catch { /* storage blocked */ }
+  };
   const [popup, setPopup] = useState<MapPoint | null>(null);
 
   const mapStyle = useMemo(() => {
     const key = branding?.maptilerKey;
-    if (!key) return OSM_FALLBACK;
-    const name = style === 'satellite' ? 'hybrid' : scheme === 'dark' ? 'streets-v2-dark' : 'streets-v2';
-    return `https://api.maptiler.com/maps/${name}/style.json?key=${key}`;
-  }, [branding?.maptilerKey, style, scheme]);
+    // The map stays light in both app themes so roads and routes stand out.
+    if (!key || style === 'osm') return OSM_FALLBACK;
+    return `https://api.maptiler.com/maps/${style === 'satellite' ? 'hybrid' : 'streets-v2'}/style.json?key=${key}`;
+  }, [branding?.maptilerKey, style]);
 
   const pad = fitPadding ?? { top: 60, bottom: 60, left: 60, right: 60 };
   useImperativeHandle(ref, () => ({
@@ -152,8 +165,8 @@ export const FleetMap = forwardRef<FleetMapHandle, Props>(function FleetMap(
       </Map>
       {branding?.maptilerKey && (
         <SegmentedControl className={classes.styleSwitch} size="xs" value={style}
-                          onChange={(v) => setStyle(v as 'streets' | 'satellite')}
-                          data={[{ label: 'Map', value: 'streets' }, { label: 'Satellite', value: 'satellite' }]} />
+                          onChange={(v) => chooseStyle(v as BaseMap)}
+                          data={[{ label: 'Map', value: 'streets' }, { label: 'OpenStreetMap', value: 'osm' }, { label: 'Satellite', value: 'satellite' }]} />
       )}
     </div>
   );

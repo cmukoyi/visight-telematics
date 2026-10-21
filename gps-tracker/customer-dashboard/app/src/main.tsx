@@ -18,6 +18,13 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 15_000 } },
 });
 
+// Old bookmarks like //customer/index.html don't match the router's basename and
+// would render a blank page; normalise them to /customer/... first.
+const cleanPath = window.location.pathname.replace(/\/{2,}/g, '/').replace(/\/index\.html$/, '/');
+if (cleanPath !== window.location.pathname) {
+  window.history.replaceState(null, '', cleanPath + window.location.search.replace(/^\?$/, '') + window.location.hash);
+}
+
 const colorSchemeManager = localStorageColorSchemeManager({ key: 'vt-color-scheme' });
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
