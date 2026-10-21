@@ -8,7 +8,7 @@ silently failing in production.
 
 History
 -------
-On 2026-05-19 we discovered that beacon's production .env contained
+On 2026-05-19 we discovered that a production .env contained
 ``SCOPE_AUTH_HEADER=Basic <your-base64-credentials>`` — copied verbatim
 from ``.env.example`` and never filled in. Every Series 1 tag
 validation had been silently returning HTTP 401 from MProfiler since
@@ -26,7 +26,7 @@ import os
 # copied from .env.example. Keep this list short and unambiguous —
 # real credentials should never contain any of these substrings.
 _PLACEHOLDER_PATTERNS: tuple[str, ...] = (
-    "your-",        # your-tracksolid-account, your-mzone-client-secret
+    "your-",        # your-db-password, your-api-key
     "<",            # <your-base64-credentials-here>
     "change-me",
     "change_me",

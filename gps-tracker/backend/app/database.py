@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from contextlib import contextmanager
 import os
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://beacon_user:beacon_password@db:5432/beacon_telematics")
+DATABASE_URL = os.environ["DATABASE_URL"]  # set in backend/.env
 
 # PostgreSQL engine configuration
 # pool_pre_ping: test connections before use, drops stale ones automatically

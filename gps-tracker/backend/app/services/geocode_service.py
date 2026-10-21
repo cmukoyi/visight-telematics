@@ -92,8 +92,8 @@ class GeocodeService:
         self,
         provider="maptiler",
         threshold_metres=500,
-        cache_file="/tmp/pinplot_geocode_cache.json",
-        user_agent="PinPlot-GPS-Tracker/1.0 (contact@pinplot.me)",
+        cache_file="/tmp/visight_geocode_cache.json",
+        user_agent="ViSight-Track/1.0 (support@visighttelematics.co.za)",
     ):
         """
         Args:

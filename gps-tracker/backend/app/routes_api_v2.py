@@ -199,7 +199,7 @@ def get_devices(
     
     **Example:**
     ```bash
-    curl -X GET https://pinplot.me/api/v2/devices \\
+    curl -X GET https://track.visighttelematics.co.za/api/v2/devices \\
       -H "Authorization: Bearer YOUR_TOKEN"
     ```
     """
@@ -320,7 +320,7 @@ def get_movement_history(
     
     **Example:**
     ```bash
-    curl -X GET "https://pinplot.me/api/v2/movement-history/781950640095475?start_date=2026-07-01T00:00:00Z&end_date=2026-07-26T23:59:59Z" \\
+    curl -X GET "https://track.visighttelematics.co.za/api/v2/movement-history/781950640095475?start_date=2026-07-01T00:00:00Z&end_date=2026-07-26T23:59:59Z" \\
       -H "Authorization: Bearer YOUR_TOKEN"
     ```
     """
@@ -377,7 +377,7 @@ def get_geofences(
     
     **Example:**
     ```bash
-    curl -X GET "https://pinplot.me/api/v2/geofences?armed_only=true" \\
+    curl -X GET "https://track.visighttelematics.co.za/api/v2/geofences?armed_only=true" \\
       -H "Authorization: Bearer YOUR_TOKEN"
     ```
     """
@@ -428,7 +428,7 @@ def get_alerts(
     
     **Example:**
     ```bash
-    curl -X GET "https://pinplot.me/api/v2/alerts?alert_type=geofence_exit&unread_only=true" \\
+    curl -X GET "https://track.visighttelematics.co.za/api/v2/alerts?alert_type=geofence_exit&unread_only=true" \\
       -H "Authorization: Bearer YOUR_TOKEN"
     ```
     """

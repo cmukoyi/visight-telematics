@@ -74,7 +74,7 @@ class SMSService:
             "gdpr_deletion_warning": "⚠️",
         }
         emoji = type_emoji.get(alert_type, "🔔")
-        body = f"{emoji} PinPlot Alert\n{title}\n{message}"
+        body = f"{emoji} {os.getenv('BRAND_NAME', 'ViSight Track')} Alert\n{title}\n{message}"
         # Truncate to 160 chars for single SMS
         if len(body) > 160:
             body = body[:157] + "..."

@@ -106,7 +106,7 @@ def login(
     
     **Example:**
     ```bash
-    curl -X POST https://pinplot.me/api/auth/login \\
+    curl -X POST https://track.visighttelematics.co.za/api/auth/login \\
       -H "Content-Type: application/json" \\
       -d '{
         "email": "user@example.com",

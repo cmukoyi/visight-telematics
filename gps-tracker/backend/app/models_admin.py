@@ -1,5 +1,5 @@
 """
-Admin-specific database models: Admin Users, Logs, Billing
+Admin-specific database models: admin users, logs, audit, packages, critical alerts
 """
 from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, Float, Text, Enum, JSON, Index
 from sqlalchemy.sql import func
@@ -98,47 +98,6 @@ class AuditLog(Base):
     )
 
 
-class BillingData(Base):
-    """Billing summary - calculated daily"""
-    __tablename__ = "billing_data"
-    
-    id = get_uuid_column()
-    date = Column(DateTime(timezone=True), nullable=False, unique=True, index=True)
-    total_users = Column(Integer, default=0)  # Total registered users
-    active_users = Column(Integer, default=0)  # Users with at least one IMEI
-    total_imeis = Column(Integer, default=0)  # Total active IMEIs
-    active_devices_by_user = Column(JSON)  # {user_id: [imei_list]}
-    imei_to_user = Column(JSON)  # {imei: user_id}
-    user_device_count = Column(JSON)  # {user_id: count}
-    meta_data = Column(JSON)  # Additional billing metadata
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    __table_args__ = (
-        Index('ix_billing_data_date', 'date'),
-    )
-
-
-class BillingTransaction(Base):
-    """Individual billing events/transactions"""
-    __tablename__ = "billing_transactions"
-    
-    id = get_uuid_column()
-    user_id = Column(String(36), nullable=True, index=True)
-    transaction_type = Column(String(50))  # user_registered, imei_assigned, imei_removed, etc.
-    imei = Column(String(50), nullable=True, index=True)
-    amount = Column(Float, default=0)
-    currency = Column(String(3), default="USD")
-    description = Column(Text)
-    meta_data = Column(JSON)  # Transaction metadata
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
-    
-    __table_args__ = (
-        Index('ix_billing_transactions_user_date', 'user_id', 'created_at'),
-        Index('ix_billing_transactions_type_date', 'transaction_type', 'created_at'),
-    )
-
-
 class TagPackage(Base):
     """Subscription package that gates how long a BLE tag may report location data.
 
@@ -194,10 +153,8 @@ def add_months(start: datetime, months: int) -> datetime:
 
 
 class CriticalServiceCategory(str, enum.Enum):
-    POLLER_CORE = "poller_core"
-    TRACKSOLID = "tracksolid"
-    MZONE = "mzone"
-    PARETO_BRIDGE = "pareto_bridge"
+    # Retired values still exist in the Postgres enum type (poller_core,
+    # tracksolid, mzone, pareto_bridge); migration 065 removed their rows.
     EMAIL_DELIVERY = "email_delivery"
     DATABASE_ERRORS = "database_errors"
     CONTAINER_HEALTH = "container_health"
@@ -232,50 +189,3 @@ class CriticalServiceAlertSubscription(Base):
     last_alert_sent_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-
-class AsyncJob(Base):
-    """
-    Background job queue for long-running admin operations (v2.2 A5).
-    
-    Supports:
-    - batch_backfill: Backfill multiple devices in a tenant
-    - batch_reprocess: Reprocess multiple devices in a tenant
-    
-    Status flow: pending → running → completed/failed/cancelled
-    """
-    __tablename__ = "async_jobs"
-    
-    id = get_uuid_column()
-    job_type = Column(String(50), nullable=False, index=True)  # batch_backfill | batch_reprocess
-    status = Column(String(20), nullable=False, index=True)    # pending | running | completed | failed | cancelled
-    created_by = Column(String(255), nullable=False)           # Admin email
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    started_at = Column(DateTime(timezone=True), nullable=True)
-    completed_at = Column(DateTime(timezone=True), nullable=True)
-    
-    # Job parameters (JSONB for flexibility)
-    params = Column(JSON, nullable=False)
-    # Example for batch_backfill: {"tenant_id": "uuid", "preset": "last_7_days"}
-    # Example for batch_reprocess: {"tenant_id": "uuid", "device_imeis": ["imei1", "imei2"]}
-    
-    # Progress tracking
-    total_devices = Column(Integer, nullable=True)
-    completed_devices = Column(Integer, default=0, nullable=False)
-    failed_devices = Column(Integer, default=0, nullable=False)
-    
-    # Results (JSONB - accumulated stats)
-    results = Column(JSON, nullable=True)
-    # Example: {"positions_fetched": 10000, "journeys_created": 150, "errors": [...]}
-    
-    # Error tracking
-    error_message = Column(Text, nullable=True)
-    
-    # Resumability
-    last_processed_imei = Column(String(20), nullable=True)
-    
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-
-
-# Create composite index for status queries
-Index('ix_async_jobs_status_created', AsyncJob.status, AsyncJob.created_at)

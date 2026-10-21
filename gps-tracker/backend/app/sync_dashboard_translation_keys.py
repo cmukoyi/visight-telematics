@@ -2,7 +2,7 @@
 """Idempotently seed customer-dashboard keys from its i18n-marked HTML.
 
 Run after deployment for a tenant:
-    docker exec pinplot_backend python app/sync_dashboard_translation_keys.py
+    docker exec visight_telematics_backend python app/sync_dashboard_translation_keys.py
 
 The dashboard itself is the source of truth for the key inventory. This avoids
 the historical failure mode where markup gains a data-i18n key but a separate,

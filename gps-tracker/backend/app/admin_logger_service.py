@@ -25,7 +25,7 @@ class AdminPortalLogger:
         self.session = requests.Session()
         
         # Setup local logger
-        self.local_logger = logging.getLogger('beacon_telematics')
+        self.local_logger = logging.getLogger('visight_track')
         handler = logging.StreamHandler()
         formatter = logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -169,7 +169,7 @@ def get_logger() -> AdminPortalLogger:
     global _logger_instance
     if _logger_instance is None:
         # Default to same domain
-        _logger_instance = AdminPortalLogger(os.getenv('BACKEND_URL', 'https://pinplot.me'))
+        _logger_instance = AdminPortalLogger(os.getenv('BACKEND_URL', 'https://track.visighttelematics.co.za'))
     return _logger_instance
 
 # Usage examples:

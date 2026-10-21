@@ -18,46 +18,6 @@ logger = logging.getLogger(__name__)
 
 
 CATEGORY_DEFS: dict[str, dict[str, Any]] = {
-    "poller_core": {
-        "label": "Poller Core",
-        "description": "Background location poller loop and cycle failures",
-        "patterns": [
-            "location polling cycle",
-            "error in _poll_locations",
-            "location_poller_service",
-        ],
-    },
-    "tracksolid": {
-        "label": "TrackSolid",
-        "description": "TrackSolid token/auth and location fetch failures",
-        "patterns": [
-            "tracksolid",
-            "waf block",
-            "token fetch failed",
-            "getmonitorinfo",
-            "batch skipped",
-        ],
-    },
-    "mzone": {
-        "label": "MZone",
-        "description": "MZone OAuth and vehicle/location API failures",
-        "patterns": [
-            "mzone",
-            "get_oauth_token",
-            "get_vehicle_locations",
-            "error in get_all_vehicles",
-        ],
-    },
-    "pareto_bridge": {
-        "label": "Pareto Bridge",
-        "description": "Pareto socket bridge connectivity and indoor stream failures",
-        "patterns": [
-            "pareto_bridge",
-            "raddec dispatch failed",
-            "connect failed",
-            "offline sweep failed",
-        ],
-    },
     "email_delivery": {
         "label": "Email Delivery",
         "description": "SMTP/SendGrid/Twilio email send failures",
@@ -158,7 +118,7 @@ class CriticalServiceAlertService:
         return query.filter(or_(*clauses)).count()
 
     def _count_container_failures(self) -> tuple[int, list[dict[str, str]]]:
-        prefix = os.getenv("ADMIN_OPS_CONTAINER_PREFIX", "pinplot_")
+        prefix = os.getenv("ADMIN_OPS_CONTAINER_PREFIX", "visight_telematics_")
         try:
             import docker
 

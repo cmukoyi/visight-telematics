@@ -37,14 +37,13 @@ class EmailService:
         self.smtp_port = int(os.getenv("SMTP_PORT", "1025"))
         self.smtp_user = os.getenv("SMTP_USER", "")
         self.smtp_password = os.getenv("SMTP_PASSWORD", "")
-        self.from_email = os.getenv("FROM_EMAIL", "noreply@pinplot.me")
+        self.from_email = os.getenv("FROM_EMAIL", "noreply@visighttelematics.co.za")
         self.debug = os.getenv("DEBUG", "False").lower() == "true"
 
-        # Tenant branding (env-driven so the same code runs for PinPlot,
-        # BeaconTelematics, etc. without source diffs). Used in subjects /
-        # bodies / footer links of every templated email below.
-        self.brand_name    = os.getenv("BRAND_NAME", "Pinplot")
-        self.brand_domain  = os.getenv("BRAND_DOMAIN", "pinplot.me")
+        # Branding (env-driven). Used in subjects / bodies / footer links of
+        # every templated email below.
+        self.brand_name    = os.getenv("BRAND_NAME", "ViSight Track")
+        self.brand_domain  = os.getenv("BRAND_DOMAIN", "track.visighttelematics.co.za")
         self.brand_url     = os.getenv("FRONTEND_URL", f"https://{self.brand_domain}")
         self.brand_support = os.getenv("BRAND_SUPPORT_EMAIL", f"support@{self.brand_domain}")
         

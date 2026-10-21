@@ -2,7 +2,7 @@
 Service for generating unified portal alerts (battery low, tag offline, geofence, GDPR deletion).
 
 Called by:
-  - location_poller_service  (battery_low, tag_offline, purge old alerts)
+  - housekeeping_service     (tag_offline, purge old alerts, package expiry)
   - geofence_service         (geofence_entry, geofence_exit)
   - main._gdpr_cleanup_loop  (gdpr_deletion_warning)
 """

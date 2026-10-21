@@ -2,13 +2,13 @@
 Admin Ops API — Docker container management via mounted Docker socket.
 
 Endpoints:
-  GET  /api/admin/ops/containers                - list pinplot_* containers
+  GET  /api/admin/ops/containers                - list the platform's containers
   GET  /api/admin/ops/containers/{name}/logs    - tail container logs
   POST /api/admin/ops/containers/{name}/restart - restart a container
 
 Requires /var/run/docker.sock mounted into the backend container (read for
 list/logs; the restart call needs write access, so mount without :ro for POST).
-Only containers whose name starts with 'pinplot_' can be managed.
+Only containers whose name starts with ADMIN_OPS_CONTAINER_PREFIX can be managed.
 
 SECURITY: All endpoints require admin authentication.
 """
@@ -28,10 +28,9 @@ router = APIRouter(
 )
 
 # Safety guard — only containers with this prefix may be touched.
-# Per-tenant override via ADMIN_OPS_CONTAINER_PREFIX (e.g. 'beacon_telematics_'
-# or 'pinplot_'). Default keeps PinPlot back-compat.
+# Container name prefix = TENANT_PREFIX in tenants/visight/tenant.env + "_".
 import os as _os
-ALLOWED_PREFIX = _os.getenv("ADMIN_OPS_CONTAINER_PREFIX", "pinplot_")
+ALLOWED_PREFIX = _os.getenv("ADMIN_OPS_CONTAINER_PREFIX", "visight_telematics_")
 
 
 def _client():
@@ -60,7 +59,7 @@ def _guard(name: str) -> None:
 
 @router.get("/containers")
 def list_containers():
-    """Return status of every pinplot_* container (running or stopped)."""
+    """Return status of every platform container (running or stopped)."""
     client = _client()
     result = []
     for c in client.containers.list(all=True):
