@@ -83,6 +83,8 @@ const base = createTheme({
     Card: { defaultProps: { withBorder: true, radius: 'lg', padding: 'lg' } },
     Paper: { defaultProps: { radius: 'lg' } },
     Button: { defaultProps: { radius: 'md' } },
+    // Dialogs (confirmations, temporary passwords) open in the middle of the screen, like the editors
+    Modal: { defaultProps: { centered: true } },
   },
 });
 

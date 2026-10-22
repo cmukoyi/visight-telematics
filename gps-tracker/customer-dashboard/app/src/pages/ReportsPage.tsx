@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  ActionIcon, Badge, Button, Drawer, Group, Menu, Modal, NumberInput, Paper, Select, SimpleGrid, Stack, Switch, Tabs, TagsInput,
+  ActionIcon, Badge, Button, Drawer, Group, Menu, NumberInput, Paper, Select, SimpleGrid, Stack, Switch, Tabs, TagsInput,
   Text, TextInput, Title, Tooltip, UnstyledButton,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
@@ -16,6 +16,7 @@ import type { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { api, download, qs } from '../api/client';
 import { useCan, useCategories, useGroupTheme, useReports, useSchedules, useVehicles, type Range } from '../api/hooks';
 import type { ReportDef, ReportResult, ReportSchedule } from '../api/types';
+import { EditorShell, firstError } from '../components/EditorShell';
 import { DataGrid } from '../components/DataGrid';
 import { RangePicker, defaultRange } from '../components/RangePicker';
 import { dateTime, vehicleName } from '../utils/format';
@@ -119,29 +120,43 @@ function ScheduleModal({ editing, onClose }: { editing: ReportSchedule | { repor
       notifications.show({ color: 'green', message: existing ? 'Schedule saved' : 'Report scheduled' });
       onClose();
     } catch (e) { notifications.show({ color: 'red', message: (e as Error).message }); }
-  });
+  }, firstError);
 
   return (
-    <Modal opened={!!editing} onClose={onClose} title={existing ? 'Edit scheduled report' : 'Schedule a report'} size="lg">
-      <form onSubmit={submit}>
-        <Stack>
-          <SimpleGrid cols={2}>
+    <EditorShell opened={!!editing} onClose={onClose} title={existing ? 'Edit Scheduled Report' : 'Schedule a Report'} onSave={() => submit()}
+                 sections={[
+      { id: 'general', label: 'General', keywords: 'report name active',
+        content: (
+          <Stack maw={620}>
             <Select label="Report" data={reports.map((r) => ({ value: r.key, label: r.title }))} allowDeselect={false} {...form.getInputProps('report_key')} />
             <TextInput label="Name" placeholder="Optional, used as the email subject" {...form.getInputProps('name')} />
-            <Select label="Frequency" allowDeselect={false} data={Object.entries(FREQ_LABEL).map(([value, label]) => ({ value, label }))} {...form.getInputProps('frequency')} />
-            <NumberInput label={`Send at (hour, ${existing?.timezone ?? tz})`} min={0} max={23} clampBehavior="strict" {...form.getInputProps('send_hour')} />
+            <Switch label="Active" {...form.getInputProps('is_active', { type: 'checkbox' })} />
+          </Stack>
+        ) },
+      { id: 'vehicles', label: 'Vehicles', keywords: 'vehicle group',
+        content: (
+          <Stack maw={620}>
             <Select label="Vehicle" placeholder="All vehicles" clearable searchable data={vehicles.map((v) => ({ value: v.imei, label: vehicleName(v) }))} {...form.getInputProps('imei')} />
             <Select label="Vehicle group" placeholder="All groups" clearable data={categories.map((c) => c.name)} {...form.getInputProps('category')} />
+          </Stack>
+        ) },
+      { id: 'schedule', label: 'Schedule', keywords: 'frequency daily weekly monthly hour time',
+        content: (
+          <Stack maw={620}>
+            <Select label="Frequency" allowDeselect={false} data={Object.entries(FREQ_LABEL).map(([value, label]) => ({ value, label }))} {...form.getInputProps('frequency')} />
+            <NumberInput label={`Send at (hour, ${existing?.timezone ?? tz})`} min={0} max={23} clampBehavior="strict" {...form.getInputProps('send_hour')} />
+            <Text size="sm" c="dimmed">Daily reports cover the previous day, weekly reports the previous Monday–Sunday, monthly reports the previous month.</Text>
+          </Stack>
+        ) },
+      { id: 'delivery', label: 'Delivery', keywords: 'recipients email format excel csv',
+        content: (
+          <Stack maw={620}>
+            <TagsInput label="Recipients" withAsterisk description="Press Enter after each email address" placeholder="name@company.co.za"
+                       splitChars={[',', ' ', ';']} clearable {...form.getInputProps('recipients')} />
             <Select label="File format" allowDeselect={false} data={[{ value: 'xlsx', label: 'Excel (.xlsx)' }, { value: 'csv', label: 'CSV' }]} {...form.getInputProps('file_format')} />
-          </SimpleGrid>
-          <TagsInput label="Recipients" description="Press Enter after each email address" placeholder="name@company.co.za"
-                     splitChars={[',', ' ', ';']} clearable {...form.getInputProps('recipients')} />
-          <Switch label="Active" {...form.getInputProps('is_active', { type: 'checkbox' })} />
-          <Text size="xs" c="dimmed">Daily reports cover the previous day, weekly reports the previous Monday–Sunday, monthly reports the previous month.</Text>
-          <Group justify="flex-end"><Button variant="default" onClick={onClose}>Cancel</Button><Button type="submit">{existing ? 'Save' : 'Schedule'}</Button></Group>
-        </Stack>
-      </form>
-    </Modal>
+          </Stack>
+        ) },
+    ]} />
   );
 }
 

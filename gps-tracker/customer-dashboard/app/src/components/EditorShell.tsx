@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button, CloseButton, Group, Modal, ScrollArea, Text, TextInput, UnstyledButton } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
+import { notifications } from '@mantine/notifications';
 import { IconSearch } from '@tabler/icons-react';
 import classes from './EditorShell.module.css';
 
@@ -98,4 +99,10 @@ export function EditorShell({ opened, onClose, title, sections, onSave, onSaveAn
       </div>
     </Modal>
   );
+}
+
+/** Show the first validation error (it may be in a section that's scrolled out of view). */
+export function firstError(errors: Record<string, unknown>) {
+  const msg = Object.values(errors).find(Boolean);
+  if (msg) notifications.show({ color: 'orange', message: String(msg) });
 }

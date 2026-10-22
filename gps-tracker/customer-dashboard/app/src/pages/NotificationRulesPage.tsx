@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ActionIcon, Alert, Anchor, Badge, Breadcrumbs, Button, Checkbox, Group, Modal, MultiSelect, Paper, Select, SimpleGrid,
+  ActionIcon, Alert, Anchor, Badge, Breadcrumbs, Button, Checkbox, Group, MultiSelect, Paper, Select,
   Stack, Switch, TagsInput, Text, TextInput, Textarea, Title, Tooltip,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
@@ -13,6 +13,7 @@ import type { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { api } from '../api/client';
 import { useCan, useCategories, useEventTypeGroups, useEventTypeList, usePlaceGroups, usePlaces, useRules, useRulesMeta, useVehicles } from '../api/hooks';
 import { detail, type NotificationRule } from '../api/types';
+import { EditorShell, firstError } from '../components/EditorShell';
 import { DataGrid } from '../components/DataGrid';
 import { dateTime, vehicleName } from '../utils/format';
 import classes from './NotificationRulesPage.module.css';
@@ -75,15 +76,15 @@ export function NotificationRulesPage() {
   };
   const toJson = (v: RuleForm) => ({ ...v, category: v.category === ALL ? null : v.category, email_message: v.email_message || null });
   const refresh = () => qc.invalidateQueries({ queryKey: ['notification-rules'] });
-  const save = form.onSubmit(async (v) => {
+  const save = (andNew: boolean) => form.onSubmit(async (v) => {
     try {
       if (editing === 'new') await api('/api/portal/notification-rules', { method: 'POST', json: toJson(v) });
       else if (editing) await api(`/api/portal/notification-rules/${editing.id}`, { method: 'PUT', json: toJson(v) });
       refresh();
-      setEditing(null);
       notifications.show({ color: 'green', message: 'Notification rule saved' });
+      if (andNew) open('new'); else setEditing(null);
     } catch (e) { notifications.show({ color: 'red', message: (e as Error).message }); }
-  });
+  }, firstError)();
   const toggleActive = async (r: NotificationRule) => {
     try {
       await api(`/api/portal/notification-rules/${r.id}`, { method: 'PUT', json: {
@@ -179,56 +180,62 @@ export function NotificationRulesPage() {
                   overlayNoRowsTemplate='<span style="opacity:.7">No rules yet — add one to get place entry and exit alerts.</span>' />
       </Paper>
 
-      <Modal opened={!!editing} onClose={() => setEditing(null)} size="xl"
-             title={<Group gap="xs"><IconBellRinging size={18} /><Text fw={650}>{editing === 'new' ? 'New notification rule' : 'Edit notification rule'}</Text></Group>}>
-        <form onSubmit={save}>
-          <Stack>
-            <SimpleGrid cols={{ base: 1, sm: 2 }}>
-              <TextInput label="Rule name" placeholder="e.g. Depot arrivals and departures" {...form.getInputProps('name')} data-autofocus />
+      <EditorShell opened={!!editing} onClose={() => setEditing(null)}
+                   title={<Group gap="sm"><IconBellRinging size={24} />{editing === 'new' ? 'New Notification Rule' : 'Edit Notification Rule'}</Group>}
+                   onSave={manage ? () => save(false) : undefined} onSaveAndNew={manage ? () => save(true) : undefined} sections={[
+        { id: 'general', label: 'General', keywords: 'name rule type vehicle group active',
+          content: (
+            <Stack maw={640}>
+              <TextInput label="Rule name" withAsterisk placeholder="e.g. Depot arrivals and departures" {...form.getInputProps('name')} data-autofocus />
               <Select label="Rule type" allowDeselect={false} data={meta?.rule_types ?? [{ value: 'geofence', label: 'Place entry / exit' }]}
                       {...form.getInputProps('rule_type')} />
-              <Select label="Vehicle group" allowDeselect={false}
+              <Select label="Vehicle group" allowDeselect={false} description="Which vehicles the rule covers"
                       data={[{ value: ALL, label: 'All vehicles' }, ...categories.map((c) => ({ value: c.name, label: c.name }))]}
                       {...form.getInputProps('category')} />
-              {form.values.rule_type === 'event' ? (
-                <MultiSelect label="Events" placeholder={form.values.event_codes.length ? '' : 'e.g. Speeding, Harsh braking'} searchable clearable
-                             data={eventOptions} {...form.getInputProps('event_codes')} maxDropdownHeight={320} />
-              ) : (
-                <MultiSelect label="Places" placeholder={form.values.place_ids.length || form.values.place_group_ids.length ? '' : 'All places'}
-                             searchable clearable data={places.map((p) => ({ value: p.id, label: p.name }))} {...form.getInputProps('place_ids')}
-                             nothingFoundMessage="No places — add them under Configuration → Places" />
-              )}
-              {form.values.rule_type === 'event' && eventGroups.length > 0 && (
+              <Switch label="Rule is active" {...form.getInputProps('is_active', { type: 'checkbox' })} />
+            </Stack>
+          ) },
+        { id: 'watch', label: form.values.rule_type === 'event' ? 'Events' : 'Places', keywords: 'places place groups events entry exit notify',
+          content: form.values.rule_type === 'event' ? (
+            <Stack maw={720}>
+              <Text size="sm" c="dimmed">An alert is raised every time a vehicle in the chosen vehicle group reports one of these events.
+                Speeding and harsh driving come from the unit's own settings (overspeed limit, green driving).</Text>
+              <MultiSelect label="Events" placeholder={form.values.event_codes.length ? '' : 'e.g. Speeding, Harsh braking'} searchable clearable
+                           data={eventOptions} {...form.getInputProps('event_codes')} maxDropdownHeight={320} />
+              {eventGroups.length > 0 && (
                 <Select label="…and an event type group" placeholder="Optional" clearable data={eventGroups.map((g) => ({ value: g.id, label: g.name }))}
                         {...form.getInputProps('event_group_id')} />
               )}
-              {form.values.rule_type === 'geofence' && placeGroups.length > 0 && (
+            </Stack>
+          ) : (
+            <Stack maw={720}>
+              <MultiSelect label="Places" placeholder={form.values.place_ids.length || form.values.place_group_ids.length ? '' : 'All places'}
+                           searchable clearable data={places.map((p) => ({ value: p.id, label: p.name }))} {...form.getInputProps('place_ids')}
+                           nothingFoundMessage="No places — add them under Configuration → Places" />
+              {placeGroups.length > 0 && (
                 <MultiSelect label="…and place groups" placeholder={form.values.place_group_ids.length ? '' : 'Optional'} searchable clearable
                              data={placeGroups.map((g) => ({ value: g.id, label: g.name }))} {...form.getInputProps('place_group_ids')} />
               )}
-            </SimpleGrid>
-            {form.values.rule_type === 'event' ? (
-              <Text size="sm" c="dimmed">An alert is raised every time a vehicle in the chosen vehicle group reports one of these events.
-                Speeding and harsh driving come from the unit's own settings (overspeed limit, green driving).</Text>
-            ) : (
-            <div>
-              <Text size="sm" fw={500} mb={6}>Notify</Text>
-              <Group>
-                <Checkbox label="Once when a vehicle enters a place" {...form.getInputProps('on_entry', { type: 'checkbox' })} />
-                <Checkbox label="Once when a vehicle leaves a place" {...form.getInputProps('on_exit', { type: 'checkbox' })}
-                          error={form.errors.on_exit} />
-              </Group>
-            </div>
-            )}
-            <Alert variant="light" icon={<IconInfoCircle size={16} />} p="xs">
-              Every notification is listed in the Inbox for users who can see the vehicle.
-            </Alert>
-
-            <Paper withBorder p="md" radius="md">
+              <div>
+                <Text size="sm" fw={500} mb={6}>Notify</Text>
+                <Stack gap="xs">
+                  <Checkbox label="Once when a vehicle enters a place" {...form.getInputProps('on_entry', { type: 'checkbox' })} />
+                  <Checkbox label="Once when a vehicle leaves a place" {...form.getInputProps('on_exit', { type: 'checkbox' })}
+                            error={form.errors.on_exit} />
+                </Stack>
+              </div>
+            </Stack>
+          ) },
+        { id: 'email', label: 'Email', keywords: 'email subscribe recipients message placeholders preview',
+          content: (
+            <Stack maw={760}>
+              <Alert variant="light" icon={<IconInfoCircle size={16} />} p="xs">
+                Every notification is listed in the Inbox for users who can see the vehicle.
+              </Alert>
               <Checkbox label="Subscribe by email" description="Also email these addresses with your own message"
                         {...form.getInputProps('email_enabled', { type: 'checkbox' })} />
               {form.values.email_enabled && (
-                <Stack mt="md" gap="sm">
+                <Stack gap="sm">
                   <TagsInput label="Email addresses" placeholder="name@company.co.za — press Enter after each" splitChars={[',', ' ', ';']}
                              clearable {...form.getInputProps('email_recipients')} />
                   <Textarea ref={messageRef} label="Custom message" autosize minRows={3} maxLength={2000}
@@ -249,13 +256,9 @@ export function NotificationRulesPage() {
                   </Paper>
                 </Stack>
               )}
-            </Paper>
-            <Switch label="Rule is active" {...form.getInputProps('is_active', { type: 'checkbox' })} />
-            <Group justify="flex-end"><Button variant="default" onClick={() => setEditing(null)}>Cancel</Button>
-              <Button type="submit">{editing === 'new' ? 'Create rule' : 'Save rule'}</Button></Group>
-          </Stack>
-        </form>
-      </Modal>
+            </Stack>
+          ) },
+      ]} />
     </Stack>
   );
 }

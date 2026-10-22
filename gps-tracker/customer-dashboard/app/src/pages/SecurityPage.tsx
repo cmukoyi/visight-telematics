@@ -21,6 +21,7 @@ import { UserEditor } from './UserEditor';
 import type { PortalUserRow, Role, SecurityGroup } from '../api/types';
 import { ConfigHeader } from '../components/ConfigHeader';
 import { DataGrid } from '../components/DataGrid';
+import { EditorShell, firstError } from '../components/EditorShell';
 import { dateTime } from '../utils/format';
 import classes from './SecurityPage.module.css';
 
@@ -129,14 +130,16 @@ function SecurityGroupsTab() {
   const [editing, setEditing] = useState<SecurityGroup | 'new' | null>(null);
   const form = useForm({ initialValues: { name: '', description: '' }, validate: { name: (v) => (v.trim() ? null : 'Enter a name') } });
   const open = (g: SecurityGroup | 'new') => { form.setValues(g === 'new' ? { name: '', description: '' } : { name: g.name, description: g.description ?? '' }); setEditing(g); };
-  const save = form.onSubmit(async (v) => {
+  const { data: users = [] } = usePortalUsers(can('users.view') || can('users.manage'));
+  const save = (andNew: boolean) => form.onSubmit(async (v) => {
     try {
       if (editing === 'new') await api('/api/portal/security-groups', { method: 'POST', json: v });
       else if (editing) await api(`/api/portal/security-groups/${editing.id}`, { method: 'PUT', json: v });
       qc.invalidateQueries({ queryKey: ['security-groups'] });
-      setEditing(null);
+      notifications.show({ color: 'green', message: `${v.name} saved` });
+      if (andNew) open('new'); else setEditing(null);
     } catch (e) { fail(e); }
-  });
+  }, firstError)();
   const remove = (g: SecurityGroup) => modals.openConfirmModal({
     title: `Delete “${g.name}”?`, labels: { confirm: 'Delete', cancel: 'Cancel' }, confirmProps: { color: 'red' },
     children: <Text size="sm">Only empty security groups can be deleted.</Text>,
@@ -177,15 +180,38 @@ function SecurityGroupsTab() {
           </Paper>
         ))}
       </SimpleGrid>
-      <Modal opened={!!editing} onClose={() => setEditing(null)} title={editing === 'new' ? 'Add security group' : 'Edit security group'}>
-        <form onSubmit={save}>
-          <Stack>
-            <TextInput label="Name" placeholder="e.g. Northern region" {...form.getInputProps('name')} data-autofocus />
-            <Textarea label="Description" autosize minRows={2} {...form.getInputProps('description')} />
-            <Group justify="flex-end"><Button variant="default" onClick={() => setEditing(null)}>Cancel</Button><Button type="submit">Save</Button></Group>
-          </Stack>
-        </form>
-      </Modal>
+      <EditorShell opened={!!editing} onClose={() => setEditing(null)} title={editing === 'new' ? 'New Security Group' : 'Edit Security Group'}
+                   onSave={manage ? () => save(false) : undefined} onSaveAndNew={manage ? () => save(true) : undefined} sections={[
+        { id: 'general', label: 'General', keywords: 'name description',
+          content: (
+            <Stack maw={620}>
+              <TextInput label="Name" withAsterisk placeholder="e.g. Northern region" disabled={!manage} {...form.getInputProps('name')} data-autofocus />
+              <Textarea label="Description" autosize minRows={2} disabled={!manage} {...form.getInputProps('description')} />
+            </Stack>
+          ) },
+        { id: 'vehicles', label: 'Vehicle groups', keywords: 'vehicle groups vehicles',
+          content: (
+            <Stack maw={760} gap="xs">
+              <Text size="sm" c="dimmed">Users in this security group see the vehicles in these vehicle groups. Choose a vehicle group's security group under Configuration → Vehicles → Vehicle Groups.</Text>
+              <Group gap={6}>
+                {editing && editing !== 'new' && editing.vehicle_groups.length
+                  ? editing.vehicle_groups.map((n) => <Badge key={n} variant="light">{n}</Badge>)
+                  : <Text size="sm" c="dimmed">None yet</Text>}
+              </Group>
+            </Stack>
+          ) },
+        { id: 'users', label: 'Users', keywords: 'users members',
+          content: (() => {
+            const members = editing && editing !== 'new' ? users.filter((u) => u.security_group_id === editing.id) : [];
+            return (
+              <Stack maw={760} gap={6}>
+                <Text size="sm" c="dimmed">Choose a user's security group in their user editor (Configuration → Users).</Text>
+                {members.length === 0 && <Text size="sm" c="dimmed">No users yet.</Text>}
+                {members.map((u) => <Text key={u.id} size="sm">{fullName(u)} <Text span c="dimmed">· {u.email}</Text></Text>)}
+              </Stack>
+            );
+          })() },
+      ]} />
     </Stack>
   );
 }

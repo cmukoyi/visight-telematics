@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ActionIcon, Alert, Anchor, Badge, Breadcrumbs, Button, Code, ColorInput, Group, Modal, Paper, PasswordInput, PinInput, Select,
+  ActionIcon, Alert, Anchor, Badge, Breadcrumbs, Button, Code, ColorInput, Group, Modal, Paper, PasswordInput, PinInput, Radio, Select,
   SimpleGrid, Stack, Text, TextInput, ThemeIcon, Title, Tooltip, UnstyledButton,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
@@ -19,6 +19,7 @@ import { VEHICLE_DETAILS, detail, type Category, type Vehicle } from '../api/typ
 import { getSession } from '../auth/session';
 import { ConfigHeader } from '../components/ConfigHeader';
 import { DataGrid } from '../components/DataGrid';
+import { EditorShell, firstError } from '../components/EditorShell';
 import { EventTypeGroupsPage, EventTypesPage, GeofencesPage, PlaceGroupsPage } from './CatalogPages';
 import { STATUS } from '../theme';
 import { ago, dateTime, vehicleName } from '../utils/format';
@@ -208,23 +209,45 @@ function Devices() {
           </Stack>
         )}
       </Modal>
-      <Modal opened={!!editing} onClose={() => setEditing(null)} title={editing ? `Edit ${vehicleName(editing)}` : ''} size="lg">
-        <form onSubmit={save}>
-          <Stack>
-            <TextInput label="Name" placeholder="e.g. Truck 12" {...form.getInputProps('description')} data-autofocus />
-            <SimpleGrid cols={2}>
+      <EditorShell opened={!!editing} onClose={() => setEditing(null)} title={editing ? `Edit ${vehicleName(editing)}` : ''}
+                   onSave={() => save()} sections={editing ? [
+        { id: 'general', label: 'General', keywords: 'name description group',
+          content: (
+            <Stack maw={620}>
+              <TextInput label="Name" placeholder="e.g. Truck 12" {...form.getInputProps('description')} data-autofocus />
+              <Select label="Vehicle group" placeholder="No group" clearable data={categories.map((c) => c.name)}
+                      description="The group's security group decides who sees this vehicle"
+                      value={form.values.category || null} onChange={(v) => form.setFieldValue('category', v ?? '')} />
+            </Stack>
+          ) },
+        { id: 'details', label: 'Vehicle details', keywords: 'registration driver make model year',
+          content: (
+            <SimpleGrid cols={{ base: 1, sm: 2 }} maw={760}>
               <TextInput label="Registration" placeholder="e.g. CA 123-456" {...form.getInputProps('registration')} />
               <TextInput label="Driver" placeholder="Driver's name" {...form.getInputProps('driver')} />
               <TextInput label="Make" placeholder="e.g. Toyota" {...form.getInputProps('make')} />
               <TextInput label="Model" placeholder="e.g. Hilux 2.8 GD-6" {...form.getInputProps('model')} />
               <TextInput label="Year" placeholder="e.g. 2022" maxLength={4} {...form.getInputProps('year')} />
             </SimpleGrid>
-            <Select label="Group" placeholder="No group" clearable data={categories.map((c) => c.name)}
-                    value={form.values.category || null} onChange={(v) => form.setFieldValue('category', v ?? '')} />
-            <Group justify="flex-end"><Button variant="default" onClick={() => setEditing(null)}>Cancel</Button><Button type="submit">Save</Button></Group>
-          </Stack>
-        </form>
-      </Modal>
+          ) },
+        { id: 'device', label: 'Device', keywords: 'imei unit model package expiry last seen',
+          content: (
+            <SimpleGrid cols={{ base: 1, sm: 2 }} maw={760} verticalSpacing="sm">
+              <TextInput label="IMEI" value={editing.imei} readOnly />
+              <TextInput label="Unit type" value={editing.device_model ?? '—'} readOnly />
+              <TextInput label="Last seen" value={editing.last_seen ? `${dateTime(editing.last_seen)} (${ago(editing.last_seen)})` : 'Never'} readOnly />
+              <TextInput label="Package" value={editing.package_name ?? '—'} readOnly />
+              <TextInput label="Expires" value={editing.expiry_date ? dateTime(editing.expiry_date).slice(0, 11) : '—'} readOnly />
+            </SimpleGrid>
+          ) },
+        ...(canDelete ? [{ id: 'delete', label: 'Delete vehicle', danger: true, keywords: 'remove delete',
+          content: (
+            <Stack maw={620} align="flex-start">
+              <Text size="sm">Deleting {vehicleName(editing)} removes it and all its positions, trips and events for good. You'll be asked to type a code to confirm.</Text>
+              <Button color="red" variant="light" leftSection={<IconBan size={16} />} onClick={() => { const v = editing; setEditing(null); startDelete(v); }}>Delete vehicle</Button>
+            </Stack>
+          ) }] : []),
+      ] : []} />
     </Stack>
   );
 }
@@ -250,16 +273,17 @@ function Groups() {
       : { name: c.name, color: c.color || '#3e7cfb', security_group_id: c.security_group_id });
     setEditing(c);
   };
-  const save = form.onSubmit(async (values) => {
+  const save = (andNew: boolean) => form.onSubmit(async (values) => {
     try {
       if (editing === 'new') await api('/api/portal/categories', { method: 'POST', json: values });
       else await api(`/api/portal/categories/${(editing as Category).id}`, { method: 'PUT', json: values });
       qc.invalidateQueries({ queryKey: ['categories'] });
       qc.invalidateQueries({ queryKey: ['vehicles'] });
       qc.invalidateQueries({ queryKey: ['security-groups'] });
-      setEditing(null);
+      notifications.show({ color: 'green', message: `${values.name} saved` });
+      if (andNew) open('new'); else setEditing(null);
     } catch (e) { notifications.show({ color: 'red', message: (e as Error).message }); }
-  });
+  }, firstError)();
   const remove = (c: Category) => modals.openConfirmModal({
     title: `Delete group “${c.name}”?`,
     children: <Text size="sm">Vehicles in this group stay on the platform; they just lose the group.</Text>,
@@ -292,21 +316,44 @@ function Groups() {
           </Group>
         ))}
       </Paper>
-      <Modal opened={!!editing} onClose={() => setEditing(null)} title={editing === 'new' ? 'Add group' : 'Edit group'}>
-        <form onSubmit={save}>
-          <Stack>
-            <TextInput label="Name" {...form.getInputProps('name')} data-autofocus />
-            <Select label="Security group" withAsterisk placeholder="Who may see these vehicles"
-                    data={securityGroups.map((g) => ({ value: g.id, label: g.name }))} {...form.getInputProps('security_group_id')}
-                    nothingFoundMessage="No security groups yet" />
-            {securityGroups.length === 0 && (
-              <Text size="xs" c="orange">Create a security group first under Configuration → Security.</Text>
-            )}
-            <ColorInput label="Colour" {...form.getInputProps('color')} />
-            <Group justify="flex-end"><Button variant="default" onClick={() => setEditing(null)}>Cancel</Button><Button type="submit">Save</Button></Group>
-          </Stack>
-        </form>
-      </Modal>
+      <EditorShell opened={!!editing} onClose={() => setEditing(null)} title={editing === 'new' ? 'New Vehicle Group' : 'Edit Vehicle Group'}
+                   onSave={() => save(false)} onSaveAndNew={() => save(true)} sections={[
+        { id: 'general', label: 'General', keywords: 'name colour color',
+          content: (
+            <Stack maw={620}>
+              <TextInput label="Name" withAsterisk {...form.getInputProps('name')} data-autofocus />
+              <ColorInput label="Colour" {...form.getInputProps('color')} />
+            </Stack>
+          ) },
+        { id: 'security', label: 'Security group', keywords: 'security group visibility',
+          content: (
+            <Stack maw={760}>
+              <Text size="sm" c="dimmed">Users in this security group can see the vehicles in this vehicle group.</Text>
+              {form.errors.security_group_id && <Text size="sm" c="red">{form.errors.security_group_id}</Text>}
+              {securityGroups.length === 0 && <Text size="sm" c="orange">Create a security group first under Configuration → Security.</Text>}
+              <Radio.Group value={form.values.security_group_id ?? ''} onChange={(v) => form.setFieldValue('security_group_id', v || null)}>
+                <Stack gap="xs">
+                  {securityGroups.map((g) => (
+                    <Paper key={g.id} withBorder p="sm" radius="md">
+                      <Radio value={g.id} label={<Text size="sm" fw={600}>{g.name}</Text>}
+                             description={`${g.user_count} user${g.user_count === 1 ? '' : 's'}${g.description ? ` · ${g.description}` : ''}`} />
+                    </Paper>
+                  ))}
+                </Stack>
+              </Radio.Group>
+            </Stack>
+          ) },
+        ...(editing && editing !== 'new' ? [{ id: 'vehicles', label: 'Vehicles', keywords: 'vehicles members',
+          content: (() => {
+            const inGroup = vehicles.filter((v) => v.category_name === editing.name);
+            return (
+              <Stack maw={760} gap={6}>
+                <Text size="sm" c="dimmed">{inGroup.length} vehicle{inGroup.length === 1 ? '' : 's'} in this group. Change a vehicle's group under Vehicles.</Text>
+                {inGroup.map((v) => <Text key={v.id} size="sm">{vehicleName(v)} <Text span c="dimmed">· {v.imei}</Text></Text>)}
+              </Stack>
+            );
+          })() }] : []),
+      ]} />
     </Stack>
   );
 }

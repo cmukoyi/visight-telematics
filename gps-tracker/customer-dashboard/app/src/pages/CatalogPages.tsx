@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
-  ActionIcon, Badge, Button, ColorInput, Group, Modal, MultiSelect, Paper, Stack, Text, TextInput, Tooltip,
+  ActionIcon, Badge, Button, ColorInput, Group, Paper, Stack, Text, TextInput, Tooltip,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { modals } from '@mantine/modals';
@@ -9,10 +9,12 @@ import { IconMapPinOff, IconPencil, IconPlus, IconSearch, IconTrash } from '@tab
 import { useQueryClient } from '@tanstack/react-query';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { api } from '../api/client';
-import { useCan, useEventTypeGroups, useEventTypeList, useGeofences, usePlaceGroups } from '../api/hooks';
+import { useCan, useEventTypeGroups, useEventTypeList, useGeofences, usePlaceGroups, usePlaces } from '../api/hooks';
 import type { EventTypeGroup, EventTypeRow, GeofenceRow, PlaceGroup } from '../api/types';
 import { ConfigHeader } from '../components/ConfigHeader';
 import { DataGrid } from '../components/DataGrid';
+import { EditorShell, firstError } from '../components/EditorShell';
+import { CheckList } from '../components/FeaturePicker';
 import { ago, dateTime } from '../utils/format';
 import classes from './CatalogPages.module.css';
 
@@ -36,14 +38,16 @@ export function PlaceGroupsPage() {
   const form = useForm({ initialValues: { name: '', color: '#7c3aed' }, validate: { name: (v) => (v.trim() ? null : 'Enter a name') } });
   const open = (g: PlaceGroup | 'new') => { form.setValues(g === 'new' ? { name: '', color: '#7c3aed' } : { name: g.name, color: g.color ?? '#7c3aed' }); setEditing(g); };
   const refresh = () => { qc.invalidateQueries({ queryKey: ['place-groups'] }); qc.invalidateQueries({ queryKey: ['places'] }); };
-  const save = form.onSubmit(async (v) => {
+  const { data: places = [] } = usePlaces();
+  const save = (andNew: boolean) => form.onSubmit(async (v) => {
     try {
       if (editing === 'new') await api('/api/portal/place-groups', { method: 'POST', json: v });
       else if (editing) await api(`/api/portal/place-groups/${editing.id}`, { method: 'PUT', json: v });
       refresh();
-      setEditing(null);
+      notifications.show({ color: 'green', message: `${v.name} saved` });
+      if (andNew) open('new'); else setEditing(null);
     } catch (e) { fail(e); }
-  });
+  }, firstError)();
   const cols: ColDef<PlaceGroup>[] = [
     { colId: 'swatch', headerName: '', width: 54, minWidth: 54, sortable: false, filter: false,
       cellRenderer: (p: ICellRendererParams<PlaceGroup>) => p.data && <span className={classes.swatch} style={{ background: p.data.color ?? '#7c3aed' }} /> },
@@ -68,16 +72,27 @@ export function PlaceGroupsPage() {
         <DataGrid rowData={groups} columnDefs={cols} loading={isFetching && !groups.length} getRowId={(p) => p.data.id}
                   overlayNoRowsTemplate='<span style="opacity:.7">No place groups yet.</span>' />
       </Paper>
-      <Modal opened={!!editing} onClose={() => setEditing(null)} title={editing === 'new' ? 'Add place group' : 'Edit place group'}>
-        <form onSubmit={save}>
-          <Stack>
-            <TextInput label="Name" placeholder="e.g. Depots" {...form.getInputProps('name')} data-autofocus />
-            <ColorInput label="Colour" format="hex" {...form.getInputProps('color')} />
-            <Text size="xs" c="dimmed">Choose a place's group when you add or edit it under Places.</Text>
-            <Group justify="flex-end"><Button variant="default" onClick={() => setEditing(null)}>Cancel</Button><Button type="submit">Save</Button></Group>
-          </Stack>
-        </form>
-      </Modal>
+      <EditorShell opened={!!editing} onClose={() => setEditing(null)} title={editing === 'new' ? 'New Place Group' : 'Edit Place Group'}
+                   onSave={() => save(false)} onSaveAndNew={() => save(true)} sections={[
+        { id: 'general', label: 'General', keywords: 'name colour color',
+          content: (
+            <Stack maw={620}>
+              <TextInput label="Name" withAsterisk placeholder="e.g. Depots" {...form.getInputProps('name')} data-autofocus />
+              <ColorInput label="Colour" format="hex" {...form.getInputProps('color')} />
+            </Stack>
+          ) },
+        { id: 'places', label: 'Places', keywords: 'places members',
+          content: (() => {
+            const inGroup = editing && editing !== 'new' ? places.filter((p) => p.place_group_id === editing.id) : [];
+            return (
+              <Stack maw={760} gap={6}>
+                <Text size="sm" c="dimmed">Choose a place's group when you add or edit it under Places.
+                  {editing !== 'new' && ` ${inGroup.length} place${inGroup.length === 1 ? '' : 's'} in this group.`}</Text>
+                {inGroup.map((p) => <Text key={p.id} size="sm">{p.name}{p.address ? <Text span c="dimmed"> · {p.address}</Text> : null}</Text>)}
+              </Stack>
+            );
+          })() },
+      ]} />
     </Stack>
   );
 }
@@ -167,16 +182,28 @@ export function EventTypesPage() {
         <DataGrid rowData={shown} columnDefs={cols} loading={isFetching && !rows.length} getRowId={(p) => p.data.code}
                   onRowDoubleClicked={(e) => manage && e.data && open(e.data)} />
       </Paper>
-      <Modal opened={!!editing} onClose={() => setEditing(null)} title={editing ? `Edit “${editing.default_label}”` : ''}>
-        <form onSubmit={save}>
-          <Stack>
-            <TextInput label="Optional description" placeholder={editing?.default_label} description="Leave empty to use the default name"
-                       {...form.getInputProps('label')} data-autofocus />
-            <ColorInput label="Map marker colour" placeholder="Default (leave empty)" format="hex" {...form.getInputProps('color')} />
-            <Group justify="flex-end"><Button variant="default" onClick={() => setEditing(null)}>Cancel</Button><Button type="submit">Save</Button></Group>
-          </Stack>
-        </form>
-      </Modal>
+      <EditorShell opened={!!editing} onClose={() => setEditing(null)} title={editing ? `Edit “${editing.default_label}”` : ''}
+                   onSave={() => save()} sections={editing ? [
+        { id: 'general', label: 'General', keywords: 'name description category',
+          content: (
+            <Stack maw={620}>
+              <TextInput label="Default description" value={editing.default_label} readOnly />
+              <TextInput label="Optional description" placeholder={editing.default_label} description="Your own name for this event, used everywhere on the platform. Leave empty for the default."
+                         {...form.getInputProps('label')} data-autofocus />
+              <TextInput label="Category" value={editing.category_label} readOnly />
+            </Stack>
+          ) },
+        { id: 'marker', label: 'Map marker', keywords: 'colour color marker map',
+          content: (
+            <Stack maw={620}>
+              <ColorInput label="Map marker colour" placeholder="Default (leave empty)" format="hex" {...form.getInputProps('color')} />
+              <Group gap="sm"><Text size="sm" c="dimmed">Preview</Text>
+                <svg width="22" height="27" viewBox="0 0 18 22" aria-hidden="true">
+                  <path d="M9 21s7-7.2 7-12.2A7 7 0 0 0 2 8.8C2 13.8 9 21 9 21z" fill={form.values.color || '#ffffff'} stroke="#64748b" strokeWidth="1.2" />
+                </svg></Group>
+            </Stack>
+          ) },
+      ] : []} />
     </Stack>
   );
 }
@@ -190,24 +217,21 @@ export function EventTypeGroupsPage() {
   const { data: types = [] } = useEventTypeList();
   const [editing, setEditing] = useState<EventTypeGroup | 'new' | null>(null);
   const label = useMemo(() => new Map(types.map((t) => [t.code, t.label])), [types]);
-  const options = useMemo(() => {
-    const cats = [...new Set(types.map((t) => t.category_label))];
-    return cats.map((c) => ({ group: c, items: types.filter((t) => t.category_label === c).map((t) => ({ value: t.code, label: t.label })) }));
-  }, [types]);
   const form = useForm<{ name: string; codes: string[] }>({
     initialValues: { name: '', codes: [] },
     validate: { name: (v) => (v.trim() ? null : 'Enter a name'), codes: (v) => (v.length ? null : 'Choose at least one event type') },
   });
   const open = (g: EventTypeGroup | 'new') => { form.setValues(g === 'new' ? { name: '', codes: [] } : { name: g.name, codes: g.codes }); setEditing(g); };
   const refresh = () => qc.invalidateQueries({ queryKey: ['event-type-groups'] });
-  const save = form.onSubmit(async (v) => {
+  const save = (andNew: boolean) => form.onSubmit(async (v) => {
     try {
       if (editing === 'new') await api('/api/portal/event-type-groups', { method: 'POST', json: v });
       else if (editing) await api(`/api/portal/event-type-groups/${editing.id}`, { method: 'PUT', json: v });
       refresh();
-      setEditing(null);
+      notifications.show({ color: 'green', message: `${v.name} saved` });
+      if (andNew) open('new'); else setEditing(null);
     } catch (e) { fail(e); }
-  });
+  }, firstError)();
   return (
     <Stack p="lg" gap={0} className={classes.narrow}>
       <ConfigHeader section="Events" title="Event Type Groups" description="Group event types, then use a group in a notification rule to alert on any event in it.">
@@ -234,16 +258,27 @@ export function EventTypeGroupsPage() {
           </Group>
         ))}
       </Paper>
-      <Modal opened={!!editing} onClose={() => setEditing(null)} title={editing === 'new' ? 'Add event type group' : 'Edit event type group'} size="lg">
-        <form onSubmit={save}>
-          <Stack>
-            <TextInput label="Name" placeholder="e.g. Harsh driving" {...form.getInputProps('name')} data-autofocus />
-            <MultiSelect label="Event types" searchable clearable data={options} placeholder="Choose event types" maxDropdownHeight={320}
-                         {...form.getInputProps('codes')} />
-            <Group justify="flex-end"><Button variant="default" onClick={() => setEditing(null)}>Cancel</Button><Button type="submit">Save</Button></Group>
-          </Stack>
-        </form>
-      </Modal>
+      <EditorShell opened={!!editing} onClose={() => setEditing(null)} title={editing === 'new' ? 'New Event Type Group' : 'Edit Event Type Group'}
+                   onSave={() => save(false)} onSaveAndNew={() => save(true)} sections={[
+        { id: 'general', label: 'General', keywords: 'name',
+          content: (
+            <Stack maw={620}>
+              <TextInput label="Name" withAsterisk placeholder="e.g. Harsh driving" {...form.getInputProps('name')} data-autofocus />
+              {editing && editing !== 'new' && editing.rule_count > 0 &&
+                <Text size="sm" c="dimmed">Used by {editing.rule_count} notification rule{editing.rule_count === 1 ? '' : 's'}.</Text>}
+            </Stack>
+          ) },
+        { id: 'events', label: 'Event types', keywords: 'events types codes',
+          content: (
+            <Stack maw={820}>
+              <Text size="sm" c="dimmed">A notification rule using this group alerts on any of these events.</Text>
+              {form.errors.codes && <Text size="sm" c="red">{form.errors.codes}</Text>}
+              <CheckList value={form.values.codes} onChange={(v) => form.setFieldValue('codes', v)} height={460}
+                         items={types.map((t) => ({ value: t.code, label: t.label, description: t.custom_label ? t.default_label : undefined,
+                                                    extra: <Badge size="xs" variant="default">{t.category_label}</Badge> }))} />
+            </Stack>
+          ) },
+      ]} />
     </Stack>
   );
 }
