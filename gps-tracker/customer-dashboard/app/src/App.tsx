@@ -8,7 +8,7 @@ import { AppLayout, NAV } from './layout/AppLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { WorkspacePage } from './pages/WorkspacePage';
 import { AccountPage, ConfigurationPage } from './pages/ConfigurationPage';
-import { ReportsPage } from './pages/ReportsPage';
+import { ReportsSection } from './pages/analytics/ReportsHub';
 import { InboxPage } from './pages/InboxPage';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
@@ -40,7 +40,7 @@ export function App() {
         <Route path="/workspace" element={<Allowed any={need('/workspace')}><WorkspacePage /></Allowed>} />
         <Route path="/configuration/*" element={<Allowed any={need('/configuration')}><ConfigurationPage /></Allowed>} />
         <Route path="/account" element={<AccountPage />} />
-        <Route path="/reports" element={<Allowed any={need('/reports')}><ReportsPage /></Allowed>} />
+        <Route path="/reports/*" element={<Allowed any={need('/reports')}><ReportsSection /></Allowed>} />
         <Route path="/inbox" element={<Allowed any={need('/inbox')}><InboxPage /></Allowed>} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

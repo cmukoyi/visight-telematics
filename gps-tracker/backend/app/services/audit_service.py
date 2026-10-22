@@ -22,7 +22,9 @@ _MAX_BODY = 64 * 1024
 
 # (path pattern under /api/portal, area, noun, {method: verb override}); None area = not audited
 ROUTES = [
-    (r"/login|/auth/.*|/alerts/.*", None, None, {}),
+    (r"/login|/auth/.*|/alerts/.*|/analytics/query|/analytics/expressions/test", None, None, {}),
+    (r"/analytics/pages(?:/(?P<id>[^/]+))?", "Analytics", "analytics page", {}),
+    (r"/analytics/expressions(?:/(?P<id>[^/]+))?", "Expressions", "expression", {}),
     (r"/users/(?P<id>[^/]+)/reset-password", "Users", "user", {"POST": "Reset password"}),
     (r"/users(?:/(?P<id>[^/]+))?", "Users", "user", {}),
     (r"/roles(?:/(?P<id>[^/]+))?", "Roles", "role", {}),
@@ -83,6 +85,8 @@ def _name_of(db, area: str, rid: Optional[str]) -> Optional[str]:
         "Notification rules": (models.NotificationRule, lambda o: o.name),
         "Event type groups": (models.EventTypeGroup, lambda o: o.name),
         "Reports": (ReportSchedule, lambda o: o.name or o.report_key),
+        "Analytics": (models.AnalyticsPage, lambda o: o.name),
+        "Expressions": (models.AnalyticsExpression, lambda o: o.name),
     }.get(area)
     if not table:
         return None

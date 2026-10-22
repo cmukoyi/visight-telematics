@@ -4,7 +4,7 @@ import { getSession, saveAccess } from '../auth/session';
 import type {
   Alert, Branding, Category, DataExchangeStatus, DeviceEvent, EventTypes, GroupTheme, Kpis, LivePosition, Me,
   NotificationRule, Permission, Place, PortalUserRow, ReportDef, ReportSchedule, Role, RulesMeta, SecurityGroup, Trip,
-  TripDetail, Vehicle, VehicleStatus, PlaceGroup, EventTypeRow, EventTypeGroup, AuditRow, GeofenceRow, NotificationPrefs, FleetStatusRow,
+  TripDetail, Vehicle, VehicleStatus, PlaceGroup, EventTypeRow, EventTypeGroup, AuditRow, AnalyticsCatalog, AnalyticsPageDef, AnalyticsExpression, AnalyticsResult, Visual, GeofenceRow, NotificationPrefs, FleetStatusRow,
 } from './types';
 import { cachedLook } from '../utils/look';
 
@@ -161,3 +161,25 @@ export const useNotificationPrefs = () => useQuery({ queryKey: ['notification-pr
 /** Latest event, speed, odometer and address per vehicle (Workspace vehicle grid), every 15 s while shown. */
 export const useFleetStatus = (enabled: boolean) =>
   useQuery({ queryKey: ['fleet-status'], queryFn: () => api<FleetStatusRow[]>('/api/portal/fleet-status'), enabled, refetchInterval: 15_000 });
+
+// ── Analytics ──
+export const useAnalyticsCatalog = () =>
+  useQuery({ queryKey: ['analytics-catalog'], queryFn: () => api<AnalyticsCatalog>('/api/portal/analytics/catalog'), staleTime: 60_000 });
+export const useAnalyticsPages = () =>
+  useQuery({ queryKey: ['analytics-pages'], queryFn: () => api<AnalyticsPageDef[]>('/api/portal/analytics/pages') });
+export const useExpressions = () =>
+  useQuery({ queryKey: ['analytics-expressions'], queryFn: () => api<AnalyticsExpression[]>('/api/portal/analytics/expressions') });
+
+/** One visual's data for a period (and the page's vehicle group, unless the visual sets its own). */
+export const useAnalyticsQuery = (v: Visual | null, range: Range, category: string | null) => {
+  const body = v && v.type !== 'text' && v.measures.length ? {
+    date_from: range.from.toISOString(), date_to: range.to.toISOString(), dimension: v.dimension, measures: v.measures,
+    category: v.category || category || null, imei: v.imei || null, sort: v.sort || null, descending: v.descending ?? true,
+    limit: v.limit || null,
+  } : null;
+  return useQuery({
+    queryKey: ['analytics-query', body],
+    queryFn: () => api<AnalyticsResult>('/api/portal/analytics/query', { method: 'POST', json: body }),
+    enabled: !!body, staleTime: 60_000, placeholderData: (prev) => prev,
+  });
+};

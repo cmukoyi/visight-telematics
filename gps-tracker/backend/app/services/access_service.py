@@ -41,6 +41,7 @@ PERMISSIONS: dict = {
     "rules.manage":          ("Notification rules", "Alerts", "Create and edit notification rules, including email subscriptions."),
     "reports.view":          ("Run reports", "Reports", "Run, view and download reports."),
     "reports.schedule":      ("Schedule reports", "Reports", "Email reports to people on a schedule."),
+    "analytics.manage":      ("Build analytics", "Reports", "Add and change Analytics pages, charts and Expressions (everyone who can run reports can view them)."),
     "vehicles.manage":       ("Edit vehicles", "Vehicles", "Change vehicle details: description, registration, make, model, driver and vehicle group."),
     "vehicles.delete":       ("Delete vehicles", "Vehicles", "Remove vehicles and all their history."),
     "vehicle_groups.manage": ("Vehicle groups", "Vehicles", "Create and edit vehicle groups and choose their security group."),
@@ -89,8 +90,8 @@ DEFAULT_ROLES: dict = {
                      ["map.view", "live.track", "history.view", "places.view", "places.manage", "places.arm"], False),
     "Maintenance User": ("Vehicle positions, trips and events, alerts and reports",
                          ["map.view", "history.view", "events.view", "inbox.view", "reports.view", "reports.schedule"], False),
-    "Reporting User": ("Runs and schedules reports, and receives alerts",
-                       ["reports.view", "reports.schedule", "inbox.view"], False),
+    "Reporting User": ("Runs and schedules reports, builds analytics, and receives alerts",
+                       ["reports.view", "reports.schedule", "analytics.manage", "inbox.view"], False),
     "MZone Driver": ("Sees their vehicles on the map, live, with their trips",
                      ["map.view", "live.track", "history.view"], False),
 }

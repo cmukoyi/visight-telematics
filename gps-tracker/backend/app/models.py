@@ -571,3 +571,36 @@ class DevicePosition(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
 
+
+
+class AnalyticsExpression(Base):
+    """Reports → Expressions: a named calculation over analytics measures, e.g. m.Trip_distance_km / m.Trip_count."""
+    __tablename__ = "analytics_expressions"
+    __table_args__ = (UniqueConstraint("usergroup_id", "name", name="uq_analytics_expression_name"),)
+
+    id           = get_uuid_column()
+    usergroup_id = get_uuid_fk("user_groups.id")
+    name         = Column(String(120), nullable=False)
+    category     = Column(String(60), nullable=True)
+    expression   = Column(Text, nullable=False)
+    description  = Column(String(255), nullable=True)
+    unit         = Column(String(20), nullable=True)
+    decimals     = Column(Integer, nullable=False, default=2)
+    created_by   = Column(UUID(as_uuid=True), ForeignKey("portal_users.id", ondelete="SET NULL"), nullable=True)
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at   = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class AnalyticsPage(Base):
+    """Reports → Analytics: a page of visuals (charts, tables, KPIs) with its default period."""
+    __tablename__ = "analytics_pages"
+
+    id           = get_uuid_column()
+    usergroup_id = get_uuid_fk("user_groups.id")
+    name         = Column(String(120), nullable=False)
+    position     = Column(Integer, nullable=False, default=0)
+    date_preset  = Column(String(30), nullable=False, default="this_month")
+    visuals      = Column(JSON, nullable=False, default=list)
+    created_by   = Column(UUID(as_uuid=True), ForeignKey("portal_users.id", ondelete="SET NULL"), nullable=True)
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at   = Column(DateTime(timezone=True), onupdate=func.now())

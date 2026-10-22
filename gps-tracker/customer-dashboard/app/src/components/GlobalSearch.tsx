@@ -18,7 +18,9 @@ interface Hit { id: string; group: string; label: string; sub?: string; to: stri
 const PAGES: { label: string; sub: string; to: string; any: string[]; words?: string }[] = [
   { label: 'Dashboard', sub: 'Where is my fleet', to: '/dashboard', any: ['map.view'], words: 'live map kpi' },
   { label: 'Workspace', sub: 'Trips, events and places on the map', to: '/workspace', any: ['map.view', 'history.view'], words: 'trips events history routes' },
-  { label: 'Reports', sub: 'Run and download reports', to: '/reports', any: ['reports.view'] },
+  { label: 'Reports', sub: 'Run and download reports', to: '/reports/reports', any: ['reports.view'] },
+  { label: 'Analytics', sub: 'Reports · charts and tables', to: '/reports/analytics', any: ['reports.view'], words: 'charts dashboard bi kpi' },
+  { label: 'Expressions', sub: 'Reports · calculations', to: '/reports/expressions', any: ['reports.view'], words: 'formula calculation' },
   { label: 'Inbox', sub: 'Alerts', to: '/inbox', any: ['inbox.view'], words: 'alerts notifications' },
   { label: 'Vehicles', sub: 'Configuration · Vehicles', to: '/configuration/devices', any: ['admin'], words: 'registration driver make model imei delete' },
   { label: 'Vehicle groups', sub: 'Configuration · Vehicles', to: '/configuration/groups', any: ['admin'] },
@@ -98,7 +100,7 @@ export const GlobalSearch = forwardRef<HTMLInputElement, { onNavigate?: () => vo
     }
     if (can('reports.view')) {
       for (const r of reports) if (match(r.title, r.description, r.category)) {
-        out.push({ id: `r-${r.key}`, group: 'Reports', label: r.title, sub: r.description, icon: IconChartBar, to: `/reports?run=${r.key}` });
+        out.push({ id: `r-${r.key}`, group: 'Reports', label: r.title, sub: r.description, icon: IconChartBar, to: `/reports/reports?run=${r.key}` });
       }
     }
     if (can('users.view') || can('users.manage')) {

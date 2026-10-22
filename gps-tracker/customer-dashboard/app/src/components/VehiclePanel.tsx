@@ -123,7 +123,7 @@ export function VehiclePanel({ vehicle, plotted, onTogglePlot, plottedTrips, onT
               <Action icon={IconShare} label="Share location" onClick={share} />
               {can('live.track') && <Action icon={IconBroadcast} label="Live track" onClick={() => navigate(`/dashboard?vehicle=${encodeURIComponent(vehicle.imei)}`)} />}
               {can('vehicles.manage') && <Action icon={IconPencil} label="Edit vehicle" onClick={() => navigate(`/configuration/devices?edit=${vehicle.id}`)} />}
-              {can('reports.view') && <Action icon={IconReportAnalytics} label="View report" onClick={() => navigate('/reports?run=trips')} />}
+              {can('reports.view') && <Action icon={IconReportAnalytics} label="View report" onClick={() => navigate('/reports/reports?run=trips')} />}
             </SimpleGrid>
             <Divider />
             {status.isLoading ? <Group justify="center" p="xl"><Loader size="sm" /></Group> : (

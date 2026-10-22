@@ -1,0 +1,8 @@
+.tile { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px; }
+.icon {
+  width: 100%; aspect-ratio: 1 / 1; max-width: 190px; display: flex; align-items: center; justify-content: center;
+  border-radius: var(--mantine-radius-lg); border: 1px solid var(--mantine-color-default-border);
+  background: var(--mantine-color-default); color: var(--mantine-color-dimmed); transition: all 120ms ease;
+}
+.tile:hover .icon { border-color: var(--mantine-color-brand-5); color: var(--mantine-color-text);
+  background: color-mix(in srgb, var(--mantine-color-brand-5) 14%, var(--mantine-color-default)); }

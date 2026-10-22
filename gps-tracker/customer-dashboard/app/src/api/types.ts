@@ -359,3 +359,34 @@ export interface FleetStatusRow {
   imei: string; event: string; recorded_at: string; speed: number; ignition: boolean | null;
   odometer_km: number | null; address: string | null;
 }
+
+// ── Analytics (Reports → Analytics / Expressions) ──
+export type VisualType = 'kpi' | 'table' | 'column' | 'bar' | 'stacked' | 'line' | 'area' | 'pie' | 'donut' | 'text';
+export interface Visual {
+  id: string;
+  type: VisualType;
+  title: string;
+  dimension: string;           // '' = total
+  measures: string[];          // measure keys, or 'expr:<id>'
+  width: number;               // of 12 columns
+  height: 's' | 'm' | 'l';
+  sort?: string | null;
+  descending?: boolean;
+  limit?: number | null;
+  category?: string | null;
+  imei?: string | null;
+  text?: string | null;
+  show_values?: boolean;
+}
+export interface AnalyticsPageDef { id: string; name: string; position: number; date_preset: string; visuals: Visual[] }
+export interface AnalyticsMeasure { key: string; label: string; unit: string; category: string; decimals: number }
+export interface AnalyticsExpression {
+  id: string; key: string; name: string; category: string | null; expression: string; description: string | null;
+  unit: string | null; decimals: number; used_in?: string[];
+}
+export interface AnalyticsCatalog { measures: AnalyticsMeasure[]; expressions: AnalyticsExpression[]; dimensions: { key: string; label: string }[] }
+export interface AnalyticsColumn { key: string; label: string; unit: string; decimals: number }
+export interface AnalyticsResult {
+  dimension: string; dimension_label: string; columns: AnalyticsColumn[];
+  rows: { key: string; label: string; values: Record<string, number | null> }[];
+}
