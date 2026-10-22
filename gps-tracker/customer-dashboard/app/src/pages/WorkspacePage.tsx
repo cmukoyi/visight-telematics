@@ -11,7 +11,7 @@ import {
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { useNavigate } from 'react-router-dom';
 import { useLocalStorage } from '@mantine/hooks';
-import { fetchTrip, useCan, useCategories, useFleetStatus, useEvents, useEventTypes, usePlaces, useTrips, useVehicles, type Range } from '../api/hooks';
+import { fetchTrip, useCan, useCategories, useFleetStatus, useEvents, useEventTypes, useLive, usePlaces, useTrips, useVehicles, type Range } from '../api/hooks';
 import { detail, type DeviceEvent, type FleetStatusRow, type Trip, type TripDetail, type Vehicle } from '../api/types';
 import { DataGrid } from '../components/DataGrid';
 import { VehiclePanel } from '../components/VehiclePanel';
@@ -95,12 +95,21 @@ export function WorkspacePage() {
     return m;
   }, [vehicles]);
 
+  // Follow one vehicle live (from its details panel): 5-second position and trail, map re-centred
+  const [followImei, setFollowImei] = useState<string | null>(null);
+  const { data: live } = useLive(followImei);
+  const livePos = live?.position;
+
   // ── map layers from plotted state ──
   const mapVehicles = useMemo(() => vehicles.filter((v) => plottedVehicles.has(v.imei)).map(toMapVehicle)
-    .filter(Boolean) as MapVehicle[], [vehicles, plottedVehicles]);
+    .filter(Boolean).map((m) => (m!.id === followImei && livePos
+      ? { ...m!, lat: livePos.latitude, lng: livePos.longitude, heading: livePos.heading } : m)) as MapVehicle[],
+  [vehicles, plottedVehicles, followImei, livePos]);
   const routes: MapRoute[] = useMemo(() => [...plottedTrips.values()].map((t) => ({
     id: t.id, color: t.color, coords: t.points.map((p) => [p[0], p[1]] as [number, number]), arrows: true,
   })), [plottedTrips]);
+  const liveTrail: MapRoute[] = followImei && live && live.trail.length > 1
+    ? [{ id: 'live-trail', color: '#22c55e', coords: live.trail, arrows: true }] : [];
   const points: MapPoint[] = useMemo(() => {
     const out: MapPoint[] = [];
     for (const t of plottedTrips.values()) {
@@ -125,11 +134,20 @@ export function WorkspacePage() {
   const [detailsImei, setDetailsImei] = useState<string | null>(null);
   const [detailsCollapsed, setDetailsCollapsed] = useState(false);
   const detailsVehicle = vehicles.find((v) => v.imei === detailsImei) ?? null;
-  const openDetails = (imei: string) => { setDetailsImei(imei); setDetailsCollapsed(false); setPlaceDraft(null); };
+  const openDetails = (imei: string) => {
+    if (imei !== detailsImei) setFollowImei(null);
+    setDetailsImei(imei); setDetailsCollapsed(false); setPlaceDraft(null);
+  };
+  const closeDetails = () => { setDetailsImei(null); setFollowImei(null); };
+  const toggleFollow = (imei: string) => {
+    if (followImei === imei) { setFollowImei(null); return; }
+    setFollowImei(imei);
+    setPlottedVehicles((s) => (s.has(imei) ? s : new Set(s).add(imei)));
+  };
   const panelRight = detailsVehicle ? (detailsCollapsed ? 68 : 404) : 12;
 
   const startPlace = (lat: number, lng: number, imei: string | null, name: string) => {
-    setDetailsImei(null);
+    closeDetails();
     const tagId = vehicles.find((v) => v.imei === imei)?.id;
     const d = newDraft([lat, lng], tagId ? [tagId] : [], name);
     setPlaceDraft(d);
@@ -160,7 +178,10 @@ export function WorkspacePage() {
     mapPlaces.forEach((p) => pts.push([p.lat, p.lng]));
     if (pts.length) mapRef.current?.fit(pts);
   };
-  useEffect(() => { fitAll(); }, [plottedTrips.size, plottedEvents.size, plottedVehicles.size, plottedPlaces.size]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!followImei) fitAll(); }, [plottedTrips.size, plottedEvents.size, plottedVehicles.size, plottedPlaces.size]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (followImei && livePos) mapRef.current?.panTo(livePos.latitude, livePos.longitude);
+  }, [followImei, livePos?.latitude, livePos?.longitude]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── plot / unplot ──
   const toggleVehicle = (imei: string) => setPlottedVehicles((s) => { const n = new Set(s); n.has(imei) ? n.delete(imei) : n.add(imei); return n; });
@@ -281,14 +302,15 @@ export function WorkspacePage() {
 
   return (
     <div className={classes.root} ref={rootRef}>
-      <FleetMap ref={mapRef} vehicles={mapVehicles} routes={[...routes, ...draft.routes]} points={[...points, ...draft.points]}
+      <FleetMap ref={mapRef} vehicles={mapVehicles} routes={[...routes, ...liveTrail, ...draft.routes]} points={[...points, ...draft.points]}
                 places={mapPlaces} actions={mapActions}
                 onMapClick={placeDraft ? (lat, lng) => setPlaceDraft((d) => d && clickDraft(d, lat, lng)) : undefined}
                 fitPadding={{ top: 80, left: 60, right: placeDraft ? 400 : panelRight + 48, bottom: panel ? (maximized ? 60 : dockHeight + 24) : 60 }} />
 
       {detailsVehicle && (
         <VehiclePanel vehicle={detailsVehicle} collapsed={detailsCollapsed} onCollapse={setDetailsCollapsed}
-                      onClose={() => setDetailsImei(null)}
+                      onClose={closeDetails}
+                      following={followImei === detailsVehicle.imei} onFollow={() => toggleFollow(detailsVehicle.imei)}
                       plotted={plottedVehicles.has(detailsVehicle.imei)} onTogglePlot={() => toggleVehicle(detailsVehicle.imei)}
                       plottedTrips={new Set(plottedTrips.keys())} onToggleTrip={toggleTrip} />
       )}

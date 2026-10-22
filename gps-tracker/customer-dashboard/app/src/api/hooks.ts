@@ -6,6 +6,7 @@ import type {
   NotificationRule, Permission, Place, PortalUserRow, ReportDef, ReportSchedule, Role, RulesMeta, SecurityGroup, Trip,
   TripDetail, Vehicle, VehicleStatus, PlaceGroup, EventTypeRow, EventTypeGroup, GeofenceRow, NotificationPrefs, FleetStatusRow,
 } from './types';
+import { cachedLook } from '../utils/look';
 
 export const useBranding = () =>
   useQuery({ queryKey: ['branding'], queryFn: () => api<Branding>('/api/branding'), staleTime: Infinity });
@@ -103,6 +104,14 @@ export const useGroupTheme = () =>
     queryFn: () => (getSession().token ? api<GroupTheme>('/api/portal/theme') : Promise.resolve(null)),
     staleTime: 5 * 60_000,
   });
+
+/** The platform name: the group's own (white label), else the last one seen in this browser, else the tenant's. */
+export function usePlatformName() {
+  const { data: branding } = useBranding();
+  const { data: group } = useGroupTheme();
+  return group?.theme_settings?.brand_name ?? (group ? null : cachedLook()?.theme_settings?.brand_name)
+    ?? branding?.name ?? 'ViSight Track';
+}
 
 export const usePermissions = () =>
   useQuery({ queryKey: ['permissions'], queryFn: () => api<Permission[]>('/api/portal/access/permissions'), staleTime: Infinity });

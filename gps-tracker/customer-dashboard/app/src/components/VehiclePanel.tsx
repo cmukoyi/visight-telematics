@@ -8,7 +8,7 @@ import { notifications } from '@mantine/notifications';
 import {
   IconBattery2, IconBolt, IconBroadcast, IconCalendar, IconCheck, IconChevronLeft, IconChevronRight, IconClock,
   IconCopy, IconCpu, IconEye, IconEyeOff, IconGauge, IconKey, IconMapPin, IconPencil, IconReportAnalytics, IconRoad,
-  IconRoute, IconSatellite, IconShare, IconDeviceSim, IconAntennaBars5, IconWalk,
+  IconFocus2, IconRoute, IconSatellite, IconShare, IconDeviceSim, IconAntennaBars5, IconWalk,
 } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import { useCan, useTrips, useVehicleStatus } from '../api/hooks';
@@ -50,12 +50,15 @@ interface Props {
   plottedTrips: Set<string>;
   onToggleTrip: (trip: Trip) => void;
   onClose: () => void;
+  /** Following live: the map re-centres on the vehicle as it moves. */
+  following: boolean;
+  onFollow: () => void;
   collapsed: boolean;
   onCollapse: (collapsed: boolean) => void;
 }
 
 /** The right-hand vehicle panel in Workspace: Vehicle details and Trips tabs; collapses to a strip. */
-export function VehiclePanel({ vehicle, plotted, onTogglePlot, plottedTrips, onToggleTrip, onClose, collapsed, onCollapse }: Props) {
+export function VehiclePanel({ vehicle, plotted, onTogglePlot, plottedTrips, onToggleTrip, onClose, following, onFollow, collapsed, onCollapse }: Props) {
   const navigate = useNavigate();
   const can = useCan();
   const [tab, setTab] = useState<Tab>('details');
@@ -114,8 +117,9 @@ export function VehiclePanel({ vehicle, plotted, onTogglePlot, plottedTrips, onT
 
         <Tabs.Panel value="details" className={classes.tabPanel}>
           <ScrollArea h="100%" type="auto">
-            <SimpleGrid cols={5} spacing={4} px="xs" py="sm">
+            <SimpleGrid cols={3} spacing={4} px="xs" py="sm">
               <Action icon={plotted ? IconEyeOff : IconEye} label={plotted ? 'Unplot' : 'Toggle plot'} onClick={onTogglePlot} active={plotted} />
+              {can('map.view') && <Action icon={IconFocus2} label={following ? 'Following' : 'Follow live'} onClick={onFollow} active={following} />}
               <Action icon={IconShare} label="Share location" onClick={share} />
               {can('map.view') && <Action icon={IconBroadcast} label="Live track" onClick={() => navigate(`/dashboard?vehicle=${encodeURIComponent(vehicle.imei)}`)} />}
               {can('vehicles.manage') && <Action icon={IconPencil} label="Edit vehicle" onClick={() => navigate(`/configuration/devices?edit=${vehicle.id}`)} />}

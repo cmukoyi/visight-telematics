@@ -38,6 +38,9 @@ function Kpi({ period, title, value, unit, group, icon: Icon, delta }: {
   );
 }
 
+// Keeps a followed vehicle clear of the live-tracking card (top left, 320 px wide)
+const FOLLOW_PADDING = { top: 60, bottom: 60, left: 350, right: 60 };
+
 export function DashboardPage() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
@@ -70,10 +73,11 @@ export function DashboardPage() {
   }, [inScope, live, selected]);
   const trail: MapRoute[] = showTrail && live && live.trail.length > 1
     ? [{ id: 'live-trail', color: '#22c55e', coords: live.trail, arrows: true }] : [];
+  // Follow: re-centre on every new position (and straight away when switched on)
+  const pos = live?.position;
   useEffect(() => {
-    const pos = live?.position;
     if (follow && pos) mapRef.current?.panTo(pos.latitude, pos.longitude);
-  }, [live?.position?.recorded_at, follow, selected]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pos?.latitude, pos?.longitude, follow, selected]); // eslint-disable-line react-hooks/exhaustive-deps
   const counts = useMemo(() => ({
     active: inScope.filter((v) => v.activity_status === 'active').length,
     idle: inScope.filter((v) => v.activity_status === 'idle').length,
@@ -116,6 +120,7 @@ export function DashboardPage() {
       <Card p={0} className={classes.mapCard}>
         {isLoading ? <Skeleton h="100%" /> : (
           <FleetMap ref={mapRef} vehicles={markers} selectedVehicleId={selected} routes={trail}
+                    fitPadding={tracked && window.innerWidth >= 720 ? FOLLOW_PADDING : undefined}
                     onVehicleClick={(id) => select(id === selected ? null : id)} />
         )}
         {tracked && (

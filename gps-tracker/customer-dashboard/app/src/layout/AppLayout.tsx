@@ -12,7 +12,7 @@ import {
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useQueryClient } from '@tanstack/react-query';
-import { useBranding, useCan, useGroupTheme, useUnreadCount } from '../api/hooks';
+import { useCan, useGroupTheme, usePlatformName, useUnreadCount } from '../api/hooks';
 import { clearSession, getSession } from '../auth/session';
 import { GlobalSearch } from '../components/GlobalSearch';
 import classes from './AppLayout.module.css';
@@ -67,7 +67,7 @@ export function AppLayout() {
   const openSearch = () => { setCollapsed(false); setTimeout(() => searchRef.current?.focus(), 250); };
   const { setColorScheme } = useMantineColorScheme();
   const scheme = useComputedColorScheme('dark');
-  const { data: branding } = useBranding();
+  const platformName = usePlatformName();
   const can = useCan();
   const nav = NAV.filter((n) => n.any.length === 0 || n.any.some(can));
   const { data: unread } = useUnreadCount();
@@ -82,8 +82,8 @@ export function AppLayout() {
 
   useEffect(() => { close(); }, [location.pathname, close]);
   useEffect(() => {
-    if (branding) document.title = `${title ? `${title} · ` : ''}${branding.name}`;
-  }, [branding, title]);
+    document.title = `${title ? `${title} · ` : ''}${platformName}`;
+  }, [platformName, title]);
 
   const logout = () => {
     clearSession();
@@ -122,12 +122,12 @@ export function AppLayout() {
                 </Indicator>
               </Tooltip>
             )}
-            <Tooltip label={scheme === 'dark' ? 'Light mode' : 'Dark mode'}>
+            {!groupTheme?.theme_settings?.lock_scheme && <Tooltip label={scheme === 'dark' ? 'Light mode' : 'Dark mode'}>
               <ActionIcon variant="default" size="lg" aria-label="Toggle colour scheme"
                           onClick={() => setColorScheme(scheme === 'dark' ? 'light' : 'dark')}>
                 {scheme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
               </ActionIcon>
-            </Tooltip>
+            </Tooltip>}
             <Menu position="bottom-end" width={240} shadow="md">
               <Menu.Target>
                 <Group gap={8} className={classes.userButton} wrap="nowrap">
@@ -157,15 +157,15 @@ export function AppLayout() {
           {logo
             ? <img src={logo} alt={groupTheme?.name ?? group?.name ?? 'Logo'} className={classes.logo} />
             : collapsed
-              ? <Text className={classes.brandName} fz={20}>{(branding?.name ?? 'V')[0]}</Text>
+              ? <Text className={classes.brandName} fz={20}>{platformName[0]}</Text>
               : <Stack gap={2} align="center">
-                  <Text className={classes.brandName}>{branding?.name ?? 'ViSight Track'}</Text>
+                  <Text className={classes.brandName}>{platformName}</Text>
                   <Text size="xs" c="dimmed">{group?.name}</Text>
                 </Stack>}
         </div>
         <div className={classes.search}>
           {collapsed
-            ? <Tooltip label="Search (⌘K)" position="right"><ActionIcon variant="subtle" color="gray" size="xl" onClick={openSearch} aria-label="Search">
+            ? <Tooltip label="Search (⌘K)" position="right"><ActionIcon variant="subtle" color="gray" size="xl" onClick={openSearch} aria-label="Search" style={{ color: 'var(--vt-menu-fg)' }}>
                 <IconSearch size={20} /></ActionIcon></Tooltip>
             : <GlobalSearch ref={searchRef} onNavigate={close} />}
         </div>

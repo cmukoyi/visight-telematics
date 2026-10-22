@@ -246,6 +246,9 @@ class UserGroup(Base):
     logo_dark_data        = Column(Text, nullable=True)          # base64 data-URL (dark mode)
     theme_primary         = Column(String(20), nullable=True)    # hex e.g. '#3b82f6'
     theme_accent          = Column(String(20), nullable=True)    # secondary hex
+    # White-label look: menu/background colours, default colour scheme, font, corners, platform name
+    # (keys validated by routes_portal.THEME_SETTINGS)
+    theme_settings        = Column(JSON, nullable=True)
     report_logo_data      = Column(Text, nullable=True)          # base64 data-URL used on reports
     timezone              = Column(String(64), nullable=True)    # IANA name, e.g. 'Africa/Johannesburg'
     # Data retention
@@ -350,6 +353,7 @@ class NotificationRule(Base):
     place_ids        = Column(JSON, nullable=True)
     place_group_ids  = Column(JSON, nullable=True)        # places in these groups too
     event_group_id   = Column(UUID(as_uuid=True), ForeignKey("event_type_groups.id", ondelete="SET NULL"), nullable=True)
+    event_codes      = Column(JSON, nullable=True)        # rule_type 'event': these event types too (dictionary.EVENTS codes)
     on_entry         = Column(Boolean, nullable=False, default=True)
     on_exit          = Column(Boolean, nullable=False, default=True)
     email_enabled    = Column(Boolean, nullable=False, default=False)

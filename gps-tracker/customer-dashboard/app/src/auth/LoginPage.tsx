@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Alert, Anchor, Button, Checkbox, Paper, PasswordInput, PinInput, Stack, Text, TextInput, Title } from '@mantine/core';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { api } from '../api/client';
-import { useBranding } from '../api/hooks';
+import { useBranding, usePlatformName } from '../api/hooks';
 import { saveSession, type Access, type PortalUser, type UserGroup } from './session';
 import classes from './LoginPage.module.css';
 
@@ -16,6 +16,7 @@ export function LoginPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: branding } = useBranding();
+  const platformName = usePlatformName();
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState(() => { try { return localStorage.getItem(REMEMBER_KEY) || ''; } catch { return ''; } });
   const [password, setPassword] = useState('');
@@ -57,7 +58,7 @@ export function LoginPage() {
   return (
     <div className={classes.page}>
       <div className={classes.brandSide}>
-        <Text className={classes.brandName}>{branding?.name ?? 'ViSight Track'}</Text>
+        <Text className={classes.brandName}>{platformName}</Text>
         <Text className={classes.tagline}>{branding?.tagline ?? 'Live vehicle tracking, trips and reporting.'}</Text>
       </div>
       <Paper className={classes.card} p="xl" shadow="xl">

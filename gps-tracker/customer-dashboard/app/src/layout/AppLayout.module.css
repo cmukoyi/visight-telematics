@@ -1,11 +1,10 @@
 .header { backdrop-filter: blur(8px); }
 .navbar {
-  background: linear-gradient(180deg, var(--mantine-color-dark-8) 0%, var(--mantine-color-dark-9) 100%);
-  border-right: 1px solid var(--mantine-color-dark-6);
-  color: var(--mantine-color-dark-0);
-}
-:global([data-mantine-color-scheme='light']) .navbar {
-  background: linear-gradient(180deg, #113356 0%, #0d2b4a 100%);
+  /* --vt-menu-* come from theme.ts (the group's menu colour, with readable text on it) */
+  background: var(--vt-menu-bg);
+  border-right: 1px solid rgba(var(--vt-menu-ink), 0.08);
+  color: var(--vt-menu-fg);
+  --mantine-color-dimmed: var(--vt-menu-muted);
 }
 .main {
   height: 100dvh; box-sizing: border-box;
@@ -16,24 +15,24 @@
 .logoBox {
   width: 280px; max-width: 100%; height: 150px; margin: 0 auto; flex: none;
   display: flex; align-items: center; justify-content: center;
-  border-radius: var(--mantine-radius-lg); background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06); overflow: hidden;
+  border-radius: var(--mantine-radius-lg); background: rgba(var(--vt-menu-ink), 0.04);
+  border: 1px solid rgba(var(--vt-menu-ink), 0.06); overflow: hidden;
 }
 .logo { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
-.brandName { font-size: 24px; font-weight: 750; letter-spacing: -0.02em; color: #fff; text-align: center; }
+.brandName { font-size: 24px; font-weight: 750; letter-spacing: -0.02em; color: var(--vt-menu-fg); text-align: center; }
 .navItem {
-  border-radius: var(--mantine-radius-md); color: #c9d4e5; font-weight: 500; padding: 12px 14px;
+  border-radius: var(--mantine-radius-md); color: var(--vt-menu-muted); font-weight: 500; padding: 12px 14px;
 }
 .navItem :global(.mantine-NavLink-label) { font-size: 15px; }
-.navItem:hover { background: rgba(255, 255, 255, 0.06); }
+.navItem:hover { background: rgba(var(--vt-menu-ink), 0.06); }
 .navItem[data-active] {
-  background: color-mix(in srgb, var(--mantine-color-brand-5) 26%, transparent); color: #fff;
+  background: color-mix(in srgb, var(--mantine-color-brand-5) 26%, transparent); color: var(--vt-menu-fg);
   box-shadow: inset 3px 0 0 var(--mantine-color-accent-5);
 }
-.navItem[data-active] svg { color: var(--mantine-color-accent-3); }
+.navItem[data-active] svg { color: var(--mantine-color-accent-5); }
 .clock {
-  border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.04);
-  border-radius: var(--mantine-radius-md); padding: 10px 12px; color: #fff; flex: none;
+  border: 1px solid rgba(var(--vt-menu-ink), 0.08); background: rgba(var(--vt-menu-ink), 0.04);
+  border-radius: var(--mantine-radius-md); padding: 10px 12px; color: var(--vt-menu-fg); flex: none;
 }
 .clockBig { font-size: 28px; font-weight: 300; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .userButton { cursor: pointer; padding: 4px 8px; border-radius: var(--mantine-radius-md); }
@@ -46,7 +45,7 @@
 .collapsed .search > * { width: auto; }
 .logoSmall {
   width: 56px; height: 56px; margin: 4px auto 0; flex: none; display: flex; align-items: center; justify-content: center;
-  border-radius: var(--mantine-radius-md); background: rgba(255, 255, 255, 0.05); overflow: hidden;
+  border-radius: var(--mantine-radius-md); background: rgba(var(--vt-menu-ink), 0.05); overflow: hidden;
 }
 .navIcon { position: relative; display: inline-flex; }
 .dotBadge { position: absolute; top: -2px; right: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--mantine-color-red-6); }

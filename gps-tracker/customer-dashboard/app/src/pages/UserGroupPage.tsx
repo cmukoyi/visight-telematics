@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
-  Box, Button, Checkbox, ColorInput, FileButton, Group, NumberInput, Paper, Select, SimpleGrid, Stack, Switch, TagsInput, Text,
+  Box, Button, Checkbox, ColorInput, FileButton, Group, NumberInput, Paper, SegmentedControl, Select, SimpleGrid, Stack, Switch,
+  TagsInput, Text, TextInput, UnstyledButton,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconPhoto, IconTrash, IconUpload } from '@tabler/icons-react';
@@ -9,7 +10,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { api } from '../api/client';
 import { useCan, useGroupTheme, useNotificationPrefs } from '../api/hooks';
-import type { GroupTheme, NotificationPrefs } from '../api/types';
+import type { GroupTheme, NotificationPrefs, ThemeSettings } from '../api/types';
+import { DEFAULT_MENU, FONTS, PRESETS, darkShadesOf, fontStack, isHex, isLight, loadFont } from '../theme';
 import { ConfigHeader } from '../components/ConfigHeader';
 import classes from './UserGroupPage.module.css';
 
@@ -17,6 +19,45 @@ const ACCEPT = 'image/png,image/jpeg,image/svg+xml';
 const MAX_BYTES = 1024 * 1024;
 const DEFAULT_PRIMARY = '#2468fb';
 const DEFAULT_SECONDARY = '#f59e0b';
+const DEFAULT_SURFACE = '#113356';
+const RADII = { xs: 2, sm: 4, md: 8, lg: 16, xl: 24 } as const;
+
+/** A small picture of the app in the (unsaved) look: menu, page, a card and a button. */
+function ThemePreview({ primary, secondary, settings, name }: { primary: string; secondary: string; settings: ThemeSettings; name: string }) {
+  const dark = (settings.color_scheme ?? 'dark') === 'dark';
+  const shades = darkShadesOf(isHex(settings.surface) ? settings.surface : DEFAULT_SURFACE);
+  const menu = isHex(settings.menu_bg) ? settings.menu_bg : dark ? shades[8] : DEFAULT_MENU;
+  const menuInk = isLight(menu) ? '#1f2937' : '#ffffff';
+  const r = RADII[settings.radius ?? 'md'];
+  const page = dark ? shades[7] : isHex(settings.light_bg) ? settings.light_bg : '#ffffff';
+  const card = dark ? shades[6] : '#ffffff';
+  const ink = dark ? shades[0] : '#1f2937';
+  const border = dark ? shades[4] : '#e5e7eb';
+  return (
+    <div className={classes.mock} style={{ fontFamily: fontStack(settings.font ?? 'Inter') }}>
+      <div className={classes.mockMenu} style={{ background: menu, color: menuInk }}>
+        <div className={classes.mockLogo}>{settings.brand_name || name}</div>
+        {['Dashboard', 'Workspace', 'Reports', 'Inbox'].map((label, i) => (
+          <div key={label} className={classes.mockItem}
+               style={i === 0 ? { background: `color-mix(in srgb, ${primary} 30%, transparent)`, boxShadow: `inset 3px 0 0 ${secondary}` } : { opacity: 0.75 }}>
+            {label}
+          </div>
+        ))}
+      </div>
+      <div className={classes.mockPage} style={{ background: page, color: ink }}>
+        <div style={{ fontWeight: 650, fontSize: 16 }}>Where is my fleet</div>
+        <div className={classes.mockCard} style={{ background: card, borderColor: border, borderRadius: r * 1.5 }}>
+          <div style={{ fontSize: 11, opacity: 0.7, textTransform: 'uppercase', letterSpacing: 0.4 }}>Current week</div>
+          <div style={{ fontSize: 22, fontWeight: 700 }}>1 284 <span style={{ fontSize: 12, opacity: 0.7 }}>km</span></div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span className={classes.mockButton} style={{ background: primary, borderRadius: r, color: isLight(primary) ? '#1f2937' : '#fff' }}>Primary button</span>
+          <span style={{ color: primary, fontSize: 12, fontWeight: 600 }}>A link</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function readImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -116,12 +157,21 @@ export function UserGroupPage({ mode }: { mode: 'theme' | 'preferences' }) {
 
   if (!form) return null;
   const set = (patch: Partial<GroupTheme>) => setForm((f) => f && { ...f, ...patch });
+  const settings: ThemeSettings = form.theme_settings ?? {};
+  // Change white-label settings; unset values are dropped (back to the default)
+  const setLook = (patch: Partial<ThemeSettings>) => setForm((f) => {
+    if (!f) return f;
+    const next = { ...(f.theme_settings ?? {}), ...patch } as Record<string, unknown>;
+    Object.keys(next).forEach((k) => next[k] === undefined && delete next[k]);
+    return { ...f, theme_settings: Object.keys(next).length ? next as ThemeSettings : null };
+  });
   const save = async () => {
     setSaving(true);
     try {
       const saved = await api<GroupTheme>('/api/portal/theme', { method: 'PUT', json: {
         theme_primary: form.theme_primary ?? '', theme_accent: form.theme_accent ?? '',
         logo_data: form.logo_data ?? '', report_logo_data: form.report_logo_data ?? '', timezone: form.timezone ?? '',
+        theme_settings: form.theme_settings ?? {},
         ...(form.history_retention_days ? { history_retention_days: form.history_retention_days } : {}),
       } });
       qc.setQueryData(['theme'], saved);
@@ -137,32 +187,101 @@ export function UserGroupPage({ mode }: { mode: 'theme' | 'preferences' }) {
   return (
     <Stack p="lg" gap="lg" maw={1040}>
       <ConfigHeader section="Users" title={mode === 'theme' ? 'Custom Themes' : 'User Groups'}
-                    description={mode === 'theme' ? `Colours and logos for everyone in ${form.name ?? 'this user group'}.`
+                    description={mode === 'theme' ? `Your own look for everyone in ${form.name ?? 'this user group'}: colours, menu, font, logos and platform name.`
                       : `${form.name ?? 'Your user group'}: timezone, data retention and your notification preferences.`}>
         {canEdit && <Button onClick={save} loading={saving}>Save changes</Button>}
       </ConfigHeader>
 
       {mode === 'theme' && <>
       <Paper withBorder p="lg">
-        <Text fw={650} mb="md">Theme</Text>
-        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
-          <ColorInput label="Primary colour" description="Buttons, links and highlights" format="hex" swatchesPerRow={8}
-                      swatches={['#2468fb', '#0f766e', '#16a34a', '#7c3aed', '#db2777', '#dc2626', '#ea580c', '#0f172a']}
-                      placeholder={DEFAULT_PRIMARY} value={form.theme_primary ?? ''} onChange={(v) => set({ theme_primary: v || null })} />
-          <ColorInput label="Secondary colour" description="Accents, such as the selected menu item" format="hex" swatchesPerRow={8}
-                      swatches={['#f59e0b', '#22c55e', '#06b6d4', '#a855f7', '#f43f5e', '#eab308', '#64748b', '#ffffff']}
-                      placeholder={DEFAULT_SECONDARY} value={form.theme_accent ?? ''} onChange={(v) => set({ theme_accent: v || null })} />
+        <Text fw={650}>Ready-made looks</Text>
+        <Text size="sm" c="dimmed" mb="md">Start from one of these, then adjust anything below.</Text>
+        <SimpleGrid cols={{ base: 2, sm: 3, md: 6 }} spacing="sm">
+          {PRESETS.map((p) => (
+            <UnstyledButton key={p.name} className={classes.preset} disabled={!canEdit}
+                            onClick={() => {
+                              // Colours and mode from the preset; keep the name, font and corners already chosen
+                              set({ theme_primary: p.primary, theme_accent: p.secondary, theme_settings: null });
+                              setLook({ ...p.settings, brand_name: settings.brand_name, font: settings.font, radius: settings.radius,
+                                        lock_scheme: settings.lock_scheme });
+                            }}>
+              <div className={classes.presetSwatch}>
+                <span style={{ flex: 2, background: p.settings.menu_bg ?? DEFAULT_MENU }} />
+                <span style={{ flex: 3, background: p.settings.color_scheme === 'light' ? (p.settings.light_bg ?? '#fff') : (p.settings.surface ?? DEFAULT_SURFACE),
+                               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                  <span style={{ width: 14, height: 14, borderRadius: 4, background: p.primary }} />
+                  <span style={{ width: 14, height: 14, borderRadius: 4, background: p.secondary }} />
+                </span>
+              </div>
+              <Text size="xs" fw={600}>{p.name}</Text>
+            </UnstyledButton>
+          ))}
         </SimpleGrid>
-        <Group gap="sm" mt="md">
-          <Text size="sm" c="dimmed">Preview:</Text>
-          <Button size="xs" color={form.theme_primary || DEFAULT_PRIMARY}>Primary button</Button>
-          <Box className={classes.accentPreview} style={{ boxShadow: `inset 3px 0 0 ${form.theme_accent || DEFAULT_SECONDARY}` }}>
-            Selected menu item
-          </Box>
-          {(form.theme_primary || form.theme_accent) &&
-            <Button size="xs" variant="subtle" color="gray" onClick={() => set({ theme_primary: null, theme_accent: null })}>Reset to default</Button>}
-        </Group>
       </Paper>
+
+      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
+        <Paper withBorder p="lg">
+          <Text fw={650} mb="md">Colours</Text>
+          <Stack gap="sm">
+            <ColorInput label="Primary colour" description="Buttons, links and highlights" format="hex" swatchesPerRow={8} disabled={!canEdit}
+                        swatches={['#2468fb', '#0f766e', '#16a34a', '#7c3aed', '#db2777', '#dc2626', '#ea580c', '#0f172a']}
+                        placeholder={DEFAULT_PRIMARY} value={form.theme_primary ?? ''} onChange={(v) => set({ theme_primary: v || null })} />
+            <ColorInput label="Secondary colour" description="Accents, such as the selected menu item" format="hex" swatchesPerRow={8} disabled={!canEdit}
+                        swatches={['#f59e0b', '#22c55e', '#06b6d4', '#a855f7', '#f43f5e', '#eab308', '#64748b', '#ffffff']}
+                        placeholder={DEFAULT_SECONDARY} value={form.theme_accent ?? ''} onChange={(v) => set({ theme_accent: v || null })} />
+            <ColorInput label="Menu colour" description="The side menu; its text turns dark or light to stay readable" format="hex" swatchesPerRow={8} disabled={!canEdit}
+                        swatches={['#113356', '#0f172a', '#18181b', '#14532d', '#4c0519', '#083344', '#ffffff', '#f1f5f9']}
+                        placeholder={`${DEFAULT_MENU} (default)`} value={settings.menu_bg ?? ''} onChange={(v) => setLook({ menu_bg: v || undefined })} />
+            <ColorInput label="Dark mode background" description="Pages, panels and tables in dark mode are shades of this" format="hex" swatchesPerRow={8} disabled={!canEdit}
+                        swatches={['#113356', '#0f172a', '#1e293b', '#27272a', '#1a2e22', '#2a1419', '#0c2a33', '#1f1f1f']}
+                        placeholder={`${DEFAULT_SURFACE} (default)`} value={settings.surface ?? ''} onChange={(v) => setLook({ surface: v || undefined })} />
+            <ColorInput label="Light mode background" description="The page behind cards in light mode" format="hex" swatchesPerRow={8} disabled={!canEdit}
+                        swatches={['#ffffff', '#f8fafc', '#f5f7fb', '#f4f4f5', '#f7f7f2', '#fdf8f6', '#f0fdf4', '#eff6ff']}
+                        placeholder="#ffffff (default)" value={settings.light_bg ?? ''} onChange={(v) => setLook({ light_bg: v || undefined })} />
+          </Stack>
+        </Paper>
+
+        <Stack gap="lg">
+          <Paper withBorder p="lg">
+            <Text fw={650} mb="md">Look and feel</Text>
+            <Stack gap="sm">
+              <TextInput label="Platform name" description="Browser tab, sign-in page, and the menu when there's no logo" maxLength={60} disabled={!canEdit}
+                         placeholder="ViSight Track" value={settings.brand_name ?? ''} onChange={(e) => setLook({ brand_name: e.currentTarget.value || undefined })} />
+              <div>
+                <Text size="sm" fw={500} mb={4}>Default mode</Text>
+                <SegmentedControl size="xs" disabled={!canEdit} value={settings.color_scheme ?? 'dark'}
+                                  onChange={(v) => setLook({ color_scheme: v as 'dark' | 'light' })}
+                                  data={[{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }]} />
+                <Switch mt="xs" size="sm" disabled={!canEdit} label="Always use this mode (hide the light / dark switch)"
+                        checked={!!settings.lock_scheme} onChange={(e) => setLook({ lock_scheme: e.currentTarget.checked || undefined })} />
+              </div>
+              <Select label="Font" allowDeselect={false} disabled={!canEdit} value={settings.font ?? 'Inter'}
+                      data={FONTS.map((f) => ({ value: f, label: f === 'System' ? 'System (device default)' : f }))}
+                      renderOption={({ option }) => <span style={{ fontFamily: fontStack(option.value) }}>{option.label}</span>}
+                      onDropdownOpen={() => FONTS.forEach(loadFont)}
+                      onChange={(v) => { loadFont(v ?? undefined); setLook({ font: v && v !== 'Inter' ? v : undefined }); }} />
+              <div>
+                <Text size="sm" fw={500} mb={4}>Corners</Text>
+                <SegmentedControl size="xs" disabled={!canEdit} value={settings.radius ?? 'md'}
+                                  onChange={(v) => setLook({ radius: v === 'md' ? undefined : v as ThemeSettings['radius'] })}
+                                  data={[{ value: 'xs', label: 'Square' }, { value: 'sm', label: 'Slight' }, { value: 'md', label: 'Rounded' },
+                                         { value: 'lg', label: 'More' }, { value: 'xl', label: 'Round' }]} />
+              </div>
+            </Stack>
+          </Paper>
+          <Paper withBorder p="lg">
+            <Group justify="space-between" mb="sm">
+              <Text fw={650}>Preview</Text>
+              {(form.theme_primary || form.theme_accent || Object.keys(settings).length > 0) && canEdit &&
+                <Button size="xs" variant="subtle" color="gray" onClick={() => set({ theme_primary: null, theme_accent: null, theme_settings: null })}>
+                  Reset to default</Button>}
+            </Group>
+            <ThemePreview primary={form.theme_primary || DEFAULT_PRIMARY} secondary={form.theme_accent || DEFAULT_SECONDARY}
+                          settings={settings} name={form.name ?? 'ViSight Track'} />
+            <Text size="xs" c="dimmed" mt="xs">Saved changes apply to everyone in the user group the next time a page loads.</Text>
+          </Paper>
+        </Stack>
+      </SimpleGrid>
 
       <Paper withBorder p="lg">
         <Text fw={650} mb="md">Logos</Text>

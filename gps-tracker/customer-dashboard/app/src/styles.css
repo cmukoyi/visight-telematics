@@ -1,16 +1,18 @@
 html, body, #root { height: 100%; }
 body { margin: 0; -webkit-font-smoothing: antialiased; }
 
-/* Dark mode body = deep navy (dark-7 from the navy palette) */
-[data-mantine-color-scheme='dark'] { --mantine-color-body: #113356; }
-
-/* AG Grid themed to match Mantine (both schemes) */
+/* AG Grid themed to match Mantine (both schemes); dark mode follows the group's background palette */
 .vt-grid { --ag-font-family: inherit; --ag-font-size: 13px; --ag-border-radius: 10px; --ag-wrapper-border-radius: 10px; }
 [data-mantine-color-scheme='dark'] .vt-grid {
-  --ag-background-color: #143a60; --ag-foreground-color: #e6ecf5; --ag-header-background-color: #0f2f50;
-  --ag-header-foreground-color: #a6b5cc; --ag-odd-row-background-color: #173f67; --ag-row-hover-color: #1f4a76;
-  --ag-selected-row-background-color: rgba(62, 124, 251, 0.25); --ag-border-color: #2d4a72; --ag-input-border-color: #3f5880;
-  --ag-control-panel-background-color: #0f2f50; --ag-menu-background-color: #143a60; --ag-secondary-foreground-color: #a6b5cc;
+  --ag-background-color: color-mix(in srgb, var(--mantine-color-dark-6) 40%, var(--mantine-color-dark-7));
+  --ag-foreground-color: var(--mantine-color-dark-0); --ag-header-background-color: var(--mantine-color-dark-8);
+  --ag-header-foreground-color: var(--mantine-color-dark-1);
+  --ag-odd-row-background-color: color-mix(in srgb, var(--mantine-color-dark-6) 70%, var(--mantine-color-dark-7));
+  --ag-row-hover-color: color-mix(in srgb, var(--mantine-color-dark-5) 70%, var(--mantine-color-dark-6));
+  --ag-selected-row-background-color: color-mix(in srgb, var(--mantine-color-brand-5) 25%, transparent);
+  --ag-border-color: var(--mantine-color-dark-5); --ag-input-border-color: var(--mantine-color-dark-4);
+  --ag-control-panel-background-color: var(--mantine-color-dark-8); --ag-menu-background-color: var(--mantine-color-dark-7);
+  --ag-secondary-foreground-color: var(--mantine-color-dark-1);
 }
 .vt-grid .ag-header-cell-text { font-weight: 600; }
 

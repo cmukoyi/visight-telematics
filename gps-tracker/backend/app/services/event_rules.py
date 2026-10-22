@@ -1,7 +1,8 @@
-"""Event notification rules — alerts when a vehicle reports an event in an event type group.
+"""Event notification rules — alerts when a vehicle reports one of the chosen events.
 
 Called by the dashboard ingest with each batch of newly stored events. A rule
-of type "event" covers a vehicle group (or all vehicles) and an event type
+of type "event" covers a vehicle group (or all vehicles) and watches event
+types picked directly (e.g. speeding, harsh braking) and/or an event type
 group; every matching event raises an inbox alert (event_<code>) and, when the
 rule has email enabled, emails its recipients with its custom message.
 """
@@ -30,17 +31,17 @@ def process(db: Session, imei: str, usergroup_id, rows: list) -> int:
         return 0
     rules = db.query(NotificationRule).filter(NotificationRule.usergroup_id == usergroup_id,
                                               NotificationRule.is_active == True,  # noqa: E712
-                                              NotificationRule.rule_type == "event",
-                                              NotificationRule.event_group_id.isnot(None)).all()
+                                              NotificationRule.rule_type == "event").all()
     if not rules:
         return 0
-    groups = {g.id: set(g.codes or []) for g in db.query(EventTypeGroup).filter(
-        EventTypeGroup.id.in_([r.event_group_id for r in rules]))}
+    group_codes = {g.id: set(g.codes or []) for g in db.query(EventTypeGroup).filter(
+        EventTypeGroup.id.in_([r.event_group_id for r in rules if r.event_group_id]))}
+    watched = {r.id: set(r.event_codes or []) | group_codes.get(r.event_group_id, set()) for r in rules}
     tag = db.query(BLETag).filter(BLETag.imei == imei).first()
     if tag is None:
         return 0
     category = (((tag.attributes or {}).get("category") or {}).get("value") or "").lower()
-    rules = [r for r in rules if groups.get(r.event_group_id, set()) & codes
+    rules = [r for r in rules if watched[r.id] & codes
              and (not r.category or r.category.lower() == category)]
     if not rules:
         return 0
@@ -56,7 +57,7 @@ def process(db: Session, imei: str, usergroup_id, rows: list) -> int:
     vehicle = tag.description or tag.device_name or tag.imei
     for row in sorted(rows, key=lambda r: r["recorded_at"]):
         code = row.get("event_type")
-        matching = [r for r in rules if code in groups.get(r.event_group_id, set())]
+        matching = [r for r in rules if code in watched[r.id]]
         if not matching:
             continue
         label = labels.get(code) or (EVENTS[code][0] if code in EVENTS else code)

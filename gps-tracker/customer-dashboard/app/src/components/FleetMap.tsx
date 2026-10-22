@@ -40,7 +40,8 @@ export interface MapPlace { id: string; name: string; lat: number; lng: number; 
 
 export interface FleetMapHandle {
   fit: (points: [number, number][]) => void;
-  /** Move to a point keeping the zoom (zoom in to `minZoom` if further out), e.g. to follow a vehicle. */
+  /** Move to a point keeping the zoom (zoom in to `minZoom` if further out), e.g. to follow a vehicle.
+   *  The point is centred in the area left clear by `fitPadding` (panels over the map). */
   panTo: (lat: number, lng: number, minZoom?: number) => void;
 }
 
@@ -128,7 +129,7 @@ export const FleetMap = forwardRef<FleetMapHandle, Props>(function FleetMap(
     panTo(lat, lng, minZoom = 13) {
       const map = mapRef.current;
       if (!map) return;
-      map.easeTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), minZoom), duration: 800 });
+      map.easeTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), minZoom), padding: pad, duration: 800 });
     },
   }), [pad]);
 

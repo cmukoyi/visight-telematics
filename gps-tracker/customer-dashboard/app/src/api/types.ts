@@ -247,6 +247,19 @@ export interface GroupTheme {
   theme_accent: string | null;
   timezone: string | null;
   history_retention_days?: number | null;
+  theme_settings: ThemeSettings | null;
+}
+
+/** White-label look for a user group (Configuration → Users → Custom Themes). */
+export interface ThemeSettings {
+  menu_bg?: string;
+  surface?: string;
+  light_bg?: string;
+  color_scheme?: 'dark' | 'light';
+  lock_scheme?: boolean;
+  font?: string;
+  radius?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  brand_name?: string;
 }
 
 export interface NotificationRule {
@@ -258,6 +271,7 @@ export interface NotificationRule {
   place_ids: string[];
   place_group_ids: string[];
   event_group_id: string | null;
+  event_codes: string[];
   on_entry: boolean;
   on_exit: boolean;
   email_enabled: boolean;

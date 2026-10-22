@@ -759,9 +759,51 @@ class ThemeOut(BaseModel):
     theme_accent: Optional[str] = None
     timezone: Optional[str] = None
     history_retention_days: Optional[int] = 365
+    theme_settings: Optional[dict] = None
 
     class Config:
         from_attributes = True
+
+
+# White-label settings (UserGroup.theme_settings); anything else sent is dropped
+THEME_FONTS = ("Inter", "System", "Roboto", "Open Sans", "Lato", "Montserrat", "Poppins", "Nunito", "Source Sans 3")
+THEME_SETTINGS = {
+    "menu_bg": "colour",          # side menu background
+    "surface": "colour",          # dark-mode background (the app's panels are shades of it)
+    "light_bg": "colour",         # light-mode page background
+    "color_scheme": ("dark", "light"),   # default for users who haven't picked one
+    "lock_scheme": "bool",        # hide the light/dark switch
+    "font": THEME_FONTS,
+    "radius": ("xs", "sm", "md", "lg", "xl"),
+    "brand_name": "text",         # platform name in the browser tab and menu (no logo)
+}
+
+
+def _check_theme_settings(raw: dict) -> Optional[dict]:
+    import re
+    out = {}
+    for key, kind in THEME_SETTINGS.items():
+        v = raw.get(key)
+        if v is None or v == "":
+            continue
+        if kind == "colour":
+            if not isinstance(v, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", v):
+                raise HTTPException(status_code=400, detail=f"{key}: use a hex colour like #113356")
+            out[key] = v.lower()
+        elif kind == "bool":
+            if v:
+                out[key] = True
+        elif kind == "text":
+            v = str(v).strip()
+            if len(v) > 60:
+                raise HTTPException(status_code=400, detail="Keep the platform name under 60 characters")
+            if v:
+                out[key] = v
+        elif v not in kind:
+            raise HTTPException(status_code=400, detail=f"{key}: choose one of {', '.join(kind)}")
+        else:
+            out[key] = v
+    return out or None
 
 
 class ThemeUpdate(BaseModel):
@@ -772,6 +814,7 @@ class ThemeUpdate(BaseModel):
     history_retention_days: Optional[int] = None
     report_logo_data: Optional[str] = None   # data URL, '' clears
     timezone: Optional[str] = None           # IANA name, '' clears
+    theme_settings: Optional[dict] = None    # THEME_SETTINGS keys; {} resets to the default look
 
 
 _LOGO_PREFIXES = ("data:image/png", "data:image/jpeg", "data:image/jpg", "data:image/svg+xml")
@@ -844,6 +887,9 @@ def update_theme(
         if val and not val.startswith("#"):
             raise HTTPException(status_code=400, detail="theme_accent must be a hex color like #10b981")
         group.theme_accent = val or None
+
+    if data.theme_settings is not None:
+        group.theme_settings = _check_theme_settings(data.theme_settings)
 
     if data.history_retention_days is not None:
         days = data.history_retention_days

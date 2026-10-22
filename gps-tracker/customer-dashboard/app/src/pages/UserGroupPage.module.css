@@ -8,3 +8,20 @@
   font-size: 13px; padding: 6px 12px; border-radius: var(--mantine-radius-sm);
   background: color-mix(in srgb, var(--mantine-color-brand-5) 20%, transparent);
 }
+
+/* Ready-made looks */
+.preset {
+  display: block; width: 100%; padding: 8px; text-align: left; border-radius: var(--mantine-radius-md);
+  border: 1px solid var(--mantine-color-default-border); background: var(--mantine-color-body);
+}
+.preset:hover { border-color: var(--mantine-color-brand-5); }
+.presetSwatch { display: flex; height: 44px; border-radius: var(--mantine-radius-sm); overflow: hidden; margin-bottom: 6px; }
+
+/* Mini app preview: colours come from inline styles (the unsaved form) */
+.mock { display: flex; height: 260px; border-radius: var(--mantine-radius-md); overflow: hidden; border: 1px solid var(--mantine-color-default-border); }
+.mockMenu { width: 30%; min-width: 120px; padding: 12px 10px; display: flex; flex-direction: column; gap: 6px; }
+.mockLogo { font-weight: 750; font-size: 15px; margin-bottom: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mockItem { font-size: 12px; padding: 7px 9px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mockPage { flex: 1; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.mockCard { padding: 12px; border: 1px solid; }
+.mockButton { display: inline-block; padding: 6px 12px; font-size: 12px; font-weight: 600; color: #fff; }
