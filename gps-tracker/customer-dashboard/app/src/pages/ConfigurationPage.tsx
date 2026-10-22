@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, Route, Routes, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ActionIcon, Anchor, Badge, Breadcrumbs, Button, ColorInput, Group, Modal, Paper, PasswordInput, Select, SimpleGrid, Stack,
   Text, TextInput, ThemeIcon, Title, UnstyledButton,
@@ -115,6 +115,11 @@ function Devices() {
                      ...Object.fromEntries(VEHICLE_DETAILS.map((k) => [k, detail(v, k)])) });
     setEditing(v);
   };
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    const v = vehicles.find((x) => x.id === params.get('edit'));
+    if (v && admin) { open(v); setParams({}, { replace: true }); }
+  }, [vehicles, params]); // eslint-disable-line react-hooks/exhaustive-deps
   const save = form.onSubmit(async (values) => {
     try {
       await api(`/api/portal/tags/${editing!.id}`, { method: 'PUT', json: values });

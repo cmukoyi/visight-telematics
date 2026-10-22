@@ -150,6 +150,60 @@ def live(request: Request, db: Session = Depends(get_db), imei: str = Query(...)
     }
 
 
+@router.get("/vehicle-status")
+def vehicle_status(request: Request, db: Session = Depends(get_db), imei: str = Query(...)):
+    """Everything the Workspace details panel shows for one vehicle.
+
+    Readings are the latest value of each IO element across the vehicle's
+    recent records (devices send some, like the SIM number, only now and then),
+    plus the last position's street address and today's trip totals in the
+    user group's timezone.
+    """
+    from zoneinfo import ZoneInfo
+    from app.services import address_service
+    me = get_portal_user_from_request(request, db)
+    access = access_service.for_user(me, db)
+    if not (access.can("map.view") or access.can("history.view")):
+        access.require("map.view")
+    if not access.can_see(db, imei):
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    recent = (db.query(DeviceEvent).filter(DeviceEvent.usergroup_id == me.usergroup_id, DeviceEvent.imei == imei)
+              .order_by(DeviceEvent.recorded_at.desc(), DeviceEvent.id.desc()).limit(300).all())
+    latest_io: dict = {}
+    for e in recent:
+        for k, v in (e.io or {}).items():
+            latest_io.setdefault(k, v)
+    fix = next((e for e in recent if e.latitude is not None), None)
+    position = None
+    if fix:
+        position = {"latitude": fix.latitude, "longitude": fix.longitude, "speed": fix.speed or 0,
+                    "heading": fix.angle, "satellites": fix.satellites, "recorded_at": fix.recorded_at,
+                    "address": address_service.lookup(db, fix.latitude, fix.longitude) or None}
+        db.commit()   # keep the address in the cache
+    iccid = None
+    if latest_io.get("11") is not None and latest_io.get("14") is not None:
+        iccid = f"{latest_io['11']}{latest_io['14']}"
+    group = db.get(UserGroup, me.usergroup_id)
+    try:
+        tz = ZoneInfo((group.timezone if group else None) or "Africa/Johannesburg")
+    except Exception:
+        tz = timezone.utc
+    day_start = datetime.now(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+    count, distance, driving = (db.query(func.count(Trip.id), func.coalesce(func.sum(Trip.distance_m), 0),
+                                         func.coalesce(func.sum(Trip.duration_s), 0))
+                                .filter(Trip.usergroup_id == me.usergroup_id, Trip.imei == imei,
+                                        Trip.started_at >= day_start).one())
+    return {
+        "imei": imei,
+        "last_report": recent[0].recorded_at if recent else None,
+        "last_event": event_label(recent[0].event_type, recent[0].event_io_id) if recent else None,
+        "position": position,
+        "readings": describe_io(latest_io),
+        "iccid": iccid,
+        "today": {"trips": count, "distance_km": round(distance / 1000, 1), "driving_s": int(driving)},
+    }
+
+
 # ---------------------------------------------------------------------------
 # Address search (for drawing places)
 # ---------------------------------------------------------------------------

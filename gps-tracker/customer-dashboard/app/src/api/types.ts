@@ -282,3 +282,16 @@ export interface GeocodeResult {
   latitude: number;
   longitude: number;
 }
+
+export interface VehicleStatus {
+  imei: string;
+  last_report: string | null;
+  last_event: string | null;
+  position: {
+    latitude: number; longitude: number; speed: number; heading: number | null; satellites: number | null;
+    recorded_at: string; address: string | null;
+  } | null;
+  readings: { id: number; key: string; name: string; value: unknown; display: string }[];
+  iccid: string | null;
+  today: { trips: number; distance_km: number; driving_s: number };
+}

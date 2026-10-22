@@ -1,0 +1,31 @@
+.panel {
+  position: absolute; top: 12px; right: 12px; bottom: 12px; z-index: 5; width: 380px; max-width: calc(100% - 24px);
+  display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--mantine-color-default-border);
+}
+.collapsed { width: 44px; align-items: center; padding-top: 8px; gap: 12px; }
+.vtab {
+  writing-mode: vertical-rl; font-size: 13px; font-weight: 600; padding: 12px 6px; border-radius: var(--mantine-radius-sm);
+  color: var(--mantine-color-dimmed);
+}
+.vtab:hover { color: var(--mantine-color-text); background: var(--mantine-color-default-hover); }
+.head { padding: 6px 8px 0; }
+.tabs { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.tabPanel { flex: 1; min-height: 0; }
+.section { padding: 12px 16px; border-bottom: 1px solid var(--mantine-color-default-border); }
+.field { min-width: 0; }
+.fieldIcon { flex: none; opacity: 0.6; }
+.action { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.actionIcon {
+  width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  border: 1.5px solid var(--mantine-color-default-border); transition: background 120ms ease, border-color 120ms ease;
+}
+.action:hover .actionIcon { border-color: var(--mantine-color-brand-5); background: var(--mantine-color-default-hover); }
+.actionActive { background: var(--mantine-color-brand-6); border-color: var(--mantine-color-brand-6); color: #fff; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: #94a3b8; }
+.dot[data-status='active'] { background: #22c55e; }
+.dot[data-status='idle'] { background: #f59e0b; }
+.trip { display: block; width: 100%; padding: 10px 16px; border-bottom: 1px solid var(--mantine-color-default-border); }
+.trip:hover { background: var(--mantine-color-default-hover); }
+.tripOn { box-shadow: inset 3px 0 0 var(--mantine-color-accent-5); background: color-mix(in srgb, var(--mantine-color-brand-5) 12%, transparent); }
+.from { color: #16a34a; }
+.to { color: #dc2626; }

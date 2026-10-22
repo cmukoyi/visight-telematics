@@ -4,7 +4,7 @@ import { getSession, saveAccess } from '../auth/session';
 import type {
   Alert, Branding, Category, DataExchangeStatus, DeviceEvent, EventTypes, GroupTheme, Kpis, LivePosition, Me,
   NotificationRule, Permission, Place, PortalUserRow, ReportDef, ReportSchedule, Role, RulesMeta, SecurityGroup, Trip,
-  TripDetail, Vehicle,
+  TripDetail, Vehicle, VehicleStatus,
 } from './types';
 
 export const useBranding = () =>
@@ -126,4 +126,13 @@ export const useLive = (imei: string | null) =>
     enabled: !!imei,
     refetchInterval: 5_000,
     refetchIntervalInBackground: false,
+  });
+
+/** The Workspace details panel's data for one vehicle, refreshed every 15 s while open. */
+export const useVehicleStatus = (imei: string | null) =>
+  useQuery({
+    queryKey: ['vehicle-status', imei],
+    queryFn: () => api<VehicleStatus>(`/api/portal/vehicle-status${qs({ imei })}`),
+    enabled: !!imei,
+    refetchInterval: 15_000,
   });

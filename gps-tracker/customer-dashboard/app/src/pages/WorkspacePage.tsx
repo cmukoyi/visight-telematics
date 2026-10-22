@@ -6,13 +6,14 @@ import {
 import { notifications } from '@mantine/notifications';
 import {
   IconAlertTriangle, IconCar, IconEraser, IconEye, IconEyeOff, IconMapPin, IconMaximize, IconMinimize, IconRoute,
-  IconMapPinPlus, IconSearch, IconTimeline,
+  IconInfoCircle, IconMapPinPlus, IconSearch, IconTimeline,
 } from '@tabler/icons-react';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { fetchTrip, useCan, useCategories, useEvents, useEventTypes, usePlaces, useTrips, useVehicles, type Range } from '../api/hooks';
 import { detail, type DeviceEvent, type Trip, type TripDetail } from '../api/types';
 import { DataGrid } from '../components/DataGrid';
-import { FleetMap, type FleetMapHandle, type MapAction, type MapPoint, type MapRoute, type MapVehicle } from '../components/FleetMap';
+import { VehiclePanel } from '../components/VehiclePanel';
+import { FleetMap, type FleetMapHandle, type MapAction, type MapPoint, type MapTarget, type MapRoute, type MapVehicle } from '../components/FleetMap';
 import { PlaceEditor, clickDraft, draftExtent, draftLayers, newDraft, type PlaceDraft } from '../components/PlaceEditor';
 import { RangePicker, defaultRange } from '../components/RangePicker';
 import { STATUS } from '../theme';
@@ -95,19 +96,32 @@ export function WorkspacePage() {
   const [placeDraft, setPlaceDraft] = useState<PlaceDraft | null>(null);
   const draft = draftLayers(placeDraft);
   const canPlaces = can('places.manage');
+  // Vehicle details panel (right): opened from a vehicle's popup or the list
+  const [detailsImei, setDetailsImei] = useState<string | null>(null);
+  const [detailsCollapsed, setDetailsCollapsed] = useState(false);
+  const detailsVehicle = vehicles.find((v) => v.imei === detailsImei) ?? null;
+  const openDetails = (imei: string) => { setDetailsImei(imei); setDetailsCollapsed(false); setPlaceDraft(null); };
+  const panelRight = detailsVehicle ? (detailsCollapsed ? 68 : 404) : 12;
+
   const startPlace = (lat: number, lng: number, imei: string | null, name: string) => {
+    setDetailsImei(null);
     const tagId = vehicles.find((v) => v.imei === imei)?.id;
     const d = newDraft([lat, lng], tagId ? [tagId] : [], name);
     setPlaceDraft(d);
     mapRef.current?.fit(draftExtent(d));
   };
-  const mapActions: MapAction[] = canPlaces && !placeDraft ? [{
-    label: 'Create place here',
-    onClick: (t) => {
-      const ev = t.kind === 'point' ? [...plottedEvents.values()].find((e) => `ev-${e.id}` === t.id) : null;
-      startPlace(t.lat, t.lng, t.kind === 'vehicle' ? t.id : ev?.imei ?? null, t.kind === 'vehicle' ? `${t.label} location` : '');
+  const eventFor = (t: { kind: string; id: string }) => (t.kind === 'point' ? [...plottedEvents.values()].find((e) => `ev-${e.id}` === t.id) : null);
+  const mapActions: MapAction[] = placeDraft ? [] : [
+    ...(canPlaces ? [{
+      label: 'Draw place',
+      onClick: (t: MapTarget) => startPlace(t.lat, t.lng, t.kind === 'vehicle' ? t.id : eventFor(t)?.imei ?? null,
+                                            t.kind === 'vehicle' ? `${t.label} location` : ''),
+    }] : []),
+    {
+      label: 'Details',
+      onClick: (t: MapTarget) => { const imei = t.kind === 'vehicle' ? t.id : eventFor(t)?.imei; if (imei) openDetails(imei); },
     },
-  }] : [];
+  ];
 
   const mapPlaces = useMemo(() => {
     const out = places.filter((p) => plottedPlaces.has(p.id)).map(toMapPlace);
@@ -193,8 +207,8 @@ export function WorkspacePage() {
     { headerName: 'Odometer', field: 'odometer_km', width: 115, valueFormatter: (p) => (p.value != null ? `${p.value} km` : '—'), type: 'numericColumn' },
     ...(canPlaces ? [{ headerName: '', width: 56, minWidth: 56, sortable: false, filter: false, pinned: 'right' as const,
       cellRenderer: (p: ICellRendererParams<DeviceEvent>) => p.data && p.data.latitude != null && (
-        <Tooltip label="Create place at this event" withinPortal>
-          <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Create place at this event"
+        <Tooltip label="Draw place at this event" withinPortal>
+          <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Draw place at this event"
                       onClick={() => startPlace(p.data!.latitude!, p.data!.longitude!, p.data!.imei, `${p.data!.label} — ${p.data!.device_name}`)}>
             <IconMapPinPlus size={15} />
           </ActionIcon>
@@ -208,7 +222,14 @@ export function WorkspacePage() {
       <FleetMap ref={mapRef} vehicles={mapVehicles} routes={[...routes, ...draft.routes]} points={[...points, ...draft.points]}
                 places={mapPlaces} actions={mapActions}
                 onMapClick={placeDraft ? (lat, lng) => setPlaceDraft((d) => d && clickDraft(d, lat, lng)) : undefined}
-                fitPadding={{ top: 80, left: 60, right: placeDraft ? 400 : 60, bottom: panel ? (maximized ? 60 : 380) : 60 }} />
+                fitPadding={{ top: 80, left: 60, right: placeDraft ? 400 : panelRight + 48, bottom: panel ? (maximized ? 60 : 380) : 60 }} />
+
+      {detailsVehicle && (
+        <VehiclePanel vehicle={detailsVehicle} collapsed={detailsCollapsed} onCollapse={setDetailsCollapsed}
+                      onClose={() => setDetailsImei(null)}
+                      plotted={plottedVehicles.has(detailsVehicle.imei)} onTogglePlot={() => toggleVehicle(detailsVehicle.imei)}
+                      plottedTrips={new Set(plottedTrips.keys())} onToggleTrip={toggleTrip} />
+      )}
 
       {placeDraft && (
         <Paper className={classes.placePanel} shadow="xl" withBorder>
@@ -242,7 +263,7 @@ export function WorkspacePage() {
       </Paper>
 
       {panel && (
-        <Paper className={`${classes.dock} ${maximized ? classes.dockMax : ''}`} shadow="xl">
+        <Paper className={`${classes.dock} ${maximized ? classes.dockMax : ''}`} shadow="xl" style={{ right: panelRight }}>
           <div className={classes.vehicles}>
             <Group justify="space-between" mb="xs">
               <Group gap={6}><IconCar size={18} /><Text fw={650}>Vehicles</Text></Group>
@@ -267,9 +288,15 @@ export function WorkspacePage() {
                     <Text size="sm" fw={500} truncate>{vehicleName(v)}</Text>
                     <Text size="xs" c="dimmed" truncate>{detail(v, 'registration') || v.imei}</Text>
                   </div>
+                  <Tooltip label="Details" withinPortal>
+                    <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Vehicle details"
+                                onClick={(e) => { e.stopPropagation(); openDetails(v.imei); }}>
+                      <IconInfoCircle size={15} />
+                    </ActionIcon>
+                  </Tooltip>
                   {canPlaces && v.latitude && v.longitude && (
-                    <Tooltip label="Create place at this vehicle" withinPortal>
-                      <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Create place at this vehicle"
+                    <Tooltip label="Draw place at this vehicle" withinPortal>
+                      <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Draw place at this vehicle"
                                   onClick={(e) => { e.stopPropagation(); startPlace(parseFloat(v.latitude!), parseFloat(v.longitude!), v.imei, `${vehicleName(v)} location`); }}>
                         <IconMapPinPlus size={15} />
                       </ActionIcon>
