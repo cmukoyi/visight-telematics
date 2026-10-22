@@ -266,7 +266,17 @@ def profile(db: Session, access: Access) -> dict:
         "is_admin": access.is_admin,
         "security_group_id": str(sg.id) if sg else None,
         "security_group_name": sg.name if sg else None,
+        "language": user_language(db, access.user),
     }
+
+
+def user_language(db: Session, user: PortalUser) -> str:
+    """The user's own language, else their user group's default, else English."""
+    if user.language:
+        return user.language
+    from app.models import UserGroup
+    group = db.get(UserGroup, user.usergroup_id)
+    return (group.default_language if group and group.default_language else None) or "en"
 
 
 def admin_count(db: Session, usergroup_id, exclude_user_id=None) -> int:

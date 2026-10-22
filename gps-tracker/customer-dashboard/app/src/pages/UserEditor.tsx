@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Badge, Button, Group, Paper, Radio, SimpleGrid, Stack, Switch, Text, TextInput } from '@mantine/core';
+import { Alert, Badge, Button, Group, Paper, Radio, Select, SimpleGrid, Stack, Switch, Text, TextInput } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { IconAlertTriangle, IconKey, IconShieldLock, IconTrash } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { useMe, usePermissions, useRoles, useSecurityGroups } from '../api/hooks';
+import { useGroupTheme, useLanguages, useMe, usePermissions, useRoles, useSecurityGroups } from '../api/hooks';
 import type { PortalUserRow, Role } from '../api/types';
 import { EditorShell, type EditorSection } from '../components/EditorShell';
 import { CheckList, FeatureSummary } from '../components/FeaturePicker';
 import { dateTime } from '../utils/format';
 
-type Draft = { email: string; first_name: string; last_name: string; role_ids: string[]; security_group_id: string | null; is_active: boolean };
-const EMPTY: Draft = { email: '', first_name: '', last_name: '', role_ids: [], security_group_id: null, is_active: true };
+type Draft = { email: string; first_name: string; last_name: string; role_ids: string[]; security_group_id: string | null; is_active: boolean; language: string | null };
+const EMPTY: Draft = { email: '', first_name: '', last_name: '', role_ids: [], security_group_id: null, is_active: true, language: null };
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const fail = (e: unknown) => notifications.show({ color: 'red', message: (e as Error).message });
 
@@ -38,6 +38,9 @@ export function UserEditor({ user: initial, opened, onClose, onCreated }: {
   const { data: groups = [] } = useSecurityGroups();
   const { data: allPermissions = [] } = usePermissions();
   const permissions = allPermissions.filter((p) => !p.admin_only);
+  const { data: languages = [] } = useLanguages();
+  const { data: groupTheme } = useGroupTheme();
+  const groupLanguage = languages.find((l) => l.code === groupTheme?.default_language)?.name;
   const grantable = useGrantable();
   const [user, setUser] = useState<PortalUserRow | null>(initial);   // null after "Save and new"
   const [draft, setDraft] = useState<Draft>(EMPTY);
@@ -49,7 +52,7 @@ export function UserEditor({ user: initial, opened, onClose, onCreated }: {
     setUser(initial);
     setDraft(initial ? { email: initial.email, first_name: initial.first_name ?? '', last_name: initial.last_name ?? '',
                          role_ids: initial.role_ids?.length ? initial.role_ids : initial.role_id ? [initial.role_id] : [],
-                         security_group_id: initial.security_group_id, is_active: initial.is_active } : EMPTY);
+                         security_group_id: initial.security_group_id, is_active: initial.is_active, language: initial.language ?? null } : EMPTY);
   }, [opened, initial]);
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
 
@@ -75,12 +78,13 @@ export function UserEditor({ user: initial, opened, onClose, onCreated }: {
       if (!user) {
         const res = await api<{ portal_user: PortalUserRow; temp_password: string }>('/api/portal/users', { method: 'POST', json: {
           email: draft.email.trim(), first_name: draft.first_name.trim(), last_name: draft.last_name.trim() || null,
-          role_ids: draft.role_ids, security_group_id: draft.security_group_id } });
+          role_ids: draft.role_ids, security_group_id: draft.security_group_id, language: draft.language } });
         onCreated(res.portal_user.email, res.temp_password);
       } else {
         await api(`/api/portal/users/${user.id}`, { method: 'PATCH', json: {
           first_name: draft.first_name.trim(), last_name: draft.last_name.trim(), role_ids: draft.role_ids,
-          security_group_id: draft.security_group_id, ...(draft.is_active !== user.is_active ? { is_active: draft.is_active } : {}) } });
+          security_group_id: draft.security_group_id, language: draft.language,
+          ...(draft.is_active !== user.is_active ? { is_active: draft.is_active } : {}) } });
         notifications.show({ color: 'green', message: `${draft.email} saved` });
       }
       refresh();
@@ -105,12 +109,16 @@ export function UserEditor({ user: initial, opened, onClose, onCreated }: {
   });
 
   const sections: EditorSection[] = [
-    { id: 'general', label: 'General', keywords: 'first name last name description',
+    { id: 'general', label: 'General', keywords: 'first name last name description language',
       content: (
         <Stack maw={620}>
           <TextInput label="First name" withAsterisk value={draft.first_name} onChange={(e) => set({ first_name: e.currentTarget.value })}
                      error={tried && errors.first_name} data-autofocus />
           <TextInput label="Last name" value={draft.last_name} onChange={(e) => set({ last_name: e.currentTarget.value })} />
+          <Select label="Language" description="The language the platform is shown in for this user (add and translate languages in the admin portal)"
+                  placeholder={`User group default${groupLanguage ? ` (${groupLanguage})` : ''}`} clearable searchable
+                  data={languages.map((l) => ({ value: l.code, label: `${l.name} (${l.code})` }))}
+                  value={draft.language} onChange={(v) => set({ language: v })} />
           {user && (
             <SimpleGrid cols={2}>
               <Text size="sm"><Text span c="dimmed">Created </Text>{dateTime(user.created_at) || '—'}</Text>

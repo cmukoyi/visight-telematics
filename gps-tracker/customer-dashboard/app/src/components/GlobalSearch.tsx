@@ -10,6 +10,7 @@ import { api } from '../api/client';
 import { useCan, useCategories, usePlaces, usePortalUsers, useReports, useRules, useVehicles } from '../api/hooks';
 import { detail, type Alert } from '../api/types';
 import { vehicleName } from '../utils/format';
+import { useT } from '../i18n';
 import classes from './GlobalSearch.module.css';
 
 interface Hit { id: string; group: string; label: string; sub?: string; to: string; icon: typeof IconCar }
@@ -49,6 +50,7 @@ const norm = (s: string) => s.toLowerCase();
  * pages and settings, reports, users, notification rules and recent alerts. Ctrl/⌘ + K focuses it.
  */
 export const GlobalSearch = forwardRef<HTMLInputElement, { onNavigate?: () => void }>(function GlobalSearch({ onNavigate }, ref) {
+  const t = useT();
   const navigate = useNavigate();
   const can = useCan();
   const combobox = useCombobox({ onDropdownClose: () => combobox.resetSelectedOption() });
@@ -136,7 +138,7 @@ export const GlobalSearch = forwardRef<HTMLInputElement, { onNavigate?: () => vo
                 onNavigate?.();
               }}>
       <Combobox.Target>
-        <TextInput ref={ref} value={q} placeholder="Search" aria-label="Search the platform" className={classes.input}
+        <TextInput ref={ref} value={q} placeholder={t('app.common.search', 'Search')} aria-label={t('app.common.search', 'Search')} className={classes.input}
                    leftSection={<IconSearch size={16} />} rightSection={!q ? <Kbd size="xs" className={classes.kbd}>⌘K</Kbd> : null}
                    rightSectionWidth={44}
                    onChange={(e) => { setQ(e.currentTarget.value); combobox.openDropdown(); combobox.updateSelectedOptionIndex(); }}

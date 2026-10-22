@@ -246,6 +246,7 @@ class PortalUserOut(BaseModel):
     role_id: Optional[UUID] = None
     role_ids: List[str] = []
     role_names: List[str] = []
+    language: Optional[str] = None
     security_group_id: Optional[UUID] = None
     created_at: Optional[datetime] = None
     last_login_at: Optional[datetime] = None
@@ -439,6 +440,7 @@ class PortalUserCreate(BaseModel):
     role_id: Optional[UUID] = None           # one role (older clients); role_ids takes precedence
     role_ids: Optional[List[UUID]] = None    # the roles the user holds
     security_group_id: Optional[UUID] = None
+    language: Optional[str] = None           # a language code from the admin portal; None = the group's default
 
 
 def _check_roles_and_security_group(db: Session, access, role_ids, security_group_id, current_ids=()):
@@ -466,6 +468,31 @@ def _check_roles_and_security_group(db: Session, access, role_ids, security_grou
     elif not any(r.is_admin or "security.all_vehicles" in (r.permissions or []) for r in roles):
         raise HTTPException(status_code=400, detail="Add the user to a security group so they can see vehicles")
     return sorted(roles, key=lambda r: (not r.is_admin, r.name.lower()))
+
+
+def _check_language(db: Session, code: Optional[str]) -> Optional[str]:
+    """A language added (and active) in the admin portal, or None for the user group's default."""
+    code = (code or "").strip()
+    if not code:
+        return None
+    from app.models_i18n import Language
+    if not db.query(Language).filter(Language.code == code, Language.is_active == True).first():  # noqa: E712
+        raise HTTPException(status_code=400, detail=f"Language '{code}' isn't available")
+    return code
+
+
+class LanguageIn(BaseModel):
+    language: Optional[str] = None
+
+
+@router.put("/account/language")
+def set_my_language(data: LanguageIn, request: Request, db: Session = Depends(get_db)):
+    """Change the signed-in user's own language (None = the user group's default)."""
+    me = get_portal_user_from_request(request, db)
+    me.language = _check_language(db, data.language)
+    db.commit()
+    from app.services import access_service
+    return {"language": access_service.user_language(db, me)}
 
 
 def _guard_admin_target(db: Session, access, target: PortalUser) -> None:
@@ -538,6 +565,7 @@ def create_portal_user(
         role=role,
         custom_features=data.custom_features if (role == "custom" and not new_roles) else None,
         security_group_id=data.security_group_id if new_roles else None,
+        language=_check_language(db, data.language),
     )
     db.add(new_user)
     db.flush()
@@ -562,6 +590,7 @@ class PortalUserPatch(BaseModel):
     security_group_id: Optional[UUID] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    language: Optional[str] = None
 
 
 @router.patch("/users/{user_id}", response_model=PortalUserOut)
@@ -620,6 +649,8 @@ def patch_portal_user(
     if "custom_features" in data.model_fields_set:
         target.custom_features = data.custom_features if (target.role == "custom") else None
 
+    if "language" in data.model_fields_set:
+        target.language = _check_language(db, data.language)
     if data.first_name is not None:
         target.first_name = data.first_name.strip() or None
     if data.last_name is not None:
@@ -771,6 +802,7 @@ class ThemeOut(BaseModel):
     timezone: Optional[str] = None
     history_retention_days: Optional[int] = 365
     theme_settings: Optional[dict] = None
+    default_language: Optional[str] = None
 
     class Config:
         from_attributes = True

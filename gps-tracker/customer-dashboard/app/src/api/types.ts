@@ -202,6 +202,7 @@ export interface PortalUserRow {
   role_id: string | null;
   role_ids: string[];
   role_names: string[];
+  language: string | null;
   security_group_id: string | null;
   expires_at: string | null;
   created_at: string | null;
@@ -268,6 +269,7 @@ export interface GroupTheme {
   timezone: string | null;
   history_retention_days?: number | null;
   theme_settings: ThemeSettings | null;
+  default_language?: string | null;
 }
 
 /** White-label look for a user group (Configuration → Users → Custom Themes). */

@@ -34,6 +34,8 @@ COPY ./backend/ .
 # The i18n synchronizer scans the customer dashboard to keep database keys in
 # sync with the UI served by the separate customer container.
 COPY ./customer-dashboard/public/index.html /app/customer-dashboard/public/index.html
+# The React app's source, so the translation sync can find its t('app.…', '…') texts
+COPY ./customer-dashboard/app/src /app/customer-dashboard/app/src
 
 # Make sure scripts in .local are usable
 ENV PATH=/root/.local/bin:$PATH

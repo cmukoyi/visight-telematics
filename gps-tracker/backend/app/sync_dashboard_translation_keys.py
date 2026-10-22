@@ -26,6 +26,11 @@ MARKER_PATTERN = re.compile(
 RUNTIME_CALL_PATTERN = re.compile(
     r"\bt(?:Alert|Confirm|Prompt)?\(\s*['\"](?P<key>[a-z][a-z0-9_.]+)['\"]\s*,\s*['\"](?P<text>(?:\\.|[^'\"])*)['\"]"
 )
+# React customer app (customer-dashboard/app/src): t('app.key', 'Text') / msg('app.key', 'Text') — see src/i18n.tsx
+APP_CALL_PATTERN = re.compile(
+    r"\b(?:t|tr|msg)\(\s*'(?P<key>app\.[a-z0-9_.]+)'\s*,\s*'(?P<text>(?:\\.|[^'\\])*)'"
+)
+PLACEHOLDER = re.compile(r"\{[a-z_]+\}")
 ATTRIBUTE_PATTERN = re.compile(r'\b(?P<name>placeholder|title)="(?P<value>[^"]*)"')
 TAG_PATTERN = re.compile(r"<[^>]+>")
 EXPLICIT_DEFAULTS = {
@@ -59,6 +64,28 @@ def customer_dashboard_path(filename: str) -> Path:
 
 def dashboard_path() -> Path:
     return customer_dashboard_path("index.html")
+
+
+def app_source_dir() -> Path | None:
+    """The React customer app's src/ (copied into the backend image), if present."""
+    script_path = Path(__file__).resolve()
+    for candidate in (script_path.parents[2] / "customer-dashboard/app/src", script_path.parents[1] / "customer-dashboard/app/src"):
+        if candidate.is_dir():
+            return candidate
+    return None
+
+
+def extract_app_defaults(src: Path | None) -> dict[str, tuple[str, str]]:
+    """{key: (English text, context)} from t()/msg() calls in the React app."""
+    defaults: dict[str, tuple[str, str]] = {}
+    if src is None:
+        return defaults
+    for path in sorted(src.rglob("*.ts*")):
+        for match in APP_CALL_PATTERN.finditer(path.read_text(encoding="utf-8")):
+            text = match.group("text").replace("\\'", "'")
+            if text:
+                defaults.setdefault(match.group("key"), (text, f"Customer app ({path.relative_to(src)})"))
+    return defaults
 
 
 def extract_defaults(content: str) -> dict[str, tuple[str, str]]:
@@ -130,7 +157,9 @@ def translate_batch(texts: list[str], target_lang: str) -> list[str]:
         headers["Ocp-Apim-Subscription-Region"] = region
     request = Request(
         f"{endpoint}/translate?{query}",
-        data=json.dumps([{"text": text} for text in texts]).encode("utf-8"),
+        # {placeholders} (e.g. {count}) must come back untouched: Azure's dynamic dictionary keeps them as-is
+        data=json.dumps([{"text": PLACEHOLDER.sub(lambda m: f'<mstrans:dictionary translation="{m.group(0)}">{m.group(0)}</mstrans:dictionary>', text)}
+                         for text in texts]).encode("utf-8"),
         headers=headers,
         method="POST",
     )
@@ -198,6 +227,9 @@ def main() -> None:
 
     content = dashboard_path().read_text(encoding="utf-8")
     defaults = extract_defaults(content)
+    app_defaults = extract_app_defaults(app_source_dir())
+    print(f"Customer app i18n keys: {len(app_defaults)}")
+    defaults.update({k: v for k, v in app_defaults.items() if k not in defaults})
     marker_keys = set(re.findall(r'data-i18n(?:-placeholder|-title)?="([^"]+)"', content))
     runtime_keys = set(match.group("key") for match in RUNTIME_CALL_PATTERN.finditer(content))
     missing_defaults = sorted((marker_keys | runtime_keys) - set(defaults))

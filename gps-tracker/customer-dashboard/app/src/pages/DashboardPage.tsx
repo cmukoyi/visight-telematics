@@ -6,12 +6,14 @@ import { useCan, useCategories, useKpis, useLive, useVehicles } from '../api/hoo
 import { FleetMap, type FleetMapHandle, type MapRoute, type MapVehicle } from '../components/FleetMap';
 import { LiveTrack } from '../components/LiveTrack';
 import { ALL_VEHICLES, inGroup, toMapVehicle } from './vehicles';
+import { useT } from '../i18n';
 import classes from './DashboardPage.module.css';
 
 function Kpi({ period, title, value, unit, group, icon: Icon, delta }: {
   period: string; title: string; value: string | number; unit?: string; group: string;
   icon: typeof IconRoute; delta?: number | null;
 }) {
+  const t = useT();
   return (
     <Card className={classes.kpi}>
       <Group justify="space-between" align="flex-start" wrap="nowrap">
@@ -30,7 +32,7 @@ function Kpi({ period, title, value, unit, group, icon: Icon, delta }: {
         {delta != null && Number.isFinite(delta) && (
           <Badge size="sm" variant="light" color={delta >= 0 ? 'teal' : 'orange'}
                  leftSection={delta >= 0 ? <IconTrendingUp size={12} /> : <IconTrendingDown size={12} />}>
-            {delta >= 0 ? '+' : ''}{Math.round(delta)}% vs last week
+            {t('app.dashboard.vs_last_week', '{delta}% vs last week', { delta: `${delta >= 0 ? '+' : ''}${Math.round(delta)}` })}
           </Badge>
         )}
       </Group>
@@ -89,7 +91,8 @@ export function DashboardPage() {
     if (markers.length && !selected) mapRef.current?.fit(markers.map((m) => [m.lat, m.lng]));
   }, [markers.length, group]);  // eslint-disable-line react-hooks/exhaustive-deps
 
-  const groupLabel = group === ALL_VEHICLES ? 'All vehicles' : group;
+  const t = useT();
+  const groupLabel = group === ALL_VEHICLES ? t('app.common.all_vehicles', 'All vehicles') : group;
   const cur = kpis?.current_week;
   const prev = kpis?.previous_week;
   const pct = (a?: number, b?: number) => (a != null && b ? ((a - b) / b) * 100 : null);
@@ -98,19 +101,19 @@ export function DashboardPage() {
     <Stack p="lg" gap="lg">
       <Group justify="space-between" wrap="wrap">
         <div>
-          <Title order={3}>Where is my fleet</Title>
-          <Text c="dimmed" size="sm">{inScope.length} vehicles · positions refresh every 15 s · click a vehicle to track it live</Text>
+          <Title order={3}>{t('app.dashboard.title', 'Where is my fleet')}</Title>
+          <Text c="dimmed" size="sm">{t('app.dashboard.subtitle', '{count} vehicles · positions refresh every 15 s · click a vehicle to track it live', { count: inScope.length })}</Text>
         </div>
         <Group gap="sm">
-          <Badge size="lg" variant="dot" color="green">{counts.active} active</Badge>
-          <Badge size="lg" variant="dot" color="yellow">{counts.idle} idle</Badge>
-          <Badge size="lg" variant="dot" color="gray">{counts.offline} offline</Badge>
+          <Badge size="lg" variant="dot" color="green">{t('app.status.n_active', '{count} active', { count: counts.active })}</Badge>
+          <Badge size="lg" variant="dot" color="yellow">{t('app.status.n_idle', '{count} idle', { count: counts.idle })}</Badge>
+          <Badge size="lg" variant="dot" color="gray">{t('app.status.n_offline', '{count} offline', { count: counts.offline })}</Badge>
           <Select
             aria-label="Vehicle group"
             leftSection={<IconCar size={16} />}
             value={group}
             onChange={(v) => setGroup(v ?? ALL_VEHICLES)}
-            data={[{ value: ALL_VEHICLES, label: 'All Vehicles' },
+            data={[{ value: ALL_VEHICLES, label: t('app.common.all_vehicles', 'All vehicles') },
                    ...(categories ?? []).filter((c) => c.is_active).map((c) => ({ value: c.name, label: c.name }))]}
             allowDeselect={false}
             w={220}
@@ -132,15 +135,15 @@ export function DashboardPage() {
       </Card>
 
       <SimpleGrid cols={{ base: 1, xs: 2, md: 3 }} spacing="lg">
-        <Kpi period="Current week" title="Average journey length" value={cur?.avg_trip_km ?? '—'} unit="km" group={groupLabel}
+        <Kpi period={t('app.dashboard.current_week', 'Current week')} title={t('app.dashboard.avg_journey', 'Average journey length')} value={cur?.avg_trip_km ?? '—'} unit="km" group={groupLabel}
              icon={IconRoute} delta={pct(cur?.avg_trip_km, prev?.avg_trip_km)} />
-        <Kpi period="Current week" title="Distance driven" value={cur?.distance_km.toLocaleString() ?? '—'} unit="km" group={groupLabel}
+        <Kpi period={t('app.dashboard.current_week', 'Current week')} title={t('app.dashboard.distance', 'Distance driven')} value={cur?.distance_km.toLocaleString() ?? '—'} unit="km" group={groupLabel}
              icon={IconRoad} delta={pct(cur?.distance_km, prev?.distance_km)} />
-        <Kpi period="Current week" title="Driving time" value={cur?.driving_hours ?? '—'} unit="h" group={groupLabel}
+        <Kpi period={t('app.dashboard.current_week', 'Current week')} title={t('app.dashboard.driving_time', 'Driving time')} value={cur?.driving_hours ?? '—'} unit="h" group={groupLabel}
              icon={IconClock} delta={pct(cur?.driving_hours, prev?.driving_hours)} />
-        <Kpi period="Previous week" title="Average journey length" value={prev?.avg_trip_km ?? '—'} unit="km" group={groupLabel} icon={IconRoute} />
-        <Kpi period="Previous week" title="Distance driven" value={prev?.distance_km.toLocaleString() ?? '—'} unit="km" group={groupLabel} icon={IconRoad} />
-        <Kpi period="Previous week" title="Trips" value={prev?.trips ?? '—'} group={groupLabel} icon={IconCar} />
+        <Kpi period={t('app.dashboard.previous_week', 'Previous week')} title={t('app.dashboard.avg_journey', 'Average journey length')} value={prev?.avg_trip_km ?? '—'} unit="km" group={groupLabel} icon={IconRoute} />
+        <Kpi period={t('app.dashboard.previous_week', 'Previous week')} title={t('app.dashboard.distance', 'Distance driven')} value={prev?.distance_km.toLocaleString() ?? '—'} unit="km" group={groupLabel} icon={IconRoad} />
+        <Kpi period={t('app.dashboard.previous_week', 'Previous week')} title={t('app.dashboard.trips', 'Trips')} value={prev?.trips ?? '—'} group={groupLabel} icon={IconCar} />
       </SimpleGrid>
     </Stack>
   );

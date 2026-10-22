@@ -29,23 +29,24 @@ app = FastAPI(
     description="""
 ## ViSight Track API
 
-Telematics data for your Teltonika devices: positions, events, geofences and alerts.
+Your fleet's data: vehicles, live positions, trips with routes, decoded events, places, alerts, reports and analytics.
 
 ### Authentication
 
-**All API endpoints require Bearer token authentication.**
+1. **Get a token:** `POST /api/auth/login` with a portal user's email and password.
+2. **Use it:** send `Authorization: Bearer <access_token>` with every request (in this page: **Authorize**, top right).
 
-1. **Get Token:** `POST /api/auth/login` with email and password
-2. **Use Token:** Include in `Authorization: Bearer <token>` header for all requests
+Tokens last 12 hours. The API answers exactly what that user may see in the web app — their user group, the vehicles
+in their security group, and only what their roles allow. A dedicated user with only the features an integration needs
+is the safest way to connect a system.
 
-### API v2 Endpoints
+```bash
+TOKEN=$(curl -s -X POST https://track.visighttelematics.co.za/api/auth/login \\
+  -H "Content-Type: application/json" -d '{"email": "api@yourcompany.co.za", "password": "..."}' | jq -r .access_token)
+curl "https://track.visighttelematics.co.za/api/v2/trips?date_from=2026-10-01T00:00:00Z" -H "Authorization: Bearer $TOKEN"
+```
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/v2/devices` | List all devices with last known positions |
-| `GET /api/v2/movement-history/{imei}` | Get position history by date range |
-| `GET /api/v2/geofences` | List all geofences (POIs) |
-| `GET /api/v2/alerts` | Get alerts by type and date range |
+Times are ISO 8601 (UTC unless an offset is given). Distances are metres (`_m`) or kilometres (`_km`), speeds km/h.
 """,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -53,7 +54,20 @@ Telematics data for your Teltonika devices: positions, events, geofences and ale
     swagger_ui_parameters={
         "defaultModelsExpandDepth": -1,
         "persistAuthorization": True,
-    }
+        "docExpansion": "list",
+        "tryItOutEnabled": True,
+    },
+    openapi_tags=[
+        {"name": "Authentication", "description": "Get a bearer token"},
+        {"name": "Account", "description": "The token's user"},
+        {"name": "Vehicles", "description": "Vehicles, their status and live position"},
+        {"name": "Trips", "description": "Trips with distance, duration, addresses, routes and events"},
+        {"name": "Events", "description": "Decoded device events (ignition, speeding, harsh driving, …)"},
+        {"name": "Places", "description": "Places (geofences)"},
+        {"name": "Reports", "description": "The web app's reports as JSON"},
+        {"name": "Analytics", "description": "Measures by vehicle, group, driver or time"},
+        {"name": "Devices (v2)", "description": "Earlier v2 endpoints: devices, movement history, geofences, alerts"},
+    ]
 )
 
 # ==============================================================================
@@ -67,6 +81,10 @@ app.include_router(auth_router)
 # API v2 (production endpoints)
 from app.routes_api_v2 import router as api_v2_router  # noqa: E402
 app.include_router(api_v2_router)
+
+# Public API v2 — vehicles, trips, events, places, reports, analytics (same data and permissions as the web app)
+from app.routes_api_public import router as api_public_router  # noqa: E402
+app.include_router(api_public_router)
 
 # ==============================================================================
 # INTERNAL APIS - Hidden from /docs (dashboard/admin use only)

@@ -22,6 +22,7 @@ import { STATUS } from '../theme';
 import { ago, dateTime, duration, km, vehicleName } from '../utils/format';
 import { toMapPlace } from '../utils/places';
 import { ALL_VEHICLES, inGroup, toMapVehicle } from './vehicles';
+import { msg, useT, type Msg } from '../i18n';
 import classes from './WorkspacePage.module.css';
 
 type Panel = 'vehicles' | 'trips' | 'events' | 'places';
@@ -36,14 +37,15 @@ const EVENT_COLORS: Record<string, string> = {
 const eventColor = (code: string | null, kind: string) =>
   (code && EVENT_COLORS[code]) || (kind === 'alert' ? '#ef4444' : kind === 'position' ? '#64748b' : '#0ea5e9');
 
-const RIBBON: { key: Panel; label: string; icon: typeof IconCar; permission: string }[] = [
-  { key: 'vehicles', label: 'Vehicles', icon: IconCar, permission: 'map.view' },
-  { key: 'trips', label: 'Trips', icon: IconRoute, permission: 'history.view' },
-  { key: 'events', label: 'Events', icon: IconTimeline, permission: 'events.view' },
-  { key: 'places', label: 'Places', icon: IconMapPin, permission: 'places.view' },
+const RIBBON: { key: Panel; label: Msg; icon: typeof IconCar; permission: string }[] = [
+  { key: 'vehicles', label: msg('app.workspace.vehicles', 'Vehicles'), icon: IconCar, permission: 'map.view' },
+  { key: 'trips', label: msg('app.workspace.trips', 'Trips'), icon: IconRoute, permission: 'history.view' },
+  { key: 'events', label: msg('app.workspace.events', 'Events'), icon: IconTimeline, permission: 'events.view' },
+  { key: 'places', label: msg('app.workspace.places', 'Places'), icon: IconMapPin, permission: 'places.view' },
 ];
 
 export function WorkspacePage() {
+  const t = useT();
   const mapRef = useRef<FleetMapHandle>(null);
   const can = useCan();
   const navigate = useNavigate();
@@ -334,7 +336,7 @@ export function WorkspacePage() {
           {ribbon.map((r) => (
             <Button key={r.key} size="xs" variant={panel === r.key ? 'filled' : 'subtle'} color={panel === r.key ? 'brand' : 'gray'}
                     leftSection={<r.icon size={16} />} onClick={() => setPanel(panel === r.key ? null : r.key)}>
-              {r.label}
+              {t(r.label)}
             </Button>
           ))}
           <div className={classes.sep} />
@@ -356,7 +358,7 @@ export function WorkspacePage() {
           <div className={classes.content}>
             <Group justify="space-between" mb="sm" wrap="nowrap" gap="sm">
               <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
-                <Text fw={650} size="lg">{RIBBON.find((r) => r.key === panel)?.label}</Text>
+                <Text fw={650} size="lg">{(() => { const r = RIBBON.find((x) => x.key === panel); return r ? t(r.label) : ''; })()}</Text>
                 {panel === 'vehicles' && <>
                   <TextInput size="xs" w={240} placeholder="Search vehicle, registration, driver" leftSection={<IconSearch size={14} />}
                              value={search} onChange={(e) => setSearch(e.currentTarget.value)} aria-label="Search vehicles" />

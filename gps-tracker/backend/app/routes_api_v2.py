@@ -16,13 +16,23 @@ from app.models import BLETag, DevicePosition, PortalUser, POI, PortalAlert, Use
 from app.routes_portal import get_portal_user_from_request
 from sqlalchemy import or_
 
-router = APIRouter(prefix="/api/v2", tags=["API v2"])
+from fastapi.security import HTTPBearer
+bearer = HTTPBearer(auto_error=False, description="The access_token from POST /api/auth/login")
+router = APIRouter(prefix="/api/v2", tags=["Devices (v2)"], dependencies=[Depends(bearer)])
 logger = logging.getLogger(__name__)
 
 
 def get_current_portal_user(request: Request, db: Session = Depends(get_db)) -> PortalUser:
     """Dependency: Verify bearer token and return authenticated PortalUser."""
     return get_portal_user_from_request(request, db)
+
+
+def _scoped_imeis(user: PortalUser, db: Session) -> List[str]:
+    """The group's devices that this user may see (their security group, unless their roles see all)."""
+    from app.services import access_service
+    imeis = _get_usergroup_device_imeis(str(user.usergroup_id), db)
+    visible = access_service.for_user(user, db).visible_imeis(db)
+    return imeis if visible is None else [i for i in imeis if i in visible]
 
 
 def _get_usergroup_device_imeis(usergroup_id: str, db: Session) -> List[str]:
@@ -183,7 +193,7 @@ def get_devices(
     from sqlalchemy import func
     
     # Get IMEIs for this usergroup ONLY (multi-tenant isolation)
-    allowed_imeis = _get_usergroup_device_imeis(str(user.usergroup_id), db)
+    allowed_imeis = _scoped_imeis(user, db)
     
     if not allowed_imeis:
         return DeviceListResponse(total=0, devices=[])
@@ -302,7 +312,7 @@ def get_movement_history(
     ```
     """
     # 🔒 SECURITY: Verify IMEI belongs to user's usergroup
-    allowed_imeis = _get_usergroup_device_imeis(str(user.usergroup_id), db)
+    allowed_imeis = _scoped_imeis(user, db)
     
     if imei not in allowed_imeis:
         raise HTTPException(
@@ -412,6 +422,11 @@ def get_alerts(
     query = db.query(PortalAlert).filter(
         PortalAlert.usergroup_id == user.usergroup_id
     )
+    # Only alerts about vehicles this user may see
+    from app.services import access_service
+    if access_service.for_user(user, db).visible_imeis(db) is not None:
+        visible_tags = db.query(BLETag.id).filter(BLETag.imei.in_(_scoped_imeis(user, db)))
+        query = query.filter(PortalAlert.tag_id.in_(visible_tags))
     
     if alert_type:
         query = query.filter(PortalAlert.alert_type == alert_type)

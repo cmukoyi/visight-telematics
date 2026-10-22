@@ -3,6 +3,7 @@ import { Button, CloseButton, Group, Modal, ScrollArea, Text, TextInput, Unstyle
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { IconSearch } from '@tabler/icons-react';
+import { useT } from '../i18n';
 import classes from './EditorShell.module.css';
 
 export interface EditorSection {
@@ -32,6 +33,7 @@ interface Props {
  */
 export function EditorShell({ opened, onClose, title, sections, onSave, onSaveAndNew, saving, saveDisabled }: Props) {
   const mobile = useMediaQuery('(max-width: 48em)');
+  const t = useT();
   const viewport = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState<string | undefined>(sections[0]?.id);
   const [search, setSearch] = useState('');
@@ -66,7 +68,7 @@ export function EditorShell({ opened, onClose, title, sections, onSave, onSaveAn
            classNames={{ content: classes.content, body: classes.body }} trapFocus returnFocus>
       <Group justify="space-between" className={classes.head} wrap="nowrap">
         <Text fz={26} fw={500}>{title}</Text>
-        <CloseButton size="lg" onClick={onClose} aria-label="Close" />
+        <CloseButton size="lg" onClick={onClose} aria-label={t('app.common.close', 'Close')} />
       </Group>
       <div className={classes.main}>
         <nav className={classes.nav} aria-label="Sections">
@@ -88,13 +90,13 @@ export function EditorShell({ opened, onClose, title, sections, onSave, onSaveAn
         </ScrollArea>
       </div>
       <div className={classes.foot}>
-        <TextInput w={280} radius="xl" placeholder="Search label…" leftSection={<IconSearch size={16} />} value={search}
+        <TextInput w={280} radius="xl" placeholder={t('app.editor.search_label', 'Search label…')} leftSection={<IconSearch size={16} />} value={search}
                    onChange={(e) => setSearch(e.currentTarget.value)}
                    onKeyDown={(e) => { if (e.key === 'Enter') { const hit = sections.find(matches); if (hit) jump(hit.id); } }} />
         <Group gap="sm">
-          {onSaveAndNew && <Button variant="outline" radius="xl" size="md" onClick={onSaveAndNew} disabled={saveDisabled} loading={saving}>Save and new</Button>}
-          {onSave && <Button radius="xl" size="md" onClick={onSave} disabled={saveDisabled} loading={saving}>Save</Button>}
-          <Button variant="default" radius="xl" size="md" onClick={onClose}>{onSave ? 'Cancel' : 'Close'}</Button>
+          {onSaveAndNew && <Button variant="outline" radius="xl" size="md" onClick={onSaveAndNew} disabled={saveDisabled} loading={saving}>{t('app.common.save_and_new', 'Save and new')}</Button>}
+          {onSave && <Button radius="xl" size="md" onClick={onSave} disabled={saveDisabled} loading={saving}>{t('app.common.save', 'Save')}</Button>}
+          <Button variant="default" radius="xl" size="md" onClick={onClose}>{onSave ? t('app.common.cancel', 'Cancel') : t('app.common.close', 'Close')}</Button>
         </Group>
       </div>
     </Modal>

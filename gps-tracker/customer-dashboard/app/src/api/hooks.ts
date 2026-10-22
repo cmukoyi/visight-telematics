@@ -89,6 +89,7 @@ export const useMe = () =>
     staleTime: 30_000,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
+    enabled: !!getSession().token,
   });
 
 /** can('places.manage') — from /me, falling back to what login stored. can('admin'): a User Group Administrator. */
@@ -183,3 +184,10 @@ export const useAnalyticsQuery = (v: Visual | null, range: Range, category: stri
     enabled: !!body, staleTime: 60_000, placeholderData: (prev) => prev,
   });
 };
+
+/** Languages added (and active) in the admin portal. */
+export const useLanguages = () =>
+  useQuery({ queryKey: ['languages'], queryFn: async () => {
+    const res = await fetch('/api/languages');
+    return res.ok ? ((await res.json()) as { code: string; name: string }[]) : [];
+  }, staleTime: 10 * 60_000 });

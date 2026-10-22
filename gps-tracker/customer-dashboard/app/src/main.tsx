@@ -17,6 +17,9 @@ import { buildTheme, cssVariables, loadFont } from './theme';
 import { setDisplayTimezone } from './utils/format';
 import { cachedLook, saveLook, type Look } from './utils/look';
 import { App } from './App';
+import { I18nProvider, storedLanguage } from './i18n';
+import { useMe } from './api/hooks';
+import { getSession } from './auth/session';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 15_000 } },
@@ -30,6 +33,14 @@ if (cleanPath !== window.location.pathname) {
 }
 
 const colorSchemeManager = localStorageColorSchemeManager({ key: 'vt-color-scheme' });
+
+/** The signed-in user's language (from /me), else the last one used in this browser. */
+function Localised({ children }: { children: React.ReactNode }) {
+  const signedIn = !!getSession().token;
+  const { data: me } = useMe();
+  const lang = (signedIn && (me?.access.language || getSession().access?.language)) || storedLanguage();
+  return <I18nProvider lang={lang}>{children}</I18nProvider>;
+}
 
 function Root() {
   // The group's look and timezone (refetched when the user signs in or out).
@@ -48,7 +59,7 @@ function Root() {
                      forceColorScheme={settings?.lock_scheme ? scheme : undefined} colorSchemeManager={colorSchemeManager}>
       <Notifications position="top-right" />
       <BrowserRouter basename="/customer" future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <ModalsProvider><App /></ModalsProvider>
+        <ModalsProvider><Localised><App /></Localised></ModalsProvider>
       </BrowserRouter>
     </MantineProvider>
   );

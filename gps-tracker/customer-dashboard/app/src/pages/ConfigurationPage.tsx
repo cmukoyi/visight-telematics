@@ -14,7 +14,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { api } from '../api/client';
-import { useCan, useCategories, useDataExchange, useMe, useSecurityGroups, useVehicles } from '../api/hooks';
+import { useCan, useCategories, useDataExchange, useLanguages, useMe, useSecurityGroups, useVehicles } from '../api/hooks';
 import { VEHICLE_DETAILS, detail, type Category, type Vehicle } from '../api/types';
 import { getSession } from '../auth/session';
 import { ConfigHeader } from '../components/ConfigHeader';
@@ -23,6 +23,7 @@ import { EditorShell, firstError } from '../components/EditorShell';
 import { EventTypeGroupsPage, EventTypesPage, GeofencesPage, PlaceGroupsPage } from './CatalogPages';
 import { STATUS } from '../theme';
 import { ago, dateTime, vehicleName } from '../utils/format';
+import { msg, useT, type Msg } from '../i18n';
 import classes from './ConfigurationPage.module.css';
 import { NotificationRulesPage } from './NotificationRulesPage';
 import { PlacesPage } from './PlacesPage';
@@ -30,36 +31,36 @@ import { SecurityPage, UsersPage } from './SecurityPage';
 import { MyNotificationPrefs, UserGroupPage } from './UserGroupPage';
 
 // Configuration sections, each a tile with its sub-menu. `any`: shown when the role has one of these permissions.
-interface MenuItem { label: string; to?: string; classic?: string; any: string[] }
-interface Section { title: string; icon: typeof IconCar; items: MenuItem[] }
+interface MenuItem { label: Msg; to?: string; classic?: string; any: string[] }
+interface Section { title: Msg; icon: typeof IconCar; items: MenuItem[] }
 
 const SECTIONS: Section[] = [
-  { title: 'Vehicles', icon: IconCar, items: [
-    { label: 'Vehicles', to: 'devices', any: [] },
-    { label: 'Vehicle Groups', to: 'groups', any: ['vehicle_groups.manage'] },
-    { label: 'Data Exchange', to: 'exchange', any: ['data_exchange.manage'] },
+  { title: msg('app.config.vehicles', 'Vehicles'), icon: IconCar, items: [
+    { label: msg('app.config.vehicles', 'Vehicles'), to: 'devices', any: [] },
+    { label: msg('app.config.vehicle_groups', 'Vehicle Groups'), to: 'groups', any: ['vehicle_groups.manage'] },
+    { label: msg('app.config.data_exchange', 'Data Exchange'), to: 'exchange', any: ['data_exchange.manage'] },
   ] },
-  { title: 'Users', icon: IconUsers, items: [
-    { label: 'Users', to: 'users', any: ['users.view', 'users.manage'] },
-    { label: 'User Groups', to: 'user-groups', any: [] },
-    { label: 'Custom Themes', to: 'custom-themes', any: ['theme.manage'] },
+  { title: msg('app.config.users', 'Users'), icon: IconUsers, items: [
+    { label: msg('app.config.users', 'Users'), to: 'users', any: ['users.view', 'users.manage'] },
+    { label: msg('app.config.user_groups', 'User Groups'), to: 'user-groups', any: [] },
+    { label: msg('app.config.custom_themes', 'Custom Themes'), to: 'custom-themes', any: ['theme.manage'] },
   ] },
-  { title: 'Places', icon: IconMapPin, items: [
-    { label: 'Places', to: 'places', any: ['places.view', 'places.manage'] },
-    { label: 'Place Groups', to: 'place-groups', any: ['places.view', 'places.manage'] },
-    { label: 'Geofences', to: 'geofences', any: ['places.view', 'places.manage'] },
+  { title: msg('app.config.places', 'Places'), icon: IconMapPin, items: [
+    { label: msg('app.config.places', 'Places'), to: 'places', any: ['places.view', 'places.manage'] },
+    { label: msg('app.config.place_groups', 'Place Groups'), to: 'place-groups', any: ['places.view', 'places.manage'] },
+    { label: msg('app.config.geofences', 'Geofences'), to: 'geofences', any: ['places.view', 'places.manage'] },
   ] },
-  { title: 'Events', icon: IconBolt, items: [
-    { label: 'Event Types', to: 'event-types', any: [] },
-    { label: 'Event Type Groups', to: 'event-type-groups', any: ['events.manage', 'rules.manage'] },
+  { title: msg('app.config.events', 'Events'), icon: IconBolt, items: [
+    { label: msg('app.config.event_types', 'Event Types'), to: 'event-types', any: [] },
+    { label: msg('app.config.event_type_groups', 'Event Type Groups'), to: 'event-type-groups', any: ['events.manage', 'rules.manage'] },
   ] },
-  { title: 'Security', icon: IconShieldLock, items: [
-    { label: 'Security Groups', to: 'security?tab=groups', any: ['security.manage', 'users.manage'] },
-    { label: 'Roles', to: 'security?tab=roles', any: ['roles.manage', 'users.manage'] },
-    { label: 'Audit Trail', to: 'security?tab=audit', any: ['audit.view'] },
+  { title: msg('app.config.security', 'Security'), icon: IconShieldLock, items: [
+    { label: msg('app.config.security_groups', 'Security Groups'), to: 'security?tab=groups', any: ['security.manage', 'users.manage'] },
+    { label: msg('app.config.roles', 'Roles'), to: 'security?tab=roles', any: ['roles.manage', 'users.manage'] },
+    { label: msg('app.config.audit_trail', 'Audit Trail'), to: 'security?tab=audit', any: ['audit.view'] },
   ] },
-  { title: 'Misc', icon: IconDots, items: [
-    { label: 'Notification Rules', to: 'misc/notification-rules', any: ['inbox.view', 'rules.manage'] },
+  { title: msg('app.config.misc', 'Misc'), icon: IconDots, items: [
+    { label: msg('app.config.notification_rules', 'Notification Rules'), to: 'misc/notification-rules', any: ['inbox.view', 'rules.manage'] },
   ] },
 ];
 
@@ -81,22 +82,23 @@ function Tiles() {
   const navigate = useNavigate();
   const can = useCan();
   const allowed = (i: MenuItem) => i.any.length === 0 || i.any.some(can);
+  const t = useT();
   const sections = SECTIONS.map((sec) => ({ ...sec, items: sec.items.filter(allowed) })).filter((sec) => sec.items.length);
   return (
     <Stack p="lg" gap="lg">
-      <Title order={2}>Configuration</Title>
+      <Title order={2}>{t('app.nav.configuration', 'Configuration')}</Title>
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 3, xl: 4 }} spacing="md">
         {sections.map((sec) => (
-          <Paper key={sec.title} className={classes.tile}>
+          <Paper key={sec.title.key} className={classes.tile}>
             <Group gap="md" wrap="nowrap" mb="md">
               <sec.icon size={34} stroke={1.3} className={classes.tileIcon} />
-              <Text className={classes.tileTitle}>{sec.title}</Text>
+              <Text className={classes.tileTitle}>{t(sec.title)}</Text>
             </Group>
             <Stack gap={2} className={classes.links}>
               {sec.items.map((i) => (
-                <UnstyledButton key={i.label} className={classes.link}
+                <UnstyledButton key={i.label.key} className={classes.link}
                                 onClick={() => (i.to ? navigate(i.to) : window.open(classicUrl(i.classic!), '_self'))}>
-                  {i.label}
+                  {t(i.label)}
                   {i.classic && <IconArrowUpRight size={13} className={classes.ext} />}
                 </UnstyledButton>
               ))}
@@ -409,6 +411,16 @@ function Exchange() {
 export function AccountPage() {
   const user = getSession().user;
   const { data: me } = useMe();
+  const t = useT();
+  const qc = useQueryClient();
+  const { data: languages = [] } = useLanguages();
+  const setLanguage = async (code: string | null) => {
+    try {
+      await api('/api/portal/account/language', { method: 'PUT', json: { language: code } });
+      await qc.invalidateQueries({ queryKey: ['me'] });
+      notifications.show({ color: 'green', message: t('app.account.language_saved', 'Language saved') });
+    } catch (e) { notifications.show({ color: 'red', message: (e as Error).message }); }
+  };
   const form = useForm({
     initialValues: { current_password: '', new_password: '', confirm: '' },
     validate: {
@@ -421,29 +433,35 @@ export function AccountPage() {
     try {
       await api('/api/portal/account/change-password', { method: 'POST', json: { current_password, new_password } });
       form.reset();
-      notifications.show({ color: 'green', message: 'Password changed' });
+      notifications.show({ color: 'green', message: t('app.account.password_changed', 'Password changed') });
     } catch (e) { notifications.show({ color: 'red', message: (e as Error).message }); }
   });
   return (
     <Stack p="lg" gap={0} className={classes.narrow}>
-      <Title order={2} mb="md">My account</Title>
+      <Title order={2} mb="md">{t('app.account.title', 'My account')}</Title>
       <Paper withBorder p="lg" mb="md">
         <Group gap="sm"><ThemeIcon variant="light" size="lg"><IconKey size={20} /></ThemeIcon>
           <div><Text fw={650}>{[user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.email}</Text>
             <Text size="sm" c="dimmed">{user?.email}</Text></div></Group>
         {me?.access && (
-          <Text size="sm" mt="sm"><Text span c="dimmed">Roles: </Text>{me.access.is_admin ? 'User Group Administrator' : (me.access.role_names ?? []).join(', ') || '—'}
-            {me.access.security_group_name && <><Text span c="dimmed"> · Security group: </Text>{me.access.security_group_name}</>}</Text>
+          <Text size="sm" mt="sm"><Text span c="dimmed">{t('app.account.roles', 'Roles')}: </Text>{me.access.is_admin ? 'User Group Administrator' : (me.access.role_names ?? []).join(', ') || '—'}
+            {me.access.security_group_name && <><Text span c="dimmed"> · {t('app.account.security_group', 'Security group')}: </Text>{me.access.security_group_name}</>}</Text>
         )}
       </Paper>
+      <Paper withBorder p="lg" mb="md">
+        <Text fw={650} mb="xs">{t('app.account.language', 'Language')}</Text>
+        <Select maw={360} searchable clearable placeholder={t('app.account.group_default', 'User group default')}
+                data={languages.map((l) => ({ value: l.code, label: l.name }))}
+                value={me?.portal_user.language ?? null} onChange={setLanguage} />
+      </Paper>
       <Paper withBorder p="lg">
-        <Text fw={650} mb="md">Change password</Text>
+        <Text fw={650} mb="md">{t('app.account.change_password', 'Change password')}</Text>
         <form onSubmit={submit}>
           <Stack>
-            <PasswordInput label="Current password" autoComplete="current-password" {...form.getInputProps('current_password')} />
-            <PasswordInput label="New password" autoComplete="new-password" {...form.getInputProps('new_password')} />
-            <PasswordInput label="Confirm new password" autoComplete="new-password" {...form.getInputProps('confirm')} />
-            <Group justify="flex-end"><Button type="submit">Change password</Button></Group>
+            <PasswordInput label={t('app.account.current_password', 'Current password')} autoComplete="current-password" {...form.getInputProps('current_password')} />
+            <PasswordInput label={t('app.login.new_password', 'New password')} autoComplete="new-password" {...form.getInputProps('new_password')} />
+            <PasswordInput label={t('app.account.confirm_password', 'Confirm new password')} autoComplete="new-password" {...form.getInputProps('confirm')} />
+            <Group justify="flex-end"><Button type="submit">{t('app.login.change_password', 'Change password')}</Button></Group>
           </Stack>
         </form>
       </Paper>

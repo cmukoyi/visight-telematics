@@ -15,20 +15,22 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCan, useGroupTheme, usePlatformName, useUnreadCount } from '../api/hooks';
 import { clearSession, getSession } from '../auth/session';
 import { GlobalSearch } from '../components/GlobalSearch';
+import { msg, useT } from '../i18n';
 import classes from './AppLayout.module.css';
 
 dayjs.extend(utc);
 
 // `any`: the role needs at least one of these permissions to see the section.
 export const NAV = [
-  { to: '/dashboard', label: 'Dashboard', icon: IconLayoutDashboard, any: ['map.view'] },
-  { to: '/workspace', label: 'Workspace', icon: IconMapRoute, any: ['map.view', 'history.view', 'places.view'] },
-  { to: '/configuration', label: 'Configuration', icon: IconAdjustmentsHorizontal, any: ['admin'] },
-  { to: '/reports', label: 'Reports', icon: IconChartBar, any: ['reports.view'] },
-  { to: '/inbox', label: 'Inbox', icon: IconInbox, any: ['inbox.view'] },
+  { to: '/dashboard', label: msg('app.nav.dashboard', 'Dashboard'), icon: IconLayoutDashboard, any: ['map.view'] },
+  { to: '/workspace', label: msg('app.nav.workspace', 'Workspace'), icon: IconMapRoute, any: ['map.view', 'history.view', 'places.view'] },
+  { to: '/configuration', label: msg('app.nav.configuration', 'Configuration'), icon: IconAdjustmentsHorizontal, any: ['admin'] },
+  { to: '/reports', label: msg('app.nav.reports', 'Reports'), icon: IconChartBar, any: ['reports.view'] },
+  { to: '/inbox', label: msg('app.nav.inbox', 'Inbox'), icon: IconInbox, any: ['inbox.view'] },
 ];
 
 function Clock({ compact }: { compact?: boolean }) {
+  const t = useT();
   const [now, setNow] = useState(dayjs());
   useEffect(() => {
     const t = setInterval(() => setNow(dayjs()), 15_000);
@@ -47,11 +49,11 @@ function Clock({ compact }: { compact?: boolean }) {
       <Group gap="md" align="baseline" wrap="nowrap">
         <div>
           <Text className={classes.clockBig}>{now.format('HH:mm')}</Text>
-          <Text size="10px" c="dimmed">LOCAL</Text>
+          <Text size="10px" c="dimmed" tt="uppercase">{t('app.clock.local', 'Local')}</Text>
         </div>
         <div>
           <Text className={classes.clockBig} c="dimmed">{now.utc().format('HH:mm')}</Text>
-          <Text size="10px" c="dimmed">UTC</Text>
+          <Text size="10px" c="dimmed">{t('app.clock.utc', 'UTC')}</Text>
         </div>
       </Group>
     </div>
@@ -77,7 +79,9 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, group } = getSession();
-  const title = NAV.find((n) => location.pathname.startsWith(n.to))?.label ?? (location.pathname.startsWith('/account') ? 'My account' : '');
+  const t = useT();
+  const navItem = NAV.find((n) => location.pathname.startsWith(n.to));
+  const title = navItem ? t(navItem.label) : location.pathname.startsWith('/account') ? t('app.account.title', 'My account') : '';
   const initials = `${user?.first_name?.[0] ?? ''}${user?.last_name?.[0] ?? ''}`.toUpperCase() || (user?.email?.[0] ?? '?').toUpperCase();
 
   useEffect(() => { close(); }, [location.pathname, close]);
@@ -103,7 +107,7 @@ export function AppLayout() {
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
           <Group gap="sm" wrap="nowrap">
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" aria-label="Menu" />
-            <Tooltip label={collapsed ? 'Expand menu' : 'Collapse menu'}>
+            <Tooltip label={collapsed ? t('app.nav.expand_menu', 'Expand menu') : t('app.nav.collapse_menu', 'Collapse menu')}>
               <ActionIcon variant="subtle" color="gray" size="lg" visibleFrom="sm" onClick={() => setCollapsed(!collapsedPref)}
                           aria-label={collapsed ? 'Expand menu' : 'Collapse menu'}>
                 {collapsed ? <IconLayoutSidebarLeftExpand size={20} /> : <IconLayoutSidebarLeftCollapse size={20} />}
@@ -113,7 +117,7 @@ export function AppLayout() {
           </Group>
           <Group gap="xs" wrap="nowrap">
             {nav.some((n) => n.to === '/inbox') && (
-              <Tooltip label={unread ? `${unread} unread notification${unread === 1 ? '' : 's'}` : 'No unread notifications'}>
+              <Tooltip label={unread ? t('app.nav.unread_notifications', '{count} unread notifications', { count: unread }) : t('app.nav.no_unread', 'No unread notifications')}>
                 <Indicator label={unread && unread > 99 ? '99+' : unread} size={18} color="red" offset={4} disabled={!unread}>
                   <ActionIcon variant="default" size="lg" aria-label="Notifications"
                               onClick={() => navigate('/inbox?status=unread')}>
@@ -122,7 +126,7 @@ export function AppLayout() {
                 </Indicator>
               </Tooltip>
             )}
-            {!groupTheme?.theme_settings?.lock_scheme && <Tooltip label={scheme === 'dark' ? 'Light mode' : 'Dark mode'}>
+            {!groupTheme?.theme_settings?.lock_scheme && <Tooltip label={scheme === 'dark' ? t('app.nav.light_mode', 'Light mode') : t('app.nav.dark_mode', 'Dark mode')}>
               <ActionIcon variant="default" size="lg" aria-label="Toggle colour scheme"
                           onClick={() => setColorScheme(scheme === 'dark' ? 'light' : 'dark')}>
                 {scheme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
@@ -140,12 +144,12 @@ export function AppLayout() {
               </Menu.Target>
               <Menu.Dropdown>
                 <Menu.Label>{user?.email}</Menu.Label>
-                <Menu.Item leftSection={<IconUserCircle size={16} />} onClick={() => navigate('/account')}>My account</Menu.Item>
+                <Menu.Item leftSection={<IconUserCircle size={16} />} onClick={() => navigate('/account')}>{t('app.account.title', 'My account')}</Menu.Item>
                 <Menu.Item leftSection={<IconExternalLink size={16} />} component="a" href="/customer/classic/">
-                  Classic dashboard
+                  {t('app.nav.classic_dashboard', 'Classic dashboard')}
                 </Menu.Item>
                 <Menu.Divider />
-                <Menu.Item color="red" leftSection={<IconLogout size={16} />} onClick={logout}>Sign out</Menu.Item>
+                <Menu.Item color="red" leftSection={<IconLogout size={16} />} onClick={logout}>{t('app.nav.sign_out', 'Sign out')}</Menu.Item>
               </Menu.Dropdown>
             </Menu>
           </Group>
@@ -166,7 +170,7 @@ export function AppLayout() {
         </div>
         <div className={classes.search}>
           {collapsed
-            ? <Tooltip label="Search (⌘K)" position="right"><ActionIcon variant="subtle" color="gray" size="xl" onClick={openSearch} aria-label="Search" style={{ color: 'var(--vt-menu-fg)' }}>
+            ? <Tooltip label={`${t('app.common.search', 'Search')} (⌘K)`} position="right"><ActionIcon variant="subtle" color="gray" size="xl" onClick={openSearch} aria-label="Search" style={{ color: 'var(--vt-menu-fg)' }}>
                 <IconSearch size={20} /></ActionIcon></Tooltip>
             : <GlobalSearch ref={searchRef} onNavigate={close} />}
         </div>
@@ -178,15 +182,15 @@ export function AppLayout() {
                 key={n.to}
                 component={RouterLink}
                 to={n.to}
-                label={collapsed ? null : n.label}
-                aria-label={n.label}
+                label={collapsed ? null : t(n.label)}
+                aria-label={t(n.label)}
                 leftSection={<span className={classes.navIcon}><n.icon size={22} stroke={1.6} />{collapsed && !!unread && n.to === '/inbox' ? <span className={classes.dotBadge} /> : null}</span>}
                 rightSection={collapsed ? null : badge}
                 active={location.pathname.startsWith(n.to)}
                 className={classes.navItem}
               />
             );
-            return collapsed ? <Tooltip key={n.to} label={n.label} position="right">{link}</Tooltip> : link;
+            return collapsed ? <Tooltip key={n.to} label={t(n.label)} position="right">{link}</Tooltip> : link;
           })}
         </Stack>
         <Clock compact={collapsed} />
