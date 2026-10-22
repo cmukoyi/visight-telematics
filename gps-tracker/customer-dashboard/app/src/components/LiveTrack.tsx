@@ -13,9 +13,9 @@ function secondsAgo(iso: string | null | undefined, now: number) {
 const agoText = (s: number | null) => (s == null ? '—' : s < 60 ? `${s}s ago` : s < 3600 ? `${Math.floor(s / 60)} min ago` : `${Math.floor(s / 3600)} h ago`);
 
 /** The live-tracking card for one vehicle (data from useLive, refreshed every 5 s). */
-export function LiveTrack({ vehicle, live, follow, onFollow, onClose, onShowTrip }: {
+export function LiveTrack({ vehicle, live, follow, onFollow, trail, onTrail, onClose, onShowTrip }: {
   vehicle: Vehicle; live: LivePosition | undefined; follow: boolean; onFollow: (v: boolean) => void;
-  onClose: () => void; onShowTrip?: () => void;
+  trail: boolean; onTrail: (v: boolean) => void; onClose: () => void; onShowTrip?: () => void;
 }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
@@ -61,7 +61,7 @@ export function LiveTrack({ vehicle, live, follow, onFollow, onClose, onShowTrip
       )}
       <Group justify="space-between">
         <Switch size="sm" label="Follow on map" checked={follow} onChange={(e) => onFollow(e.currentTarget.checked)} />
-        <Text size="xs" c="dimmed">{pos?.event ?? ''}</Text>
+        <Switch size="sm" label="Show trail" checked={trail} onChange={(e) => onTrail(e.currentTarget.checked)} />
       </Group>
     </Paper>
   );

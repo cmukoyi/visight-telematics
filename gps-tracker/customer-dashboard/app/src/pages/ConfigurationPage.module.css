@@ -22,3 +22,5 @@
 .miscRow { display: block; width: 100%; padding: 14px 16px; border-bottom: 1px solid var(--mantine-color-default-border); }
 .miscRow:last-child { border-bottom: 0; }
 .miscRow:hover { background: var(--mantine-color-default-hover); }
+
+.stateDot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }

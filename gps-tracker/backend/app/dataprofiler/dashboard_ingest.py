@@ -31,7 +31,7 @@ from app.dataprofiler.decoder import DELIVER_EXCHANGE, exchange_queue
 from app.models import BLETag, DevicePosition
 from app.models_admin import TagPackage
 from app.models_dataprofiler import DeviceEvent
-from app.services import address_service, geofence_engine, trip_builder
+from app.services import address_service, event_rules, geofence_engine, trip_builder
 
 logger = logging.getLogger("dataprofiler.dashboard_ingest")
 
@@ -64,8 +64,8 @@ def store_delivery(db: Session, message: dict) -> int:
         .returning(DeviceEvent.__table__.c.dp_event_id)
     ).scalars().all()
 
-    fixes = [r for r in rows if r["latitude"] is not None and r["longitude"] is not None]
     new_ids = set(inserted)
+    fixes = [r for r in rows if r["latitude"] is not None and r["longitude"] is not None]
     if fixes:
         db.execute(pg_insert(DevicePosition.__table__).values([{
             "device_imei": imei, "lat": r["latitude"], "lng": r["longitude"],
@@ -78,6 +78,9 @@ def store_delivery(db: Session, message: dict) -> int:
         new_fixes = [r for r in fixes if r["dp_event_id"] in new_ids]
         if tag is not None and new_fixes:
             geofence_engine.check_positions(db, tag, new_fixes)
+    new_rows = [r for r in rows if r["dp_event_id"] in new_ids]
+    if new_rows:
+        event_rules.process(db, imei, group_id, new_rows)
     return len(inserted)
 
 

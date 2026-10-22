@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Link, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ActionIcon, Anchor, Badge, Breadcrumbs, Button, ColorInput, Group, Modal, Paper, PasswordInput, Select, SimpleGrid, Stack,
-  Text, TextInput, ThemeIcon, Title, UnstyledButton,
+  ActionIcon, Alert, Anchor, Badge, Breadcrumbs, Button, Code, ColorInput, Group, Modal, Paper, PasswordInput, PinInput, Select,
+  SimpleGrid, Stack, Text, TextInput, ThemeIcon, Title, Tooltip, UnstyledButton,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import {
-  IconArrowUpRight, IconCar, IconKey, IconUsers, IconMapPin, IconPencil, IconPlugConnected,
-  IconTrash, IconPlus, IconShieldLock, IconBuilding, IconDots, IconBellRinging, IconChevronRight,
+  IconAlertTriangle, IconArrowUpRight, IconBan, IconBolt, IconCar, IconKey, IconUsers, IconMapPin, IconPencil, IconPlugConnected,
+  IconSearch, IconTrash, IconPlus, IconShieldLock, IconDots, IconBellRinging, IconChevronRight,
 } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
@@ -17,13 +17,15 @@ import { api } from '../api/client';
 import { useCan, useCategories, useDataExchange, useSecurityGroups, useVehicles } from '../api/hooks';
 import { VEHICLE_DETAILS, detail, type Category, type Vehicle } from '../api/types';
 import { getSession } from '../auth/session';
+import { ConfigHeader } from '../components/ConfigHeader';
 import { DataGrid } from '../components/DataGrid';
+import { EventTypeGroupsPage, EventTypesPage, GeofencesPage, PlaceGroupsPage } from './CatalogPages';
 import { STATUS } from '../theme';
 import { ago, dateTime, vehicleName } from '../utils/format';
 import classes from './ConfigurationPage.module.css';
 import { NotificationRulesPage } from './NotificationRulesPage';
 import { PlacesPage } from './PlacesPage';
-import { SecurityPage } from './SecurityPage';
+import { SecurityPage, UsersPage } from './SecurityPage';
 import { UserGroupPage } from './UserGroupPage';
 
 // Configuration sections, each a tile with its sub-menu. `any`: shown when the role has one of these permissions.
@@ -31,25 +33,29 @@ interface MenuItem { label: string; to?: string; classic?: string; any: string[]
 interface Section { title: string; icon: typeof IconCar; items: MenuItem[] }
 
 const SECTIONS: Section[] = [
-  { title: 'Users', icon: IconUsers, items: [
-    { label: 'Users', to: 'security?tab=users', any: ['users.manage'] },
-    { label: 'Security Groups', to: 'security?tab=groups', any: ['users.manage', 'security.manage'] },
-    { label: 'Roles & Permissions', to: 'security?tab=roles', any: ['users.manage', 'security.manage'] },
-    { label: 'My Account', to: 'account', any: [] },
-  ] },
   { title: 'Vehicles', icon: IconCar, items: [
-    { label: 'Vehicles & Devices', to: 'devices', any: [] },
+    { label: 'Vehicles', to: 'devices', any: [] },
     { label: 'Vehicle Groups', to: 'groups', any: ['vehicles.manage'] },
     { label: 'Data Exchange', to: 'exchange', any: ['settings.manage'] },
   ] },
+  { title: 'Users', icon: IconUsers, items: [
+    { label: 'Users', to: 'users', any: ['users.manage'] },
+    { label: 'User Groups', to: 'user-groups', any: [] },
+    { label: 'Custom Themes', to: 'custom-themes', any: ['settings.manage'] },
+    { label: 'My Account', to: 'account', any: [] },
+  ] },
   { title: 'Places', icon: IconMapPin, items: [
     { label: 'Places', to: 'places', any: ['places.view', 'places.manage'] },
-    { label: 'Geofence Alerts', to: 'misc/notification-rules', any: ['inbox.view', 'rules.manage'] },
+    { label: 'Place Groups', to: 'place-groups', any: ['places.view', 'places.manage'] },
+    { label: 'Geofences', to: 'geofences', any: ['places.view', 'places.manage'] },
   ] },
-  { title: 'User Group', icon: IconBuilding, items: [
-    { label: 'Theme & Logos', to: 'user-group', any: ['settings.manage'] },
-    { label: 'Timezone', to: 'user-group#timezone', any: ['settings.manage'] },
-    { label: 'Notification Preferences', classic: 'settings', any: ['settings.manage'] },
+  { title: 'Events', icon: IconBolt, items: [
+    { label: 'Event Types', to: 'event-types', any: [] },
+    { label: 'Event Type Groups', to: 'event-type-groups', any: ['inbox.view', 'rules.manage', 'settings.manage'] },
+  ] },
+  { title: 'Security', icon: IconShieldLock, items: [
+    { label: 'Security Groups', to: 'security?tab=groups', any: ['users.manage', 'security.manage'] },
+    { label: 'Roles', to: 'security?tab=roles', any: ['users.manage', 'security.manage'] },
   ] },
   { title: 'Misc', icon: IconDots, items: [
     { label: 'Notification Rules', to: 'misc/notification-rules', any: ['inbox.view', 'rules.manage'] },
@@ -129,32 +135,76 @@ function Devices() {
     } catch (e) { notifications.show({ color: 'red', message: (e as Error).message }); }
   });
 
+  // Delete asks the user to type a short code, so a vehicle and its history aren't removed by a stray click
+  const [deleting, setDeleting] = useState<{ vehicle: Vehicle; code: string } | null>(null);
+  const [typed, setTyped] = useState('');
+  const [search, setSearch] = useState('');
+  const startDelete = (v: Vehicle) => { setTyped(''); setDeleting({ vehicle: v, code: String(Math.floor(1000 + Math.random() * 9000)) }); };
+  const doDelete = async () => {
+    if (!deleting || typed !== deleting.code) return;
+    try {
+      await api(`/api/portal/tags/${deleting.vehicle.id}`, { method: 'DELETE' });
+      qc.invalidateQueries({ queryKey: ['vehicles'] });
+      notifications.show({ color: 'green', message: `${vehicleName(deleting.vehicle)} deleted` });
+      setDeleting(null);
+    } catch (e) { notifications.show({ color: 'red', message: (e as Error).message }); }
+  };
+  const shown = vehicles.filter((v) => !search || [v.imei, vehicleName(v), detail(v, 'registration'), detail(v, 'driver'), v.category_name]
+    .join(' ').toLowerCase().includes(search.toLowerCase()));
+
   const cols: ColDef<Vehicle>[] = [
-    { headerName: 'Name', valueGetter: (p) => p.data && vehicleName(p.data), flex: 1.3 },
-    { headerName: 'Registration', valueGetter: (p) => p.data && (detail(p.data, 'registration') || '—'), width: 140 },
-    { headerName: 'Make / model', valueGetter: (p) => p.data && ([detail(p.data, 'make'), detail(p.data, 'model'), detail(p.data, 'year')].filter(Boolean).join(' ') || '—'), width: 170 },
-    { headerName: 'Driver', valueGetter: (p) => p.data && (detail(p.data, 'driver') || '—'), width: 150 },
-    { headerName: 'IMEI', field: 'imei', width: 170 },
-    { headerName: 'Group', field: 'category_name', valueFormatter: (p) => p.value || '—', width: 150 },
-    { headerName: 'Status', field: 'activity_status', width: 120,
+    { colId: 'state', headerName: '', width: 54, minWidth: 54, sortable: false, filter: false, pinned: 'left', lockPosition: 'left',
+      cellRenderer: (p: ICellRendererParams<Vehicle>) => p.data &&
+        <span className={classes.stateDot} style={{ background: STATUS[p.data.activity_status] }} title={p.data.activity_status} /> },
+    { colId: 'imei', headerName: 'IMEI', field: 'imei', width: 180 },
+    { colId: 'description', headerName: 'Description', valueGetter: (p) => p.data && vehicleName(p.data), flex: 1.3, minWidth: 180, sort: 'asc' },
+    { colId: 'registration', headerName: 'Registration', valueGetter: (p) => p.data && (detail(p.data, 'registration') || '—'), flex: 1, minWidth: 140 },
+    { colId: 'make_model', headerName: 'Make / model', hide: true, valueGetter: (p) => p.data && ([detail(p.data, 'make'), detail(p.data, 'model'), detail(p.data, 'year')].filter(Boolean).join(' ') || '—'), width: 170 },
+    { colId: 'driver', headerName: 'Driver', hide: true, valueGetter: (p) => p.data && (detail(p.data, 'driver') || '—'), width: 150 },
+    { colId: 'group', headerName: 'Group', hide: true, field: 'category_name', valueFormatter: (p) => p.value || '—', width: 150 },
+    { colId: 'status', headerName: 'Status', hide: true, field: 'activity_status', width: 120,
       cellRenderer: (p: ICellRendererParams<Vehicle>) => p.data && (
         <Badge size="sm" variant="dot" color={STATUS[p.data.activity_status]} styles={{ root: { textTransform: 'capitalize' } }}>{p.data.activity_status}</Badge>) },
-    { headerName: 'Last seen', field: 'last_seen', valueFormatter: (p) => ago(p.value), width: 130 },
-    { headerName: 'Package', field: 'package_name', valueFormatter: (p) => p.value || '—', width: 150 },
-    { headerName: 'Expires', field: 'expiry_date', width: 140, valueFormatter: (p) => (p.value ? dateTime(p.value).slice(0, 11) : '—'),
+    { colId: 'last_seen', headerName: 'Last seen', field: 'last_seen', valueFormatter: (p) => ago(p.value), width: 130 },
+    { colId: 'package', headerName: 'Package', hide: true, field: 'package_name', valueFormatter: (p) => p.value || '—', width: 150 },
+    { colId: 'expires', headerName: 'Expires', hide: true, field: 'expiry_date', width: 140, valueFormatter: (p) => (p.value ? dateTime(p.value).slice(0, 11) : '—'),
       cellStyle: (p) => ((p.data?.days_remaining ?? 99) < 30 ? { color: 'var(--mantine-color-orange-6)' } : null) },
-    ...(admin ? [{ headerName: '', width: 60, minWidth: 60, sortable: false, filter: false,
+    ...(admin ? [{ colId: 'actions', headerName: '', width: 90, minWidth: 90, sortable: false, filter: false, pinned: 'right' as const,
       cellRenderer: (p: ICellRendererParams<Vehicle>) => p.data && (
-        <ActionIcon size="sm" variant="subtle" onClick={() => open(p.data!)} aria-label="Edit vehicle"><IconPencil size={15} /></ActionIcon>) }] : []),
+        <Group gap={2} wrap="nowrap">
+          <Tooltip label="Edit" withinPortal><ActionIcon size="sm" variant="subtle" onClick={() => open(p.data!)} aria-label="Edit vehicle"><IconPencil size={15} /></ActionIcon></Tooltip>
+          <Tooltip label="Delete" withinPortal><ActionIcon size="sm" variant="subtle" color="red" onClick={() => startDelete(p.data!)} aria-label="Delete vehicle"><IconBan size={15} /></ActionIcon></Tooltip>
+        </Group>) }] : []),
   ];
 
   return (
     <Stack p="lg" gap={0} className={classes.page}>
-      <Header title="Vehicles & devices" />
-      <Text size="sm" c="dimmed" mb="sm">Devices arrive automatically from your Data Exchange. Give them a name and a group here.</Text>
+      <ConfigHeader section="Vehicles" title="Vehicles" description="Devices arrive automatically from your Data Exchange. Name them, add details and a group here." />
+      <Group mb="sm" justify="space-between">
+        <TextInput size="xs" w={280} placeholder="Search IMEI, description, registration, driver" leftSection={<IconSearch size={14} />}
+                   value={search} onChange={(e) => setSearch(e.currentTarget.value)} />
+        <Text size="sm" c="dimmed">{shown.length} vehicles · the gear shows more columns</Text>
+      </Group>
       <Paper withBorder className={classes.gridCard}>
-        <DataGrid rowData={vehicles} columnDefs={cols} loading={isFetching && !vehicles.length} getRowId={(p) => p.data.id} />
+        <DataGrid rowData={shown} columnDefs={cols} loading={isFetching && !vehicles.length} getRowId={(p) => p.data.id}
+                  stateKey="config-vehicles" onRowDoubleClicked={(e) => admin && e.data && open(e.data)} />
       </Paper>
+      <Modal opened={!!deleting} onClose={() => setDeleting(null)} title="Delete vehicle" centered>
+        {deleting && (
+          <Stack>
+            <Alert color="red" variant="light" icon={<IconAlertTriangle size={16} />}>
+              <b>{vehicleName(deleting.vehicle)}</b> ({deleting.vehicle.imei}) and all its positions, trips and events will be
+              permanently deleted. This can't be undone.
+            </Alert>
+            <Text size="sm">To confirm, type the code <Code fz="md" fw={700}>{deleting.code}</Code></Text>
+            <PinInput length={4} type="number" value={typed} onChange={setTyped} oneTimeCode={false} aria-label="Confirmation code" />
+            <Group justify="flex-end">
+              <Button variant="default" onClick={() => setDeleting(null)}>Cancel</Button>
+              <Button color="red" disabled={typed !== deleting.code} onClick={doDelete}>Delete vehicle</Button>
+            </Group>
+          </Stack>
+        )}
+      </Modal>
       <Modal opened={!!editing} onClose={() => setEditing(null)} title={editing ? `Edit ${vehicleName(editing)}` : ''} size="lg">
         <form onSubmit={save}>
           <Stack>
@@ -382,7 +432,14 @@ export function ConfigurationPage() {
       <Route path="account" element={<Account />} />
       <Route path="places" element={<PlacesPage />} />
       <Route path="security" element={<SecurityPage />} />
-      <Route path="user-group" element={<UserGroupPage />} />
+      <Route path="user-group" element={<UserGroupPage mode="theme" />} />
+      <Route path="custom-themes" element={<UserGroupPage mode="theme" />} />
+      <Route path="user-groups" element={<UserGroupPage mode="preferences" />} />
+      <Route path="users" element={<UsersPage />} />
+      <Route path="place-groups" element={<PlaceGroupsPage />} />
+      <Route path="geofences" element={<GeofencesPage />} />
+      <Route path="event-types" element={<EventTypesPage />} />
+      <Route path="event-type-groups" element={<EventTypeGroupsPage />} />
       <Route path="misc" element={<Misc />} />
       <Route path="misc/notification-rules" element={<NotificationRulesPage />} />
       <Route path="*" element={<Tiles />} />

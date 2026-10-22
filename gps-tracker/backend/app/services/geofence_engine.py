@@ -161,7 +161,10 @@ def _watched(db: Session, tag: BLETag) -> dict:
         return out
     places = {p.id: p for p in db.query(POI).filter(POI.usergroup_id == group_id, POI.is_active == True).all()}  # noqa: E712
     for rule in rules:
-        wanted = places.values() if not rule.place_ids else [places[p] for p in places if str(p) in set(map(str, rule.place_ids))]
+        ids = set(map(str, rule.place_ids or []))
+        groups = set(map(str, rule.place_group_ids or []))
+        wanted = (places.values() if not ids and not groups else
+                  [p for p in places.values() if str(p.id) in ids or (p.place_group_id and str(p.place_group_id) in groups)])
         for poi in wanted:
             poi_, armed, rs = out.get(poi.id, (poi, False, []))
             out[poi.id] = (poi_, armed, rs + [rule])

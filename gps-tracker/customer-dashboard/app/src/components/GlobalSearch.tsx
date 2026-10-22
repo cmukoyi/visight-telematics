@@ -20,15 +20,20 @@ const PAGES: { label: string; sub: string; to: string; any: string[]; words?: st
   { label: 'Workspace', sub: 'Trips, events and places on the map', to: '/workspace', any: ['map.view', 'history.view'], words: 'trips events history routes' },
   { label: 'Reports', sub: 'Run and download reports', to: '/reports', any: ['reports.view'] },
   { label: 'Inbox', sub: 'Alerts', to: '/inbox', any: ['inbox.view'], words: 'alerts notifications' },
-  { label: 'Vehicles & devices', sub: 'Configuration', to: '/configuration/devices', any: [], words: 'registration driver make model' },
-  { label: 'Vehicle groups', sub: 'Configuration', to: '/configuration/groups', any: ['vehicles.manage'] },
-  { label: 'Places', sub: 'Configuration · geofences', to: '/configuration/places', any: ['places.view'], words: 'geofence poi' },
-  { label: 'Users', sub: 'Configuration · Security', to: '/configuration/security?tab=users', any: ['users.manage'] },
-  { label: 'Security groups', sub: 'Configuration · Security', to: '/configuration/security?tab=groups', any: ['users.manage', 'security.manage'] },
-  { label: 'Roles & permissions', sub: 'Configuration · Security', to: '/configuration/security?tab=roles', any: ['users.manage', 'security.manage'] },
-  { label: 'User Group', sub: 'Configuration · theme, logos, timezone', to: '/configuration/user-group', any: ['settings.manage'], words: 'theme logo colour timezone' },
-  { label: 'Data Exchange', sub: 'Configuration', to: '/configuration/exchange', any: ['settings.manage'] },
-  { label: 'Notification Rules', sub: 'Configuration · Misc', to: '/configuration/misc/notification-rules', any: ['inbox.view', 'rules.manage'], words: 'alerts email geofence' },
+  { label: 'Vehicles', sub: 'Configuration · Vehicles', to: '/configuration/devices', any: [], words: 'registration driver make model imei delete' },
+  { label: 'Vehicle groups', sub: 'Configuration · Vehicles', to: '/configuration/groups', any: ['vehicles.manage'] },
+  { label: 'Data Exchange', sub: 'Configuration · Vehicles', to: '/configuration/exchange', any: ['settings.manage'] },
+  { label: 'Users', sub: 'Configuration · Users', to: '/configuration/users', any: ['users.manage'], words: 'login activity' },
+  { label: 'User Groups', sub: 'Configuration · Users · preferences', to: '/configuration/user-groups', any: [], words: 'timezone retention notification preferences' },
+  { label: 'Custom Themes', sub: 'Configuration · Users · colours and logos', to: '/configuration/custom-themes', any: ['settings.manage'], words: 'theme logo colour' },
+  { label: 'Places', sub: 'Configuration · Places', to: '/configuration/places', any: ['places.view'], words: 'geofence poi' },
+  { label: 'Place Groups', sub: 'Configuration · Places', to: '/configuration/place-groups', any: ['places.view'] },
+  { label: 'Geofences', sub: 'Configuration · Places · armed vehicles', to: '/configuration/geofences', any: ['places.view'], words: 'armed inside outside' },
+  { label: 'Event Types', sub: 'Configuration · Events', to: '/configuration/event-types', any: [], words: 'dictionary marker' },
+  { label: 'Event Type Groups', sub: 'Configuration · Events', to: '/configuration/event-type-groups', any: ['inbox.view', 'rules.manage', 'settings.manage'] },
+  { label: 'Security Groups', sub: 'Configuration · Security', to: '/configuration/security?tab=groups', any: ['users.manage', 'security.manage'] },
+  { label: 'Roles', sub: 'Configuration · Security', to: '/configuration/security?tab=roles', any: ['users.manage', 'security.manage'], words: 'permissions' },
+  { label: 'Notification Rules', sub: 'Configuration · Misc', to: '/configuration/misc/notification-rules', any: ['inbox.view', 'rules.manage'], words: 'alerts email geofence event' },
   { label: 'My account', sub: 'Change password', to: '/configuration/account', any: [], words: 'password' },
 ];
 
@@ -98,7 +103,7 @@ export const GlobalSearch = forwardRef<HTMLInputElement, { onNavigate?: () => vo
     if (can('users.manage')) {
       for (const u of users.data ?? []) if (match(u.email, u.first_name, u.last_name)) {
         out.push({ id: `u-${u.id}`, group: 'Users', label: [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email, sub: u.email,
-                   icon: IconUser, to: `/configuration/security?tab=users&q=${encodeURIComponent(u.email)}` });
+                   icon: IconUser, to: `/configuration/users?q=${encodeURIComponent(u.email)}` });
       }
     }
     for (const r of rules.data ?? []) if (match(r.name, r.category)) {

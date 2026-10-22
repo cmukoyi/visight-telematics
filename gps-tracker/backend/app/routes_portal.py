@@ -7,7 +7,7 @@ Routes are mounted at /api/portal (separate from /api/v1 user routes and
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from time import perf_counter
 from typing import List, Optional
 from uuid import UUID
@@ -240,6 +240,8 @@ class PortalUserOut(BaseModel):
     role_id: Optional[UUID] = None
     security_group_id: Optional[UUID] = None
     created_at: Optional[datetime] = None
+    last_login_at: Optional[datetime] = None
+    last_active_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -320,6 +322,12 @@ def get_portal_user_from_request(request: Request, db: Session) -> PortalUser:
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail="Portal user not found or inactive")
+    # Last activity, recorded at most every 5 minutes
+    now = datetime.now(timezone.utc)
+    last = user.last_active_at
+    if last is None or (last if last.tzinfo else last.replace(tzinfo=timezone.utc)) < now - timedelta(minutes=5):
+        user.last_active_at = now
+        db.commit()
     return user
 
 
@@ -359,6 +367,8 @@ def portal_login(data: PortalLoginRequest, request: Request, db: Session = Depen
                             detail="User group is inactive or not found")
 
     _login_record_success(ip)
+    user.last_login_at = user.last_active_at = datetime.now(timezone.utc)
+    db.commit()
     token = _create_portal_token(str(user.id), str(user.usergroup_id))
     effective = _compute_effective_features(user, group)
     from app.services import access_service
@@ -1529,22 +1539,29 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
 
 @router.delete("/tags", status_code=204)
 def delete_tags(data: PortalTagDelete, request: Request, db: Session = Depends(get_db)):
-    """Permanently delete one or more BLE tags (group admin only).
-    Tags must belong to a user in the group's configured email domain."""
+    """Permanently delete one or more devices of the group that the user may see."""
     me = get_portal_user_from_request(request, db)
     if not _user_can_manage(me, "asset-mgmt"):
         raise HTTPException(status_code=403, detail="You don't have permission to delete tags")
-    group = _get_group_and_assert_domain(me, db)
+    group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="User group not found")
     all_owner_ids = _get_group_owner_ids(group, db)
+    from app.services import access_service
+    access = access_service.for_user(me, db)
 
     deleted_count = 0
     for tag_id in data.tag_ids:
+        try:
+            UUID(str(tag_id))
+        except ValueError:
+            continue
         tag = (
             db.query(BLETag)
             .filter(BLETag.id == tag_id, _group_tag_scope_filter(group, all_owner_ids))
             .first()
         )
-        if tag:
+        if tag and access.can_see(db, tag.imei):
             try:
                 _delete_tag_with_cleanup(db, tag, logger_prefix=f"BULK DELETE [{deleted_count+1}/{len(data.tag_ids)}]")
                 deleted_count += 1
@@ -1563,17 +1580,24 @@ def delete_tag_single(tag_id: str, request: Request, db: Session = Depends(get_d
     me = get_portal_user_from_request(request, db)
     if not _user_can_manage(me, "asset-mgmt"):
         raise HTTPException(status_code=403, detail="You don't have permission to delete tags")
-    group = _get_group_and_assert_domain(me, db)
+    group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="User group not found")
     all_owner_ids = _get_group_owner_ids(group, db)
+    try:
+        UUID(str(tag_id))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Tag not found in your group")
 
     tag = (
         db.query(BLETag)
         .filter(BLETag.id == tag_id, _group_tag_scope_filter(group, all_owner_ids))
         .first()
     )
-    if not tag:
+    from app.services import access_service
+    if not tag or not access_service.for_user(me, db).can_see(db, tag.imei):
         raise HTTPException(status_code=404, detail="Tag not found in your group")
-    
+
     try:
         _delete_tag_with_cleanup(db, tag, logger_prefix="SINGLE DELETE")
         db.commit()
@@ -1950,6 +1974,7 @@ def _poi_dict(poi: POI, db: Session, usergroup_id: str) -> dict:
         "coordinates": getattr(poi, 'coordinates', None),
         "notes":       getattr(poi, 'notes', None),
         "is_active":   poi.is_active,
+        "place_group_id": str(poi.place_group_id) if poi.place_group_id else None,
         "created_at":  poi.created_at.isoformat() if poi.created_at else None,
         "armed_count": len(armed_tag_ids),
         "tags_armed":  tags_armed,
@@ -2019,6 +2044,7 @@ class LocationCreate(BaseModel):
     coordinates: Optional[str] = None  # JSON string [[lat,lng], ...] for polygon/rectangle
     notes: Optional[str] = None
     status: Optional[str] = None     # 'active' | 'draft' | 'inactive'
+    place_group_id: Optional[UUID] = None
 
 
 @router.post("/locations", status_code=201)
@@ -2059,6 +2085,7 @@ async def create_location(data: LocationCreate, request: Request, db: Session = 
         poi.coordinates = data.coordinates
     if hasattr(poi, 'notes'):
         poi.notes = data.notes
+    poi.place_group_id = _check_place_group(db, me.usergroup_id, data.place_group_id)
     db.add(poi)
     db.commit()
     db.refresh(poi)
@@ -2078,6 +2105,21 @@ class LocationUpdate(BaseModel):
     shape_type: Optional[str] = None
     coordinates: Optional[str] = None
     notes: Optional[str] = None
+    place_group_id: Optional[str] = None    # "" clears
+
+
+def _check_place_group(db: Session, usergroup_id, place_group_id):
+    """The place group id if it belongs to the user group (None for none)."""
+    from app.models import PlaceGroup
+    if not place_group_id:
+        return None
+    try:
+        UUID(str(place_group_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Unknown place group")
+    if not db.query(PlaceGroup).filter(PlaceGroup.id == str(place_group_id), PlaceGroup.usergroup_id == usergroup_id).first():
+        raise HTTPException(status_code=400, detail="Unknown place group")
+    return place_group_id
 
 
 @router.put("/locations/{location_id}")
@@ -2109,6 +2151,8 @@ def update_location(
         poi.coordinates = data.coordinates
     if data.notes is not None and hasattr(poi, 'notes'):
         poi.notes = data.notes
+    if data.place_group_id is not None:
+        poi.place_group_id = _check_place_group(db, me.usergroup_id, data.place_group_id)
     db.commit()
     db.refresh(poi)
     return _poi_dict(poi, db, str(me.usergroup_id))

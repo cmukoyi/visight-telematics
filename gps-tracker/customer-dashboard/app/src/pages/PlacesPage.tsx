@@ -9,7 +9,7 @@ import { notifications } from '@mantine/notifications';
 import { IconMapPin, IconPencil, IconPlus, IconSearch, IconTrash } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { useCan, usePlaces, useVehicles } from '../api/hooks';
+import { useCan, usePlaceGroups, usePlaces, useVehicles } from '../api/hooks';
 import type { Place } from '../api/types';
 import { FleetMap, type FleetMapHandle, type MapPlace } from '../components/FleetMap';
 import { PlaceEditor, clickDraft, draftFromPlace, draftLayers, newDraft, type PlaceDraft } from '../components/PlaceEditor';
@@ -23,6 +23,8 @@ export function PlacesPage() {
   const mapRef = useRef<FleetMapHandle>(null);
   const { data: places = [] } = usePlaces();
   const { data: vehicles = [] } = useVehicles();
+  const { data: placeGroups = [] } = usePlaceGroups();
+  const groupName = useMemo(() => new Map(placeGroups.map((g) => [g.id, g.name])), [placeGroups]);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
   const [draft, setDraft] = useState<PlaceDraft | null>(null);
@@ -112,7 +114,9 @@ export function PlacesPage() {
                   <UnstyledButton key={p.id} className={`${classes.row} ${selected === p.id ? classes.active : ''}`} onClick={() => focus(p)}>
                     <Group justify="space-between" wrap="nowrap" align="flex-start">
                       <div style={{ minWidth: 0 }}>
-                        <Text size="sm" fw={600} truncate>{p.name}</Text>
+                        <Group gap={6} wrap="nowrap"><Text size="sm" fw={600} truncate>{p.name}</Text>
+                          {p.place_group_id && groupName.get(p.place_group_id) &&
+                            <Badge size="xs" variant="outline" color="violet">{groupName.get(p.place_group_id)}</Badge>}</Group>
                         <Text size="xs" c="dimmed" truncate>
                           {placeOutline(p) ? 'Polygon' : `Circle · ${Math.round(p.radius)} m`}{p.address ? ` · ${p.address}` : ''}
                         </Text>

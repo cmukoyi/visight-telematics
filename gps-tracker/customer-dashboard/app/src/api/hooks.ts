@@ -4,7 +4,7 @@ import { getSession, saveAccess } from '../auth/session';
 import type {
   Alert, Branding, Category, DataExchangeStatus, DeviceEvent, EventTypes, GroupTheme, Kpis, LivePosition, Me,
   NotificationRule, Permission, Place, PortalUserRow, ReportDef, ReportSchedule, Role, RulesMeta, SecurityGroup, Trip,
-  TripDetail, Vehicle, VehicleStatus,
+  TripDetail, Vehicle, VehicleStatus, PlaceGroup, EventTypeRow, EventTypeGroup, GeofenceRow, NotificationPrefs,
 } from './types';
 
 export const useBranding = () =>
@@ -136,3 +136,9 @@ export const useVehicleStatus = (imei: string | null) =>
     enabled: !!imei,
     refetchInterval: 15_000,
   });
+
+export const usePlaceGroups = () => useQuery({ queryKey: ['place-groups'], queryFn: () => api<PlaceGroup[]>('/api/portal/place-groups') });
+export const useEventTypeList = () => useQuery({ queryKey: ['event-type-list'], queryFn: () => api<EventTypeRow[]>('/api/portal/event-type-list') });
+export const useEventTypeGroups = () => useQuery({ queryKey: ['event-type-groups'], queryFn: () => api<EventTypeGroup[]>('/api/portal/event-type-groups') });
+export const useGeofences = () => useQuery({ queryKey: ['geofences'], queryFn: () => api<GeofenceRow[]>('/api/portal/geofences'), refetchInterval: 30_000 });
+export const useNotificationPrefs = () => useQuery({ queryKey: ['notification-prefs'], queryFn: () => api<NotificationPrefs>('/api/portal/notifications') });

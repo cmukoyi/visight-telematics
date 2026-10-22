@@ -1,0 +1,9 @@
+.page { display: flex; flex-direction: column; }
+.narrow { max-width: 900px; }
+.grid { height: max(420px, calc(100dvh - 260px)); overflow: hidden; }
+.row { padding: 12px 16px; border-bottom: 1px solid var(--mantine-color-default-border); }
+.row:last-child { border-bottom: 0; }
+.swatch { width: 16px; height: 16px; border-radius: 4px; display: inline-block; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; background: #94a3b8; }
+.dot[data-state='in'] { background: #22c55e; }
+.dot[data-state='out'] { background: #3b82f6; }

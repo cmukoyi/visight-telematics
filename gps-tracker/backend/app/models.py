@@ -134,6 +134,7 @@ class POI(Base):
     shape_type = Column(String(20), default='circle')   # circle | polygon | rectangle
     coordinates = Column(Text, nullable=True)           # JSON [[lat,lng], ...] for polygon/rectangle
     notes = Column(Text, nullable=True)                 # free-text notes
+    place_group_id = Column(UUID(as_uuid=True), ForeignKey("place_groups.id", ondelete="SET NULL"), nullable=True, index=True)
 
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -347,6 +348,8 @@ class NotificationRule(Base):
     rule_type        = Column(String(30), nullable=False, default="geofence")
     category         = Column(String(100), nullable=True)
     place_ids        = Column(JSON, nullable=True)
+    place_group_ids  = Column(JSON, nullable=True)        # places in these groups too
+    event_group_id   = Column(UUID(as_uuid=True), ForeignKey("event_type_groups.id", ondelete="SET NULL"), nullable=True)
     on_entry         = Column(Boolean, nullable=False, default=True)
     on_exit          = Column(Boolean, nullable=False, default=True)
     email_enabled    = Column(Boolean, nullable=False, default=False)
@@ -356,6 +359,40 @@ class NotificationRule(Base):
     created_by       = Column(UUID(as_uuid=True), ForeignKey("portal_users.id", ondelete="SET NULL"), nullable=True)
     created_at       = Column(DateTime(timezone=True), server_default=func.now())
     updated_at       = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class PlaceGroup(Base):
+    """A named set of places (e.g. Depots, Customer sites), for organising places and notification rules."""
+    __tablename__ = "place_groups"
+    __table_args__ = (UniqueConstraint("usergroup_id", "name", name="uq_place_group_name"),)
+
+    id           = get_uuid_column()
+    usergroup_id = get_uuid_fk("user_groups.id")
+    name         = Column(String(100), nullable=False)
+    color        = Column(String(20), nullable=True)
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class EventTypeSetting(Base):
+    """A user group's own name and map marker colour for one of our event codes (dictionary.EVENTS)."""
+    __tablename__ = "event_type_settings"
+
+    usergroup_id = Column(UUID(as_uuid=True), ForeignKey("user_groups.id", ondelete="CASCADE"), primary_key=True)
+    code         = Column(String(40), primary_key=True)
+    label        = Column(String(120), nullable=True)
+    color        = Column(String(20), nullable=True)
+
+
+class EventTypeGroup(Base):
+    """A named set of event codes; a notification rule can fire on any event in the group."""
+    __tablename__ = "event_type_groups"
+    __table_args__ = (UniqueConstraint("usergroup_id", "name", name="uq_event_type_group_name"),)
+
+    id           = get_uuid_column()
+    usergroup_id = get_uuid_fk("user_groups.id")
+    name         = Column(String(100), nullable=False)
+    codes        = Column(JSON, nullable=False, default=list)
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class GeofenceStatus(Base):
@@ -431,6 +468,8 @@ class PortalUser(Base):
     # whose vehicles they see. Users whose role is an admin role see everything.
     role_id           = Column(UUID(as_uuid=True), ForeignKey("portal_roles.id", ondelete="SET NULL"), nullable=True, index=True)
     security_group_id = Column(UUID(as_uuid=True), ForeignKey("security_groups.id", ondelete="SET NULL"), nullable=True, index=True)
+    last_login_at     = Column(DateTime(timezone=True), nullable=True)
+    last_active_at    = Column(DateTime(timezone=True), nullable=True)
     created_at      = Column(DateTime(timezone=True), server_default=func.now())
     updated_at      = Column(DateTime(timezone=True), onupdate=func.now())
     # Notification preferences (per-user)

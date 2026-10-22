@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import {
   ActionIcon, Alert, Anchor, Badge, Breadcrumbs, Button, Checkbox, CopyButton, Group, Menu, Modal, Paper, ScrollArea,
   Select, SimpleGrid, Stack, Switch, Tabs, Text, TextInput, Textarea, ThemeIcon, Title, Tooltip, UnstyledButton,
@@ -16,6 +16,7 @@ import type { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { api } from '../api/client';
 import { useCan, useMe, usePermissions, usePortalUsers, useRoles, useSecurityGroups } from '../api/hooks';
 import type { PortalUserRow, Role, SecurityGroup } from '../api/types';
+import { ConfigHeader } from '../components/ConfigHeader';
 import { DataGrid } from '../components/DataGrid';
 import { dateTime } from '../utils/format';
 import classes from './SecurityPage.module.css';
@@ -112,19 +113,24 @@ function UsersTab() {
   const isSelf = (u: PortalUserRow) => u.id === me?.portal_user.id;
   const rows = users.filter((u) => !search || `${u.email} ${fullName(u)}`.toLowerCase().includes(search.toLowerCase()));
   const cols: ColDef<PortalUserRow>[] = [
-    { headerName: 'Name', valueGetter: (p) => p.data && fullName(p.data), flex: 1, minWidth: 150 },
-    { headerName: 'Email', field: 'email', flex: 1.3, minWidth: 200 },
-    { headerName: 'Role', valueGetter: (p) => roleById.get(p.data?.role_id ?? '')?.name ?? (p.data?.is_group_admin ? 'User Group Administrator' : '—'), flex: 1, minWidth: 170 },
-    { headerName: 'Security group', flex: 1, minWidth: 150,
+    { colId: 'state', headerName: '', width: 54, minWidth: 54, sortable: false, filter: false, pinned: 'left', lockPosition: 'left',
+      cellRenderer: (p: ICellRendererParams<PortalUserRow>) => p.data &&
+        <span className={classes.stateDot} data-active={p.data.is_active} title={p.data.is_active ? 'Active' : 'Disabled'} /> },
+    { colId: 'description', headerName: 'Description', valueGetter: (p) => p.data && fullName(p.data), flex: 1, minWidth: 160, sort: 'asc' },
+    { colId: 'username', headerName: 'Username', field: 'email', flex: 1.2, minWidth: 200 },
+    { colId: 'last_login', headerName: 'Last login', field: 'last_login_at', valueFormatter: (p) => dateTime(p.value), width: 170 },
+    { colId: 'last_activity', headerName: 'Last activity', field: 'last_active_at', valueFormatter: (p) => dateTime(p.value), width: 170 },
+    { colId: 'role', headerName: 'Role', valueGetter: (p) => roleById.get(p.data?.role_id ?? '')?.name ?? (p.data?.is_group_admin ? 'User Group Administrator' : '—'), flex: 1, minWidth: 170 },
+    { colId: 'security_group', headerName: 'Security group', flex: 1, minWidth: 150,
       valueGetter: (p) => sgById.get(p.data?.security_group_id ?? '')?.name ?? '',
       cellRenderer: (p: ICellRendererParams<PortalUserRow>) => p.data && (p.value
         ? p.value
         : roleById.get(p.data.role_id ?? '')?.is_admin || p.data.is_group_admin
           ? <Text size="sm" c="dimmed">All vehicles</Text>
           : <Badge size="sm" color="orange" variant="light">None — sees no vehicles</Badge>) },
-    { headerName: 'Status', field: 'is_active', width: 110,
+    { colId: 'status', headerName: 'Status', field: 'is_active', width: 110, hide: true,
       cellRenderer: (p: ICellRendererParams<PortalUserRow>) => p.data && <Badge size="sm" variant="light" color={p.data.is_active ? 'green' : 'gray'}>{p.data.is_active ? 'Active' : 'Disabled'}</Badge> },
-    { headerName: 'Created', field: 'created_at', valueFormatter: (p) => dateTime(p.value), width: 170 },
+    { colId: 'created', headerName: 'Created', field: 'created_at', valueFormatter: (p) => dateTime(p.value), width: 170, hide: true },
     { headerName: '', width: 60, minWidth: 60, sortable: false, filter: false, pinned: 'right',
       cellRenderer: (p: ICellRendererParams<PortalUserRow>) => p.data && !isSelf(p.data) && (
         <Menu position="bottom-end" withinPortal>
@@ -148,7 +154,7 @@ function UsersTab() {
         <Button size="xs" leftSection={<IconPlus size={14} />} onClick={() => open('new')}>Add user</Button>
       </Group>
       <Paper withBorder className={classes.grid}>
-        <DataGrid rowData={rows} columnDefs={cols} loading={isFetching && !users.length} getRowId={(p) => p.data.id}
+        <DataGrid rowData={rows} columnDefs={cols} loading={isFetching && !users.length} getRowId={(p) => p.data.id} stateKey="config-users"
                   onRowDoubleClicked={(e) => e.data && !isSelf(e.data) && open(e.data)} />
       </Paper>
       <Modal opened={!!editing} onClose={() => setEditing(null)} title={editing === 'new' ? 'Add user' : 'Edit user'} size="lg">
@@ -367,11 +373,21 @@ function RolesTab() {
   );
 }
 
+/** Configuration → Users → Users */
+export function UsersPage() {
+  return (
+    <Stack p="lg" gap={0}>
+      <ConfigHeader section="Users" title="Users" description="People who can sign in, with their role and the security group whose vehicles they see." />
+      {useCan()('users.manage') ? <UsersTab /> : <Text c="dimmed">Your role doesn’t include managing users.</Text>}
+    </Stack>
+  );
+}
+
 export function SecurityPage() {
   const can = useCan();
   const [params, setParams] = useSearchParams();
+  if (params.get('tab') === 'users') return <Navigate to="/configuration/users" replace />;
   const tabs = [
-    { value: 'users', label: 'Users', icon: IconUsers, show: can('users.manage') },
     { value: 'groups', label: 'Security groups', icon: IconUsersGroup, show: can('security.manage') || can('users.manage') },
     { value: 'roles', label: 'Roles & permissions', icon: IconShieldLock, show: can('security.manage') || can('users.manage') },
   ].filter((t) => t.show);
@@ -391,7 +407,6 @@ export function SecurityPage() {
           <Tabs.List mb="md">
             {tabs.map((t) => <Tabs.Tab key={t.value} value={t.value} leftSection={<t.icon size={16} />}>{t.label}</Tabs.Tab>)}
           </Tabs.List>
-          <Tabs.Panel value="users"><UsersTab /></Tabs.Panel>
           <Tabs.Panel value="groups"><SecurityGroupsTab /></Tabs.Panel>
           <Tabs.Panel value="roles"><RolesTab /></Tabs.Panel>
         </Tabs>

@@ -122,6 +122,7 @@ export interface Place {
   coordinates: string | null;    // JSON [[lat, lng], ...] for polygons
   armed_count: number;
   tags_armed: { id: string; imei: string; label: string }[];
+  place_group_id: string | null;
   notes?: string | null;
 }
 
@@ -202,6 +203,8 @@ export interface PortalUserRow {
   security_group_id: string | null;
   expires_at: string | null;
   created_at: string | null;
+  last_login_at: string | null;
+  last_active_at: string | null;
 }
 
 export interface Me {
@@ -243,6 +246,7 @@ export interface GroupTheme {
   theme_primary: string | null;
   theme_accent: string | null;
   timezone: string | null;
+  history_retention_days?: number | null;
 }
 
 export interface NotificationRule {
@@ -252,6 +256,8 @@ export interface NotificationRule {
   rule_type_label: string;
   category: string | null;
   place_ids: string[];
+  place_group_ids: string[];
+  event_group_id: string | null;
   on_entry: boolean;
   on_exit: boolean;
   email_enabled: boolean;
@@ -294,4 +300,23 @@ export interface VehicleStatus {
   readings: { id: number; key: string; name: string; value: unknown; display: string }[];
   iccid: string | null;
   today: { trips: number; distance_km: number; driving_s: number };
+}
+
+export interface PlaceGroup { id: string; name: string; color: string | null; place_count: number }
+
+export interface EventTypeRow {
+  id: number; code: string; default_label: string; label: string; custom_label: string | null; color: string | null;
+  category: string; category_label: string; kind: string;
+}
+
+export interface EventTypeGroup { id: string; name: string; codes: string[]; rule_count: number }
+
+export interface GeofenceRow {
+  poi_id: string; place: string; tag_id: string; imei: string; vehicle: string;
+  armed_at: string | null; inside: boolean | null; checked_at: string | null;
+}
+
+export interface NotificationPrefs {
+  alerts_enabled: boolean; notify_geofence_exit: boolean; notify_battery_low: boolean; notify_offline: boolean;
+  notify_via_email: boolean; notification_emails: string[] | null;
 }

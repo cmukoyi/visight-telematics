@@ -10,13 +10,13 @@ from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import POI, NotificationRule, PortalUser, TagCategory
+from app.models import POI, EventTypeGroup, NotificationRule, PlaceGroup, PortalUser, TagCategory
 from app.routes_portal import get_portal_user_from_request
 from app.services import access_service, geofence_engine
 
 router = APIRouter(prefix="/api/portal", tags=["portal-rules"])
 
-RULE_TYPES = {"geofence": "Place entry / exit"}
+RULE_TYPES = {"geofence": "Place entry / exit", "event": "Vehicle event"}
 
 
 def _me(request: Request, db: Session, write: bool = False) -> PortalUser:
@@ -31,7 +31,9 @@ class RuleIn(BaseModel):
     name: str
     rule_type: str = "geofence"
     category: Optional[str] = None            # vehicle group; None = all vehicles
-    place_ids: Optional[List[UUID]] = None    # None / [] = every place
+    place_ids: Optional[List[UUID]] = None    # None / [] = every place (with no place groups either)
+    place_group_ids: Optional[List[UUID]] = None
+    event_group_id: Optional[UUID] = None     # rule_type "event": fire on any event in this group
     on_entry: bool = True
     on_exit: bool = True
     email_enabled: bool = False
@@ -71,14 +73,26 @@ class RuleIn(BaseModel):
 
 def _out(r: NotificationRule) -> dict:
     return {"id": str(r.id), "name": r.name, "rule_type": r.rule_type, "rule_type_label": RULE_TYPES.get(r.rule_type, r.rule_type),
-            "category": r.category, "place_ids": r.place_ids or [], "on_entry": r.on_entry, "on_exit": r.on_exit,
+            "category": r.category, "place_ids": r.place_ids or [], "place_group_ids": r.place_group_ids or [],
+            "event_group_id": str(r.event_group_id) if r.event_group_id else None,
+            "on_entry": r.on_entry, "on_exit": r.on_exit,
             "email_enabled": r.email_enabled, "email_recipients": r.email_recipients or [],
             "email_message": r.email_message, "is_active": r.is_active, "created_at": r.created_at}
 
 
 def _apply(db: Session, me: PortalUser, r: NotificationRule, data: RuleIn) -> None:
-    if not data.on_entry and not data.on_exit:
+    if data.rule_type == "geofence" and not data.on_entry and not data.on_exit:
         raise HTTPException(status_code=400, detail="Notify on entry, exit or both")
+    if data.rule_type == "event":
+        if not data.event_group_id or not db.query(EventTypeGroup).filter(
+                EventTypeGroup.id == data.event_group_id, EventTypeGroup.usergroup_id == me.usergroup_id).first():
+            raise HTTPException(status_code=400, detail="Choose the event type group this rule watches")
+    group_ids = [str(g) for g in data.place_group_ids or []]
+    if group_ids:
+        found = {str(g) for (g,) in db.query(PlaceGroup.id).filter(PlaceGroup.usergroup_id == me.usergroup_id,
+                                                                  PlaceGroup.id.in_(group_ids))}
+        if len(found) != len(set(group_ids)):
+            raise HTTPException(status_code=400, detail="Unknown place group")
     if data.category and not db.query(TagCategory).filter(TagCategory.usergroup_id == me.usergroup_id,
                                                           TagCategory.name == data.category,
                                                           TagCategory.is_active == True).first():  # noqa: E712
@@ -92,6 +106,8 @@ def _apply(db: Session, me: PortalUser, r: NotificationRule, data: RuleIn) -> No
         raise HTTPException(status_code=400, detail="Add at least one email address, or untick Subscribe by email")
     r.name, r.rule_type, r.category = data.name, data.rule_type, data.category or None
     r.place_ids = place_ids or None
+    r.place_group_ids = (group_ids or None) if data.rule_type == "geofence" else None
+    r.event_group_id = data.event_group_id if data.rule_type == "event" else None
     r.on_entry, r.on_exit, r.is_active = data.on_entry, data.on_exit, data.is_active
     r.email_enabled = data.email_enabled
     r.email_recipients = [str(e).lower() for e in data.email_recipients] if data.email_enabled else []

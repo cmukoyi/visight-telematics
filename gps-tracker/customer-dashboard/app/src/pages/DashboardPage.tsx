@@ -49,6 +49,7 @@ export function DashboardPage() {
   // Live tracking: the selected vehicle (also from ?vehicle=<imei>, e.g. from search)
   const [selected, setSelected] = useState<string | null>(params.get('vehicle'));
   const [follow, setFollow] = useState(true);
+  const [showTrail, setShowTrail] = useState(true);
   const { data: live } = useLive(selected);
   const tracked = vehicles?.find((v) => v.imei === selected) ?? null;
   useEffect(() => {
@@ -67,7 +68,8 @@ export function DashboardPage() {
     // The tracked vehicle uses its live (5-second) position
     return pos ? out.map((m) => (m.id === selected ? { ...m, lat: pos.latitude, lng: pos.longitude, status: 'active' as const } : m)) : out;
   }, [inScope, live, selected]);
-  const trail: MapRoute[] = live && live.trail.length > 1 ? [{ id: 'live-trail', color: '#22c55e', coords: live.trail }] : [];
+  const trail: MapRoute[] = showTrail && live && live.trail.length > 1
+    ? [{ id: 'live-trail', color: '#22c55e', coords: live.trail, arrows: true }] : [];
   useEffect(() => {
     const pos = live?.position;
     if (follow && pos) mapRef.current?.panTo(pos.latitude, pos.longitude);
@@ -117,7 +119,8 @@ export function DashboardPage() {
                     onVehicleClick={(id) => select(id === selected ? null : id)} />
         )}
         {tracked && (
-          <LiveTrack vehicle={tracked} live={live} follow={follow} onFollow={setFollow} onClose={() => select(null)}
+          <LiveTrack vehicle={tracked} live={live} follow={follow} onFollow={setFollow} trail={showTrail} onTrail={setShowTrail}
+                     onClose={() => select(null)}
                      onShowTrip={() => navigate('/workspace')} />
         )}
       </Card>

@@ -8,6 +8,7 @@ import { notifications } from '@mantine/notifications';
 import { IconArrowBackUp, IconCar, IconInfoCircle, IconSearch, IconSquare } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, qs } from '../api/client';
+import { usePlaceGroups } from '../api/hooks';
 import type { GeocodeResult, Place, Vehicle } from '../api/types';
 import { vehicleName } from '../utils/format';
 import { placeOutline } from '../utils/places';
@@ -23,6 +24,7 @@ export interface PlaceDraft {
   radius: number;
   vertices: [number, number][];
   armed: string[];      // vehicle (tag) ids
+  groupId?: string | null;
 }
 
 const DRAFT_COLOR = '#f59e0b';
@@ -35,7 +37,7 @@ export function draftFromPlace(p: Place): PlaceDraft {
   return {
     id: p.id, name: p.name, description: p.description ?? '', shape: outline ? 'polygon' : 'circle',
     center: [p.latitude, p.longitude], radius: Math.round(p.radius), vertices: outline ?? [],
-    armed: p.tags_armed.map((t) => t.id),
+    armed: p.tags_armed.map((t) => t.id), groupId: p.place_group_id,
   };
 }
 
@@ -136,6 +138,7 @@ interface Props {
 export function PlaceEditor({ draft, setDraft, places, vehicles, onLocate, onCancel, onSaved }: Props) {
   const qc = useQueryClient();
   const [saving, setSaving] = useState(false);
+  const { data: placeGroups = [] } = usePlaceGroups();
   const set = (patch: Partial<PlaceDraft>) => setDraft((d) => d && { ...d, ...patch });
   const located = vehicles.filter((v) => v.latitude && v.longitude);
 
@@ -159,7 +162,7 @@ export function PlaceEditor({ draft, setDraft, places, vehicles, onLocate, onCan
       const radius = Math.max(50, ...draft.vertices.map((v) => distanceM([lat, lng], v)));
       body = { latitude: lat, longitude: lng, radius: Math.round(radius), shape_type: 'polygon', coordinates: JSON.stringify(draft.vertices) };
     }
-    body = { ...body, name: draft.name.trim(), description: draft.description.trim() || null };
+    body = { ...body, name: draft.name.trim(), description: draft.description.trim() || null, place_group_id: draft.groupId ?? '' };
     setSaving(true);
     try {
       const saved = draft.id
@@ -221,6 +224,10 @@ export function PlaceEditor({ draft, setDraft, places, vehicles, onLocate, onCan
                   onClick={() => set({ vertices: draft.vertices.slice(0, -1) })}>Undo</Button>
           <Button size="xs" variant="subtle" color="gray" disabled={!draft.vertices.length} onClick={() => set({ vertices: [] })}>Clear</Button>
         </Group>
+      )}
+      {placeGroups.length > 0 && (
+        <Select label="Place group" placeholder="No group" clearable data={placeGroups.map((g) => ({ value: g.id, label: g.name }))}
+                value={draft.groupId ?? null} onChange={(v) => set({ groupId: v })} />
       )}
       <Textarea label="Description" autosize minRows={1} value={draft.description}
                 onChange={(e) => set({ description: e.currentTarget.value })} />

@@ -8,7 +8,33 @@ import { STATUS } from '../theme';
 import classes from './FleetMap.module.css';
 
 export interface MapVehicle { id: string; name: string; lat: number; lng: number; status: 'active' | 'idle' | 'offline'; heading?: number | null }
-export interface MapRoute { id: string; color: string; coords: [number, number][] }
+/** A line on the map; `arrows` adds a few direction arrows along it (e.g. a trip). */
+export interface MapRoute { id: string; color: string; coords: [number, number][]; arrows?: boolean }
+
+const ARROWS_PER_ROUTE = 8;
+
+/** Compass bearing (degrees) from a to b, both [lat, lng]. */
+function bearing([lat1, lng1]: [number, number], [lat2, lng2]: [number, number]) {
+  const r = Math.PI / 180;
+  const y = Math.sin((lng2 - lng1) * r) * Math.cos(lat2 * r);
+  const x = Math.cos(lat1 * r) * Math.sin(lat2 * r) - Math.sin(lat1 * r) * Math.cos(lat2 * r) * Math.cos((lng2 - lng1) * r);
+  return (Math.atan2(y, x) / r + 360) % 360;
+}
+
+/** Evenly spaced points along a route with the direction of travel there. */
+function arrowsAlong(route: MapRoute) {
+  const c = route.coords;
+  if (c.length < 3) return [];
+  const n = Math.min(ARROWS_PER_ROUTE, Math.floor(c.length / 2));
+  const out: { id: string; lat: number; lng: number; deg: number; color: string }[] = [];
+  for (let k = 1; k <= n; k++) {
+    const i = Math.min(c.length - 1, Math.max(1, Math.round((k * (c.length - 1)) / (n + 1))));
+    const [a, b] = [c[i - 1], c[i]];
+    if (a[0] === b[0] && a[1] === b[1]) continue;
+    out.push({ id: `${route.id}-arrow-${k}`, lat: (a[0] + b[0]) / 2, lng: (a[1] + b[1]) / 2, deg: bearing(a, b), color: route.color });
+  }
+  return out;
+}
 export interface MapPoint { id: string; lat: number; lng: number; color: string; label: string; detail?: string; icon?: string }
 export interface MapPlace { id: string; name: string; lat: number; lng: number; radius: number; polygon?: [number, number][] | null }
 
@@ -153,6 +179,14 @@ export const FleetMap = forwardRef<FleetMapHandle, Props>(function FleetMap(
           <Layer id="routes-line" type="line" layout={{ 'line-join': 'round', 'line-cap': 'round' }}
                  paint={{ 'line-color': ['get', 'color'], 'line-width': 4 }} />
         </Source>
+
+        {routes.filter((r) => r.arrows).flatMap(arrowsAlong).map((a) => (
+          <Marker key={a.id} latitude={a.lat} longitude={a.lng} anchor="center" rotation={a.deg} rotationAlignment="map">
+            <svg width="20" height="20" viewBox="0 0 20 20" className={classes.arrow} aria-hidden="true">
+              <path d="M10 2 L17 17 L10 13 L3 17 Z" fill={a.color} stroke="#fff" strokeWidth="1.6" strokeLinejoin="round" />
+            </svg>
+          </Marker>
+        ))}
 
         {places.map((p) => (
           <Marker key={`pl-${p.id}`} latitude={p.lat} longitude={p.lng} anchor="center">

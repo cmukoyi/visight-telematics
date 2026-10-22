@@ -74,7 +74,7 @@ export function WorkspacePage() {
   const mapVehicles = useMemo(() => vehicles.filter((v) => plottedVehicles.has(v.imei)).map(toMapVehicle)
     .filter(Boolean) as MapVehicle[], [vehicles, plottedVehicles]);
   const routes: MapRoute[] = useMemo(() => [...plottedTrips.values()].map((t) => ({
-    id: t.id, color: t.color, coords: t.points.map((p) => [p[0], p[1]] as [number, number]),
+    id: t.id, color: t.color, coords: t.points.map((p) => [p[0], p[1]] as [number, number]), arrows: true,
   })), [plottedTrips]);
   const points: MapPoint[] = useMemo(() => {
     const out: MapPoint[] = [];

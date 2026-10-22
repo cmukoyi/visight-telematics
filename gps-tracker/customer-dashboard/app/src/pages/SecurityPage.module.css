@@ -12,3 +12,5 @@
 .roleActive { background: color-mix(in srgb, var(--mantine-color-brand-5) 16%, transparent); box-shadow: inset 3px 0 0 var(--mantine-color-accent-5); }
 .roleDetail { min-height: 360px; }
 @media (max-width: 62em) { .roles { grid-template-columns: 1fr; } }
+.stateDot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: #94a3b8; }
+.stateDot[data-active='true'] { background: #22c55e; }

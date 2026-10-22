@@ -60,10 +60,12 @@ def dashboard_kpis(request: Request, db: Session = Depends(get_db), category: Op
 
 @router.get("/event-types")
 def event_types(request: Request, db: Session = Depends(get_db)):
-    """Our event codes with labels, grouped by category (for filters)."""
-    get_portal_user_from_request(request, db)
+    """Our event codes with labels (the group's own names where set), grouped by category (for filters)."""
+    me = get_portal_user_from_request(request, db)
+    from app.routes_catalog import event_labels
+    custom = event_labels(db, me.usergroup_id)
     return {"categories": CATEGORIES,
-            "events": [{"code": c, "label": l, "category": cat, "kind": k} for c, (l, cat, k) in EVENTS.items()]}
+            "events": [{"code": c, "label": custom.get(c) or l, "category": cat, "kind": k} for c, (l, cat, k) in EVENTS.items()]}
 
 
 @router.get("/events")
@@ -94,10 +96,12 @@ def list_events(request: Request, db: Session = Depends(get_db),
         q = q.filter(DeviceEvent.id < before_id)
     rows = q.order_by(DeviceEvent.recorded_at.desc(), DeviceEvent.id.desc()).limit(limit).all()
     names = reports_service.group_devices(db, me.usergroup_id)
+    from app.routes_catalog import event_labels
+    custom = event_labels(db, me.usergroup_id)
     return {
         "rows": [{
             "id": e.id, "imei": e.imei, "device_name": names.get(e.imei, e.imei),
-            "code": e.event_type, "label": event_label(e.event_type, e.event_io_id),
+            "code": e.event_type, "label": custom.get(e.event_type) or event_label(e.event_type, e.event_io_id),
             "kind": EVENTS[e.event_type][2] if e.event_type in EVENTS else "info",
             "recorded_at": e.recorded_at, "latitude": e.latitude, "longitude": e.longitude,
             "speed": e.speed, "trip_id": str(e.trip_id) if e.trip_id else None,

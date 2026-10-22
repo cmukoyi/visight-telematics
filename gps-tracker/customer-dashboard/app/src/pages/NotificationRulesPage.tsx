@@ -11,7 +11,7 @@ import { IconBellRinging, IconInfoCircle, IconMail, IconPencil, IconPlus, IconTr
 import { useQueryClient } from '@tanstack/react-query';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { api } from '../api/client';
-import { useCan, useCategories, usePlaces, useRules, useRulesMeta, useVehicles } from '../api/hooks';
+import { useCan, useCategories, useEventTypeGroups, usePlaceGroups, usePlaces, useRules, useRulesMeta, useVehicles } from '../api/hooks';
 import { detail, type NotificationRule } from '../api/types';
 import { DataGrid } from '../components/DataGrid';
 import { dateTime, vehicleName } from '../utils/format';
@@ -19,7 +19,8 @@ import classes from './NotificationRulesPage.module.css';
 
 const ALL = '__all__';
 type RuleForm = {
-  name: string; rule_type: string; category: string; place_ids: string[]; on_entry: boolean; on_exit: boolean;
+  name: string; rule_type: string; category: string; place_ids: string[]; place_group_ids: string[]; event_group_id: string | null;
+  on_entry: boolean; on_exit: boolean;
   email_enabled: boolean; email_recipients: string[]; email_message: string; is_active: boolean;
 };
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -31,17 +32,23 @@ export function NotificationRulesPage() {
   const { data: meta } = useRulesMeta();
   const { data: categories = [] } = useCategories();
   const { data: places = [] } = usePlaces();
+  const { data: placeGroups = [] } = usePlaceGroups();
+  const { data: eventGroups = [] } = useEventTypeGroups();
+  const eventGroupName = useMemo(() => new Map(eventGroups.map((g) => [g.id, g.name])), [eventGroups]);
+  const placeGroupName = useMemo(() => new Map(placeGroups.map((g) => [g.id, g.name])), [placeGroups]);
   const { data: vehicles = [] } = useVehicles();
   const [editing, setEditing] = useState<NotificationRule | 'new' | null>(null);
   const messageRef = useRef<HTMLTextAreaElement>(null);
   const placeName = useMemo(() => new Map(places.map((p) => [p.id, p.name])), [places]);
 
   const form = useForm<RuleForm>({
-    initialValues: { name: '', rule_type: 'geofence', category: ALL, place_ids: [], on_entry: true, on_exit: true,
+    initialValues: { name: '', rule_type: 'geofence', category: ALL, place_ids: [], place_group_ids: [], event_group_id: null,
+                     on_entry: true, on_exit: true,
                      email_enabled: false, email_recipients: [], email_message: '', is_active: true },
     validate: {
       name: (v) => (v.trim() ? null : 'Enter a name'),
-      on_exit: (v, all) => (v || all.on_entry ? null : 'Choose entry, exit or both'),
+      on_exit: (v, all) => (all.rule_type !== 'geofence' || v || all.on_entry ? null : 'Choose entry, exit or both'),
+      event_group_id: (v, all) => (all.rule_type !== 'event' || v ? null : 'Choose an event type group'),
       email_recipients: (v, all) => (!all.email_enabled ? null : v.length === 0 ? 'Add at least one email address'
         : v.some((e) => !EMAIL.test(e)) ? 'One of the addresses is not valid' : v.length > 20 ? 'At most 20 addresses' : null),
     },
@@ -51,7 +58,8 @@ export function NotificationRulesPage() {
     form.reset();
     if (r === 'new') form.setFieldValue('email_message', meta?.default_message ?? '');
     else form.setValues({
-      name: r.name, rule_type: r.rule_type, category: r.category ?? ALL, place_ids: r.place_ids, on_entry: r.on_entry,
+      name: r.name, rule_type: r.rule_type, category: r.category ?? ALL, place_ids: r.place_ids,
+      place_group_ids: r.place_group_ids ?? [], event_group_id: r.event_group_id, on_entry: r.on_entry,
       on_exit: r.on_exit, email_enabled: r.email_enabled, email_recipients: r.email_recipients,
       email_message: r.email_message ?? meta?.default_message ?? '', is_active: r.is_active,
     });
@@ -94,7 +102,8 @@ export function NotificationRulesPage() {
   const preview = (form.values.email_message || meta?.default_message || '').replace(/\{(\w+)\}/g, (m, k: string) => {
     const values: Record<string, string> = {
       vehicle: sample ? vehicleName(sample) : 'Truck 12', imei: sample?.imei ?? '861327083699665',
-      place: placeName.get(form.values.place_ids[0]) ?? places[0]?.name ?? 'Head office', event: form.values.on_entry ? 'entered' : 'left',
+      place: placeName.get(form.values.place_ids[0]) ?? places[0]?.name ?? 'Head office',
+      event: form.values.rule_type === 'event' ? 'Harsh braking' : form.values.on_entry ? 'entered' : 'left',
       time: dateTime(new Date().toISOString()), speed: '42',
       registration: (sample && detail(sample, 'registration')) || 'CA 123-456', make: (sample && detail(sample, 'make')) || '—',
       model: (sample && detail(sample, 'model')) || '—', year: (sample && detail(sample, 'year')) || '—',
@@ -107,14 +116,21 @@ export function NotificationRulesPage() {
     { headerName: 'Rule', field: 'name', flex: 1.2, minWidth: 180 },
     { headerName: 'Type', field: 'rule_type_label', width: 150 },
     { headerName: 'Vehicles', valueGetter: (p) => p.data?.category ?? 'All vehicles', width: 150 },
-    { headerName: 'Places', flex: 1, minWidth: 160,
-      valueGetter: (p) => (p.data?.place_ids.length ? p.data.place_ids.map((id) => placeName.get(id) ?? '?').join(', ') : 'All places') },
+    { headerName: 'Watches', flex: 1, minWidth: 180,
+      valueGetter: (p) => {
+        const r = p.data;
+        if (!r) return '';
+        if (r.rule_type === 'event') return `Events: ${eventGroupName.get(r.event_group_id ?? '') ?? '?'}`;
+        const names = [...r.place_ids.map((id) => placeName.get(id) ?? '?'), ...(r.place_group_ids ?? []).map((id) => `${placeGroupName.get(id) ?? '?'} (group)`)];
+        return names.length ? names.join(', ') : 'All places';
+      } },
     { headerName: 'Notify on', width: 150, sortable: false,
-      cellRenderer: (p: ICellRendererParams<NotificationRule>) => p.data && (
-        <Group gap={4} wrap="nowrap">
-          {p.data.on_entry && <Badge size="sm" color="green" variant="light">Entry</Badge>}
-          {p.data.on_exit && <Badge size="sm" color="red" variant="light">Exit</Badge>}
-        </Group>) },
+      cellRenderer: (p: ICellRendererParams<NotificationRule>) => p.data && (p.data.rule_type === 'event'
+        ? <Badge size="sm" color="violet" variant="light">Each event</Badge>
+        : <Group gap={4} wrap="nowrap">
+            {p.data.on_entry && <Badge size="sm" color="green" variant="light">Entry</Badge>}
+            {p.data.on_exit && <Badge size="sm" color="red" variant="light">Exit</Badge>}
+          </Group>) },
     { headerName: 'Email', width: 140,
       valueGetter: (p) => (p.data?.email_enabled ? p.data.email_recipients.length : 0),
       cellRenderer: (p: ICellRendererParams<NotificationRule>) => p.data && (p.data.email_enabled
@@ -165,10 +181,22 @@ export function NotificationRulesPage() {
               <Select label="Vehicle group" allowDeselect={false}
                       data={[{ value: ALL, label: 'All vehicles' }, ...categories.map((c) => ({ value: c.name, label: c.name }))]}
                       {...form.getInputProps('category')} />
-              <MultiSelect label="Places" placeholder={form.values.place_ids.length ? '' : 'All places'} searchable clearable
-                           data={places.map((p) => ({ value: p.id, label: p.name }))} {...form.getInputProps('place_ids')}
-                           nothingFoundMessage="No places — add them under Configuration → Places" />
+              {form.values.rule_type === 'event' ? (
+                <Select label="Event type group" placeholder="Choose a group" data={eventGroups.map((g) => ({ value: g.id, label: g.name }))}
+                        {...form.getInputProps('event_group_id')} nothingFoundMessage="No groups — add them under Configuration → Events" />
+              ) : (
+                <MultiSelect label="Places" placeholder={form.values.place_ids.length || form.values.place_group_ids.length ? '' : 'All places'}
+                             searchable clearable data={places.map((p) => ({ value: p.id, label: p.name }))} {...form.getInputProps('place_ids')}
+                             nothingFoundMessage="No places — add them under Configuration → Places" />
+              )}
+              {form.values.rule_type === 'geofence' && placeGroups.length > 0 && (
+                <MultiSelect label="…and place groups" placeholder={form.values.place_group_ids.length ? '' : 'Optional'} searchable clearable
+                             data={placeGroups.map((g) => ({ value: g.id, label: g.name }))} {...form.getInputProps('place_group_ids')} />
+              )}
             </SimpleGrid>
+            {form.values.rule_type === 'event' ? (
+              <Text size="sm" c="dimmed">An alert is raised for every event in the group from a vehicle in the chosen vehicle group.</Text>
+            ) : (
             <div>
               <Text size="sm" fw={500} mb={6}>Notify</Text>
               <Group>
@@ -177,6 +205,7 @@ export function NotificationRulesPage() {
                           error={form.errors.on_exit} />
               </Group>
             </div>
+            )}
             <Alert variant="light" icon={<IconInfoCircle size={16} />} p="xs">
               Every notification is listed in the Inbox for users who can see the vehicle.
             </Alert>

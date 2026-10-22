@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import {
-  Anchor, Box, Breadcrumbs, Button, ColorInput, FileButton, Group, Paper, Select, SimpleGrid, Stack, Text, Title,
+  Box, Button, Checkbox, ColorInput, FileButton, Group, NumberInput, Paper, Select, SimpleGrid, Stack, Switch, TagsInput, Text,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconPhoto, IconTrash, IconUpload } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { api } from '../api/client';
-import { useGroupTheme } from '../api/hooks';
-import type { GroupTheme } from '../api/types';
+import { useCan, useGroupTheme, useNotificationPrefs } from '../api/hooks';
+import type { GroupTheme, NotificationPrefs } from '../api/types';
+import { ConfigHeader } from '../components/ConfigHeader';
 import classes from './UserGroupPage.module.css';
 
 const ACCEPT = 'image/png,image/jpeg,image/svg+xml';
@@ -54,8 +55,49 @@ function LogoField({ label, hint, value, onChange, width, height }: {
   );
 }
 
-export function UserGroupPage() {
+/** My own alert preferences (email on/off, which alerts, extra addresses). */
+function MyNotificationPrefs() {
   const qc = useQueryClient();
+  const { data } = useNotificationPrefs();
+  const [prefs, setPrefs] = useState<NotificationPrefs | null>(null);
+  useEffect(() => { if (data && !prefs) setPrefs(data); }, [data, prefs]);
+  if (!prefs) return null;
+  const set = (patch: Partial<NotificationPrefs>) => setPrefs((p) => p && { ...p, ...patch });
+  const save = async () => {
+    try {
+      const saved = await api<NotificationPrefs>('/api/portal/notifications', { method: 'PUT', json: { ...prefs, notification_emails: prefs.notification_emails ?? [] } });
+      qc.setQueryData(['notification-prefs'], saved);
+      notifications.show({ color: 'green', message: 'Your notification preferences are saved' });
+    } catch (e) { notifications.show({ color: 'red', message: (e as Error).message }); }
+  };
+  return (
+    <Paper withBorder p="lg">
+      <Group justify="space-between" mb="md">
+        <div><Text fw={650}>My notification preferences</Text><Text size="sm" c="dimmed">Which alerts you are emailed about (alerts always show in the Inbox).</Text></div>
+        <Button size="xs" variant="light" onClick={save}>Save preferences</Button>
+      </Group>
+      <Stack gap="sm">
+        <Switch label="Alerts on" checked={prefs.alerts_enabled} onChange={(e) => set({ alerts_enabled: e.currentTarget.checked })} />
+        <Switch label="Email me alerts" checked={prefs.notify_via_email} disabled={!prefs.alerts_enabled}
+                onChange={(e) => set({ notify_via_email: e.currentTarget.checked })} />
+        <Group gap="xl" ml="xl">
+          <Checkbox label="Place entry / exit" checked={prefs.notify_geofence_exit} disabled={!prefs.alerts_enabled || !prefs.notify_via_email}
+                    onChange={(e) => set({ notify_geofence_exit: e.currentTarget.checked })} />
+          <Checkbox label="Vehicle offline" checked={prefs.notify_offline} disabled={!prefs.alerts_enabled || !prefs.notify_via_email}
+                    onChange={(e) => set({ notify_offline: e.currentTarget.checked })} />
+          <Checkbox label="Low battery" checked={prefs.notify_battery_low} disabled={!prefs.alerts_enabled || !prefs.notify_via_email}
+                    onChange={(e) => set({ notify_battery_low: e.currentTarget.checked })} />
+        </Group>
+        <TagsInput label="Also email" placeholder="Extra addresses — press Enter after each" splitChars={[',', ' ', ';']} clearable maw={560}
+                   value={prefs.notification_emails ?? []} onChange={(v) => set({ notification_emails: v })} />
+      </Stack>
+    </Paper>
+  );
+}
+
+export function UserGroupPage({ mode }: { mode: 'theme' | 'preferences' }) {
+  const qc = useQueryClient();
+  const canEdit = useCan()('settings.manage');
   const { data: theme } = useGroupTheme();
   const [form, setForm] = useState<GroupTheme | null>(null);
   const [saving, setSaving] = useState(false);
@@ -80,6 +122,7 @@ export function UserGroupPage() {
       const saved = await api<GroupTheme>('/api/portal/theme', { method: 'PUT', json: {
         theme_primary: form.theme_primary ?? '', theme_accent: form.theme_accent ?? '',
         logo_data: form.logo_data ?? '', report_logo_data: form.report_logo_data ?? '', timezone: form.timezone ?? '',
+        ...(form.history_retention_days ? { history_retention_days: form.history_retention_days } : {}),
       } });
       qc.setQueryData(['theme'], saved);
       setForm(saved);
@@ -93,20 +136,13 @@ export function UserGroupPage() {
 
   return (
     <Stack p="lg" gap="lg" maw={1040}>
-      <Stack gap={4}>
-        <Breadcrumbs>
-          <Anchor component={Link} to="/configuration" size="sm">Configuration</Anchor>
-          <Text size="sm">User Group</Text>
-        </Breadcrumbs>
-        <Group justify="space-between">
-          <div>
-            <Title order={2}>{form.name ?? 'User Group'}</Title>
-            <Text size="sm" c="dimmed">Theme, logos and timezone for everyone in this user group.</Text>
-          </div>
-          <Button onClick={save} loading={saving}>Save changes</Button>
-        </Group>
-      </Stack>
+      <ConfigHeader section="Users" title={mode === 'theme' ? 'Custom Themes' : 'User Groups'}
+                    description={mode === 'theme' ? `Colours and logos for everyone in ${form.name ?? 'this user group'}.`
+                      : `${form.name ?? 'Your user group'}: timezone, data retention and your notification preferences.`}>
+        {canEdit && <Button onClick={save} loading={saving}>Save changes</Button>}
+      </ConfigHeader>
 
+      {mode === 'theme' && <>
       <Paper withBorder p="lg">
         <Text fw={650} mb="md">Theme</Text>
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
@@ -140,12 +176,24 @@ export function UserGroupPage() {
         </SimpleGrid>
       </Paper>
 
+      </>}
+
+      {mode === 'preferences' && <>
+      <Paper withBorder p="lg">
+        <Text fw={650} mb={4}>{form.name}</Text>
+        <Text size="sm" c="dimmed" mb="md">Settings for everyone in this user group{canEdit ? '' : ' (ask a User Group Administrator to change them)'}.</Text>
+        <NumberInput label="Keep history for (days)" description="Positions and events older than this are removed" min={7} max={3650} maw={260}
+                     disabled={!canEdit} value={form.history_retention_days ?? 365}
+                     onChange={(v) => set({ history_retention_days: Number(v) || 365 })} />
+      </Paper>
       <Paper withBorder p="lg" id="timezone">
         <Text fw={650} mb="md">Timezone</Text>
-        <Select searchable clearable maw={420} data={zones} value={form.timezone} placeholder="Each user's own device timezone"
+        <Select searchable clearable maw={420} data={zones} value={form.timezone} placeholder="Each user's own device timezone" disabled={!canEdit}
                 description="Used to show times across the platform, for report periods and as the default for scheduled reports."
                 onChange={(v) => set({ timezone: v })} nothingFoundMessage="No matching timezone" />
       </Paper>
+      <MyNotificationPrefs />
+      </>}
     </Stack>
   );
 }
