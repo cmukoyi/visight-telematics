@@ -5,7 +5,7 @@ const brand: MantineColorsTuple = [
   '#e7f1ff', '#cfe0ff', '#9ebfff', '#699bfd', '#3e7cfb', '#2468fb', '#145efc', '#004ee1', '#0045ca', '#003bb3',
 ];
 const navy: MantineColorsTuple = [
-  '#c9d4e5', '#a6b5cc', '#7d8fad', '#56698a', '#2f4366', '#1f3354', '#162847', '#10203b', '#0b1830', '#071226',
+  '#d3dceb', '#b0bfd6', '#899dbc', '#62789c', '#3f5880', '#2d4a72', '#1d3f66', '#113356', '#0d2b4a', '#09223d',
 ];
 
 /** Ten shades of a hex colour (index 6 = the colour itself), for a Mantine palette. */

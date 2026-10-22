@@ -5,7 +5,7 @@
   color: var(--mantine-color-dark-0);
 }
 :global([data-mantine-color-scheme='light']) .navbar {
-  background: linear-gradient(180deg, #0f2347 0%, #0a1830 100%);
+  background: linear-gradient(180deg, #113356 0%, #0d2b4a 100%);
 }
 .main {
   height: 100dvh; box-sizing: border-box;
