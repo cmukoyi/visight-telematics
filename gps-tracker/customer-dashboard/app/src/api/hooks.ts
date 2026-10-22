@@ -4,7 +4,7 @@ import { getSession, saveAccess } from '../auth/session';
 import type {
   Alert, Branding, Category, DataExchangeStatus, DeviceEvent, EventTypes, GroupTheme, Kpis, LivePosition, Me,
   NotificationRule, Permission, Place, PortalUserRow, ReportDef, ReportSchedule, Role, RulesMeta, SecurityGroup, Trip,
-  TripDetail, Vehicle, VehicleStatus, PlaceGroup, EventTypeRow, EventTypeGroup, GeofenceRow, NotificationPrefs,
+  TripDetail, Vehicle, VehicleStatus, PlaceGroup, EventTypeRow, EventTypeGroup, GeofenceRow, NotificationPrefs, FleetStatusRow,
 } from './types';
 
 export const useBranding = () =>
@@ -142,3 +142,7 @@ export const useEventTypeList = () => useQuery({ queryKey: ['event-type-list'], 
 export const useEventTypeGroups = () => useQuery({ queryKey: ['event-type-groups'], queryFn: () => api<EventTypeGroup[]>('/api/portal/event-type-groups') });
 export const useGeofences = () => useQuery({ queryKey: ['geofences'], queryFn: () => api<GeofenceRow[]>('/api/portal/geofences'), refetchInterval: 30_000 });
 export const useNotificationPrefs = () => useQuery({ queryKey: ['notification-prefs'], queryFn: () => api<NotificationPrefs>('/api/portal/notifications') });
+
+/** Latest event, speed, odometer and address per vehicle (Workspace vehicle grid), every 15 s while shown. */
+export const useFleetStatus = (enabled: boolean) =>
+  useQuery({ queryKey: ['fleet-status'], queryFn: () => api<FleetStatusRow[]>('/api/portal/fleet-status'), enabled, refetchInterval: 15_000 });

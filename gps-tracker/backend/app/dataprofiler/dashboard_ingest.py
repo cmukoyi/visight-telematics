@@ -131,7 +131,7 @@ ADDRESS_INTERVAL_S = 20
 
 def _fill_addresses() -> int:
     with SessionLocal() as db:
-        return address_service.fill_trip_addresses(db)
+        return address_service.fill_trip_addresses(db) + address_service.fill_vehicle_addresses(db)
 
 
 async def address_loop() -> None:

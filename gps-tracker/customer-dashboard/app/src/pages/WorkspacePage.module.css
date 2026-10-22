@@ -3,25 +3,19 @@
 .sep { width: 1px; align-self: stretch; background: var(--mantine-color-default-border); margin: 2px 4px; }
 .dock {
   position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 3; height: 360px;
-  display: grid; grid-template-columns: 280px 1fr; overflow: hidden;
+  display: flex; flex-direction: column; overflow: hidden;
   border: 1px solid var(--mantine-color-default-border);
 }
-.dockMax { top: 64px; height: auto; }
-.vehicles { border-right: 1px solid var(--mantine-color-default-border); padding: 12px; display: flex; flex-direction: column; min-height: 0; }
-.vehicleList { flex: 1; }
-.vehicleRow {
-  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--mantine-radius-sm); cursor: pointer; width: 100%;
-}
-.vehicleRow:hover { background: var(--mantine-color-default-hover); }
-.focused { background: rgba(62, 124, 251, 0.18); }
-.focused:hover { background: rgba(62, 124, 251, 0.24); }
+.dockMax { top: 64px; height: auto !important; }
+/* Drag handle along the top edge */
+.resize { height: 12px; flex: none; cursor: ns-resize; display: flex; align-items: center; justify-content: center; touch-action: none; }
+.resize span { width: 48px; height: 4px; border-radius: 4px; background: var(--mantine-color-default-border); transition: background 120ms ease; }
+.resize:hover span, .resize:active span { background: var(--mantine-color-brand-5); }
 .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; display: inline-block; }
-.content { padding: 12px; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.content { padding: 0 12px 12px; display: flex; flex-direction: column; min-height: 0; min-width: 0; flex: 1; }
 .content > :last-child { flex: 1; min-height: 0; }
+.focusedRow { box-shadow: inset 3px 0 0 var(--mantine-color-accent-5); }
 .placeRow { padding: 8px 4px; border-bottom: 1px solid var(--mantine-color-default-border); }
-@media (max-width: 48em) {
-  .dock { grid-template-columns: 1fr; height: 60vh; }
-  .vehicles { display: none; }
-}
+@media (max-width: 48em) { .dock { height: 60vh !important; } }
 .placePanel { position: absolute; top: 64px; right: 12px; width: 360px; max-height: calc(100% - 88px); z-index: 4; overflow: hidden; display: flex; flex-direction: column; }
 @media (max-width: 48em) { .placePanel { left: 12px; width: auto; } }

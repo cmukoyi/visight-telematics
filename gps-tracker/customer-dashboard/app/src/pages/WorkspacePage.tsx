@@ -1,23 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActionIcon, Badge, Button, Checkbox, CloseButton, Group, MultiSelect, Paper, ScrollArea, Select, Stack, Text,
-  TextInput, Tooltip, UnstyledButton,
+  TextInput, Tooltip,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
   IconAlertTriangle, IconCar, IconEraser, IconEye, IconEyeOff, IconMapPin, IconMaximize, IconMinimize, IconRoute,
-  IconInfoCircle, IconMapPinPlus, IconSearch, IconTimeline,
+  IconInfoCircle, IconMapPinPlus, IconPencil, IconSearch, IconTimeline,
 } from '@tabler/icons-react';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
-import { fetchTrip, useCan, useCategories, useEvents, useEventTypes, usePlaces, useTrips, useVehicles, type Range } from '../api/hooks';
-import { detail, type DeviceEvent, type Trip, type TripDetail } from '../api/types';
+import { useNavigate } from 'react-router-dom';
+import { useLocalStorage } from '@mantine/hooks';
+import { fetchTrip, useCan, useCategories, useFleetStatus, useEvents, useEventTypes, usePlaces, useTrips, useVehicles, type Range } from '../api/hooks';
+import { detail, type DeviceEvent, type FleetStatusRow, type Trip, type TripDetail, type Vehicle } from '../api/types';
 import { DataGrid } from '../components/DataGrid';
 import { VehiclePanel } from '../components/VehiclePanel';
 import { FleetMap, type FleetMapHandle, type MapAction, type MapPoint, type MapTarget, type MapRoute, type MapVehicle } from '../components/FleetMap';
 import { PlaceEditor, clickDraft, draftExtent, draftLayers, newDraft, type PlaceDraft } from '../components/PlaceEditor';
 import { RangePicker, defaultRange } from '../components/RangePicker';
 import { STATUS } from '../theme';
-import { dateTime, duration, km, vehicleName } from '../utils/format';
+import { ago, dateTime, duration, km, vehicleName } from '../utils/format';
 import { toMapPlace } from '../utils/places';
 import { ALL_VEHICLES, inGroup, toMapVehicle } from './vehicles';
 import classes from './WorkspacePage.module.css';
@@ -44,10 +46,25 @@ const RIBBON: { key: Panel; label: string; icon: typeof IconCar; permission: str
 export function WorkspacePage() {
   const mapRef = useRef<FleetMapHandle>(null);
   const can = useCan();
+  const navigate = useNavigate();
   const ribbon = RIBBON.filter((r) => can(r.permission));
   const [panel, setPanel] = useState<Panel | null>(() => ribbon.find((r) => r.key === 'trips')?.key ?? ribbon[0]?.key ?? null);
   const canHistory = can('history.view');
   const [maximized, setMaximized] = useState(false);
+  // Panel height: drag the handle on its top edge; remembered per browser
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [dockHeight, setDockHeight] = useLocalStorage({ key: 'vt-dock-height', defaultValue: 360 });
+  const startResize = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const start = dockHeight;
+    const max = (rootRef.current?.clientHeight ?? 800) - 90;
+    setMaximized(false);
+    const move = (ev: PointerEvent) => setDockHeight(Math.round(Math.min(max, Math.max(180, start + (startY - ev.clientY)))));
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
   const [range, setRange] = useState<Range>(defaultRange);
   const [group, setGroup] = useState(ALL_VEHICLES);
   const [search, setSearch] = useState('');
@@ -67,8 +84,16 @@ export function WorkspacePage() {
   const trips = useTrips(range, focus, canHistory);
   const events = useEvents(range, focus, eventCodes, canHistory);
 
-  const listed = useMemo(() => vehicles.filter((v) => inGroup(v, group) &&
-    (!search || `${vehicleName(v)} ${v.imei}`.toLowerCase().includes(search.toLowerCase()))), [vehicles, group, search]);
+  const listed = useMemo(() => vehicles.filter((v) => inGroup(v, group) && (!search ||
+    [vehicleName(v), v.imei, detail(v, 'registration'), detail(v, 'driver')].join(' ').toLowerCase().includes(search.toLowerCase()))),
+  [vehicles, group, search]);
+  const fleet = useFleetStatus(panel === 'vehicles');
+  const statusByImei = useMemo(() => new Map((fleet.data ?? []).map((r) => [r.imei, r])), [fleet.data]);
+  const groupCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    vehicles.forEach((v) => v.category_name && m.set(v.category_name, (m.get(v.category_name) ?? 0) + 1));
+    return m;
+  }, [vehicles]);
 
   // ── map layers from plotted state ──
   const mapVehicles = useMemo(() => vehicles.filter((v) => plottedVehicles.has(v.imei)).map(toMapVehicle)
@@ -215,14 +240,51 @@ export function WorkspacePage() {
         </Tooltip>) }] : []),
   ];
 
-  const focusName = focus ? vehicleName(vehicles.find((v) => v.imei === focus) ?? { imei: focus }) : null;
+  // Vehicle grid: actions, then the columns of the Vehicles view (more via the gear)
+  type Row = Vehicle & { st?: FleetStatusRow };
+  const vehicleRows: Row[] = listed.map((v) => ({ ...v, st: statusByImei.get(v.imei) }));
+  const staleAfterMs = 24 * 3600 * 1000;
+  const vehicleCols: ColDef<Row>[] = [
+    { colId: 'actions', headerName: '', width: 150, minWidth: 150, sortable: false, filter: false, pinned: 'left', lockPosition: 'left',
+      cellRenderer: (p: ICellRendererParams<Row>) => p.data && (
+        <Group gap={2} wrap="nowrap">
+          {PlotCell(plottedVehicles.has(p.data.imei), () => toggleVehicle(p.data!.imei), 'vehicle')}
+          <Tooltip label="Details" withinPortal><ActionIcon size="sm" variant="subtle" color="gray" aria-label="Vehicle details"
+            onClick={() => openDetails(p.data!.imei)}><IconInfoCircle size={15} /></ActionIcon></Tooltip>
+          {can('vehicles.manage') && <Tooltip label="Edit vehicle" withinPortal><ActionIcon size="sm" variant="subtle" color="gray" aria-label="Edit vehicle"
+            onClick={() => navigate(`/configuration/devices?edit=${p.data!.id}`)}><IconPencil size={15} /></ActionIcon></Tooltip>}
+          {canPlaces && p.data.latitude && p.data.longitude && <Tooltip label="Draw place at this vehicle" withinPortal>
+            <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Draw place at this vehicle"
+              onClick={() => startPlace(parseFloat(p.data!.latitude!), parseFloat(p.data!.longitude!), p.data!.imei, `${vehicleName(p.data!)} location`)}>
+              <IconMapPinPlus size={15} /></ActionIcon></Tooltip>}
+        </Group>) },
+    { colId: 'state', headerName: '', width: 40, minWidth: 40, sortable: false, filter: false,
+      cellRenderer: (p: ICellRendererParams<Row>) => p.data && <span className={classes.dot} style={{ background: STATUS[p.data.activity_status] }} title={p.data.activity_status} /> },
+    { colId: 'description', headerName: 'Description', valueGetter: (p) => p.data && vehicleName(p.data), flex: 1, minWidth: 160, sort: 'asc' },
+    { colId: 'registration', headerName: 'Registration', valueGetter: (p) => p.data && (detail(p.data, 'registration') || '—'), width: 130 },
+    { colId: 'event', headerName: 'Event Type', valueGetter: (p) => p.data?.st?.event ?? '—', width: 160 },
+    { colId: 'timestamp', headerName: 'Timestamp', valueGetter: (p) => p.data?.st?.recorded_at ?? p.data?.last_seen ?? null, width: 130,
+      valueFormatter: (p) => ago(p.value), tooltipValueGetter: (p) => dateTime(p.value),
+      cellStyle: (p) => (p.value && Date.now() - new Date(p.value).getTime() > staleAfterMs ? { color: 'var(--mantine-color-red-5)' } : null) },
+    { colId: 'speed', headerName: 'Speed', valueGetter: (p) => p.data?.st?.speed ?? null, width: 100, type: 'numericColumn',
+      valueFormatter: (p) => (p.value == null ? '—' : `${p.value} km/h`) },
+    { colId: 'position', headerName: 'Last position', flex: 1.4, minWidth: 200, tooltipValueGetter: (p) => p.value,
+      valueGetter: (p) => p.data?.st?.address ?? (p.data?.latitude ? `${parseFloat(p.data.latitude).toFixed(5)}, ${parseFloat(p.data.longitude!).toFixed(5)}` : '—') },
+    { colId: 'odometer', headerName: 'Odometer', valueGetter: (p) => p.data?.st?.odometer_km ?? null, width: 120, type: 'numericColumn',
+      valueFormatter: (p) => (p.value == null ? '—' : `${p.value.toLocaleString()} km`) },
+    { colId: 'ignition', headerName: 'Ignition', hide: true, valueGetter: (p) => (p.data?.st?.ignition == null ? '—' : p.data.st.ignition ? 'On' : 'Off'), width: 100 },
+    { colId: 'driver', headerName: 'Driver', valueGetter: (p) => p.data && (detail(p.data, 'driver') || '—'), width: 140 },
+    { colId: 'group', headerName: 'Vehicle group', hide: true, field: 'category_name', valueFormatter: (p) => p.value || '—', width: 150 },
+    { colId: 'imei', headerName: 'IMEI', hide: true, field: 'imei', width: 170 },
+  ];
+  const vehicleOptions = [{ value: '', label: 'All vehicles' }, ...vehicles.map((v) => ({ value: v.imei, label: vehicleName(v) }))];
 
   return (
-    <div className={classes.root}>
+    <div className={classes.root} ref={rootRef}>
       <FleetMap ref={mapRef} vehicles={mapVehicles} routes={[...routes, ...draft.routes]} points={[...points, ...draft.points]}
                 places={mapPlaces} actions={mapActions}
                 onMapClick={placeDraft ? (lat, lng) => setPlaceDraft((d) => d && clickDraft(d, lat, lng)) : undefined}
-                fitPadding={{ top: 80, left: 60, right: placeDraft ? 400 : panelRight + 48, bottom: panel ? (maximized ? 60 : 380) : 60 }} />
+                fitPadding={{ top: 80, left: 60, right: placeDraft ? 400 : panelRight + 48, bottom: panel ? (maximized ? 60 : dockHeight + 24) : 60 }} />
 
       {detailsVehicle && (
         <VehiclePanel vehicle={detailsVehicle} collapsed={detailsCollapsed} onCollapse={setDetailsCollapsed}
@@ -263,61 +325,39 @@ export function WorkspacePage() {
       </Paper>
 
       {panel && (
-        <Paper className={`${classes.dock} ${maximized ? classes.dockMax : ''}`} shadow="xl" style={{ right: panelRight }}>
-          <div className={classes.vehicles}>
-            <Group justify="space-between" mb="xs">
-              <Group gap={6}><IconCar size={18} /><Text fw={650}>Vehicles</Text></Group>
-              <Text size="xs" c="dimmed">{listed.length}</Text>
-            </Group>
-            <TextInput size="xs" placeholder="Search name or IMEI" leftSection={<IconSearch size={14} />} value={search}
-                       onChange={(e) => setSearch(e.currentTarget.value)} mb={6} />
-            <Select size="xs" value={group} onChange={(v) => setGroup(v ?? ALL_VEHICLES)} allowDeselect={false} mb="xs" aria-label="Vehicle group"
-                    data={[{ value: ALL_VEHICLES, label: `All vehicles (${vehicles.length})` }, ...categories.map((c) => ({ value: c.name, label: c.name }))]} />
-            <ScrollArea className={classes.vehicleList} type="auto">
-              <UnstyledButton className={`${classes.vehicleRow} ${!focus ? classes.focused : ''}`} onClick={() => setFocus(null)}>
-                <Text size="sm" fw={500}>All vehicles</Text>
-              </UnstyledButton>
-              {listed.map((v) => (
-                <div key={v.imei} className={`${classes.vehicleRow} ${focus === v.imei ? classes.focused : ''}`}
-                     onClick={() => setFocus(focus === v.imei ? null : v.imei)} role="button" tabIndex={0}
-                     onKeyDown={(e) => e.key === 'Enter' && setFocus(v.imei)}>
-                  <Checkbox size="xs" checked={plottedVehicles.has(v.imei)} aria-label="Plot vehicle"
-                            onClick={(e) => e.stopPropagation()} onChange={() => toggleVehicle(v.imei)} />
-                  <span className={classes.dot} style={{ background: STATUS[v.activity_status] }} title={v.activity_status} />
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <Text size="sm" fw={500} truncate>{vehicleName(v)}</Text>
-                    <Text size="xs" c="dimmed" truncate>{detail(v, 'registration') || v.imei}</Text>
-                  </div>
-                  <Tooltip label="Details" withinPortal>
-                    <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Vehicle details"
-                                onClick={(e) => { e.stopPropagation(); openDetails(v.imei); }}>
-                      <IconInfoCircle size={15} />
-                    </ActionIcon>
-                  </Tooltip>
-                  {canPlaces && v.latitude && v.longitude && (
-                    <Tooltip label="Draw place at this vehicle" withinPortal>
-                      <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Draw place at this vehicle"
-                                  onClick={(e) => { e.stopPropagation(); startPlace(parseFloat(v.latitude!), parseFloat(v.longitude!), v.imei, `${vehicleName(v)} location`); }}>
-                        <IconMapPinPlus size={15} />
-                      </ActionIcon>
-                    </Tooltip>
-                  )}
-                </div>
-              ))}
-            </ScrollArea>
+        <Paper className={`${classes.dock} ${maximized ? classes.dockMax : ''}`} shadow="xl"
+               style={{ right: panelRight, height: maximized ? undefined : dockHeight }}>
+          <div className={classes.resize} onPointerDown={startResize} onDoubleClick={() => setMaximized((m) => !m)}
+               role="separator" aria-orientation="horizontal" aria-label="Drag to resize the panel" title="Drag to resize · double-click to maximise">
+            <span />
           </div>
-
           <div className={classes.content}>
-            <Group justify="space-between" mb="sm" wrap="nowrap">
-              <Group gap="sm" wrap="nowrap">
+            <Group justify="space-between" mb="sm" wrap="nowrap" gap="sm">
+              <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
                 <Text fw={650} size="lg">{RIBBON.find((r) => r.key === panel)?.label}</Text>
-                {focusName && panel !== 'places' && panel !== 'vehicles' &&
-                  <Badge variant="light" rightSection={<CloseButton size="xs" onClick={() => setFocus(null)} aria-label="Clear vehicle filter" />}>{focusName}</Badge>}
+                {panel === 'vehicles' && <>
+                  <TextInput size="xs" w={240} placeholder="Search vehicle, registration, driver" leftSection={<IconSearch size={14} />}
+                             value={search} onChange={(e) => setSearch(e.currentTarget.value)} aria-label="Search vehicles" />
+                  <Select size="xs" w={220} value={group} onChange={(v) => setGroup(v ?? ALL_VEHICLES)} allowDeselect={false} searchable
+                          aria-label="Vehicle group" leftSection={<IconCar size={14} />}
+                          data={[{ value: ALL_VEHICLES, label: `All vehicles (${vehicles.length})` },
+                                 ...categories.map((c) => ({ value: c.name, label: `${c.name} (${groupCounts.get(c.name) ?? 0})` }))]} />
+                  <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>{listed.length} shown</Text>
+                </>}
+                {(panel === 'trips' || panel === 'events') && (
+                  <Select size="xs" w={220} value={focus ?? ''} onChange={(v) => setFocus(v || null)} searchable allowDeselect={false}
+                          aria-label="Vehicle" leftSection={<IconCar size={14} />} data={vehicleOptions} />
+                )}
               </Group>
               <Group gap="xs" wrap="nowrap">
+                {panel === 'vehicles' && <>
+                  <Button size="xs" variant="light" onClick={() => setPlottedVehicles(new Set(listed.map((v) => v.imei)))} disabled={!listed.length}>
+                    Plot {listed.length === vehicles.length ? 'all' : `${listed.length} listed`}</Button>
+                  <Button size="xs" variant="subtle" color="gray" onClick={() => setPlottedVehicles(new Set())} disabled={!plottedVehicles.size}>Unplot</Button>
+                </>}
                 {(panel === 'trips' || panel === 'events') && <RangePicker value={range} onChange={setRange} />}
                 {panel === 'events' && (
-                  <MultiSelect size="sm" placeholder={eventCodes.length ? '' : 'All event types'} w={260} clearable searchable maxValues={12}
+                  <MultiSelect size="xs" placeholder={eventCodes.length ? '' : 'All event types'} w={240} clearable searchable maxValues={12}
                                value={eventCodes} onChange={setEventCodes} aria-label="Event types"
                                data={(eventTypes?.events ?? []).map((e) => ({ value: e.code, label: e.label }))} />
                 )}
@@ -328,6 +368,13 @@ export function WorkspacePage() {
               </Group>
             </Group>
 
+            {panel === 'vehicles' && (
+              <DataGrid rowData={vehicleRows} columnDefs={vehicleCols} loading={fleet.isLoading && !vehicles.length} stateKey="workspace-vehicles"
+                        tooltipShowDelay={400} getRowId={(p) => p.data.imei}
+                        rowClassRules={{ [classes.focusedRow]: (p) => p.data?.imei === focus }}
+                        onRowClicked={(e) => e.data && setFocus(e.data.imei)}
+                        onRowDoubleClicked={(e) => e.data && toggleVehicle(e.data.imei)} />
+            )}
             {panel === 'trips' && (
               <DataGrid rowData={trips.data ?? []} columnDefs={tripCols} loading={trips.isFetching} stateKey="workspace-trips" tooltipShowDelay={400}
                         getRowId={(p) => p.data.id} onRowDoubleClicked={(e) => e.data && toggleTrip(e.data)} />
@@ -335,15 +382,6 @@ export function WorkspacePage() {
             {panel === 'events' && (
               <DataGrid rowData={events.data ?? []} columnDefs={eventCols} loading={events.isFetching} stateKey="workspace-events"
                         getRowId={(p) => String(p.data.id)} onRowDoubleClicked={(e) => e.data && toggleEvent(e.data)} />
-            )}
-            {panel === 'vehicles' && (
-              <Stack gap="xs">
-                <Text size="sm" c="dimmed">Tick vehicles on the left to plot their live position; click a vehicle to filter Trips and Events.</Text>
-                <Group>
-                  <Button size="xs" variant="light" onClick={() => setPlottedVehicles(new Set(listed.map((v) => v.imei)))}>Plot all listed</Button>
-                  <Button size="xs" variant="subtle" color="gray" onClick={() => setPlottedVehicles(new Set())}>Unplot vehicles</Button>
-                </Group>
-              </Stack>
             )}
             {panel === 'places' && (
               <ScrollArea h="100%">

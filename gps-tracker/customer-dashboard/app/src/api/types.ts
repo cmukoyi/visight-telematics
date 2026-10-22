@@ -320,3 +320,8 @@ export interface NotificationPrefs {
   alerts_enabled: boolean; notify_geofence_exit: boolean; notify_battery_low: boolean; notify_offline: boolean;
   notify_via_email: boolean; notification_emails: string[] | null;
 }
+
+export interface FleetStatusRow {
+  imei: string; event: string; recorded_at: string; speed: number; ignition: boolean | null;
+  odometer_km: number | null; address: string | null;
+}

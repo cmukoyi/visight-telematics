@@ -112,3 +112,23 @@ def fill_trip_addresses(db: Session, limit: int = 25) -> int:
         db.commit()
         filled += trip.start_address is not None
     return filled
+
+
+def fill_vehicle_addresses(db: Session, limit: int = 20) -> int:
+    """Cache street addresses for vehicles' current positions (for the Workspace vehicle grid). Commits."""
+    from app.models import BLETag
+    tags = db.query(BLETag.latitude, BLETag.longitude).filter(BLETag.latitude.isnot(None), BLETag.is_active == True).all()  # noqa: E712
+    done = 0
+    for lat_s, lng_s in tags:
+        try:
+            lat, lng = float(lat_s), float(lng_s)
+        except (TypeError, ValueError):
+            continue
+        if db.get(GeocodeCache, (round(lat * 10000), round(lng * 10000))):
+            continue
+        if lookup(db, lat, lng) is not None:
+            db.commit()
+            done += 1
+        if done >= limit:
+            break
+    return done
