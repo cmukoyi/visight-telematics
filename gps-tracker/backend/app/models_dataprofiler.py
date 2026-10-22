@@ -177,6 +177,8 @@ class Trip(Base):
     start_longitude  = Column(Float, nullable=True)
     end_latitude     = Column(Float, nullable=True)
     end_longitude    = Column(Float, nullable=True)
+    start_address    = Column(String(255), nullable=True)   # reverse geocoded (address_service)
+    end_address      = Column(String(255), nullable=True)
     start_odometer_m = Column(BigInteger, nullable=True)
     end_odometer_m   = Column(BigInteger, nullable=True)
     distance_m       = Column(Integer, nullable=False, default=0)
@@ -228,3 +230,13 @@ class ReportSchedule(Base):
     last_status    = Column(String(255), nullable=True)
     created_at     = Column(DateTime(timezone=True), server_default=func.now())
     updated_at     = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class GeocodeCache(Base):
+    """Street addresses by position, rounded to 4 decimals (~11 m), so each spot is looked up once."""
+    __tablename__ = "geocode_cache"
+
+    lat_e4     = Column(Integer, primary_key=True)
+    lng_e4     = Column(Integer, primary_key=True)
+    address    = Column(String(255), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -40,7 +40,7 @@ interface Props {
 
 const OSM_FALLBACK: StyleSpecification = {
   version: 8,
-  sources: { osm: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256,
+  sources: { osm: { type: 'raster', tiles: ['a', 'b', 'c'].map((s) => `https://${s}.tile.openstreetmap.org/{z}/{x}/{y}.png`), tileSize: 256,
     attribution: '© OpenStreetMap contributors' } },
   layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
 };

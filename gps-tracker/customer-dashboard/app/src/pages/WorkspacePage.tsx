@@ -152,16 +152,23 @@ export function WorkspacePage() {
     </Tooltip>
   );
 
+  // Columns as in the Journeys view; the gear (top-left) shows/hides them and headers can be dragged to reorder
   const tripCols: ColDef<Trip>[] = [
-    { headerName: '', width: 54, minWidth: 54, sortable: false, filter: false, pinned: 'left',
+    { colId: 'plot', headerName: '', width: 54, minWidth: 54, sortable: false, filter: false, pinned: 'left', suppressMovable: true,
+      lockPosition: 'left',
       cellRenderer: (p: ICellRendererParams<Trip>) => p.data && PlotCell(plottedTrips.has(p.data.id), () => toggleTrip(p.data!), 'trip') },
-    { headerName: 'Vehicle', valueGetter: (p) => p.data?.device_name ?? p.data?.imei, flex: 1, minWidth: 140 },
-    { headerName: 'Start time', field: 'started_at', valueFormatter: (p) => dateTime(p.value), sort: 'desc', flex: 1, minWidth: 165 },
-    { headerName: 'End time', field: 'ended_at', valueFormatter: (p) => (p.data?.status === 'open' ? 'In progress' : dateTime(p.value)), flex: 1, minWidth: 165 },
-    { headerName: 'Duration', field: 'duration_s', valueFormatter: (p) => duration(p.value), width: 110 },
-    { headerName: 'Distance', field: 'distance_m', valueFormatter: (p) => km(p.value), width: 110, type: 'numericColumn' },
-    { headerName: 'Max speed', field: 'max_speed', valueFormatter: (p) => `${p.value} km/h`, width: 115, type: 'numericColumn' },
-    { headerName: 'Driving events', width: 210, filter: false,
+    { colId: 'vehicle', headerName: 'Vehicle', valueGetter: (p) => p.data?.device_name ?? p.data?.imei, flex: 1, minWidth: 150 },
+    { colId: 'duration', headerName: 'Duration', field: 'duration_s', valueFormatter: (p) => duration(p.value), width: 110, type: 'numericColumn' },
+    { colId: 'distance', headerName: 'Distance', field: 'distance_m', valueFormatter: (p) => km(p.value), width: 110, type: 'numericColumn' },
+    { colId: 'start_location', headerName: 'Start Location', valueGetter: (p) => p.data?.start_address ?? (p.data?.start ? 'Looking up address…' : '—'),
+      flex: 1.4, minWidth: 200, tooltipValueGetter: (p) => p.data?.start_address },
+    { colId: 'start_time', headerName: 'Start Time', field: 'started_at', valueFormatter: (p) => dateTime(p.value), sort: 'desc', width: 165 },
+    { colId: 'end_location', headerName: 'End Location', flex: 1.4, minWidth: 200, tooltipValueGetter: (p) => p.data?.end_address,
+      valueGetter: (p) => (p.data?.status === 'open' ? 'In progress' : p.data?.end_address ?? (p.data?.end ? 'Looking up address…' : '—')) },
+    { colId: 'end_time', headerName: 'End Time', field: 'ended_at', valueFormatter: (p) => (p.data?.status === 'open' ? 'In progress' : dateTime(p.value)), width: 165 },
+    { colId: 'driver', headerName: 'Driver', field: 'driver', valueFormatter: (p) => p.value || '—', width: 150 },
+    { colId: 'max_speed', headerName: 'Max speed', field: 'max_speed', valueFormatter: (p) => `${p.value} km/h`, width: 115, type: 'numericColumn' },
+    { colId: 'driving_events', headerName: 'Driving events', width: 190, filter: false,
       valueGetter: (p) => (p.data ? p.data.speeding_count + p.data.harsh_braking_count + p.data.harsh_acceleration_count + p.data.harsh_cornering_count : 0),
       cellRenderer: (p: ICellRendererParams<Trip>) => p.data && (
         <Group gap={4} h="100%" wrap="nowrap">
@@ -173,7 +180,7 @@ export function WorkspacePage() {
   ];
 
   const eventCols: ColDef<DeviceEvent>[] = [
-    { headerName: '', width: 54, minWidth: 54, sortable: false, filter: false, pinned: 'left',
+    { colId: 'plot', headerName: '', width: 54, minWidth: 54, sortable: false, filter: false, pinned: 'left', lockPosition: 'left',
       cellRenderer: (p: ICellRendererParams<DeviceEvent>) => p.data && PlotCell(plottedEvents.has(p.data.id), () => toggleEvent(p.data!), 'event') },
     { headerName: 'Vehicle', field: 'device_name', flex: 1, minWidth: 140 },
     { headerName: 'Event', field: 'label', flex: 1, minWidth: 160,
@@ -295,11 +302,11 @@ export function WorkspacePage() {
             </Group>
 
             {panel === 'trips' && (
-              <DataGrid rowData={trips.data ?? []} columnDefs={tripCols} loading={trips.isFetching}
+              <DataGrid rowData={trips.data ?? []} columnDefs={tripCols} loading={trips.isFetching} stateKey="workspace-trips" tooltipShowDelay={400}
                         getRowId={(p) => p.data.id} onRowDoubleClicked={(e) => e.data && toggleTrip(e.data)} />
             )}
             {panel === 'events' && (
-              <DataGrid rowData={events.data ?? []} columnDefs={eventCols} loading={events.isFetching}
+              <DataGrid rowData={events.data ?? []} columnDefs={eventCols} loading={events.isFetching} stateKey="workspace-events"
                         getRowId={(p) => String(p.data.id)} onRowDoubleClicked={(e) => e.data && toggleEvent(e.data)} />
             )}
             {panel === 'vehicles' && (

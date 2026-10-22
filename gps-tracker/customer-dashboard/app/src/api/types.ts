@@ -53,6 +53,9 @@ export interface Trip {
   id: string;
   imei: string;
   device_name: string | null;
+  driver: string | null;
+  start_address: string | null;
+  end_address: string | null;
   status: 'open' | 'closed';
   start_reason: string;
   close_reason: string | null;

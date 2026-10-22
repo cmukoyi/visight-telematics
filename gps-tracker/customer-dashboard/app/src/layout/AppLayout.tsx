@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink as RouterLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
-  ActionIcon, AppShell, Avatar, Badge, Burger, Group, Menu, NavLink, Stack, Text, Title, Tooltip,
+  ActionIcon, AppShell, Avatar, Badge, Burger, Group, Indicator, Menu, NavLink, Stack, Text, Title, Tooltip,
   useMantineColorScheme, useComputedColorScheme,
 } from '@mantine/core';
 import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import {
-  IconAdjustmentsHorizontal, IconChartBar, IconExternalLink, IconInbox, IconLayoutDashboard, IconLogout,
+  IconAdjustmentsHorizontal, IconBell, IconChartBar, IconExternalLink, IconInbox, IconLayoutDashboard, IconLogout,
   IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconMapRoute, IconMoon, IconSearch, IconSun,
 } from '@tabler/icons-react';
 import dayjs from 'dayjs';
@@ -112,6 +112,16 @@ export function AppLayout() {
             <Title order={4} fw={650}>{title}</Title>
           </Group>
           <Group gap="xs" wrap="nowrap">
+            {nav.some((n) => n.to === '/inbox') && (
+              <Tooltip label={unread ? `${unread} unread notification${unread === 1 ? '' : 's'}` : 'No unread notifications'}>
+                <Indicator label={unread && unread > 99 ? '99+' : unread} size={18} color="red" offset={4} disabled={!unread}>
+                  <ActionIcon variant="default" size="lg" aria-label="Notifications"
+                              onClick={() => navigate('/inbox?status=unread')}>
+                    <IconBell size={18} />
+                  </ActionIcon>
+                </Indicator>
+              </Tooltip>
+            )}
             <Tooltip label={scheme === 'dark' ? 'Light mode' : 'Dark mode'}>
               <ActionIcon variant="default" size="lg" aria-label="Toggle colour scheme"
                           onClick={() => setColorScheme(scheme === 'dark' ? 'light' : 'dark')}>

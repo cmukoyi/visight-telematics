@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Anchor, Box, Breadcrumbs, Button, ColorInput, FileButton, Group, Paper, Select, SimpleGrid, Stack, Text, Title,
 } from '@mantine/core';
@@ -60,6 +60,10 @@ export function UserGroupPage() {
   const [form, setForm] = useState<GroupTheme | null>(null);
   const [saving, setSaving] = useState(false);
   useEffect(() => { if (theme && !form) setForm(theme); }, [theme, form]);
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (form && hash) document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [form !== null, hash]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const zones = useMemo(() => {
     let list: string[] = [];
@@ -136,7 +140,7 @@ export function UserGroupPage() {
         </SimpleGrid>
       </Paper>
 
-      <Paper withBorder p="lg">
+      <Paper withBorder p="lg" id="timezone">
         <Text fw={650} mb="md">Timezone</Text>
         <Select searchable clearable maw={420} data={zones} value={form.timezone} placeholder="Each user's own device timezone"
                 description="Used to show times across the platform, for report periods and as the default for scheduled reports."

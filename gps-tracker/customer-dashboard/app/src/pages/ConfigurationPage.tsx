@@ -8,7 +8,7 @@ import { useForm } from '@mantine/form';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import {
-  IconArrowUpRight, IconBell, IconCar, IconCategory, IconKey, IconMapPin, IconPencil, IconPlugConnected,
+  IconArrowUpRight, IconCar, IconKey, IconUsers, IconMapPin, IconPencil, IconPlugConnected,
   IconTrash, IconPlus, IconShieldLock, IconBuilding, IconDots, IconBellRinging, IconChevronRight,
 } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -26,19 +26,34 @@ import { PlacesPage } from './PlacesPage';
 import { SecurityPage } from './SecurityPage';
 import { UserGroupPage } from './UserGroupPage';
 
-// `any`: shown when the user's role has at least one of these permissions (empty = everyone)
-interface Tile { title: string; description: string; icon: typeof IconCar; to?: string; classic?: string; any: string[] }
+// Configuration sections, each a tile with its sub-menu. `any`: shown when the role has one of these permissions.
+interface MenuItem { label: string; to?: string; classic?: string; any: string[] }
+interface Section { title: string; icon: typeof IconCar; items: MenuItem[] }
 
-const TILES: Tile[] = [
-  { title: 'Vehicles & devices', description: 'Names, groups and packages of your tracking units', icon: IconCar, to: 'devices', any: [] },
-  { title: 'Vehicle groups', description: 'Group vehicles and choose which security group sees them', icon: IconCategory, to: 'groups', any: ['vehicles.manage'] },
-  { title: 'Places', description: 'Geofences — depots, sites and no-go zones with entry and exit alerts', icon: IconMapPin, to: 'places', any: ['places.view', 'places.manage'] },
-  { title: 'Security', description: 'Users, security groups, roles and permissions', icon: IconShieldLock, to: 'security', any: ['users.manage', 'security.manage'] },
-  { title: 'User Group', description: 'Theme colours, platform and report logos, timezone', icon: IconBuilding, to: 'user-group', any: ['settings.manage'] },
-  { title: 'Data Exchange', description: 'Link the exchange that routes your devices to this account', icon: IconPlugConnected, to: 'exchange', any: ['settings.manage'] },
-  { title: 'Misc', description: 'Notification rules and other tools', icon: IconDots, to: 'misc', any: ['inbox.view', 'rules.manage'] },
-  { title: 'Notifications', description: 'Alert email and SMS preferences', icon: IconBell, classic: 'settings', any: ['settings.manage'] },
-  { title: 'My account', description: 'Change your password', icon: IconKey, to: 'account', any: [] },
+const SECTIONS: Section[] = [
+  { title: 'Users', icon: IconUsers, items: [
+    { label: 'Users', to: 'security?tab=users', any: ['users.manage'] },
+    { label: 'Security Groups', to: 'security?tab=groups', any: ['users.manage', 'security.manage'] },
+    { label: 'Roles & Permissions', to: 'security?tab=roles', any: ['users.manage', 'security.manage'] },
+    { label: 'My Account', to: 'account', any: [] },
+  ] },
+  { title: 'Vehicles', icon: IconCar, items: [
+    { label: 'Vehicles & Devices', to: 'devices', any: [] },
+    { label: 'Vehicle Groups', to: 'groups', any: ['vehicles.manage'] },
+    { label: 'Data Exchange', to: 'exchange', any: ['settings.manage'] },
+  ] },
+  { title: 'Places', icon: IconMapPin, items: [
+    { label: 'Places', to: 'places', any: ['places.view', 'places.manage'] },
+    { label: 'Geofence Alerts', to: 'misc/notification-rules', any: ['inbox.view', 'rules.manage'] },
+  ] },
+  { title: 'User Group', icon: IconBuilding, items: [
+    { label: 'Theme & Logos', to: 'user-group', any: ['settings.manage'] },
+    { label: 'Timezone', to: 'user-group#timezone', any: ['settings.manage'] },
+    { label: 'Notification Preferences', classic: 'settings', any: ['settings.manage'] },
+  ] },
+  { title: 'Misc', icon: IconDots, items: [
+    { label: 'Notification Rules', to: 'misc/notification-rules', any: ['inbox.view', 'rules.manage'] },
+  ] },
 ];
 
 const classicUrl = (tab: string) => `/customer/classic/#tab=${tab}`;
@@ -58,20 +73,28 @@ function Header({ title }: { title: string }) {
 function Tiles() {
   const navigate = useNavigate();
   const can = useCan();
+  const allowed = (i: MenuItem) => i.any.length === 0 || i.any.some(can);
+  const sections = SECTIONS.map((sec) => ({ ...sec, items: sec.items.filter(allowed) })).filter((sec) => sec.items.length);
   return (
     <Stack p="lg" gap="lg">
       <Title order={2}>Configuration</Title>
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 3, xl: 4 }} spacing="md">
-        {TILES.filter((t) => t.any.length === 0 || t.any.some(can)).map((t) => (
-          <UnstyledButton key={t.title} className={classes.tile}
-                          onClick={() => (t.to ? navigate(t.to) : window.open(classicUrl(t.classic!), '_self'))}>
-            <Group justify="space-between" align="flex-start" wrap="nowrap">
-              <ThemeIcon size={44} radius="md" variant="light"><t.icon size={24} /></ThemeIcon>
-              {t.classic && <Badge size="xs" variant="outline" color="gray" rightSection={<IconArrowUpRight size={10} />}>Classic</Badge>}
+        {sections.map((sec) => (
+          <Paper key={sec.title} className={classes.tile}>
+            <Group gap="md" wrap="nowrap" mb="md">
+              <sec.icon size={34} stroke={1.3} className={classes.tileIcon} />
+              <Text className={classes.tileTitle}>{sec.title}</Text>
             </Group>
-            <Text fw={650} mt="md">{t.title}</Text>
-            <Text size="sm" c="dimmed" mt={4}>{t.description}</Text>
-          </UnstyledButton>
+            <Stack gap={2} className={classes.links}>
+              {sec.items.map((i) => (
+                <UnstyledButton key={i.label} className={classes.link}
+                                onClick={() => (i.to ? navigate(i.to) : window.open(classicUrl(i.classic!), '_self'))}>
+                  {i.label}
+                  {i.classic && <IconArrowUpRight size={13} className={classes.ext} />}
+                </UnstyledButton>
+              ))}
+            </Stack>
+          </Paper>
         ))}
       </SimpleGrid>
     </Stack>

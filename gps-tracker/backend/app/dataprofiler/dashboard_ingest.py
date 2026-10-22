@@ -31,7 +31,7 @@ from app.dataprofiler.decoder import DELIVER_EXCHANGE, exchange_queue
 from app.models import BLETag, DevicePosition
 from app.models_admin import TagPackage
 from app.models_dataprofiler import DeviceEvent
-from app.services import geofence_engine, trip_builder
+from app.services import address_service, geofence_engine, trip_builder
 
 logger = logging.getLogger("dataprofiler.dashboard_ingest")
 
@@ -123,6 +123,26 @@ async def trip_builder_loop() -> None:
         await asyncio.sleep(TRIP_BUILD_INTERVAL_S)
 
 
+ADDRESS_INTERVAL_S = 20
+
+
+def _fill_addresses() -> int:
+    with SessionLocal() as db:
+        return address_service.fill_trip_addresses(db)
+
+
+async def address_loop() -> None:
+    """Street addresses for trip start and end points (reverse geocoding)."""
+    while True:
+        try:
+            n = await asyncio.to_thread(_fill_addresses)
+            if n:
+                logger.info("Trip addresses: %d trips updated", n)
+        except Exception:
+            logger.exception("Trip address cycle failed")
+        await asyncio.sleep(ADDRESS_INTERVAL_S)
+
+
 def _linked_exchange_keys() -> set[str]:
     with SessionLocal() as db:
         return set(db.execute(text(
@@ -155,6 +175,7 @@ async def main() -> None:
 
     consuming: set[str] = set()
     trip_task = asyncio.create_task(trip_builder_loop())  # keep a reference so it is not garbage-collected
+    address_task = asyncio.create_task(address_loop())  # noqa: F841 (kept for the same reason)
     logger.info("Dashboard ingest started")
     while True:
         try:

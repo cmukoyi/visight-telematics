@@ -2531,9 +2531,11 @@ def list_positions(
 # TRIPS (built by app/services/trip_builder.py from Teltonika events)
 # ==============================================================================
 
-def _trip_out(trip, names: dict) -> dict:
+def _trip_out(trip, names: dict, drivers: Optional[dict] = None) -> dict:
     return {
         "id": str(trip.id), "imei": trip.imei, "device_name": names.get(trip.imei),
+        "driver": (drivers or {}).get(trip.imei),
+        "start_address": trip.start_address or None, "end_address": trip.end_address or None,
         "status": trip.status, "start_reason": trip.start_reason, "close_reason": trip.close_reason,
         "started_at": trip.started_at, "ended_at": trip.ended_at, "last_event_at": trip.last_event_at,
         "start": [trip.start_latitude, trip.start_longitude] if trip.start_latitude is not None else None,
@@ -2544,6 +2546,13 @@ def _trip_out(trip, names: dict) -> dict:
         "harsh_braking_count": trip.harsh_braking_count, "harsh_cornering_count": trip.harsh_cornering_count,
         "idling_count": trip.idling_count,
     }
+
+
+def _group_drivers(db: Session, group_id) -> dict:
+    """{imei: driver name} from the vehicles' details."""
+    tags = db.query(BLETag.imei, BLETag.attributes).filter(
+        BLETag.attributes.op("->>")("_created_usergroup_id") == str(group_id)).all()
+    return {imei: ((a or {}).get("driver") or {}).get("value") for imei, a in tags if ((a or {}).get("driver") or {}).get("value")}
 
 
 def _group_device_names(db: Session, group_id) -> dict:
@@ -2576,7 +2585,8 @@ def list_trips(request: Request, db: Session = Depends(get_db),
         q = q.filter(Trip.started_at < date_to)
     trips = q.order_by(Trip.started_at.desc()).limit(limit).all()
     names = _group_device_names(db, me.usergroup_id)
-    return [_trip_out(t, names) for t in trips]
+    drivers = _group_drivers(db, me.usergroup_id)
+    return [_trip_out(t, names, drivers) for t in trips]
 
 
 @router.get("/trips/{trip_id}")

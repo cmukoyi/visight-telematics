@@ -67,13 +67,14 @@ def _trips_q(db, group_id, imeis, start, end):
 def report_trips(db, group_id, devices, start, end, tz):
     cols = ["Vehicle", "IMEI", "Start", "End", "Duration", "Distance (km)", "Max speed (km/h)",
             "Avg speed (km/h)", "Speeding", "Harsh braking", "Harsh acceleration", "Harsh cornering",
-            "Start position", "End position"]
+            "Start location", "End location", "Start position", "End position"]
     rows = []
     for t in _trips_q(db, group_id, devices, start, end).limit(MAX_ROWS):
         rows.append([devices.get(t.imei, t.imei), t.imei, _local(t.started_at, tz),
                      _local(t.ended_at, tz) if t.ended_at else "in progress", _dur(t.duration_s),
                      round((t.distance_m or 0) / 1000, 2), t.max_speed, t.avg_speed or "",
                      t.speeding_count, t.harsh_braking_count, t.harsh_acceleration_count, t.harsh_cornering_count,
+                     t.start_address or "", t.end_address or "",
                      f"{t.start_latitude:.5f}, {t.start_longitude:.5f}" if t.start_latitude is not None else "",
                      f"{t.end_latitude:.5f}, {t.end_longitude:.5f}" if t.end_latitude is not None else ""])
     return cols, rows

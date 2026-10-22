@@ -32,7 +32,12 @@ export function InboxPage() {
   const [imei, setImei] = useState<string | null>(null);
   const [params] = useSearchParams();
   const [search, setSearch] = useState(params.get('search') ?? '');
-  useEffect(() => { const q = params.get('search'); if (q) setSearch(q); }, [params]);
+  useEffect(() => {
+    const q = params.get('search');
+    if (q) setSearch(q);
+    const st = params.get('status');
+    if (st === 'unread' || st === 'read') setStatus(st);
+  }, [params]);
   const [view, setView] = useState<'grid' | 'map'>('grid');
   const { data: vehicles = [] } = useVehicles();
   const inbox = useInbox({ range, status, type, imei, search });
@@ -52,7 +57,7 @@ export function InboxPage() {
   const unread = alerts.filter((a) => !a.is_read).length;
 
   const cols: ColDef<Alert>[] = [
-    { headerName: '', width: 54, minWidth: 54, sortable: false, filter: false,
+    { colId: 'read', headerName: '', width: 54, minWidth: 54, sortable: false, filter: false, pinned: 'left', lockPosition: 'left',
       cellRenderer: (p: ICellRendererParams<Alert>) => p.data && (
         <Tooltip label={p.data.is_read ? 'Read' : 'Mark as read'} withinPortal>
           <ActionIcon size="sm" variant="subtle" color={p.data.is_read ? 'gray' : 'brand'} disabled={p.data.is_read}
@@ -110,7 +115,7 @@ export function InboxPage() {
 
       <Paper className={classes.body} withBorder>
         {view === 'grid'
-          ? <DataGrid rowData={alerts} columnDefs={cols} loading={inbox.isFetching} getRowId={(p) => p.data.id} tooltipShowDelay={400} />
+          ? <DataGrid rowData={alerts} columnDefs={cols} loading={inbox.isFetching} getRowId={(p) => p.data.id} tooltipShowDelay={400} stateKey="inbox" />
           : <FleetMap points={points} />}
       </Paper>
     </div>
