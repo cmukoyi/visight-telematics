@@ -13,7 +13,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { api, download, qs } from '../api/client';
-import { useCategories, useReports, useSchedules, useVehicles, type Range } from '../api/hooks';
+import { useCan, useCategories, useGroupTheme, useReports, useSchedules, useVehicles, type Range } from '../api/hooks';
 import type { ReportDef, ReportResult, ReportSchedule } from '../api/types';
 import { DataGrid } from '../components/DataGrid';
 import { RangePicker, defaultRange } from '../components/RangePicker';
@@ -21,7 +21,9 @@ import { dateTime, vehicleName } from '../utils/format';
 import classes from './ReportsPage.module.css';
 
 const FAV_KEY = 'vt-report-favourites';
-const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Johannesburg';
+const BROWSER_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Johannesburg';
+/** Reports use the user group's timezone (Configuration → User Group), else the browser's. */
+const useReportTz = () => useGroupTheme().data?.timezone || BROWSER_TZ;
 const FREQ_LABEL = { daily: 'Daily', weekly: 'Weekly (Mondays)', monthly: 'Monthly (1st)' } as const;
 
 function loadFavourites(): string[] {
@@ -29,7 +31,8 @@ function loadFavourites(): string[] {
 }
 
 // ── Run a report ──
-function RunDrawer({ report, onClose, onSchedule }: { report: ReportDef | null; onClose: () => void; onSchedule: (key: string) => void }) {
+function RunDrawer({ report, onClose, onSchedule }: { report: ReportDef | null; onClose: () => void; onSchedule: ((key: string) => void) | null }) {
+  const tz = useReportTz();
   const { data: vehicles = [] } = useVehicles();
   const { data: categories = [] } = useCategories();
   const [range, setRange] = useState<Range>(defaultRange);
@@ -38,7 +41,7 @@ function RunDrawer({ report, onClose, onSchedule }: { report: ReportDef | null; 
   const [result, setResult] = useState<ReportResult | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const params = (format: string) => qs({ date_from: range.from.toISOString(), date_to: range.to.toISOString(), imei, category, format, tz: TZ });
+  const params = (format: string) => qs({ date_from: range.from.toISOString(), date_to: range.to.toISOString(), imei, category, format, tz });
   const run = async () => {
     if (!report) return;
     setLoading(true);
@@ -70,7 +73,7 @@ function RunDrawer({ report, onClose, onSchedule }: { report: ReportDef | null; 
         <Group gap="xs" ml="auto">
           <Button variant="default" leftSection={<IconFileSpreadsheet size={16} />} onClick={() => save('xlsx')}>Excel</Button>
           <Button variant="default" leftSection={<IconDownload size={16} />} onClick={() => save('csv')}>CSV</Button>
-          <Button variant="light" leftSection={<IconCalendarRepeat size={16} />} onClick={() => report && onSchedule(report.key)}>Schedule</Button>
+          {onSchedule && <Button variant="light" leftSection={<IconCalendarRepeat size={16} />} onClick={() => report && onSchedule(report.key)}>Schedule</Button>}
         </Group>
       </Group>
       <Paper withBorder className={classes.result}>
@@ -90,6 +93,7 @@ type ScheduleForm = { report_key: string; name: string; frequency: string; file_
 
 function ScheduleModal({ editing, onClose }: { editing: ReportSchedule | { report_key: string } | null; onClose: () => void }) {
   const qc = useQueryClient();
+  const tz = useReportTz();
   const { data: reports = [] } = useReports();
   const { data: vehicles = [] } = useVehicles();
   const { data: categories = [] } = useCategories();
@@ -107,7 +111,7 @@ function ScheduleModal({ editing, onClose }: { editing: ReportSchedule | { repor
   });
   const submit = form.onSubmit(async (values) => {
     try {
-      const json = { ...values, name: values.name || null, timezone: TZ };
+      const json = { ...values, name: values.name || null, timezone: existing?.timezone ?? tz };
       if (existing) await api(`/api/portal/report-schedules/${existing.id}`, { method: 'PUT', json });
       else await api('/api/portal/report-schedules', { method: 'POST', json });
       qc.invalidateQueries({ queryKey: ['schedules'] });
@@ -124,7 +128,7 @@ function ScheduleModal({ editing, onClose }: { editing: ReportSchedule | { repor
             <Select label="Report" data={reports.map((r) => ({ value: r.key, label: r.title }))} allowDeselect={false} {...form.getInputProps('report_key')} />
             <TextInput label="Name" placeholder="Optional, used as the email subject" {...form.getInputProps('name')} />
             <Select label="Frequency" allowDeselect={false} data={Object.entries(FREQ_LABEL).map(([value, label]) => ({ value, label }))} {...form.getInputProps('frequency')} />
-            <NumberInput label={`Send at (hour, ${TZ})`} min={0} max={23} clampBehavior="strict" {...form.getInputProps('send_hour')} />
+            <NumberInput label={`Send at (hour, ${existing?.timezone ?? tz})`} min={0} max={23} clampBehavior="strict" {...form.getInputProps('send_hour')} />
             <Select label="Vehicle" placeholder="All vehicles" clearable searchable data={vehicles.map((v) => ({ value: v.imei, label: vehicleName(v) }))} {...form.getInputProps('imei')} />
             <Select label="Vehicle group" placeholder="All groups" clearable data={categories.map((c) => c.name)} {...form.getInputProps('category')} />
             <Select label="File format" allowDeselect={false} data={[{ value: 'xlsx', label: 'Excel (.xlsx)' }, { value: 'csv', label: 'CSV' }]} {...form.getInputProps('file_format')} />
@@ -190,6 +194,7 @@ function Scheduled({ onEdit }: { onEdit: (s: ReportSchedule | { report_key: stri
 }
 
 export function ReportsPage() {
+  const canSchedule = useCan()('reports.schedule');
   const { data: reports = [] } = useReports();
   const [tab, setTab] = useState<string | null>('reports');
   const [search, setSearch] = useState('');
@@ -217,12 +222,12 @@ export function ReportsPage() {
     <Stack p="lg" gap="md" className={classes.root}>
       <Group justify="space-between">
         <Title order={2}>Reports</Title>
-        <Button size="xs" leftSection={<IconPlus size={14} />} onClick={() => setScheduling({ report_key: 'trips' })}>Schedule a report</Button>
+        {canSchedule && <Button size="xs" leftSection={<IconPlus size={14} />} onClick={() => setScheduling({ report_key: 'trips' })}>Schedule a report</Button>}
       </Group>
       <Tabs value={tab} onChange={setTab} className={classes.tabs}>
         <Tabs.List mb="md">
           <Tabs.Tab value="reports" leftSection={<IconReportAnalytics size={16} />}>All reports</Tabs.Tab>
-          <Tabs.Tab value="scheduled" leftSection={<IconCalendarRepeat size={16} />}>Scheduled</Tabs.Tab>
+          {canSchedule && <Tabs.Tab value="scheduled" leftSection={<IconCalendarRepeat size={16} />}>Scheduled</Tabs.Tab>}
         </Tabs.List>
 
         <Tabs.Panel value="reports">
@@ -239,7 +244,7 @@ export function ReportsPage() {
                       <Text size="sm" c="dimmed" mt={4} lineClamp={2}>{r.description}</Text>
                     </UnstyledButton>
                     <Group gap={2} className={classes.cardActions}>
-                      <Tooltip label="Schedule"><ActionIcon variant="subtle" color="gray" onClick={() => setScheduling({ report_key: r.key })} aria-label="Schedule"><IconCalendarRepeat size={16} /></ActionIcon></Tooltip>
+                      {canSchedule && <Tooltip label="Schedule"><ActionIcon variant="subtle" color="gray" onClick={() => setScheduling({ report_key: r.key })} aria-label="Schedule"><IconCalendarRepeat size={16} /></ActionIcon></Tooltip>}
                       <Tooltip label={favourites.includes(r.key) ? 'Remove favourite' : 'Add to favourites'}>
                         <ActionIcon variant="subtle" color={favourites.includes(r.key) ? 'yellow' : 'gray'} onClick={() => toggleFav(r.key)} aria-label="Favourite">
                           {favourites.includes(r.key) ? <IconStarFilled size={16} /> : <IconStar size={16} />}
@@ -254,11 +259,12 @@ export function ReportsPage() {
         </Tabs.Panel>
 
         <Tabs.Panel value="scheduled" className={classes.panel}>
-          <Scheduled onEdit={setScheduling} />
+          {canSchedule && <Scheduled onEdit={setScheduling} />}
         </Tabs.Panel>
       </Tabs>
 
-      <RunDrawer report={running} onClose={() => setRunning(null)} onSchedule={(key) => { setRunning(null); setScheduling({ report_key: key }); }} />
+      <RunDrawer report={running} onClose={() => setRunning(null)}
+                 onSchedule={canSchedule ? (key) => { setRunning(null); setScheduling({ report_key: key }); } : null} />
       {scheduling && <ScheduleModal editing={scheduling} onClose={() => setScheduling(null)} />}
     </Stack>
   );

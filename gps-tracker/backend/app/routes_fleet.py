@@ -17,8 +17,9 @@ from app.database import get_db
 from app.dataprofiler.dictionary import CATEGORIES, EVENTS, describe_io, event_label
 from app.models import PortalAlert
 from app.models_dataprofiler import DeviceEvent, ReportSchedule, Trip
-from app.routes_portal import _portal_alert_dict, _user_can_manage, get_portal_user_from_request
-from app.services import reports_service
+from app.models import UserGroup
+from app.routes_portal import _portal_alert_dict, _scope_alerts, get_portal_user_from_request
+from app.services import access_service, reports_service
 
 router = APIRouter(prefix="/api/portal", tags=["portal-fleet"])
 
@@ -40,7 +41,8 @@ def _week_stats(db: Session, group_id, imeis: list, start: datetime, end: dateti
 def dashboard_kpis(request: Request, db: Session = Depends(get_db), category: Optional[str] = None):
     """Trip totals for this week and last week (weeks start Monday, UTC), optionally for one vehicle group."""
     me = get_portal_user_from_request(request, db)
-    imeis = list(reports_service.group_devices(db, me.usergroup_id, category))
+    visible = access_service.for_user(me, db).visible_imeis(db)
+    imeis = list(reports_service.group_devices(db, me.usergroup_id, category, visible))
     today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     this_week = today - timedelta(days=today.weekday())
     last_week = this_week - timedelta(days=7)
@@ -71,7 +73,12 @@ def list_events(request: Request, db: Session = Depends(get_db),
                 limit: int = Query(500, ge=1, le=5000)):
     """Device events, newest first. codes: comma-separated event codes."""
     me = get_portal_user_from_request(request, db)
+    access = access_service.for_user(me, db)
+    access.require("history.view")
     q = db.query(DeviceEvent).filter(DeviceEvent.usergroup_id == me.usergroup_id)
+    visible = access.visible_imeis(db)
+    if visible is not None:
+        q = q.filter(DeviceEvent.imei.in_(list(visible)))
     if imei:
         q = q.filter(DeviceEvent.imei == imei.strip())
     if date_from:
@@ -112,7 +119,8 @@ def inbox(request: Request, db: Session = Depends(get_db),
           limit: int = Query(500, ge=1, le=2000)):
     """Alerts for this group, filterable by date, read status, type, vehicle and text."""
     me = get_portal_user_from_request(request, db)
-    q = db.query(PortalAlert).filter(PortalAlert.usergroup_id == str(me.usergroup_id))
+    access_service.for_user(me, db).require("inbox.view")
+    q = _scope_alerts(db.query(PortalAlert), db, me).filter(PortalAlert.usergroup_id == str(me.usergroup_id))
     if date_from:
         q = q.filter(PortalAlert.created_at >= date_from)
     if date_to:
@@ -146,22 +154,35 @@ def run_report(key: str, request: Request, db: Session = Depends(get_db),
                date_from: datetime = Query(...), date_to: datetime = Query(...),
                imei: Optional[str] = None, category: Optional[str] = None,
                format: str = Query("json", pattern="^(json|csv|xlsx)$"),
-               tz: str = "Africa/Johannesburg"):
-    """Run a report for a period; format=json for on-screen, csv/xlsx to download."""
+               tz: Optional[str] = None):
+    """Run a report for a period; format=json for on-screen, csv/xlsx to download.
+
+    tz defaults to the user group's timezone.
+    """
     me = get_portal_user_from_request(request, db)
+    access = access_service.for_user(me, db)
+    access.require("reports.view")
+    group = db.get(UserGroup, me.usergroup_id)
+    tz = tz or (group.timezone if group else None) or "Africa/Johannesburg"
     if key not in reports_service.REPORTS:
         raise HTTPException(status_code=404, detail="Unknown report")
     if date_to <= date_from or date_to - date_from > timedelta(days=93):
         raise HTTPException(status_code=400, detail="Choose a period of up to 3 months")
     try:
         cols, rows = reports_service.generate(db, me.usergroup_id, key, date_from, date_to,
-                                              imei=imei, category=category, tz_name=tz)
+                                              imei=imei, category=category, tz_name=tz,
+                                              only=access.visible_imeis(db))
     except Exception as exc:  # e.g. unknown timezone
         raise HTTPException(status_code=400, detail=str(exc))
     if format == "json":
         return {"columns": cols, "rows": rows}
     title = reports_service.REPORTS[key][0]
-    content, mime, ext = reports_service.to_file(title, cols, rows, format)
+    from zoneinfo import ZoneInfo
+    zone = ZoneInfo(tz)
+    period = f"{date_from.astimezone(zone):%d %b %Y} – {(date_to - timedelta(seconds=1)).astimezone(zone):%d %b %Y}"
+    content, mime, ext = reports_service.to_file(title, cols, rows, format,
+                                                 subtitle=f"{group.name if group else ''} · {period}".strip(" ·"),
+                                                 logo=group.report_logo_data if group else None)
     filename = f"{title.replace(' ', '_')}_{date_from:%Y-%m-%d}.{ext}"
     return Response(content, media_type=mime, headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
@@ -252,13 +273,13 @@ def _own_schedule(db, me, schedule_id) -> ReportSchedule:
 
 
 def _require_reports_admin(me):
-    if not _user_can_manage(me, "reports-subscriptions"):
-        raise HTTPException(status_code=403, detail="You don't have permission to manage scheduled reports")
+    access_service.for_user(me).require("reports.schedule")
 
 
 @router.get("/report-schedules")
 def list_schedules(request: Request, db: Session = Depends(get_db)):
     me = get_portal_user_from_request(request, db)
+    _require_reports_admin(me)
     rows = (db.query(ReportSchedule).filter(ReportSchedule.usergroup_id == me.usergroup_id)
             .order_by(ReportSchedule.created_at.desc()).all())
     return [_schedule_out(s) for s in rows]

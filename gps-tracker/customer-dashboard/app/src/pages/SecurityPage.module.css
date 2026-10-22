@@ -1,0 +1,14 @@
+.root { display: flex; flex-direction: column; }
+.tabBody { min-height: 0; }
+.grid { height: max(420px, calc(100dvh - 300px)); overflow: hidden; }
+.card { transition: border-color 120ms ease; }
+.card:hover { border-color: var(--mantine-color-brand-5); }
+.roles { display: grid; grid-template-columns: 300px 1fr; gap: var(--mantine-spacing-md); align-items: start; }
+.roleList { overflow: hidden; display: flex; flex-direction: column; max-height: calc(100dvh - 280px); }
+.roleListHead { border-bottom: 1px solid var(--mantine-color-default-border); }
+.roleScroll { flex: 1; }
+.roleRow { display: block; width: 100%; padding: 10px 12px; border-bottom: 1px solid var(--mantine-color-default-border); }
+.roleRow:hover { background: var(--mantine-color-default-hover); }
+.roleActive { background: color-mix(in srgb, var(--mantine-color-brand-5) 16%, transparent); box-shadow: inset 3px 0 0 var(--mantine-color-accent-5); }
+.roleDetail { min-height: 360px; }
+@media (max-width: 62em) { .roles { grid-template-columns: 1fr; } }

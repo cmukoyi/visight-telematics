@@ -147,30 +147,23 @@ def _compute_effective_features(user: "PortalUser", group: "UserGroup") -> list:
     allowed_sections = group.allowed_sections or ALL_SECTIONS
     group_features = [f for s in allowed_sections for f in SECTION_FEATURES.get(s, [])]
 
-    role = user.role or "admin"
-    if role in ("admin", "system_admin"):
-        result = group_features
-    elif role == "manager":
-        role_features = SECTION_FEATURES["tracking"] + SECTION_FEATURES["management"]
-        result = [f for f in role_features if f in group_features]
-    elif role == "reporter":
-        result = [f for f in SECTION_FEATURES["reports"] if f in group_features]
-    elif role == "custom":
-        custom = user.custom_features or []
-        result = [f for f in custom if f in group_features]
-    else:
-        result = group_features
-    
+    # The user's role decides which of the group's tabs they get.
+    from app.services import access_service
+    access = access_service.for_user(user)
+    role_tabs = {t for p in access.permissions for t in access_service.CLASSIC_TABS.get(p, [])}
+    result = [f for f in group_features if f in role_tabs]
+
     # Apply tenant-wide feature toggles (master switch)
     # Query enabled features for this tenant
     try:
         from sqlalchemy import inspect
         session = inspect(user).session
         if session:
-            tenant_features = session.query(TenantFeature).filter(
-                TenantFeature.usergroup_id == user.usergroup_id,
-                TenantFeature.enabled == True
-            ).all()
+            with session.begin_nested():   # a failure here mustn't abort the caller's transaction
+                tenant_features = session.query(TenantFeature).filter(
+                    TenantFeature.usergroup_id == user.usergroup_id,
+                    TenantFeature.enabled == True
+                ).all()
             tenant_enabled_features = {f.feature_name for f in tenant_features}
             
             # If tenant has feature records, expand feature names to tab names
@@ -212,18 +205,10 @@ def _user_can_manage(me, feature: str) -> bool:
     """
     if feature in _DISABLED_FEATURES:
         return False
-    if getattr(me, "is_group_admin", False):
-        return True
-    role = (getattr(me, "role", None) or "").lower()
-    if role in ("admin", "system_admin"):
-        return True
-    if role == "manager":
-        manager_features = SECTION_FEATURES["tracking"] + SECTION_FEATURES["management"]
-        return feature in manager_features
-    if role == "custom":
-        return feature in (getattr(me, "custom_features", None) or [])
-    # 'reporter' and unknown roles → no write access
-    return False
+    from app.services import access_service
+    access = access_service.for_user(me)
+    permission = access_service.CLASSIC_MANAGE.get(feature)
+    return access.is_admin if permission is None else access.can(permission)
 
 
 def _delete_tag_with_cleanup(db: Session, tag: BLETag, logger_prefix: str = "TAG DELETE") -> dict:
@@ -252,6 +237,9 @@ class PortalUserOut(BaseModel):
     role: str = "admin"
     custom_features: Optional[list] = None
     mobile_user_id: Optional[UUID] = None
+    role_id: Optional[UUID] = None
+    security_group_id: Optional[UUID] = None
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -272,6 +260,8 @@ class PortalTokenResponse(BaseModel):
     token_type: str = "bearer"
     portal_user: PortalUserOut
     usergroup: UserGroupOut
+    effective_features: Optional[list] = None
+    access: Optional[dict] = None
 
 
 # ---------------------------------------------------------------------------
@@ -371,12 +361,14 @@ def portal_login(data: PortalLoginRequest, request: Request, db: Session = Depen
     _login_record_success(ip)
     token = _create_portal_token(str(user.id), str(user.usergroup_id))
     effective = _compute_effective_features(user, group)
+    from app.services import access_service
     return {
         "access_token": token,
         "token_type": "bearer",
         "portal_user": PortalUserOut.model_validate(user),
         "usergroup": UserGroupOut.model_validate(group),
         "effective_features": effective,
+        "access": access_service.profile(db, access_service.for_user(user, db)),
     }
 
 
@@ -389,10 +381,12 @@ def portal_me(
     user = get_portal_user_from_request(request, db)
     group = db.query(UserGroup).filter(UserGroup.id == user.usergroup_id).first()
     effective = _compute_effective_features(user, group) if group else []
+    from app.services import access_service
     return {
         "portal_user": PortalUserOut.model_validate(user),
         "usergroup":   UserGroupOut.model_validate(group) if group else None,
         "effective_features": effective,
+        "access": access_service.profile(db, access_service.for_user(user, db)),
     }
 
 
@@ -404,8 +398,25 @@ class PortalUserCreate(BaseModel):
     email: str
     first_name: Optional[str] = None
     last_name: Optional[str] = None
-    role: str = "admin"              # admin | manager | reporter | custom
+    role: str = "admin"              # legacy: admin | manager | reporter | custom
     custom_features: Optional[list] = None  # only used when role='custom'
+    role_id: Optional[UUID] = None           # a portal_roles row; takes precedence over `role`
+    security_group_id: Optional[UUID] = None
+
+
+def _check_role_and_security_group(db: Session, usergroup_id, role_id, security_group_id):
+    """Validate a role / security group pair for a user in this group. Returns the role."""
+    from app.models import PortalRole, SecurityGroup
+    role = db.query(PortalRole).filter(PortalRole.id == role_id, PortalRole.usergroup_id == usergroup_id).first()
+    if not role:
+        raise HTTPException(status_code=400, detail="Choose a role for this user")
+    if security_group_id is not None:
+        if not db.query(SecurityGroup).filter(SecurityGroup.id == security_group_id,
+                                              SecurityGroup.usergroup_id == usergroup_id).first():
+            raise HTTPException(status_code=400, detail="Unknown security group")
+    elif not role.is_admin:
+        raise HTTPException(status_code=400, detail="Add the user to a security group so they can see vehicles")
+    return role
 
 
 class PortalUserCreateResponse(BaseModel):
@@ -420,6 +431,8 @@ def list_portal_users(
 ):
     """List all portal users in the caller's UserGroup."""
     me = get_portal_user_from_request(request, db)
+    from app.services import access_service
+    access_service.for_user(me, db).require("users.manage")
     users = db.query(PortalUser).filter(
         PortalUser.usergroup_id == me.usergroup_id,
     ).order_by(PortalUser.created_at).all()
@@ -461,6 +474,12 @@ def create_portal_user(
 
     valid_roles = {"admin", "manager", "reporter", "custom"}
     role = data.role if data.role in valid_roles else "admin"
+    from app.services import access_service
+    access_service.ensure_defaults(db, me.usergroup_id)
+    new_role = None
+    if data.role_id is not None:
+        new_role = _check_role_and_security_group(db, me.usergroup_id, data.role_id, data.security_group_id)
+        role = "admin" if new_role.is_admin else "custom"
 
     import secrets as _secrets
     import uuid as _uuid
@@ -476,7 +495,9 @@ def create_portal_user(
         is_active=True,
         is_group_admin=False,
         role=role,
-        custom_features=data.custom_features if role == "custom" else None,
+        custom_features=data.custom_features if (role == "custom" and new_role is None) else None,
+        role_id=new_role.id if new_role else None,
+        security_group_id=data.security_group_id if new_role else None,
     )
     db.add(new_user)
     db.commit()
@@ -493,6 +514,10 @@ class PortalUserPatch(BaseModel):
     expires_at: Optional[datetime] = None
     role: Optional[str] = None
     custom_features: Optional[list] = None
+    role_id: Optional[UUID] = None
+    security_group_id: Optional[UUID] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
 
 
 @router.patch("/users/{user_id}", response_model=PortalUserOut)
@@ -553,6 +578,18 @@ def patch_portal_user(
         target.role = data.role
     if "custom_features" in data.model_fields_set:
         target.custom_features = data.custom_features if (target.role == "custom") else None
+
+    if data.first_name is not None:
+        target.first_name = data.first_name.strip() or None
+    if data.last_name is not None:
+        target.last_name = data.last_name.strip() or None
+    if "role_id" in data.model_fields_set or "security_group_id" in data.model_fields_set:
+        role_id = data.role_id if "role_id" in data.model_fields_set else target.role_id
+        sg_id = data.security_group_id if "security_group_id" in data.model_fields_set else target.security_group_id
+        new_role = _check_role_and_security_group(db, me.usergroup_id, role_id, sg_id)
+        target.role_id, target.security_group_id = new_role.id, sg_id
+        target.role = "admin" if new_role.is_admin else "custom"
+        target.custom_features = None
 
     db.commit()
     db.refresh(target)
@@ -704,10 +741,13 @@ def link_data_exchange(data: DataExchangeLinkRequest, request: Request, db: Sess
 # ---------------------------------------------------------------------------
 
 class ThemeOut(BaseModel):
+    name: Optional[str] = None
     logo_data: Optional[str] = None
     logo_dark_data: Optional[str] = None
+    report_logo_data: Optional[str] = None
     theme_primary: Optional[str] = None
     theme_accent: Optional[str] = None
+    timezone: Optional[str] = None
     history_retention_days: Optional[int] = 365
 
     class Config:
@@ -720,6 +760,22 @@ class ThemeUpdate(BaseModel):
     theme_primary: Optional[str] = None      # hex e.g. '#3b82f6' or None to reset
     theme_accent: Optional[str] = None
     history_retention_days: Optional[int] = None
+    report_logo_data: Optional[str] = None   # data URL, '' clears
+    timezone: Optional[str] = None           # IANA name, '' clears
+
+
+_LOGO_PREFIXES = ("data:image/png", "data:image/jpeg", "data:image/jpg", "data:image/svg+xml")
+_LOGO_MAX_CHARS = 1_500_000   # ~1 MB image
+
+
+def _check_logo(value: str, field: str) -> Optional[str]:
+    if not value:
+        return None
+    if not value.startswith(_LOGO_PREFIXES):
+        raise HTTPException(status_code=400, detail=f"{field}: use a PNG, JPEG or SVG image")
+    if len(value) > _LOGO_MAX_CHARS:
+        raise HTTPException(status_code=400, detail=f"{field}: the image is too large (max 1 MB)")
+    return value
 
 
 @router.get("/theme", response_model=ThemeOut)
@@ -747,10 +803,20 @@ def update_theme(
         raise HTTPException(status_code=404, detail="User group not found")
 
     if data.logo_data is not None:
-        # Validate it's a data URL (or empty string to clear)
-        if data.logo_data and not data.logo_data.startswith("data:image/"):
-            raise HTTPException(status_code=400, detail="logo_data must be a data: URL")
-        group.logo_data = data.logo_data or None
+        group.logo_data = _check_logo(data.logo_data, "Platform logo")
+
+    if data.report_logo_data is not None:
+        group.report_logo_data = _check_logo(data.report_logo_data, "Report logo")
+
+    if data.timezone is not None:
+        tz = data.timezone.strip()
+        if tz:
+            try:
+                from zoneinfo import ZoneInfo
+                ZoneInfo(tz)
+            except Exception:
+                raise HTTPException(status_code=400, detail=f"Unknown timezone '{tz}'")
+        group.timezone = tz or None
 
     if data.logo_dark_data is not None:
         if data.logo_dark_data and not data.logo_dark_data.startswith("data:image/"):
@@ -900,12 +966,12 @@ def admin_reset_user_password(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Built-in System Admin can reset any other portal user's password in
-    the same usergroup. Returns the new temporary password ONCE.
+    """Reset another portal user's password in the same usergroup (needs the
+    users.manage permission). Returns the new temporary password ONCE.
     """
     me = get_portal_user_from_request(request, db)
-    if me.role != "system_admin":
-        raise HTTPException(status_code=403, detail="Only Built-in System Admins can reset passwords")
+    from app.services import access_service
+    access_service.for_user(me, db).require("users.manage")
 
     target = db.query(PortalUser).filter(
         PortalUser.id == str(user_id),
@@ -1115,6 +1181,10 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
         .order_by(BLETag.added_at.desc())
         .all()
     )
+    from app.services import access_service
+    visible = access_service.for_user(me, db).visible_imeis(db)
+    if visible is not None:
+        tags = [t for t in tags if t.imei in visible]
 
     # Some group-scoped tags are included via attributes._created_usergroup_id
     # and may belong to users outside the current domain filter. Resolve those
@@ -1495,6 +1565,7 @@ class CategoryOut(BaseModel):
     icon: Optional[str] = None
     color: Optional[str] = None
     is_active: bool
+    security_group_id: Optional[UUID] = None
 
     class Config:
         from_attributes = True
@@ -1504,6 +1575,7 @@ class CategoryCreate(BaseModel):
     name: str
     icon: Optional[str] = None
     color: Optional[str] = None
+    security_group_id: Optional[UUID] = None   # required (vehicle groups belong to a security group)
 
 
 class CategoryUpdate(BaseModel):
@@ -1511,18 +1583,29 @@ class CategoryUpdate(BaseModel):
     icon: Optional[str] = None
     color: Optional[str] = None
     is_active: Optional[bool] = None
+    security_group_id: Optional[UUID] = None
+
+
+def _check_security_group(db: Session, usergroup_id, security_group_id):
+    from app.models import SecurityGroup
+    if security_group_id is None or not db.query(SecurityGroup).filter(
+            SecurityGroup.id == security_group_id, SecurityGroup.usergroup_id == usergroup_id).first():
+        raise HTTPException(status_code=400, detail="Choose the security group this vehicle group belongs to")
 
 
 @router.get("/categories", response_model=List[CategoryOut])
 def list_categories(request: Request, db: Session = Depends(get_db)):
     """Return all active categories for the caller's user-group."""
     me = get_portal_user_from_request(request, db)
-    return (
+    from app.services import access_service
+    visible = access_service.for_user(me, db).visible_categories(db)
+    cats = (
         db.query(TagCategory)
         .filter(TagCategory.usergroup_id == str(me.usergroup_id), TagCategory.is_active == True)
         .order_by(TagCategory.name)
         .all()
     )
+    return cats if visible is None else [c for c in cats if c.name in visible]
 
 
 @router.post("/categories", response_model=CategoryOut, status_code=201)
@@ -1541,11 +1624,13 @@ def create_category(data: CategoryCreate, request: Request, db: Session = Depend
     ).first()
     if exists:
         raise HTTPException(status_code=409, detail=f"Category '{name}' already exists")
+    _check_security_group(db, me.usergroup_id, data.security_group_id)
     cat = TagCategory(
         usergroup_id=str(me.usergroup_id),
         name=name,
         icon=data.icon,
         color=data.color,
+        security_group_id=data.security_group_id,
     )
     db.add(cat)
     db.commit()
@@ -1576,6 +1661,9 @@ def update_category(cat_id: str, data: CategoryUpdate, request: Request, db: Ses
         cat.color = data.color or None
     if data.is_active is not None:
         cat.is_active = data.is_active
+    if data.security_group_id is not None:
+        _check_security_group(db, me.usergroup_id, data.security_group_id)
+        cat.security_group_id = data.security_group_id
     db.commit()
     db.refresh(cat)
     return cat
@@ -1663,6 +1751,16 @@ def report_geofence_events(
 # Portal Alerts — unified inbox (geofence, battery_low, tag_offline)
 # ---------------------------------------------------------------------------
 
+def _scope_alerts(q, db: Session, me: PortalUser):
+    """Limit an alert query to alerts about vehicles the user may see (plus group-wide alerts)."""
+    from app.services import access_service
+    visible = access_service.for_user(me, db).visible_imeis(db)
+    if visible is None:
+        return q
+    tag_ids = [tid for (tid,) in db.query(BLETag.id).filter(BLETag.imei.in_(list(visible)))] if visible else []
+    return q.filter(or_(PortalAlert.tag_id.is_(None), PortalAlert.tag_id.in_(tag_ids)))
+
+
 @router.get("/alerts")
 def list_portal_alerts(
     request: Request,
@@ -1673,7 +1771,7 @@ def list_portal_alerts(
     me = get_portal_user_from_request(request, db)
     since = datetime.utcnow() - timedelta(days=max(1, min(days, 7)))
     alerts = (
-        db.query(PortalAlert)
+        _scope_alerts(db.query(PortalAlert), db, me)
         .filter(
             PortalAlert.usergroup_id == str(me.usergroup_id),
             PortalAlert.created_at >= since,
@@ -1694,7 +1792,7 @@ def portal_alerts_unread_count(
     me = get_portal_user_from_request(request, db)
     since = datetime.utcnow() - timedelta(days=7)
     count = (
-        db.query(PortalAlert)
+        _scope_alerts(db.query(PortalAlert), db, me)
         .filter(
             PortalAlert.usergroup_id == str(me.usergroup_id),
             PortalAlert.created_at >= since,
@@ -2016,8 +2114,11 @@ def arm_location(
     if not _user_can_manage(me, "locations"):
         raise HTTPException(status_code=403, detail="You don't have permission to manage geofences")
     poi = _get_group_poi(location_id, str(me.usergroup_id), db)
-    # Verify tag belongs to this group
+    # Verify tag belongs to this group and is visible to the user
     tag = _resolve_group_tag(tag_id, str(me.usergroup_id), db)
+    from app.services import access_service
+    if not access_service.for_user(me, db).can_see(db, tag.imei):
+        raise HTTPException(status_code=404, detail="Tag not found")
     link = db.query(POITrackerLink).filter(
         POITrackerLink.poi_id == location_id,
         POITrackerLink.tracker_id == tag_id,
@@ -2193,14 +2294,22 @@ def _resolve_group_tag(tag_id: str, usergroup_id: str, db: Session) -> BLETag:
     group = db.query(UserGroup).filter(UserGroup.id == usergroup_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
+    try:
+        UUID(str(tag_id))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Tag not found")
     tag = db.query(BLETag).filter(BLETag.id == tag_id).first()
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
-    # Verify the tag's owning user belongs to this group (by email domain)
-    owner = db.query(User).filter(User.id == tag.user_id).first()
+    # Devices created for the group (e.g. routed from a Data Exchange) carry the group id
+    if (tag.attributes or {}).get("_created_usergroup_id") == str(group.id):
+        return tag
+    # Otherwise the tag's owning user must belong to this group (by email domain)
+    owner = db.query(User).filter(User.id == tag.user_id).first() if tag.user_id else None
     if not owner:
-        raise HTTPException(status_code=404, detail="Tag owner not found")
-    if group.email_domain and not owner.email.lower().endswith("@" + group.email_domain.lstrip("@").lower()):
+        raise HTTPException(status_code=404, detail="Tag not found")
+    domains = _domains(group)
+    if not domains or owner.email.lower().split("@")[-1] not in domains:
         raise HTTPException(status_code=403, detail="Tag does not belong to your group")
     return tag
 
@@ -2422,8 +2531,15 @@ def list_trips(request: Request, db: Session = Depends(get_db),
     """Trips for this group's devices, newest first."""
     from app.models_dataprofiler import Trip
 
+    from app.services import access_service
+
     me = get_portal_user_from_request(request, db)
+    access = access_service.for_user(me, db)
+    access.require("history.view")
     q = db.query(Trip).filter(Trip.usergroup_id == me.usergroup_id)
+    visible = access.visible_imeis(db)
+    if visible is not None:
+        q = q.filter(Trip.imei.in_(list(visible)))
     if imei:
         q = q.filter(Trip.imei == imei.strip())
     if date_from:
@@ -2447,7 +2563,10 @@ def get_trip(trip_id: str, request: Request, db: Session = Depends(get_db)):
     except ValueError:
         raise HTTPException(status_code=404, detail="Trip not found")
     trip = db.query(Trip).filter(Trip.id == trip_id, Trip.usergroup_id == me.usergroup_id).first()
-    if not trip:
+    from app.services import access_service
+    access = access_service.for_user(me, db)
+    access.require("history.view")
+    if not trip or not access.can_see(db, trip.imei):
         raise HTTPException(status_code=404, detail="Trip not found")
     events = (db.query(DeviceEvent).filter(DeviceEvent.trip_id == trip.id)
               .order_by(DeviceEvent.recorded_at, DeviceEvent.id).all())

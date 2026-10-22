@@ -9,29 +9,34 @@ import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import {
   IconArrowUpRight, IconBell, IconCar, IconCategory, IconKey, IconMapPin, IconPencil, IconPlugConnected,
-  IconTrash, IconUsers, IconPlus,
+  IconTrash, IconPlus, IconShieldLock, IconBuilding,
 } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { api } from '../api/client';
-import { useCategories, useDataExchange, useVehicles } from '../api/hooks';
+import { useCan, useCategories, useDataExchange, useSecurityGroups, useVehicles } from '../api/hooks';
 import type { Category, Vehicle } from '../api/types';
-import { getSession, isAdminLike } from '../auth/session';
+import { getSession } from '../auth/session';
 import { DataGrid } from '../components/DataGrid';
 import { STATUS } from '../theme';
 import { ago, dateTime, vehicleName } from '../utils/format';
 import classes from './ConfigurationPage.module.css';
+import { PlacesPage } from './PlacesPage';
+import { SecurityPage } from './SecurityPage';
+import { UserGroupPage } from './UserGroupPage';
 
-interface Tile { title: string; description: string; icon: typeof IconCar; to?: string; classic?: string; adminOnly?: boolean }
+// `any`: shown when the user's role has at least one of these permissions (empty = everyone)
+interface Tile { title: string; description: string; icon: typeof IconCar; to?: string; classic?: string; any: string[] }
 
 const TILES: Tile[] = [
-  { title: 'Vehicles & devices', description: 'Names, groups and packages of your tracking units', icon: IconCar, to: 'devices' },
-  { title: 'Vehicle groups', description: 'Groups used to filter the dashboard, workspace and reports', icon: IconCategory, to: 'groups' },
-  { title: 'Data Exchange', description: 'Link the exchange that routes your devices to this account', icon: IconPlugConnected, to: 'exchange', adminOnly: true },
-  { title: 'My account', description: 'Change your password', icon: IconKey, to: 'account' },
-  { title: 'Users', description: 'Invite users and manage their access', icon: IconUsers, classic: 'users', adminOnly: true },
-  { title: 'Places', description: 'Geofences, depots and customer sites', icon: IconMapPin, classic: 'locations' },
-  { title: 'Notifications & appearance', description: 'Alert settings, logo and colours', icon: IconBell, classic: 'settings', adminOnly: true },
+  { title: 'Vehicles & devices', description: 'Names, groups and packages of your tracking units', icon: IconCar, to: 'devices', any: [] },
+  { title: 'Vehicle groups', description: 'Group vehicles and choose which security group sees them', icon: IconCategory, to: 'groups', any: ['vehicles.manage'] },
+  { title: 'Places', description: 'Geofences — depots, sites and no-go zones with entry and exit alerts', icon: IconMapPin, to: 'places', any: ['places.view', 'places.manage'] },
+  { title: 'Security', description: 'Users, security groups, roles and permissions', icon: IconShieldLock, to: 'security', any: ['users.manage', 'security.manage'] },
+  { title: 'User Group', description: 'Theme colours, platform and report logos, timezone', icon: IconBuilding, to: 'user-group', any: ['settings.manage'] },
+  { title: 'Data Exchange', description: 'Link the exchange that routes your devices to this account', icon: IconPlugConnected, to: 'exchange', any: ['settings.manage'] },
+  { title: 'Notifications', description: 'Alert email and SMS preferences', icon: IconBell, classic: 'settings', any: ['settings.manage'] },
+  { title: 'My account', description: 'Change your password', icon: IconKey, to: 'account', any: [] },
 ];
 
 const classicUrl = (tab: string) => `/customer/classic/#tab=${tab}`;
@@ -50,12 +55,12 @@ function Header({ title }: { title: string }) {
 
 function Tiles() {
   const navigate = useNavigate();
-  const admin = isAdminLike(getSession().user);
+  const can = useCan();
   return (
     <Stack p="lg" gap="lg">
       <Title order={2}>Configuration</Title>
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 3, xl: 4 }} spacing="md">
-        {TILES.filter((t) => admin || !t.adminOnly).map((t) => (
+        {TILES.filter((t) => t.any.length === 0 || t.any.some(can)).map((t) => (
           <UnstyledButton key={t.title} className={classes.tile}
                           onClick={() => (t.to ? navigate(t.to) : window.open(classicUrl(t.classic!), '_self'))}>
             <Group justify="space-between" align="flex-start" wrap="nowrap">
@@ -78,7 +83,7 @@ function Devices() {
   const { data: categories = [] } = useCategories();
   const [editing, setEditing] = useState<Vehicle | null>(null);
   const form = useForm({ initialValues: { description: '', category: '' } });
-  const admin = isAdminLike(getSession().user);
+  const admin = useCan()('vehicles.manage');
 
   const open = (v: Vehicle) => { form.setValues({ description: v.description ?? '', category: v.category_name ?? '' }); setEditing(v); };
   const save = form.onSubmit(async (values) => {
@@ -132,11 +137,20 @@ function Groups() {
   const qc = useQueryClient();
   const { data: categories = [] } = useCategories();
   const { data: vehicles = [] } = useVehicles();
+  const { data: securityGroups = [] } = useSecurityGroups();
+  const sgName = (id: string | null) => securityGroups.find((g) => g.id === id)?.name;
   const [editing, setEditing] = useState<Category | 'new' | null>(null);
-  const form = useForm({ initialValues: { name: '', color: '#3e7cfb' }, validate: { name: (v) => (v.trim() ? null : 'Enter a name') } });
+  const form = useForm<{ name: string; color: string; security_group_id: string | null }>({
+    initialValues: { name: '', color: '#3e7cfb', security_group_id: null },
+    validate: {
+      name: (v) => (v.trim() ? null : 'Enter a name'),
+      security_group_id: (v) => (v ? null : 'Choose the security group that may see these vehicles'),
+    },
+  });
 
   const open = (c: Category | 'new') => {
-    form.setValues(c === 'new' ? { name: '', color: '#3e7cfb' } : { name: c.name, color: c.color || '#3e7cfb' });
+    form.setValues(c === 'new' ? { name: '', color: '#3e7cfb', security_group_id: securityGroups.length === 1 ? securityGroups[0].id : null }
+      : { name: c.name, color: c.color || '#3e7cfb', security_group_id: c.security_group_id });
     setEditing(c);
   };
   const save = form.onSubmit(async (values) => {
@@ -145,6 +159,7 @@ function Groups() {
       else await api(`/api/portal/categories/${(editing as Category).id}`, { method: 'PUT', json: values });
       qc.invalidateQueries({ queryKey: ['categories'] });
       qc.invalidateQueries({ queryKey: ['vehicles'] });
+      qc.invalidateQueries({ queryKey: ['security-groups'] });
       setEditing(null);
     } catch (e) { notifications.show({ color: 'red', message: (e as Error).message }); }
   });
@@ -162,7 +177,7 @@ function Groups() {
     <Stack p="lg" gap={0} className={classes.narrow}>
       <Header title="Vehicle groups" />
       <Group justify="space-between" mb="sm">
-        <Text size="sm" c="dimmed">“All vehicles” is built in. Add groups to filter by depot, region or vehicle type.</Text>
+        <Text size="sm" c="dimmed">“All vehicles” is built in. Each group belongs to a security group, whose users can see its vehicles.</Text>
         <Button size="xs" leftSection={<IconPlus size={14} />} onClick={() => open('new')}>Add group</Button>
       </Group>
       <Paper withBorder>
@@ -171,7 +186,10 @@ function Groups() {
           <Group key={c.id} className={classes.row} wrap="nowrap">
             <span className={classes.swatch} style={{ background: c.color || '#3e7cfb' }} />
             <Text fw={500} style={{ flex: 1 }}>{c.name}</Text>
-            <Text size="sm" c="dimmed">{vehicles.filter((v) => v.category_name === c.name).length} vehicles</Text>
+            {sgName(c.security_group_id)
+              ? <Badge variant="light" leftSection={<IconShieldLock size={12} />}>{sgName(c.security_group_id)}</Badge>
+              : <Badge variant="light" color="orange">No security group — admins only</Badge>}
+            <Text size="sm" c="dimmed" w={90} ta="right">{vehicles.filter((v) => v.category_name === c.name).length} vehicles</Text>
             <ActionIcon variant="subtle" onClick={() => open(c)} aria-label="Edit group"><IconPencil size={16} /></ActionIcon>
             <ActionIcon variant="subtle" color="red" onClick={() => remove(c)} aria-label="Delete group"><IconTrash size={16} /></ActionIcon>
           </Group>
@@ -181,6 +199,12 @@ function Groups() {
         <form onSubmit={save}>
           <Stack>
             <TextInput label="Name" {...form.getInputProps('name')} data-autofocus />
+            <Select label="Security group" withAsterisk placeholder="Who may see these vehicles"
+                    data={securityGroups.map((g) => ({ value: g.id, label: g.name }))} {...form.getInputProps('security_group_id')}
+                    nothingFoundMessage="No security groups yet" />
+            {securityGroups.length === 0 && (
+              <Text size="xs" c="orange">Create a security group first under Configuration → Security.</Text>
+            )}
             <ColorInput label="Colour" {...form.getInputProps('color')} />
             <Group justify="flex-end"><Button variant="default" onClick={() => setEditing(null)}>Cancel</Button><Button type="submit">Save</Button></Group>
           </Stack>
@@ -287,6 +311,9 @@ export function ConfigurationPage() {
       <Route path="groups" element={<Groups />} />
       <Route path="exchange" element={<Exchange />} />
       <Route path="account" element={<Account />} />
+      <Route path="places" element={<PlacesPage />} />
+      <Route path="security" element={<SecurityPage />} />
+      <Route path="user-group" element={<UserGroupPage />} />
       <Route path="*" element={<Tiles />} />
     </Routes>
   );

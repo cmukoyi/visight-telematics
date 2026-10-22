@@ -31,7 +31,7 @@ from app.dataprofiler.decoder import DELIVER_EXCHANGE, exchange_queue
 from app.models import BLETag, DevicePosition
 from app.models_admin import TagPackage
 from app.models_dataprofiler import DeviceEvent
-from app.services import trip_builder
+from app.services import geofence_engine, trip_builder
 
 logger = logging.getLogger("dataprofiler.dashboard_ingest")
 
@@ -65,6 +65,7 @@ def store_delivery(db: Session, message: dict) -> int:
     ).scalars().all()
 
     fixes = [r for r in rows if r["latitude"] is not None and r["longitude"] is not None]
+    new_ids = set(inserted)
     if fixes:
         db.execute(pg_insert(DevicePosition.__table__).values([{
             "device_imei": imei, "lat": r["latitude"], "lng": r["longitude"],
@@ -73,18 +74,22 @@ def store_delivery(db: Session, message: dict) -> int:
             "ignition": None if r["io"].get(IO_IGNITION) is None else ("ON" if r["io"][IO_IGNITION] else "OFF"),
             "pos_type": 1, "source": "teltonika",
         } for r in fixes]).on_conflict_do_nothing(index_elements=["device_imei", "observed_at"]))
-        _update_tag_location(db, imei, max(fixes, key=lambda r: r["recorded_at"]))
+        tag = _update_tag_location(db, imei, max(fixes, key=lambda r: r["recorded_at"]))
+        new_fixes = [r for r in fixes if r["dp_event_id"] in new_ids]
+        if tag is not None and new_fixes:
+            geofence_engine.check_positions(db, tag, new_fixes)
     return len(inserted)
 
 
-def _update_tag_location(db: Session, imei: str, r: dict) -> None:
+def _update_tag_location(db: Session, imei: str, r: dict):
+    """Move the device to its newest fix. Returns the tag (None if the device isn't on the dashboard)."""
     tag = db.query(BLETag).filter(BLETag.imei == imei).first()
     if not tag:
-        return
+        return None
     observed = r["recorded_at"]
     last_seen = tag.last_seen if not tag.last_seen or tag.last_seen.tzinfo else tag.last_seen.replace(tzinfo=timezone.utc)
     if last_seen and last_seen >= observed:
-        return  # late, buffered record — history only
+        return tag  # late, buffered record — history only
     tag.latitude, tag.longitude, tag.last_seen = str(r["latitude"]), str(r["longitude"]), observed
     if not tag.activation_date:
         # First GPS fix starts the package period, as for polled trackers.
@@ -92,6 +97,7 @@ def _update_tag_location(db: Session, imei: str, r: dict) -> None:
         pkg = db.query(TagPackage).filter(TagPackage.id == tag.package_id).first() if tag.package_id else None
         if pkg:
             tag.expiry_date = pkg.expiry_from(observed.astimezone(timezone.utc).replace(tzinfo=None))
+    return tag
 
 
 def _store(body: bytes) -> int:

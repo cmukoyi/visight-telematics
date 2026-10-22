@@ -1,10 +1,11 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Alert, Anchor, Button, Checkbox, Paper, PasswordInput, PinInput, Stack, Text, TextInput, Title } from '@mantine/core';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { api } from '../api/client';
 import { useBranding } from '../api/hooks';
-import { saveSession, type PortalUser, type UserGroup } from './session';
+import { saveSession, type Access, type PortalUser, type UserGroup } from './session';
 import classes from './LoginPage.module.css';
 
 type Mode = 'login' | 'forgot' | 'reset';
@@ -13,6 +14,7 @@ const REMEMBER_KEY = 'portal_remembered_email';
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: branding } = useBranding();
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState(() => { try { return localStorage.getItem(REMEMBER_KEY) || ''; } catch { return ''; } });
@@ -31,10 +33,11 @@ export function LoginPage() {
   };
 
   const login = () => run(async () => {
-    const data = await api<{ access_token: string; portal_user: PortalUser; usergroup: UserGroup; effective_features: string[] | null }>(
+    const data = await api<{ access_token: string; portal_user: PortalUser; usergroup: UserGroup; effective_features: string[] | null; access: Access | null }>(
       '/api/portal/login', { method: 'POST', json: { email: email.trim(), password } });
     try { remember ? localStorage.setItem(REMEMBER_KEY, email.trim()) : localStorage.removeItem(REMEMBER_KEY); } catch { /* ignore */ }
-    saveSession(data.access_token, data.portal_user, data.usergroup, data.effective_features);
+    saveSession(data.access_token, data.portal_user, data.usergroup, data.effective_features, data.access);
+    queryClient.invalidateQueries();
     navigate('/dashboard', { replace: true });
   });
 

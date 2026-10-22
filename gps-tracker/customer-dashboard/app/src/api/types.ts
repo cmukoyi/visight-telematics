@@ -36,6 +36,7 @@ export interface Category {
   icon: string | null;
   color: string | null;
   is_active: boolean;
+  security_group_id: string | null;
 }
 
 export interface Trip {
@@ -105,8 +106,10 @@ export interface Place {
   longitude: number;
   radius: number;
   shape_type: 'circle' | 'polygon' | string;
-  coordinates: [number, number][] | null;
+  coordinates: string | null;    // JSON [[lat, lng], ...] for polygons
   armed_count: number;
+  tags_armed: { id: string; imei: string; label: string }[];
+  notes?: string | null;
 }
 
 export interface Alert {
@@ -182,4 +185,49 @@ export interface PortalUserRow {
   role: string;
   is_active: boolean;
   is_group_admin: boolean;
+  role_id: string | null;
+  security_group_id: string | null;
+  expires_at: string | null;
+  created_at: string | null;
+}
+
+export interface Me {
+  portal_user: PortalUserRow;
+  usergroup: { id: string; name: string } | null;
+  effective_features: string[];
+  access: import('../auth/session').Access;
+}
+
+export interface Permission {
+  key: string;
+  label: string;
+  section: string;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  description: string | null;
+  permissions: string[];
+  is_admin: boolean;
+  is_system: boolean;
+  user_count: number;
+}
+
+export interface SecurityGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  vehicle_groups: string[];
+  user_count: number;
+}
+
+export interface GroupTheme {
+  name: string | null;
+  logo_data: string | null;
+  logo_dark_data: string | null;
+  report_logo_data: string | null;
+  theme_primary: string | null;
+  theme_accent: string | null;
+  timezone: string | null;
 }

@@ -21,6 +21,8 @@ interface Props {
   places?: MapPlace[];
   selectedVehicleId?: string | null;
   onVehicleClick?: (id: string) => void;
+  /** Called with the clicked position (e.g. to draw a place); the cursor becomes a crosshair. */
+  onMapClick?: (lat: number, lng: number) => void;
   /** Extra padding (px) kept clear when fitting, e.g. for a docked panel at the bottom. */
   fitPadding?: { top: number; bottom: number; left: number; right: number };
 }
@@ -54,7 +56,7 @@ function circlePolygon(lat: number, lng: number, radiusM: number, steps = 48): [
 }
 
 export const FleetMap = forwardRef<FleetMapHandle, Props>(function FleetMap(
-  { vehicles = [], routes = [], points = [], places = [], selectedVehicleId, onVehicleClick, fitPadding }, ref,
+  { vehicles = [], routes = [], points = [], places = [], selectedVehicleId, onVehicleClick, onMapClick, fitPadding }, ref,
 ) {
   const mapRef = useRef<MapRef>(null);
   const { data: branding } = useBranding();
@@ -101,7 +103,9 @@ export const FleetMap = forwardRef<FleetMapHandle, Props>(function FleetMap(
     features: places.map((p) => ({
       type: 'Feature' as const, properties: { name: p.name },
       geometry: { type: 'Polygon' as const,
-        coordinates: [p.polygon && p.polygon.length > 2 ? p.polygon.map(([lat, lng]) => [lng, lat]) : circlePolygon(p.lat, p.lng, p.radius)] },
+        coordinates: [p.polygon && p.polygon.length > 2
+          ? [...p.polygon, p.polygon[0]].map(([lat, lng]) => [lng, lat])   // GeoJSON rings are closed
+          : circlePolygon(p.lat, p.lng, p.radius)] },
     })),
   }), [places]);
 
@@ -115,6 +119,8 @@ export const FleetMap = forwardRef<FleetMapHandle, Props>(function FleetMap(
         mapStyle={mapStyle}
         style={{ width: '100%', height: '100%' }}
         attributionControl={false}
+        cursor={onMapClick ? 'crosshair' : undefined}
+        onClick={onMapClick ? (e) => onMapClick(e.lngLat.lat, e.lngLat.lng) : undefined}
       >
         <NavigationControl position="top-right" />
         <ScaleControl position="bottom-right" />

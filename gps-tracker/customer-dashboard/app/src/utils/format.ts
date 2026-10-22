@@ -1,4 +1,16 @@
 import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+// Times are shown in the user group's timezone (Configuration → User Group) when set.
+let displayTz: string | null = null;
+export function setDisplayTimezone(tz: string | null | undefined) {
+  displayTz = tz || null;
+}
+const local = (v: string) => (displayTz ? dayjs(v).tz(displayTz) : dayjs(v));
 
 export const km = (m: number | null | undefined) => `${((m || 0) / 1000).toFixed(1)} km`;
 
@@ -9,8 +21,8 @@ export function duration(s: number | null | undefined) {
   return h ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m ${String(t % 60).padStart(2, '0')}s`;
 }
 
-export const dateTime = (v: string | null | undefined) => (v ? dayjs(v).format('DD MMM YYYY HH:mm') : '—');
-export const time = (v: string | null | undefined) => (v ? dayjs(v).format('HH:mm') : '—');
+export const dateTime = (v: string | null | undefined) => (v ? local(v).format('DD MMM YYYY HH:mm') : '—');
+export const time = (v: string | null | undefined) => (v ? local(v).format('HH:mm') : '—');
 
 export function ago(v: string | null | undefined) {
   if (!v) return 'never';

@@ -9,13 +9,14 @@ import {
   IconSearch, IconTimeline,
 } from '@tabler/icons-react';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
-import { fetchTrip, useCategories, useEvents, useEventTypes, usePlaces, useTrips, useVehicles, type Range } from '../api/hooks';
+import { fetchTrip, useCan, useCategories, useEvents, useEventTypes, usePlaces, useTrips, useVehicles, type Range } from '../api/hooks';
 import type { DeviceEvent, Trip, TripDetail } from '../api/types';
 import { DataGrid } from '../components/DataGrid';
 import { FleetMap, type FleetMapHandle, type MapPoint, type MapRoute, type MapVehicle } from '../components/FleetMap';
 import { RangePicker, defaultRange } from '../components/RangePicker';
 import { STATUS } from '../theme';
 import { dateTime, duration, km, vehicleName } from '../utils/format';
+import { toMapPlace } from '../utils/places';
 import { ALL_VEHICLES, inGroup, toMapVehicle } from './vehicles';
 import classes from './WorkspacePage.module.css';
 
@@ -31,16 +32,19 @@ const EVENT_COLORS: Record<string, string> = {
 const eventColor = (code: string | null, kind: string) =>
   (code && EVENT_COLORS[code]) || (kind === 'alert' ? '#ef4444' : kind === 'position' ? '#64748b' : '#0ea5e9');
 
-const RIBBON: { key: Panel; label: string; icon: typeof IconCar }[] = [
-  { key: 'vehicles', label: 'Vehicles', icon: IconCar },
-  { key: 'trips', label: 'Trips', icon: IconRoute },
-  { key: 'events', label: 'Events', icon: IconTimeline },
-  { key: 'places', label: 'Places', icon: IconMapPin },
+const RIBBON: { key: Panel; label: string; icon: typeof IconCar; permission: string }[] = [
+  { key: 'vehicles', label: 'Vehicles', icon: IconCar, permission: 'map.view' },
+  { key: 'trips', label: 'Trips', icon: IconRoute, permission: 'history.view' },
+  { key: 'events', label: 'Events', icon: IconTimeline, permission: 'history.view' },
+  { key: 'places', label: 'Places', icon: IconMapPin, permission: 'places.view' },
 ];
 
 export function WorkspacePage() {
   const mapRef = useRef<FleetMapHandle>(null);
-  const [panel, setPanel] = useState<Panel | null>('trips');
+  const can = useCan();
+  const ribbon = RIBBON.filter((r) => can(r.permission));
+  const [panel, setPanel] = useState<Panel | null>(() => ribbon.find((r) => r.key === 'trips')?.key ?? ribbon[0]?.key ?? null);
+  const canHistory = can('history.view');
   const [maximized, setMaximized] = useState(false);
   const [range, setRange] = useState<Range>(defaultRange);
   const [group, setGroup] = useState(ALL_VEHICLES);
@@ -58,8 +62,8 @@ export function WorkspacePage() {
   const { data: categories = [] } = useCategories();
   const { data: places = [] } = usePlaces();
   const { data: eventTypes } = useEventTypes();
-  const trips = useTrips(range, focus);
-  const events = useEvents(range, focus, eventCodes);
+  const trips = useTrips(range, focus, canHistory);
+  const events = useEvents(range, focus, eventCodes, canHistory);
 
   const listed = useMemo(() => vehicles.filter((v) => inGroup(v, group) &&
     (!search || `${vehicleName(v)} ${v.imei}`.toLowerCase().includes(search.toLowerCase()))), [vehicles, group, search]);
@@ -86,9 +90,7 @@ export function WorkspacePage() {
     }
     return out;
   }, [plottedTrips, plottedEvents]);
-  const mapPlaces = useMemo(() => places.filter((p) => plottedPlaces.has(p.id)).map((p) => ({
-    id: p.id, name: p.name, lat: p.latitude, lng: p.longitude, radius: p.radius, polygon: p.coordinates,
-  })), [places, plottedPlaces]);
+  const mapPlaces = useMemo(() => places.filter((p) => plottedPlaces.has(p.id)).map(toMapPlace), [places, plottedPlaces]);
 
   const fitAll = (extra: [number, number][] = []) => {
     const pts: [number, number][] = [...extra, ...mapVehicles.map((v) => [v.lat, v.lng] as [number, number])];
@@ -171,7 +173,7 @@ export function WorkspacePage() {
 
       <Paper className={classes.ribbon} shadow="md" p={4}>
         <Group gap={4} wrap="nowrap">
-          {RIBBON.map((r) => (
+          {ribbon.map((r) => (
             <Button key={r.key} size="xs" variant={panel === r.key ? 'filled' : 'subtle'} color={panel === r.key ? 'brand' : 'gray'}
                     leftSection={<r.icon size={16} />} onClick={() => setPanel(panel === r.key ? null : r.key)}>
               {r.label}

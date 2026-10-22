@@ -1,0 +1,12 @@
+.root { display: flex; flex-direction: column; padding: var(--mantine-spacing-lg); min-height: 0; }
+.body { flex: 1; display: grid; grid-template-columns: 340px 1fr; gap: var(--mantine-spacing-md); min-height: 520px; }
+.side { display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+.searchBar { padding: 10px; border-bottom: 1px solid var(--mantine-color-default-border); }
+.scroll { flex: 1; }
+.row { display: block; width: 100%; padding: 10px 12px; border-bottom: 1px solid var(--mantine-color-default-border); }
+.row:hover { background: var(--mantine-color-default-hover); }
+.active { background: color-mix(in srgb, var(--mantine-color-brand-5) 16%, transparent); }
+.map { overflow: hidden; position: relative; min-height: 420px; }
+@media (max-width: 48em) {
+  .body { grid-template-columns: 1fr; grid-template-rows: auto 420px; }
+}

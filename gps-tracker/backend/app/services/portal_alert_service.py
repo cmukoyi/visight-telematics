@@ -181,8 +181,15 @@ def check_temperature_alert(db: Session, tag: BLETag, temperature_c: float) -> b
     return created
 
 
+def _may_receive(db: Session, user: PortalUser, imei: str | None) -> bool:
+    """Whether the user's role and security group let them see an alert about this vehicle."""
+    from app.services import access_service
+    access = access_service.for_user(user, db)
+    return access.can("inbox.view") and (imei is None or access.can_see(db, imei))
+
+
 def _notify_group_by_sms(db: Session, usergroup_id: str, alert_type: str,
-                          title: str, message: str) -> None:
+                         title: str, message: str, imei: str | None = None) -> None:
     """Send an SMS alert to all opted-in portal users in the group.
 
     Only fires if:
@@ -216,6 +223,8 @@ def _notify_group_by_sms(db: Session, usergroup_id: str, alert_type: str,
                 continue
             if not getattr(pu, 'phone_number', None):
                 continue
+            if not _may_receive(notify_db, pu, imei):
+                continue
             ok = _sms_svc.send_alert(pu.phone_number, alert_type, title, message)
             if ok:
                 logger.info("📱 Alert SMS sent to %s (%s)", pu.phone_number, alert_type)
@@ -230,7 +239,7 @@ def _notify_group_by_sms(db: Session, usergroup_id: str, alert_type: str,
 
 def _notify_group_by_email(db: Session, usergroup_id: str, alert_type: str,
                             title: str, message: str,
-                            meta_data: dict | None = None) -> None:
+                            meta_data: dict | None = None, imei: str | None = None) -> None:
     """Send a one-shot email for a new alert to all opted-in portal users in the group.
 
     Uses its own DB session so it is completely isolated from the caller's
@@ -267,6 +276,9 @@ def _notify_group_by_email(db: Session, usergroup_id: str, alert_type: str,
         for pu in users:
             # Check the specific per-type flag
             if not getattr(pu, flag, True):
+                continue
+            # Only users allowed to see this vehicle (role + security group)
+            if not _may_receive(notify_db, pu, imei):
                 continue
 
             # Primary address

@@ -11,18 +11,20 @@ import {
 } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { useBranding, useUnreadCount } from '../api/hooks';
+import { useQueryClient } from '@tanstack/react-query';
+import { useBranding, useCan, useGroupTheme, useUnreadCount } from '../api/hooks';
 import { clearSession, getSession } from '../auth/session';
 import classes from './AppLayout.module.css';
 
 dayjs.extend(utc);
 
-const NAV = [
-  { to: '/dashboard', label: 'Dashboard', icon: IconLayoutDashboard },
-  { to: '/workspace', label: 'Workspace', icon: IconMapRoute },
-  { to: '/configuration', label: 'Configuration', icon: IconAdjustmentsHorizontal },
-  { to: '/reports', label: 'Reports', icon: IconChartBar },
-  { to: '/inbox', label: 'Inbox', icon: IconInbox },
+// `any`: the role needs at least one of these permissions to see the section.
+export const NAV = [
+  { to: '/dashboard', label: 'Dashboard', icon: IconLayoutDashboard, any: ['map.view'] },
+  { to: '/workspace', label: 'Workspace', icon: IconMapRoute, any: ['map.view', 'history.view', 'places.view'] },
+  { to: '/configuration', label: 'Configuration', icon: IconAdjustmentsHorizontal, any: [] },
+  { to: '/reports', label: 'Reports', icon: IconChartBar, any: ['reports.view'] },
+  { to: '/inbox', label: 'Inbox', icon: IconInbox, any: ['inbox.view'] },
 ];
 
 function Clock() {
@@ -53,7 +55,12 @@ export function AppLayout() {
   const { setColorScheme } = useMantineColorScheme();
   const scheme = useComputedColorScheme('dark');
   const { data: branding } = useBranding();
+  const can = useCan();
+  const nav = NAV.filter((n) => n.any.length === 0 || n.any.some(can));
   const { data: unread } = useUnreadCount();
+  const { data: groupTheme } = useGroupTheme();
+  const queryClient = useQueryClient();
+  const logo = (scheme === 'dark' && groupTheme?.logo_dark_data) || groupTheme?.logo_data;
   const navigate = useNavigate();
   const location = useLocation();
   const { user, group } = getSession();
@@ -67,13 +74,14 @@ export function AppLayout() {
 
   const logout = () => {
     clearSession();
+    queryClient.clear();
     navigate('/login', { replace: true });
   };
 
   return (
     <AppShell
       header={{ height: 56 }}
-      navbar={{ width: 248, breakpoint: 'sm', collapsed: { mobile: !opened } }}
+      navbar={{ width: 312, breakpoint: 'sm', collapsed: { mobile: !opened } }}
       padding={0}
       classNames={{ navbar: classes.navbar, header: classes.header, main: classes.main }}
     >
@@ -114,18 +122,23 @@ export function AppLayout() {
       </AppShell.Header>
 
       <AppShell.Navbar p="md">
-        <Stack gap={4} className={classes.brand}>
-          <Text className={classes.brandName}>{branding?.name ?? 'ViSight Track'}</Text>
-          <Text size="xs" c="dimmed">{group?.name}</Text>
-        </Stack>
-        <Stack gap={4} mt="lg" style={{ flex: 1 }}>
-          {NAV.map((n) => (
+        {/* Logo area: 280 × 150 (Configuration → User Group → Platform logo) */}
+        <div className={classes.logoBox}>
+          {logo
+            ? <img src={logo} alt={groupTheme?.name ?? group?.name ?? 'Logo'} className={classes.logo} />
+            : <Stack gap={2} align="center">
+                <Text className={classes.brandName}>{branding?.name ?? 'ViSight Track'}</Text>
+                <Text size="xs" c="dimmed">{group?.name}</Text>
+              </Stack>}
+        </div>
+        <Stack gap={6} mt="xl" style={{ flex: 1 }}>
+          {nav.map((n) => (
             <NavLink
               key={n.to}
               component={RouterLink}
               to={n.to}
               label={n.label}
-              leftSection={<n.icon size={20} stroke={1.6} />}
+              leftSection={<n.icon size={22} stroke={1.6} />}
               rightSection={n.to === '/inbox' && unread ? <Badge size="sm" color="red" variant="filled">{unread}</Badge> : null}
               active={location.pathname.startsWith(n.to)}
               className={classes.navItem}

@@ -245,6 +245,8 @@ class UserGroup(Base):
     logo_dark_data        = Column(Text, nullable=True)          # base64 data-URL (dark mode)
     theme_primary         = Column(String(20), nullable=True)    # hex e.g. '#3b82f6'
     theme_accent          = Column(String(20), nullable=True)    # secondary hex
+    report_logo_data      = Column(Text, nullable=True)          # base64 data-URL used on reports
+    timezone              = Column(String(64), nullable=True)    # IANA name, e.g. 'Africa/Johannesburg'
     # Data retention
     history_retention_days = Column(Integer, nullable=True, default=365)  # days to keep tag history
     # SMS add-on
@@ -287,10 +289,45 @@ class TagCategory(Base):
     icon         = Column(String(50), nullable=True)   # font-awesome icon name, e.g. 'fa-car'
     color        = Column(String(20), nullable=True)   # hex color, e.g. '#3b82f6'
     is_active    = Column(Boolean, nullable=False, default=True)
+    # Security group whose users can see this vehicle group's vehicles (migration 068)
+    security_group_id = Column(UUID(as_uuid=True), ForeignKey("security_groups.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at   = Column(DateTime(timezone=True), server_default=func.now())
     updated_at   = Column(DateTime(timezone=True), onupdate=func.now())
 
     usergroup = relationship("UserGroup", back_populates="tag_categories")
+
+
+class SecurityGroup(Base):
+    """A set of vehicle groups that a set of users may see, within one UserGroup."""
+    __tablename__ = "security_groups"
+    __table_args__ = (UniqueConstraint("usergroup_id", "name", name="uq_security_group_name"),)
+
+    id           = get_uuid_column()
+    usergroup_id = get_uuid_fk("user_groups.id")
+    name         = Column(String(100), nullable=False)
+    description  = Column(String(255), nullable=True)
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at   = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class PortalRole(Base):
+    """A named set of permissions (access_service.PERMISSIONS) within one UserGroup.
+
+    The default roles are created per group by access_service.ensure_defaults;
+    is_admin roles see every vehicle regardless of security group.
+    """
+    __tablename__ = "portal_roles"
+    __table_args__ = (UniqueConstraint("usergroup_id", "name", name="uq_portal_role_name"),)
+
+    id           = get_uuid_column()
+    usergroup_id = get_uuid_fk("user_groups.id")
+    name         = Column(String(100), nullable=False)
+    description  = Column(String(255), nullable=True)
+    permissions  = Column(JSON, nullable=False, default=list)
+    is_admin     = Column(Boolean, nullable=False, default=False)
+    is_system    = Column(Boolean, nullable=False, default=False)   # a default role; can't be deleted
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at   = Column(DateTime(timezone=True), onupdate=func.now())
 
 
 class TenantFeature(Base):
@@ -352,6 +389,10 @@ class PortalUser(Base):
     # api_only – API access only (no dashboard), can use bearer token for API v2 endpoints
     role            = Column(String(20), nullable=False, default='admin')
     custom_features = Column(JSON, nullable=True)  # only used when role = 'custom'
+    # Access control (migration 068): the user's role and the security group
+    # whose vehicles they see. Users whose role is an admin role see everything.
+    role_id           = Column(UUID(as_uuid=True), ForeignKey("portal_roles.id", ondelete="SET NULL"), nullable=True, index=True)
+    security_group_id = Column(UUID(as_uuid=True), ForeignKey("security_groups.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at      = Column(DateTime(timezone=True), server_default=func.now())
     updated_at      = Column(DateTime(timezone=True), onupdate=func.now())
     # Notification preferences (per-user)

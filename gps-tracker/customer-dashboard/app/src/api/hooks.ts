@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { api, qs } from './client';
+import { getSession, saveAccess } from '../auth/session';
 import type {
-  Alert, Branding, Category, DataExchangeStatus, DeviceEvent, EventTypes, Kpis, Place, PortalUserRow,
-  ReportDef, ReportSchedule, Trip, TripDetail, Vehicle,
+  Alert, Branding, Category, DataExchangeStatus, DeviceEvent, EventTypes, GroupTheme, Kpis, Me, Permission, Place,
+  PortalUserRow, ReportDef, ReportSchedule, Role, SecurityGroup, Trip, TripDetail, Vehicle,
 } from './types';
 
 export const useBranding = () =>
@@ -24,8 +25,9 @@ export interface Range { from: Date; to: Date }
 
 const iso = (d: Date) => d.toISOString();
 
-export const useTrips = (range: Range, imei: string | null) =>
+export const useTrips = (range: Range, imei: string | null, enabled = true) =>
   useQuery({
+    enabled,
     queryKey: ['trips', iso(range.from), iso(range.to), imei],
     queryFn: () => api<Trip[]>(`/api/portal/trips${qs({ date_from: iso(range.from), date_to: iso(range.to), imei, limit: 1000 })}`),
   });
@@ -35,8 +37,9 @@ export const fetchTrip = (id: string) => api<TripDetail>(`/api/portal/trips/${en
 export const useEventTypes = () =>
   useQuery({ queryKey: ['event-types'], queryFn: () => api<EventTypes>('/api/portal/event-types'), staleTime: Infinity });
 
-export const useEvents = (range: Range, imei: string | null, codes: string[]) =>
+export const useEvents = (range: Range, imei: string | null, codes: string[], enabled = true) =>
   useQuery({
+    enabled,
     queryKey: ['events', iso(range.from), iso(range.to), imei, codes.join(',')],
     queryFn: () => api<{ rows: DeviceEvent[] }>(`/api/portal/events${qs({
       date_from: iso(range.from), date_to: iso(range.to), imei, codes: codes.join(','), limit: 5000,
@@ -57,7 +60,7 @@ export const useInbox = (f: InboxFilter) =>
 export const useUnreadCount = () =>
   useQuery({
     queryKey: ['unread'],
-    queryFn: () => api<{ count: number }>('/api/portal/alerts/unread-count').then((r) => r.count),
+    queryFn: () => api<{ unread: number }>('/api/portal/alerts/unread-count').then((r) => r.unread),
     refetchInterval: 60_000,
   });
 
@@ -71,3 +74,39 @@ export const useDataExchange = () =>
 
 export const usePortalUsers = () =>
   useQuery({ queryKey: ['portal-users'], queryFn: () => api<PortalUserRow[]>('/api/portal/users') });
+
+/** The signed-in user's profile and access; refreshed so role changes apply without signing out. */
+export const useMe = () =>
+  useQuery({
+    queryKey: ['me'],
+    queryFn: async () => {
+      const me = await api<Me>('/api/portal/me');
+      saveAccess(me.access);
+      return me;
+    },
+    staleTime: 60_000,
+    refetchInterval: 5 * 60_000,
+  });
+
+/** can('places.manage') — from /me, falling back to what login stored. */
+export function useCan() {
+  const { data } = useMe();
+  const access = data?.access ?? getSession().access;
+  return (permission: string) => !!access && (access.is_admin || access.permissions.includes(permission));
+}
+
+/** The user group's colours, logos and timezone (null until signed in). */
+export const useGroupTheme = () =>
+  useQuery({
+    queryKey: ['theme'],
+    queryFn: () => (getSession().token ? api<GroupTheme>('/api/portal/theme') : Promise.resolve(null)),
+    staleTime: 5 * 60_000,
+  });
+
+export const usePermissions = () =>
+  useQuery({ queryKey: ['permissions'], queryFn: () => api<Permission[]>('/api/portal/access/permissions'), staleTime: Infinity });
+
+export const useRoles = () => useQuery({ queryKey: ['roles'], queryFn: () => api<Role[]>('/api/portal/roles') });
+
+export const useSecurityGroups = () =>
+  useQuery({ queryKey: ['security-groups'], queryFn: () => api<SecurityGroup[]>('/api/portal/security-groups') });

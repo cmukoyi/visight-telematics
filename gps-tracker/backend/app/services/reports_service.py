@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
 from app.dataprofiler.dictionary import EVENTS, event_label
-from app.models import BLETag, PortalAlert
+from app.models import BLETag, PortalAlert, PortalUser, UserGroup
 from app.models_dataprofiler import DeviceEvent, ReportSchedule, Trip
 
 logger = logging.getLogger(__name__)
@@ -28,12 +28,17 @@ MAX_ROWS = 50_000
 # Scope helpers
 # ---------------------------------------------------------------------------
 
-def group_devices(db: Session, group_id, category: Optional[str] = None) -> dict:
-    """{imei: display name} for the group's devices, optionally one vehicle group (category)."""
+def group_devices(db: Session, group_id, category: Optional[str] = None, only: Optional[set] = None) -> dict:
+    """{imei: display name} for the group's devices, optionally one vehicle group (category).
+
+    only: limit to these IMEIs (the vehicles a user may see); None means all.
+    """
     tags = db.query(BLETag).filter(
         BLETag.attributes.op("->>")("_created_usergroup_id") == str(group_id)).all()
     out = {}
     for tag in tags:
+        if only is not None and tag.imei not in only:
+            continue
         if category and ((tag.attributes or {}).get("category") or {}).get("value") != category:
             continue
         out[tag.imei] = tag.description or tag.device_name or tag.imei
@@ -155,17 +160,34 @@ def catalogue() -> list[dict]:
 
 def generate(db: Session, group_id, key: str, start: datetime, end: datetime,
              imei: Optional[str] = None, category: Optional[str] = None,
-             tz_name: str = "Africa/Johannesburg") -> tuple[list, list]:
+             tz_name: str = "Africa/Johannesburg", only: Optional[set] = None) -> tuple[list, list]:
     if key not in REPORTS:
         raise KeyError(key)
-    devices = group_devices(db, group_id, category)
+    devices = group_devices(db, group_id, category, only)
     if imei:
         devices = {k: v for k, v in devices.items() if k == imei}
     return REPORTS[key][3](db, group_id, devices, start, end, ZoneInfo(tz_name))
 
 
-def to_file(title: str, cols: list, rows: list, fmt: str) -> tuple[bytes, str, str]:
-    """(content, mime type, extension)."""
+def _logo_image(data_url: Optional[str]):
+    """An openpyxl image from a PNG/JPEG data URL (SVG isn't supported in Excel files), or None."""
+    if not data_url or not data_url.startswith(("data:image/png", "data:image/jpeg", "data:image/jpg")):
+        return None
+    try:
+        import base64
+        from openpyxl.drawing.image import Image
+        img = Image(io.BytesIO(base64.b64decode(data_url.split(",", 1)[1])))
+        scale = min(1.0, 60 / img.height, 220 / img.width)   # fit 220 × 60 px
+        img.width, img.height = int(img.width * scale), int(img.height * scale)
+        return img
+    except Exception:
+        logger.warning("Report logo could not be used", exc_info=True)
+        return None
+
+
+def to_file(title: str, cols: list, rows: list, fmt: str,
+            subtitle: Optional[str] = None, logo: Optional[str] = None) -> tuple[bytes, str, str]:
+    """(content, mime type, extension). Excel files get a heading (logo, title, subtitle) when given."""
     if fmt == "csv":
         buf = io.StringIO()
         writer = csv.writer(buf)
@@ -177,15 +199,29 @@ def to_file(title: str, cols: list, rows: list, fmt: str) -> tuple[bytes, str, s
     wb = Workbook()
     ws = wb.active
     ws.title = title[:31]
+    header_row = 1
+    if subtitle or logo:
+        image = _logo_image(logo)
+        if image is not None:
+            ws.add_image(image, "A1")
+            ws.row_dimensions[1].height = image.height * 0.75 + 4   # px → points
+            ws.append([])
+        ws.append([title])
+        ws.cell(row=ws.max_row, column=1).font = Font(bold=True, size=14)
+        if subtitle:
+            ws.append([subtitle])
+            ws.cell(row=ws.max_row, column=1).font = Font(color="666666")
+        ws.append([])
+        header_row = ws.max_row + 1
     ws.append(cols)
-    for cell in ws[1]:
+    for cell in ws[header_row]:
         cell.font = Font(bold=True)
     for row in rows:
         ws.append(row)
     for i, col in enumerate(cols, start=1):
         width = max([len(str(col))] + [len(str(r[i - 1])) for r in rows[:500]]) + 2
-        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = min(width, 50)
-    ws.freeze_panes = "A2"
+        ws.column_dimensions[ws.cell(row=header_row, column=i).column_letter].width = min(width, 50)
+    ws.freeze_panes = f"A{header_row + 1}"
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx"
@@ -222,16 +258,29 @@ def next_run(frequency: str, send_hour: int, tz_name: str, after: datetime) -> d
         candidate += timedelta(days=1)
 
 
+def _creator_scope(db: Session, schedule: ReportSchedule) -> Optional[set]:
+    """The vehicles the schedule's creator may see (None = all), so emailed reports respect security groups."""
+    from app.services import access_service
+    creator = db.get(PortalUser, schedule.created_by) if schedule.created_by else None
+    if creator is None:
+        return None
+    return access_service.for_user(creator, db).visible_imeis(db)
+
+
 def run_schedule(db: Session, schedule: ReportSchedule, email_service, now: datetime) -> str:
     title = REPORTS[schedule.report_key][0]
     tz = ZoneInfo(schedule.timezone)
     start, end = period_for(schedule.frequency, now, tz)
     params = schedule.params or {}
     cols, rows = generate(db, schedule.usergroup_id, schedule.report_key, start, end,
-                          imei=params.get("imei"), category=params.get("category"), tz_name=schedule.timezone)
-    content, mime, ext = to_file(title, cols, rows, schedule.file_format)
+                          imei=params.get("imei"), category=params.get("category"), tz_name=schedule.timezone,
+                          only=_creator_scope(db, schedule))
     period = f"{start.astimezone(tz):%d %b %Y}" + (
         "" if schedule.frequency == "daily" else f" – {(end - timedelta(seconds=1)).astimezone(tz):%d %b %Y}")
+    group = db.get(UserGroup, schedule.usergroup_id)
+    content, mime, ext = to_file(title, cols, rows, schedule.file_format,
+                                 subtitle=f"{group.name if group else ''} · {period}".strip(" ·"),
+                                 logo=group.report_logo_data if group else None)
     name = schedule.name or title
     filename = f"{name.replace(' ', '_')}_{start.astimezone(tz):%Y-%m-%d}.{ext}"
     subject = f"{name} — {period}"

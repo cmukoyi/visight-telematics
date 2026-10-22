@@ -13,3 +13,8 @@ body { margin: 0; -webkit-font-smoothing: antialiased; }
   --ag-control-panel-background-color: #0b1830; --ag-menu-background-color: #10203b; --ag-secondary-foreground-color: #a6b5cc;
 }
 .vt-grid .ag-header-cell-text { font-weight: 600; }
+
+/* Vertically centre custom cell content (badges, text, buttons) in grid rows */
+.vt-grid .ag-cell { display: flex; align-items: center; }
+.vt-grid .ag-cell > * { min-width: 0; }
+.vt-grid .ag-cell.ag-right-aligned-cell { justify-content: flex-end; }

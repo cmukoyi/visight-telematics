@@ -13,17 +13,27 @@
 }
 .main > * { flex: 1 0 auto;
 }
-.brand { padding: 4px 8px; }
-.brandName { font-size: 22px; font-weight: 750; letter-spacing: -0.02em; color: #fff; }
-.navItem {
-  border-radius: var(--mantine-radius-md); color: #c9d4e5; font-weight: 500;
+.logoBox {
+  width: 280px; max-width: 100%; height: 150px; margin: 0 auto; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--mantine-radius-lg); background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06); overflow: hidden;
 }
+.logo { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.brandName { font-size: 24px; font-weight: 750; letter-spacing: -0.02em; color: #fff; text-align: center; }
+.navItem {
+  border-radius: var(--mantine-radius-md); color: #c9d4e5; font-weight: 500; padding: 12px 14px;
+}
+.navItem :global(.mantine-NavLink-label) { font-size: 15px; }
 .navItem:hover { background: rgba(255, 255, 255, 0.06); }
-.navItem[data-active] { background: rgba(62, 124, 251, 0.22); color: #fff; }
-.navItem[data-active] svg { color: #9ebfff; }
+.navItem[data-active] {
+  background: color-mix(in srgb, var(--mantine-color-brand-5) 26%, transparent); color: #fff;
+  box-shadow: inset 3px 0 0 var(--mantine-color-accent-5);
+}
+.navItem[data-active] svg { color: var(--mantine-color-accent-3); }
 .clock {
   border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.04);
-  border-radius: var(--mantine-radius-md); padding: 10px 12px; color: #fff;
+  border-radius: var(--mantine-radius-md); padding: 10px 12px; color: #fff; flex: none;
 }
 .clockBig { font-size: 28px; font-weight: 300; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .userButton { cursor: pointer; padding: 4px 8px; border-radius: var(--mantine-radius-md); }

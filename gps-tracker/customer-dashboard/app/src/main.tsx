@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { MantineProvider, localStorageColorSchemeManager } from '@mantine/core';
@@ -11,7 +11,9 @@ import '@mantine/notifications/styles.css';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-quartz.css';
 import './styles.css';
-import { theme } from './theme';
+import { useGroupTheme } from './api/hooks';
+import { buildTheme } from './theme';
+import { setDisplayTimezone } from './utils/format';
 import { App } from './App';
 
 const queryClient = new QueryClient({
@@ -27,15 +29,26 @@ if (cleanPath !== window.location.pathname) {
 
 const colorSchemeManager = localStorageColorSchemeManager({ key: 'vt-color-scheme' });
 
+function Root() {
+  // The group's colours and timezone (refetched when the user signs in or out).
+  const { data: groupTheme } = useGroupTheme();
+  const appTheme = useMemo(() => buildTheme(groupTheme?.theme_primary, groupTheme?.theme_accent),
+    [groupTheme?.theme_primary, groupTheme?.theme_accent]);
+  setDisplayTimezone(groupTheme?.timezone);
+  return (
+    <MantineProvider theme={appTheme} defaultColorScheme="dark" colorSchemeManager={colorSchemeManager}>
+      <Notifications position="top-right" />
+      <BrowserRouter basename="/customer" future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <ModalsProvider><App /></ModalsProvider>
+      </BrowserRouter>
+    </MantineProvider>
+  );
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <MantineProvider theme={theme} defaultColorScheme="dark" colorSchemeManager={colorSchemeManager}>
-      <Notifications position="top-right" />
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter basename="/customer" future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <ModalsProvider><App /></ModalsProvider>
-        </BrowserRouter>
-      </QueryClientProvider>
-    </MantineProvider>
+    <QueryClientProvider client={queryClient}>
+      <Root />
+    </QueryClientProvider>
   </React.StrictMode>,
 );

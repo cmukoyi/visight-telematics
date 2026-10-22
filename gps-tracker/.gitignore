@@ -88,3 +88,6 @@ nginx/nginx.conf
 .tenant
 # Rendered from docker-compose.template.yml + tenants/<tenant>/tenant.env
 docker-compose.yml
+
+# TypeScript incremental build cache
+*.tsbuildinfo
