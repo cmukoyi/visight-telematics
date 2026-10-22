@@ -110,8 +110,16 @@ export function FeatureSummary({ permissions, granted, admin, height = 420 }: {
         <TextInput size="xs" radius="xl" w={180} placeholder="Search" leftSection={<IconSearch size={13} />} value={search}
                    onChange={(e) => setSearch(e.currentTarget.value)} />
       </Group>
-      {admin && <Text size="xs" c="dimmed">Administrator: every feature, and every vehicle in the user group.</Text>}
       <ScrollArea.Autosize mah={height} type="auto" className={classes.summary}>
+        <div className={classes.sumSection}>Configuration</div>
+        <div className={classes.sumItem}>
+          {admin ? <IconCheck size={15} className={classes.yes} /> : <IconX size={15} className={classes.no} />}
+          <div>
+            <Text size="sm" c={admin ? undefined : 'dimmed'}>Configuration</Text>
+            <Text size="xs" c="dimmed">{admin ? 'Users, roles, security, vehicles, places setup, rules, themes and the audit trail — and every vehicle.'
+              : 'Only User Group Administrators can open Configuration.'}</Text>
+          </div>
+        </div>
         {sections.map((s) => {
           const rows = permissions.filter((p) => p.section === s && (showMissing || has.has(p.key))
             && (!q || `${p.label} ${p.description}`.toLowerCase().includes(q)));

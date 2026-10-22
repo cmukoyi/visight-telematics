@@ -592,6 +592,9 @@ def patch_portal_user(
 
     _guard_admin_target(db, access, target)
 
+    if data.is_active is False and access_service.for_user(target, db).is_admin \
+            and access_service.admin_count(db, me.usergroup_id, exclude_user_id=target.id) == 0:
+        raise HTTPException(status_code=400, detail="The user group needs at least one active User Group Administrator")
     if data.is_active is not None:
         target.is_active = data.is_active
         # Re-activating a user clears any expiry so it doesn't immediately lapse again
@@ -627,6 +630,9 @@ def patch_portal_user(
         wanted = (data.role_ids if "role_ids" in fields else [data.role_id] if "role_id" in fields and data.role_id else current)
         sg_id = data.security_group_id if "security_group_id" in fields else target.security_group_id
         new_roles = _check_roles_and_security_group(db, access, wanted, sg_id, current_ids=current)
+        if not any(r.is_admin for r in new_roles) and access_service.for_user(target, db).is_admin \
+                and access_service.admin_count(db, me.usergroup_id, exclude_user_id=target.id) == 0:
+            raise HTTPException(status_code=400, detail="The user group needs at least one User Group Administrator")
         target.security_group_id = sg_id
         access_service.set_roles(db, target, new_roles)
 

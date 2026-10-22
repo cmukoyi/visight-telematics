@@ -17,7 +17,9 @@ export function RoleEditor({ role: initial, opened, onClose }: { role: Role | nu
   const qc = useQueryClient();
   const can = useCan();
   const { data: me } = useMe();
-  const { data: permissions = [] } = usePermissions();
+  const { data: allPermissions = [] } = usePermissions();
+  // Configuration features are for User Group Administrators only — a role can't give them
+  const permissions = allPermissions.filter((p) => !p.admin_only);
   const canUsers = can('users.manage');
   const { data: users = [] } = usePortalUsers(opened && (canUsers || can('users.view')));
   const [role, setRole] = useState<Role | null>(initial);
@@ -79,7 +81,13 @@ export function RoleEditor({ role: initial, opened, onClose }: { role: Role | nu
         <Stack>
           {role?.is_admin
             ? <Alert variant="light" icon={<IconInfoCircle size={16} />}>The User Group Administrator has every feature and sees every vehicle.</Alert>
-            : <Text size="sm" c="dimmed">Tick what people with this role may do. Each feature says exactly what it allows.</Text>}
+            : <>
+                <Text size="sm" c="dimmed">Tick what people with this role may do. Each feature says exactly what it allows.</Text>
+                <Alert variant="light" color="gray" icon={<IconLock size={16} />} p="xs">
+                  Configuration (users, roles, security, vehicle setup, notification rules, themes and the audit trail) is only for
+                  User Group Administrators, so it can't be part of a role.
+                </Alert>
+              </>}
           <FeaturePicker permissions={permissions} value={role?.is_admin ? permissions.map((p) => p.key) : draft.permissions}
                          onChange={(v) => set({ permissions: v })} readOnly={builtIn} lockedReason={builtIn ? undefined : locked} />
         </Stack>

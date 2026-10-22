@@ -21,6 +21,7 @@ export interface UserGroup {
 export interface Access {
   role_id: string | null;
   role_name: string | null;
+  role_names?: string[];
   permissions: string[];
   is_admin: boolean;
   security_group_id: string | null;

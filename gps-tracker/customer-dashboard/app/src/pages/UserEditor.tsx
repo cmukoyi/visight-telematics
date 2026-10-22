@@ -36,7 +36,8 @@ export function UserEditor({ user: initial, opened, onClose, onCreated }: {
   const qc = useQueryClient();
   const { data: roles = [] } = useRoles();
   const { data: groups = [] } = useSecurityGroups();
-  const { data: permissions = [] } = usePermissions();
+  const { data: allPermissions = [] } = usePermissions();
+  const permissions = allPermissions.filter((p) => !p.admin_only);
   const grantable = useGrantable();
   const [user, setUser] = useState<PortalUserRow | null>(initial);   // null after "Save and new"
   const [draft, setDraft] = useState<Draft>(EMPTY);

@@ -97,7 +97,7 @@ function LogoField({ label, hint, value, onChange, width, height }: {
 }
 
 /** My own alert preferences (email on/off, which alerts, extra addresses). */
-function MyNotificationPrefs() {
+export function MyNotificationPrefs() {
   const qc = useQueryClient();
   const { data } = useNotificationPrefs();
   const [prefs, setPrefs] = useState<NotificationPrefs | null>(null);

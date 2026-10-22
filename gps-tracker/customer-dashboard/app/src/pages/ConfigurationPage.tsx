@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ActionIcon, Alert, Anchor, Badge, Breadcrumbs, Button, Code, ColorInput, Group, Modal, Paper, PasswordInput, PinInput, Radio, Select,
   SimpleGrid, Stack, Text, TextInput, ThemeIcon, Title, Tooltip, UnstyledButton,
@@ -14,7 +14,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { api } from '../api/client';
-import { useCan, useCategories, useDataExchange, useSecurityGroups, useVehicles } from '../api/hooks';
+import { useCan, useCategories, useDataExchange, useMe, useSecurityGroups, useVehicles } from '../api/hooks';
 import { VEHICLE_DETAILS, detail, type Category, type Vehicle } from '../api/types';
 import { getSession } from '../auth/session';
 import { ConfigHeader } from '../components/ConfigHeader';
@@ -27,7 +27,7 @@ import classes from './ConfigurationPage.module.css';
 import { NotificationRulesPage } from './NotificationRulesPage';
 import { PlacesPage } from './PlacesPage';
 import { SecurityPage, UsersPage } from './SecurityPage';
-import { UserGroupPage } from './UserGroupPage';
+import { MyNotificationPrefs, UserGroupPage } from './UserGroupPage';
 
 // Configuration sections, each a tile with its sub-menu. `any`: shown when the role has one of these permissions.
 interface MenuItem { label: string; to?: string; classic?: string; any: string[] }
@@ -43,7 +43,6 @@ const SECTIONS: Section[] = [
     { label: 'Users', to: 'users', any: ['users.view', 'users.manage'] },
     { label: 'User Groups', to: 'user-groups', any: [] },
     { label: 'Custom Themes', to: 'custom-themes', any: ['theme.manage'] },
-    { label: 'My Account', to: 'account', any: [] },
   ] },
   { title: 'Places', icon: IconMapPin, items: [
     { label: 'Places', to: 'places', any: ['places.view', 'places.manage'] },
@@ -406,9 +405,10 @@ function Exchange() {
   );
 }
 
-// ── My account ──
-function Account() {
+// ── My account (from the user menu; everyone, whatever their roles) ──
+export function AccountPage() {
   const user = getSession().user;
+  const { data: me } = useMe();
   const form = useForm({
     initialValues: { current_password: '', new_password: '', confirm: '' },
     validate: {
@@ -426,11 +426,15 @@ function Account() {
   });
   return (
     <Stack p="lg" gap={0} className={classes.narrow}>
-      <Header title="My account" />
+      <Title order={2} mb="md">My account</Title>
       <Paper withBorder p="lg" mb="md">
         <Group gap="sm"><ThemeIcon variant="light" size="lg"><IconKey size={20} /></ThemeIcon>
           <div><Text fw={650}>{[user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.email}</Text>
-            <Text size="sm" c="dimmed">{user?.email} · {user?.role}</Text></div></Group>
+            <Text size="sm" c="dimmed">{user?.email}</Text></div></Group>
+        {me?.access && (
+          <Text size="sm" mt="sm"><Text span c="dimmed">Roles: </Text>{me.access.is_admin ? 'User Group Administrator' : (me.access.role_names ?? []).join(', ') || '—'}
+            {me.access.security_group_name && <><Text span c="dimmed"> · Security group: </Text>{me.access.security_group_name}</>}</Text>
+        )}
       </Paper>
       <Paper withBorder p="lg">
         <Text fw={650} mb="md">Change password</Text>
@@ -443,6 +447,8 @@ function Account() {
           </Stack>
         </form>
       </Paper>
+      <div style={{ height: 16 }} />
+      <MyNotificationPrefs />
     </Stack>
   );
 }
@@ -479,7 +485,7 @@ export function ConfigurationPage() {
       <Route path="devices" element={<Devices />} />
       <Route path="groups" element={<Groups />} />
       <Route path="exchange" element={<Exchange />} />
-      <Route path="account" element={<Account />} />
+      <Route path="account" element={<Navigate to="/account" replace />} />
       <Route path="places" element={<PlacesPage />} />
       <Route path="security" element={<SecurityPage />} />
       <Route path="user-group" element={<UserGroupPage mode="theme" />} />

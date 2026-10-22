@@ -5,6 +5,9 @@ Within a user group (a customer company):
 - a **role** is a named set of PERMISSIONS; a portal user holds one or more
   roles and may do whatever any of them allows. Admin roles (User Group
   Administrator) can do everything and see every vehicle.
+- **Configuration is for administrators only**: the ADMIN_ONLY permissions
+  (users, roles, security, vehicle setup, rules, themes, audit, ...) are never
+  granted through a custom role — only the administrator role has them.
 - a **security group** decides which vehicles a user sees: each vehicle group
   (tag category) belongs to a security group, and a user sees only the
   vehicles whose vehicle group is in the user's security group (unless a role
@@ -46,13 +49,22 @@ PERMISSIONS: dict = {
     "users.manage":          ("Add and edit users", "Users and security", "Add users, change their roles and security group, reset passwords, deactivate and delete them."),
     "roles.manage":          ("Roles", "Users and security", "Create and edit roles and what they allow."),
     "security.manage":       ("Security groups", "Users and security", "Create security groups and choose which vehicle groups they contain."),
-    "security.all_vehicles": ("See vehicles in all security groups", "Users and security", "See every vehicle, not only those in the user's own security group."),
+    "security.all_vehicles": ("See vehicles in all security groups", "Vehicles", "See every vehicle, not only those in the user's own security group."),
     "audit.view":            ("Audit trail", "Users and security", "See who changed what, and when."),
     "events.manage":         ("Event types", "Configuration", "Rename event types, set their colours and manage event type groups."),
     "settings.manage":       ("User group settings", "Configuration", "Timezone and how long history is kept."),
     "theme.manage":          ("Custom themes and logos", "Configuration", "Colours, menu, font, logos and the platform name."),
 }
 ALL_PERMISSIONS = list(PERMISSIONS)
+
+# Everything under Configuration: only administrators may do these
+ADMIN_ONLY = {
+    "vehicles.manage", "vehicles.delete", "vehicle_groups.manage", "data_exchange.manage",
+    "users.view", "users.manage", "roles.manage", "security.manage", "audit.view",
+    "rules.manage", "events.manage", "settings.manage", "theme.manage",
+}
+# What a role can be given (the role builder lists these)
+ROLE_PERMISSIONS = [p for p in ALL_PERMISSIONS if p not in ADMIN_ONLY]
 
 # Permissions that came with an older, broader one (expand_legacy, migration 073)
 LEGACY_IMPLIES = {
@@ -69,19 +81,17 @@ LEGACY_IMPLIES = {
 ADMIN_ROLE = "User Group Administrator"
 # name: (description, permissions, is_admin)
 DEFAULT_ROLES: dict = {
-    ADMIN_ROLE: ("Full access to everything in the user group, including every vehicle", ALL_PERMISSIONS, True),
-    "Operator": ("Day-to-day tracking: live map, trips, events, places, alerts and reports",
+    ADMIN_ROLE: ("Everything, including Configuration, and every vehicle", ALL_PERMISSIONS, True),
+    "Operator": ("Day-to-day tracking: live map, live tracking, trips, events, places, geofences, alerts and reports",
                  ["map.view", "live.track", "history.view", "events.view", "places.view", "places.manage", "places.arm",
-                  "inbox.view", "rules.manage", "reports.view"], False),
-    "Mapping User": ("Live map, trip history and places",
+                  "inbox.view", "reports.view"], False),
+    "Mapping User": ("Live map, live tracking, trips and places",
                      ["map.view", "live.track", "history.view", "places.view", "places.manage", "places.arm"], False),
-    "Maintenance User": ("Vehicle details and events, alerts and reports",
-                         ["map.view", "history.view", "events.view", "vehicles.manage", "inbox.view", "reports.view"], False),
-    "Reporting User": ("Runs and schedules reports",
+    "Maintenance User": ("Vehicle positions, trips and events, alerts and reports",
+                         ["map.view", "history.view", "events.view", "inbox.view", "reports.view", "reports.schedule"], False),
+    "Reporting User": ("Runs and schedules reports, and receives alerts",
                        ["reports.view", "reports.schedule", "inbox.view"], False),
-    "User Administrator": ("Manages users, roles and security groups, and reads the audit trail",
-                           ["users.view", "users.manage", "roles.manage", "security.manage", "audit.view"], False),
-    "MZone Driver": ("Sees the vehicles in their security group on the map, with their trips",
+    "MZone Driver": ("Sees their vehicles on the map, live, with their trips",
                      ["map.view", "live.track", "history.view"], False),
 }
 # legacy PortalUser.role → default role
@@ -126,7 +136,9 @@ def set_roles(db: Session, user: PortalUser, roles: list) -> None:
     for r in roles:
         db.add(PortalUserRole(user_id=user.id, role_id=r.id))
     user.role_id = roles[0].id if roles else None
-    user.role = "admin" if any(r.is_admin for r in roles) else "custom"
+    admin = any(r.is_admin for r in roles)
+    user.role = "admin" if admin else "custom"
+    user.is_group_admin = admin          # the legacy flag follows the roles, so roles always decide
     user.custom_features = None
     db.flush()
 
@@ -143,6 +155,16 @@ def ensure_defaults(db: Session, usergroup_id) -> None:
             db.add(roles[name])
         elif role.is_system and (list(role.permissions or []) != list(perms) or role.description != description):
             role.permissions, role.description, role.is_admin = list(perms), description, is_admin
+    # Built-in roles that no longer exist: delete if nobody holds them, else keep as the group's own role
+    for name, role in list(roles.items()):
+        if role.is_system and name not in DEFAULT_ROLES:
+            if db.query(PortalUserRole).filter(PortalUserRole.role_id == role.id).first() or \
+                    db.query(PortalUser.id).filter(PortalUser.role_id == role.id).first():
+                role.is_system = False
+                role.permissions = [p for p in role.permissions or [] if p not in ADMIN_ONLY]
+            else:
+                db.delete(role)
+                del roles[name]
     db.flush()
     for user in db.query(PortalUser).filter(PortalUser.usergroup_id == usergroup_id, PortalUser.role_id.is_(None)).all():
         if db.query(PortalUserRole).filter(PortalUserRole.user_id == user.id).first():
@@ -181,7 +203,7 @@ class Access:
             return
         if admin:
             raise HTTPException(status_code=403, detail="Only a User Group Administrator can give the administrator role")
-        missing = [PERMISSIONS[p][0] for p in permissions if p in PERMISSIONS and p not in self.permissions]
+        missing = [PERMISSIONS[p][0] for p in permissions if p in PERMISSIONS and (p not in self.permissions or p in ADMIN_ONLY)]
         if missing:
             raise HTTPException(status_code=403, detail=f"You can't give permissions you don't have: {', '.join(missing)}")
 
@@ -226,7 +248,7 @@ def for_user(user: PortalUser, db: Optional[Session] = None) -> Access:
     roles = db.query(PortalRole).filter(PortalRole.id.in_(ids)).all() if ids else []
     roles.sort(key=lambda r: (not r.is_admin, r.name.lower()))
     is_admin = bool(user.is_group_admin or any(r.is_admin for r in roles) or (not roles and user.role == "system_admin"))
-    perms = set(ALL_PERMISSIONS) if is_admin else {p for r in roles for p in (r.permissions or []) if p in PERMISSIONS}
+    perms = set(ALL_PERMISSIONS) if is_admin else {p for r in roles for p in (r.permissions or []) if p in PERMISSIONS and p not in ADMIN_ONLY}
     return Access(user=user, roles=roles, permissions=perms, is_admin=is_admin)
 
 
@@ -244,3 +266,14 @@ def profile(db: Session, access: Access) -> dict:
         "security_group_id": str(sg.id) if sg else None,
         "security_group_name": sg.name if sg else None,
     }
+
+
+def admin_count(db: Session, usergroup_id, exclude_user_id=None) -> int:
+    """Active users in the group with administrator access (by role or the legacy flag)."""
+    n = 0
+    for user in db.query(PortalUser).filter(PortalUser.usergroup_id == usergroup_id, PortalUser.is_active == True).all():  # noqa: E712
+        if exclude_user_id is not None and str(user.id) == str(exclude_user_id):
+            continue
+        if for_user(user, db).is_admin:
+            n += 1
+    return n

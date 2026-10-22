@@ -86,15 +86,16 @@ export const useMe = () =>
       saveAccess(me.access);
       return me;
     },
-    staleTime: 60_000,
-    refetchInterval: 5 * 60_000,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
 
-/** can('places.manage') — from /me, falling back to what login stored. */
+/** can('places.manage') — from /me, falling back to what login stored. can('admin'): a User Group Administrator. */
 export function useCan() {
   const { data } = useMe();
   const access = data?.access ?? getSession().access;
-  return (permission: string) => !!access && (access.is_admin || access.permissions.includes(permission));
+  return (permission: string) => !!access && (access.is_admin || (permission !== 'admin' && access.permissions.includes(permission)));
 }
 
 /** The user group's colours, logos and timezone (null until signed in). */

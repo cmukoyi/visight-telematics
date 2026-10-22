@@ -6,7 +6,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import {
-  IconAdjustmentsHorizontal, IconBell, IconChartBar, IconExternalLink, IconInbox, IconLayoutDashboard, IconLogout,
+  IconAdjustmentsHorizontal, IconBell, IconChartBar, IconExternalLink, IconUserCircle, IconInbox, IconLayoutDashboard, IconLogout,
   IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconMapRoute, IconMoon, IconSearch, IconSun,
 } from '@tabler/icons-react';
 import dayjs from 'dayjs';
@@ -23,7 +23,7 @@ dayjs.extend(utc);
 export const NAV = [
   { to: '/dashboard', label: 'Dashboard', icon: IconLayoutDashboard, any: ['map.view'] },
   { to: '/workspace', label: 'Workspace', icon: IconMapRoute, any: ['map.view', 'history.view', 'places.view'] },
-  { to: '/configuration', label: 'Configuration', icon: IconAdjustmentsHorizontal, any: [] },
+  { to: '/configuration', label: 'Configuration', icon: IconAdjustmentsHorizontal, any: ['admin'] },
   { to: '/reports', label: 'Reports', icon: IconChartBar, any: ['reports.view'] },
   { to: '/inbox', label: 'Inbox', icon: IconInbox, any: ['inbox.view'] },
 ];
@@ -77,7 +77,7 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, group } = getSession();
-  const title = NAV.find((n) => location.pathname.startsWith(n.to))?.label ?? '';
+  const title = NAV.find((n) => location.pathname.startsWith(n.to))?.label ?? (location.pathname.startsWith('/account') ? 'My account' : '');
   const initials = `${user?.first_name?.[0] ?? ''}${user?.last_name?.[0] ?? ''}`.toUpperCase() || (user?.email?.[0] ?? '?').toUpperCase();
 
   useEffect(() => { close(); }, [location.pathname, close]);
@@ -140,6 +140,7 @@ export function AppLayout() {
               </Menu.Target>
               <Menu.Dropdown>
                 <Menu.Label>{user?.email}</Menu.Label>
+                <Menu.Item leftSection={<IconUserCircle size={16} />} onClick={() => navigate('/account')}>My account</Menu.Item>
                 <Menu.Item leftSection={<IconExternalLink size={16} />} component="a" href="/customer/classic/">
                   Classic dashboard
                 </Menu.Item>

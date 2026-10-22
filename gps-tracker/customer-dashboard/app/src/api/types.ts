@@ -221,6 +221,7 @@ export interface Permission {
   label: string;
   section: string;
   description: string;
+  admin_only: boolean;   // Configuration: User Group Administrators only, never in a role
 }
 
 export interface Role {

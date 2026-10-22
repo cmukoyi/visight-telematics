@@ -44,7 +44,7 @@ def _uuid(value: str, what: str) -> UUID:
 @router.get("/access/permissions")
 def list_permissions(request: Request, db: Session = Depends(get_db)):
     _reader(request, db)
-    return [{"key": k, "label": label, "section": section, "description": desc}
+    return [{"key": k, "label": label, "section": section, "description": desc, "admin_only": k in access_service.ADMIN_ONLY}
             for k, (label, section, desc) in access_service.PERMISSIONS.items()]
 
 
@@ -153,7 +153,8 @@ class RoleIn(BaseModel):
         unknown = [p for p in v if p not in access_service.PERMISSIONS]
         if unknown:
             raise ValueError(f"Unknown permission: {', '.join(unknown)}")
-        return [p for p in access_service.ALL_PERMISSIONS if p in set(v)]
+        # Configuration features belong to administrators only; a role can't carry them
+        return [p for p in access_service.ROLE_PERMISSIONS if p in set(v)]
 
 
 def _role_users(db: Session, role: PortalRole) -> list:
@@ -164,7 +165,7 @@ def _role_users(db: Session, role: PortalRole) -> list:
 
 
 def _role_out(db: Session, role: PortalRole) -> dict:
-    perms = access_service.ALL_PERMISSIONS if role.is_admin else [p for p in role.permissions or [] if p in access_service.PERMISSIONS]
+    perms = access_service.ALL_PERMISSIONS if role.is_admin else [p for p in role.permissions or [] if p in access_service.ROLE_PERMISSIONS]
     users = _role_users(db, role)
     return {"id": str(role.id), "name": role.name, "description": role.description, "permissions": perms,
             "is_admin": role.is_admin, "is_system": role.is_system, "user_count": len(users), "users": users}
@@ -206,6 +207,8 @@ def _set_role_users(db: Session, me: PortalUser, access, role: PortalRole, user_
         if not new_ids:
             raise HTTPException(status_code=400, detail=f"{user.email} would have no role left — give them another role first")
         roles = db.query(PortalRole).filter(PortalRole.id.in_(list(new_ids))).all()
+        if role.is_admin and uid not in wanted and access_service.admin_count(db, me.usergroup_id, exclude_user_id=uid) == 0:
+            raise HTTPException(status_code=400, detail="The user group needs at least one User Group Administrator")
         if not any(r.is_admin for r in roles) and user.security_group_id is None:
             raise HTTPException(status_code=400, detail=f"Add {user.email} to a security group first")
         access_service.set_roles(db, user, sorted(roles, key=lambda r: (not r.is_admin, r.name.lower())))
@@ -243,7 +246,7 @@ def update_role(role_id: str, data: RoleIn, request: Request, db: Session = Depe
     role = _own_role(db, me, role_id)
     if role.is_system:
         # Built-in roles keep their name and permissions; only who holds them can change
-        if data.name != role.name or (not role.is_admin and set(data.permissions) != set(role.permissions or [])):
+        if data.name != role.name or (not role.is_admin and set(data.permissions) != set(_role_out(db, role)["permissions"])):
             raise HTTPException(status_code=400, detail="Built-in roles can't be changed — duplicate it to make your own")
     else:
         access.check_grant(set(data.permissions) - set(role.permissions or []))
