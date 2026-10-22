@@ -200,6 +200,8 @@ export interface PortalUserRow {
   is_active: boolean;
   is_group_admin: boolean;
   role_id: string | null;
+  role_ids: string[];
+  role_names: string[];
   security_group_id: string | null;
   expires_at: string | null;
   created_at: string | null;
@@ -218,6 +220,7 @@ export interface Permission {
   key: string;
   label: string;
   section: string;
+  description: string;
 }
 
 export interface Role {
@@ -228,6 +231,22 @@ export interface Role {
   is_admin: boolean;
   is_system: boolean;
   user_count: number;
+  users: { id: string; email: string; name: string }[];
+}
+
+export interface AuditRow {
+  id: string;
+  created_at: string;
+  user_id: string | null;
+  user_email: string | null;
+  user_name: string | null;
+  action: string;
+  area: string;
+  summary: string;
+  resource_id: string | null;
+  details: Record<string, unknown> | unknown[] | null;
+  outcome: 'success' | 'denied' | 'failed';
+  ip_address: string | null;
 }
 
 export interface SecurityGroup {

@@ -39,7 +39,7 @@ const eventColor = (code: string | null, kind: string) =>
 const RIBBON: { key: Panel; label: string; icon: typeof IconCar; permission: string }[] = [
   { key: 'vehicles', label: 'Vehicles', icon: IconCar, permission: 'map.view' },
   { key: 'trips', label: 'Trips', icon: IconRoute, permission: 'history.view' },
-  { key: 'events', label: 'Events', icon: IconTimeline, permission: 'history.view' },
+  { key: 'events', label: 'Events', icon: IconTimeline, permission: 'events.view' },
   { key: 'places', label: 'Places', icon: IconMapPin, permission: 'places.view' },
 ];
 

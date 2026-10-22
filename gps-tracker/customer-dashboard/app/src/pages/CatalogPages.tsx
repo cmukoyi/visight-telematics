@@ -128,7 +128,7 @@ export function GeofencesPage() {
 export function EventTypesPage() {
   const qc = useQueryClient();
   const can = useCan();
-  const manage = can('settings.manage') || can('rules.manage');
+  const manage = can('events.manage');
   const { data: rows = [], isFetching } = useEventTypeList();
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<EventTypeRow | null>(null);
@@ -185,7 +185,7 @@ export function EventTypesPage() {
 export function EventTypeGroupsPage() {
   const qc = useQueryClient();
   const can = useCan();
-  const manage = can('rules.manage') || can('settings.manage');
+  const manage = can('events.manage');
   const { data: groups = [], isFetching } = useEventTypeGroups();
   const { data: types = [] } = useEventTypeList();
   const [editing, setEditing] = useState<EventTypeGroup | 'new' | null>(null);

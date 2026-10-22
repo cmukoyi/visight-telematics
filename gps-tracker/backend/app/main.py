@@ -179,6 +179,10 @@ async def portal_request_timing_middleware(request, call_next):
         )
     return response
 
+# Audit trail of changes made through the customer portal (services/audit_service.py)
+from app.services.audit_service import AuditMiddleware
+app.add_middleware(AuditMiddleware)
+
 # CORS middleware - restrict to known origins only
 _cors_origins_env = os.getenv("CORS_ORIGINS", "https://track.visighttelematics.co.za")
 _allowed_origins = [o.strip() for o in _cors_origins_env.split(",") if o.strip()]

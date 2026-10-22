@@ -2,54 +2,87 @@
 
 Within a user group (a customer company):
 
-- a **role** is a named set of PERMISSIONS; every portal user has one.
-  Admin roles (User Group Administrator) can do everything and see every vehicle.
+- a **role** is a named set of PERMISSIONS; a portal user holds one or more
+  roles and may do whatever any of them allows. Admin roles (User Group
+  Administrator) can do everything and see every vehicle.
 - a **security group** decides which vehicles a user sees: each vehicle group
-  (tag category) belongs to a security group, and a non-admin user sees only
-  the vehicles whose vehicle group is in the user's security group.
+  (tag category) belongs to a security group, and a user sees only the
+  vehicles whose vehicle group is in the user's security group (unless a role
+  grants security.all_vehicles).
 
-The default roles are created per user group on first use (ensure_defaults),
-which also gives existing users the role matching their legacy `role` column.
+The built-in roles are created per user group on first use and kept in step
+with DEFAULT_ROLES (ensure_defaults); custom roles are the group's own. A
+non-admin can only grant permissions they hold themselves (check_grant).
 """
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Iterable, Optional
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, object_session
 
-from app.models import BLETag, PortalRole, PortalUser, SecurityGroup, TagCategory
+from app.models import BLETag, PortalRole, PortalUser, PortalUserRole, SecurityGroup, TagCategory
 
-# key: (label, section)
+# Sections, in the order the role editor lists them
+SECTIONS = ["Live tracking", "History", "Places", "Alerts", "Reports", "Vehicles", "Users and security", "Configuration"]
+
+# key: (label, section, what it allows — shown to admins in the role and user editors)
 PERMISSIONS: dict = {
-    "map.view":         ("View vehicles on the live map", "Tracking"),
-    "history.view":     ("View trips, routes and events", "Tracking"),
-    "places.view":      ("View places (geofences)", "Places"),
-    "places.manage":    ("Create, edit and arm places", "Places"),
-    "inbox.view":       ("Receive and view alerts", "Alerts"),
-    "rules.manage":     ("Create and edit notification rules", "Alerts"),
-    "reports.view":     ("Run and download reports", "Reports"),
-    "reports.schedule": ("Schedule emailed reports", "Reports"),
-    "vehicles.manage":  ("Edit vehicles and vehicle groups", "Administration"),
-    "users.manage":     ("Manage users", "Administration"),
-    "security.manage":  ("Manage security groups and roles", "Administration"),
-    "settings.manage":  ("Change theme, logos, timezone and Data Exchange", "Administration"),
+    "map.view":              ("Live map", "Live tracking", "See vehicles and where they are now on the Dashboard map."),
+    "live.track":            ("Follow a vehicle live", "Live tracking", "Track a vehicle every few seconds with its trail, on the Dashboard and in Workspace."),
+    "history.view":          ("Trips and routes", "History", "Open trips, replay routes and see start and end addresses in Workspace."),
+    "events.view":           ("Vehicle events", "History", "List and plot events such as ignition, speeding and harsh braking."),
+    "places.view":           ("See places", "Places", "View places, place groups and which vehicles are inside geofences."),
+    "places.manage":         ("Create and edit places", "Places", "Draw, edit, import and delete places and place groups."),
+    "places.arm":            ("Arm geofences", "Places", "Choose which vehicles raise entry and exit alerts for a place."),
+    "inbox.view":            ("Inbox and alerts", "Alerts", "Receive alerts and read them in the Inbox."),
+    "rules.manage":          ("Notification rules", "Alerts", "Create and edit notification rules, including email subscriptions."),
+    "reports.view":          ("Run reports", "Reports", "Run, view and download reports."),
+    "reports.schedule":      ("Schedule reports", "Reports", "Email reports to people on a schedule."),
+    "vehicles.manage":       ("Edit vehicles", "Vehicles", "Change vehicle details: description, registration, make, model, driver and vehicle group."),
+    "vehicles.delete":       ("Delete vehicles", "Vehicles", "Remove vehicles and all their history."),
+    "vehicle_groups.manage": ("Vehicle groups", "Vehicles", "Create and edit vehicle groups and choose their security group."),
+    "data_exchange.manage":  ("Data Exchange", "Vehicles", "Link the user group to a Data Exchange to receive devices."),
+    "users.view":            ("See users", "Users and security", "List users, their roles and when they last signed in."),
+    "users.manage":          ("Add and edit users", "Users and security", "Add users, change their roles and security group, reset passwords, deactivate and delete them."),
+    "roles.manage":          ("Roles", "Users and security", "Create and edit roles and what they allow."),
+    "security.manage":       ("Security groups", "Users and security", "Create security groups and choose which vehicle groups they contain."),
+    "security.all_vehicles": ("See vehicles in all security groups", "Users and security", "See every vehicle, not only those in the user's own security group."),
+    "audit.view":            ("Audit trail", "Users and security", "See who changed what, and when."),
+    "events.manage":         ("Event types", "Configuration", "Rename event types, set their colours and manage event type groups."),
+    "settings.manage":       ("User group settings", "Configuration", "Timezone and how long history is kept."),
+    "theme.manage":          ("Custom themes and logos", "Configuration", "Colours, menu, font, logos and the platform name."),
 }
 ALL_PERMISSIONS = list(PERMISSIONS)
+
+# Permissions that came with an older, broader one (expand_legacy, migration 073)
+LEGACY_IMPLIES = {
+    "map.view": ["live.track"],
+    "history.view": ["events.view"],
+    "places.manage": ["places.arm"],
+    "vehicles.manage": ["vehicles.delete", "vehicle_groups.manage"],
+    "users.manage": ["users.view"],
+    "security.manage": ["roles.manage"],
+    "settings.manage": ["theme.manage", "data_exchange.manage", "events.manage"],
+    "rules.manage": ["events.manage"],
+}
 
 ADMIN_ROLE = "User Group Administrator"
 # name: (description, permissions, is_admin)
 DEFAULT_ROLES: dict = {
-    ADMIN_ROLE: ("Full access to everything in the user group, including all vehicles", ALL_PERMISSIONS, True),
-    "Operator": ("Day-to-day tracking: live map, trips, places and alerts",
-                 ["map.view", "history.view", "places.view", "places.manage", "inbox.view", "rules.manage", "reports.view"], False),
+    ADMIN_ROLE: ("Full access to everything in the user group, including every vehicle", ALL_PERMISSIONS, True),
+    "Operator": ("Day-to-day tracking: live map, trips, events, places, alerts and reports",
+                 ["map.view", "live.track", "history.view", "events.view", "places.view", "places.manage", "places.arm",
+                  "inbox.view", "rules.manage", "reports.view"], False),
     "Mapping User": ("Live map, trip history and places",
-                     ["map.view", "history.view", "places.view", "places.manage"], False),
-    "Maintenance User": ("Vehicle details, live map, alerts and reports",
-                         ["map.view", "history.view", "vehicles.manage", "inbox.view", "reports.view"], False),
+                     ["map.view", "live.track", "history.view", "places.view", "places.manage", "places.arm"], False),
+    "Maintenance User": ("Vehicle details and events, alerts and reports",
+                         ["map.view", "history.view", "events.view", "vehicles.manage", "inbox.view", "reports.view"], False),
     "Reporting User": ("Runs and schedules reports",
                        ["reports.view", "reports.schedule", "inbox.view"], False),
-    "MZone Driver": ("Sees the vehicles in their security group on the map",
-                     ["map.view", "history.view"], False),
+    "User Administrator": ("Manages users, roles and security groups, and reads the audit trail",
+                           ["users.view", "users.manage", "roles.manage", "security.manage", "audit.view"], False),
+    "MZone Driver": ("Sees the vehicles in their security group on the map, with their trips",
+                     ["map.view", "live.track", "history.view"], False),
 }
 # legacy PortalUser.role → default role
 _LEGACY_ROLE = {"admin": ADMIN_ROLE, "system_admin": ADMIN_ROLE, "manager": "Operator",
@@ -71,38 +104,90 @@ CLASSIC_MANAGE = {"asset-mgmt": "vehicles.manage", "users": "users.manage",
                   "locations": "places.manage", "settings": "settings.manage"}
 
 
+def expand_legacy(perms: Iterable[str]) -> list:
+    """Old permission keys plus the newer ones they used to cover, limited to known permissions."""
+    out = set(perms)
+    for p in list(out):
+        out.update(LEGACY_IMPLIES.get(p, []))
+    return [p for p in ALL_PERMISSIONS if p in out]
+
+
+def role_ids(db: Session, user: PortalUser) -> list:
+    """IDs of the roles a user holds (falls back to the legacy single role_id)."""
+    ids = [rid for (rid,) in db.query(PortalUserRole.role_id).filter(PortalUserRole.user_id == user.id).all()]
+    if not ids and user.role_id:
+        ids = [user.role_id]
+    return ids
+
+
+def set_roles(db: Session, user: PortalUser, roles: list) -> None:
+    """Give a user exactly these roles (role_id keeps the first, for older code). Flushes only."""
+    db.query(PortalUserRole).filter(PortalUserRole.user_id == user.id).delete(synchronize_session=False)
+    for r in roles:
+        db.add(PortalUserRole(user_id=user.id, role_id=r.id))
+    user.role_id = roles[0].id if roles else None
+    user.role = "admin" if any(r.is_admin for r in roles) else "custom"
+    user.custom_features = None
+    db.flush()
+
+
 def ensure_defaults(db: Session, usergroup_id) -> None:
-    """Create any missing default roles for the group and give role-less users one. Flushes only."""
+    """Create any missing built-in roles (and keep their permissions in step with DEFAULT_ROLES),
+    and give role-less users the role matching their legacy `role`. Flushes only."""
     roles = {r.name: r for r in db.query(PortalRole).filter(PortalRole.usergroup_id == usergroup_id).all()}
     for name, (description, perms, is_admin) in DEFAULT_ROLES.items():
-        if name not in roles:
+        role = roles.get(name)
+        if role is None:
             roles[name] = PortalRole(usergroup_id=usergroup_id, name=name, description=description,
                                      permissions=list(perms), is_admin=is_admin, is_system=True)
             db.add(roles[name])
+        elif role.is_system and (list(role.permissions or []) != list(perms) or role.description != description):
+            role.permissions, role.description, role.is_admin = list(perms), description, is_admin
     db.flush()
     for user in db.query(PortalUser).filter(PortalUser.usergroup_id == usergroup_id, PortalUser.role_id.is_(None)).all():
+        if db.query(PortalUserRole).filter(PortalUserRole.user_id == user.id).first():
+            continue
         legacy = ADMIN_ROLE if user.is_group_admin else _LEGACY_ROLE.get((user.role or "admin").lower(), "Operator")
         user.role_id = roles[legacy].id
+        db.add(PortalUserRole(user_id=user.id, role_id=user.role_id))
     db.flush()
 
 
 @dataclass
 class Access:
     user: PortalUser
-    role: Optional[PortalRole]
+    roles: list = field(default_factory=list)
     permissions: set = field(default_factory=set)
     is_admin: bool = False
+
+    @property
+    def role(self) -> Optional[PortalRole]:
+        return self.roles[0] if self.roles else None
 
     def can(self, permission: str) -> bool:
         return self.is_admin or permission in self.permissions
 
     def require(self, permission: str) -> None:
         if not self.can(permission):
-            raise HTTPException(status_code=403, detail=f"Your role doesn't allow this ({PERMISSIONS[permission][0].lower()})")
+            raise HTTPException(status_code=403, detail=f"Your roles don't allow this ({PERMISSIONS[permission][0].lower()})")
+
+    def require_any(self, *permissions: str) -> None:
+        if not any(self.can(p) for p in permissions):
+            self.require(permissions[0])
+
+    def check_grant(self, permissions: Iterable[str], admin: bool = False) -> None:
+        """A non-admin may only hand out permissions they hold themselves, and never full admin."""
+        if self.is_admin:
+            return
+        if admin:
+            raise HTTPException(status_code=403, detail="Only a User Group Administrator can give the administrator role")
+        missing = [PERMISSIONS[p][0] for p in permissions if p in PERMISSIONS and p not in self.permissions]
+        if missing:
+            raise HTTPException(status_code=403, detail=f"You can't give permissions you don't have: {', '.join(missing)}")
 
     def visible_categories(self, db: Session) -> Optional[set]:
         """Vehicle-group names this user may see, or None for all."""
-        if self.is_admin:
+        if self.is_admin or "security.all_vehicles" in self.permissions:
             return None
         if not self.user.security_group_id:
             return set()
@@ -129,23 +214,31 @@ class Access:
 
 
 def for_user(user: PortalUser, db: Optional[Session] = None) -> Access:
-    """The user's role, permissions and admin status (creating default roles if needed)."""
+    """The user's roles, combined permissions and admin status (creating default roles if needed)."""
     db = db or object_session(user)
-    if user.role_id is None and db is not None:
+    if db is None:
+        return Access(user=user, is_admin=bool(user.is_group_admin))
+    ids = role_ids(db, user)
+    if not ids:
         ensure_defaults(db, user.usergroup_id)
         db.commit()
-    role = db.get(PortalRole, user.role_id) if (db is not None and user.role_id) else None
-    is_admin = bool(user.is_group_admin or (role and role.is_admin) or (role is None and user.role == "system_admin"))
-    perms = set(ALL_PERMISSIONS) if is_admin else {p for p in (role.permissions if role else []) if p in PERMISSIONS}
-    return Access(user=user, role=role, permissions=perms, is_admin=is_admin)
+        ids = role_ids(db, user)
+    roles = db.query(PortalRole).filter(PortalRole.id.in_(ids)).all() if ids else []
+    roles.sort(key=lambda r: (not r.is_admin, r.name.lower()))
+    is_admin = bool(user.is_group_admin or any(r.is_admin for r in roles) or (not roles and user.role == "system_admin"))
+    perms = set(ALL_PERMISSIONS) if is_admin else {p for r in roles for p in (r.permissions or []) if p in PERMISSIONS}
+    return Access(user=user, roles=roles, permissions=perms, is_admin=is_admin)
 
 
 def profile(db: Session, access: Access) -> dict:
-    """Role, permissions and security group for the login and /me responses."""
+    """Roles, permissions and security group for the login and /me responses."""
     sg = db.get(SecurityGroup, access.user.security_group_id) if access.user.security_group_id else None
+    names = [r.name for r in access.roles]
     return {
         "role_id": str(access.role.id) if access.role else None,
-        "role_name": access.role.name if access.role else ("Administrator" if access.is_admin else None),
+        "role_name": ", ".join(names) if names else ("Administrator" if access.is_admin else None),
+        "role_ids": [str(r.id) for r in access.roles],
+        "role_names": names,
         "permissions": sorted(access.permissions),
         "is_admin": access.is_admin,
         "security_group_id": str(sg.id) if sg else None,

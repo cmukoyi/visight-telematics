@@ -1,20 +1,23 @@
 import { useMemo, useState } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import {
-  ActionIcon, Alert, Anchor, Badge, Breadcrumbs, Button, Checkbox, CopyButton, Group, Menu, Modal, Paper, ScrollArea,
-  Select, SimpleGrid, Stack, Switch, Tabs, Text, TextInput, Textarea, ThemeIcon, Title, Tooltip, UnstyledButton,
+  ActionIcon, Anchor, Badge, Breadcrumbs, Button, CopyButton, Group, Menu, Modal, Paper,
+  SimpleGrid, Stack, Tabs, Text, TextInput, Textarea, ThemeIcon, Title, Tooltip,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import {
-  IconCheck, IconCopy, IconDots, IconKey, IconLock, IconPencil, IconPlus, IconSearch, IconShieldLock, IconTrash,
+  IconCheck, IconCopy, IconDots, IconHistory, IconLock, IconPencil, IconPlus, IconSearch, IconShieldLock, IconTrash,
   IconUserCheck, IconUserOff, IconUsers, IconUsersGroup,
 } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { api } from '../api/client';
-import { useCan, useMe, usePermissions, usePortalUsers, useRoles, useSecurityGroups } from '../api/hooks';
+import { useCan, useMe, usePortalUsers, useRoles, useSecurityGroups } from '../api/hooks';
+import { AuditTrail } from './AuditTrailPage';
+import { RoleEditor } from './RoleEditor';
+import { UserEditor } from './UserEditor';
 import type { PortalUserRow, Role, SecurityGroup } from '../api/types';
 import { ConfigHeader } from '../components/ConfigHeader';
 import { DataGrid } from '../components/DataGrid';
@@ -47,71 +50,25 @@ function TempPassword({ email, password, onClose }: { email: string; password: s
 }
 
 // ── Users ──
-type UserForm = { email: string; first_name: string; last_name: string; role_id: string | null; security_group_id: string | null; is_active: boolean };
-
 function UsersTab() {
   const qc = useQueryClient();
+  const can = useCan();
+  const manage = can('users.manage');
   const { data: users = [], isFetching } = usePortalUsers();
-  const { data: roles = [] } = useRoles();
   const { data: groups = [] } = useSecurityGroups();
   const { data: me } = useMe();
   const [editing, setEditing] = useState<PortalUserRow | 'new' | null>(null);
   const [params] = useSearchParams();
   const [search, setSearch] = useState(params.get('q') ?? '');
   const [temp, setTemp] = useState<{ email: string; password: string } | null>(null);
-  const roleById = useMemo(() => new Map(roles.map((r) => [r.id, r])), [roles]);
   const sgById = useMemo(() => new Map(groups.map((g) => [g.id, g])), [groups]);
-
-  const form = useForm<UserForm>({
-    initialValues: { email: '', first_name: '', last_name: '', role_id: null, security_group_id: null, is_active: true },
-    validate: {
-      email: (v) => (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.trim()) ? null : 'Enter a valid email address'),
-      role_id: (v) => (v ? null : 'Choose a role'),
-      security_group_id: (v, all) => (v || roleById.get(all.role_id ?? '')?.is_admin ? null : 'Choose a security group'),
-    },
-  });
-  const open = (u: PortalUserRow | 'new') => {
-    form.reset();
-    if (u !== 'new') {
-      form.setValues({ email: u.email, first_name: u.first_name ?? '', last_name: u.last_name ?? '', role_id: u.role_id,
-                       security_group_id: u.security_group_id, is_active: u.is_active });
-    }
-    setEditing(u);
-  };
-  const refresh = () => { qc.invalidateQueries({ queryKey: ['portal-users'] }); qc.invalidateQueries({ queryKey: ['roles'] }); qc.invalidateQueries({ queryKey: ['security-groups'] }); };
-  const save = form.onSubmit(async (v) => {
-    try {
-      if (editing === 'new') {
-        const res = await api<{ portal_user: PortalUserRow; temp_password: string }>('/api/portal/users', { method: 'POST', json: {
-          email: v.email.trim(), first_name: v.first_name.trim() || null, last_name: v.last_name.trim() || null,
-          role_id: v.role_id, security_group_id: v.security_group_id,
-        } });
-        setTemp({ email: res.portal_user.email, password: res.temp_password });
-      } else if (editing) {
-        await api(`/api/portal/users/${editing.id}`, { method: 'PATCH', json: {
-          first_name: v.first_name, last_name: v.last_name, role_id: v.role_id, security_group_id: v.security_group_id,
-          ...(v.is_active !== editing.is_active ? { is_active: v.is_active } : {}),
-        } });
-        notifications.show({ color: 'green', message: 'User saved' });
-      }
-      refresh();
-      setEditing(null);
-    } catch (e) { fail(e); }
-  });
-  const resetPassword = (u: PortalUserRow) => modals.openConfirmModal({
-    title: `Reset password for ${u.email}?`, children: <Text size="sm">Their current password stops working straight away.</Text>,
-    labels: { confirm: 'Reset password', cancel: 'Cancel' },
-    onConfirm: async () => {
-      try { const r = await api<{ temp_password: string }>(`/api/portal/users/${u.id}/reset-password`, { method: 'POST' }); setTemp({ email: u.email, password: r.temp_password }); }
-      catch (e) { fail(e); }
-    },
-  });
+  const refresh = () => { qc.invalidateQueries({ queryKey: ['portal-users'] }); qc.invalidateQueries({ queryKey: ['roles'] }); };
   const setActive = async (u: PortalUserRow, active: boolean) => {
     try { await api(`/api/portal/users/${u.id}`, { method: 'PATCH', json: { is_active: active } }); refresh(); } catch (e) { fail(e); }
   };
 
   const isSelf = (u: PortalUserRow) => u.id === me?.portal_user.id;
-  const rows = users.filter((u) => !search || `${u.email} ${fullName(u)}`.toLowerCase().includes(search.toLowerCase()));
+  const rows = users.filter((u) => !search || `${u.email} ${fullName(u)} ${(u.role_names ?? []).join(' ')}`.toLowerCase().includes(search.toLowerCase()));
   const cols: ColDef<PortalUserRow>[] = [
     { colId: 'state', headerName: '', width: 54, minWidth: 54, sortable: false, filter: false, pinned: 'left', lockPosition: 'left',
       cellRenderer: (p: ICellRendererParams<PortalUserRow>) => p.data &&
@@ -120,69 +77,44 @@ function UsersTab() {
     { colId: 'username', headerName: 'Username', field: 'email', flex: 1.2, minWidth: 200 },
     { colId: 'last_login', headerName: 'Last login', field: 'last_login_at', valueFormatter: (p) => dateTime(p.value), width: 170 },
     { colId: 'last_activity', headerName: 'Last activity', field: 'last_active_at', valueFormatter: (p) => dateTime(p.value), width: 170 },
-    { colId: 'role', headerName: 'Role', valueGetter: (p) => roleById.get(p.data?.role_id ?? '')?.name ?? (p.data?.is_group_admin ? 'User Group Administrator' : '—'), flex: 1, minWidth: 170 },
+    { colId: 'role', headerName: 'Roles', valueGetter: (p) => (p.data?.role_names ?? []).join(', ') || '—', flex: 1.3, minWidth: 200,
+      tooltipValueGetter: (p) => (p.data?.role_names ?? []).join(', ') },
     { colId: 'security_group', headerName: 'Security group', flex: 1, minWidth: 150,
       valueGetter: (p) => sgById.get(p.data?.security_group_id ?? '')?.name ?? '',
       cellRenderer: (p: ICellRendererParams<PortalUserRow>) => p.data && (p.value
         ? p.value
-        : roleById.get(p.data.role_id ?? '')?.is_admin || p.data.is_group_admin
+        : p.data.role === 'admin' || p.data.is_group_admin
           ? <Text size="sm" c="dimmed">All vehicles</Text>
-          : <Badge size="sm" color="orange" variant="light">None — sees no vehicles</Badge>) },
+          : <Text size="sm" c="dimmed">—</Text>) },
     { colId: 'status', headerName: 'Status', field: 'is_active', width: 110, hide: true,
       cellRenderer: (p: ICellRendererParams<PortalUserRow>) => p.data && <Badge size="sm" variant="light" color={p.data.is_active ? 'green' : 'gray'}>{p.data.is_active ? 'Active' : 'Disabled'}</Badge> },
     { colId: 'created', headerName: 'Created', field: 'created_at', valueFormatter: (p) => dateTime(p.value), width: 170, hide: true },
-    { headerName: '', width: 60, minWidth: 60, sortable: false, filter: false, pinned: 'right',
+    ...(manage ? [{ headerName: '', width: 60, minWidth: 60, sortable: false, filter: false, pinned: 'right' as const,
       cellRenderer: (p: ICellRendererParams<PortalUserRow>) => p.data && !isSelf(p.data) && (
         <Menu position="bottom-end" withinPortal>
           <Menu.Target><ActionIcon variant="subtle" color="gray" aria-label="User actions"><IconDots size={16} /></ActionIcon></Menu.Target>
           <Menu.Dropdown>
-            <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => open(p.data!)}>Edit</Menu.Item>
-            <Menu.Item leftSection={<IconKey size={14} />} onClick={() => resetPassword(p.data!)}>Reset password</Menu.Item>
+            <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => setEditing(p.data!)}>Edit</Menu.Item>
             {p.data.is_active
               ? <Menu.Item color="red" leftSection={<IconUserOff size={14} />} onClick={() => setActive(p.data!, false)}>Disable</Menu.Item>
               : <Menu.Item leftSection={<IconUserCheck size={14} />} onClick={() => setActive(p.data!, true)}>Enable</Menu.Item>}
           </Menu.Dropdown>
-        </Menu>) },
+        </Menu>) }] : []),
   ];
-  const chosenRole = roleById.get(form.values.role_id ?? '');
 
   return (
     <Stack gap="sm" className={classes.tabBody}>
       <Group justify="space-between">
-        <TextInput size="xs" w={260} placeholder="Search name or email" leftSection={<IconSearch size={14} />} value={search}
+        <TextInput size="xs" w={260} placeholder="Search name, email or role" leftSection={<IconSearch size={14} />} value={search}
                    onChange={(e) => setSearch(e.currentTarget.value)} />
-        <Button size="xs" leftSection={<IconPlus size={14} />} onClick={() => open('new')}>Add user</Button>
+        {manage && <Button size="xs" leftSection={<IconPlus size={14} />} onClick={() => setEditing('new')}>Add user</Button>}
       </Group>
       <Paper withBorder className={classes.grid}>
         <DataGrid rowData={rows} columnDefs={cols} loading={isFetching && !users.length} getRowId={(p) => p.data.id} stateKey="config-users"
-                  onRowDoubleClicked={(e) => e.data && !isSelf(e.data) && open(e.data)} />
+                  onRowDoubleClicked={(e) => manage && e.data && !isSelf(e.data) && setEditing(e.data)} />
       </Paper>
-      <Modal opened={!!editing} onClose={() => setEditing(null)} title={editing === 'new' ? 'Add user' : 'Edit user'} size="lg">
-        <form onSubmit={save}>
-          <Stack>
-            <TextInput label="Email" disabled={editing !== 'new'} {...form.getInputProps('email')} data-autofocus />
-            <SimpleGrid cols={2}>
-              <TextInput label="First name" {...form.getInputProps('first_name')} />
-              <TextInput label="Last name" {...form.getInputProps('last_name')} />
-              <Select label="Role" placeholder="Choose a role" allowDeselect={false} withAsterisk
-                      data={roles.map((r) => ({ value: r.id, label: r.name }))} {...form.getInputProps('role_id')} />
-              <Select label="Security group" placeholder={chosenRole?.is_admin ? 'Optional — admins see all vehicles' : 'Choose a security group'}
-                      clearable withAsterisk={!chosenRole?.is_admin}
-                      data={groups.map((g) => ({ value: g.id, label: g.name }))} {...form.getInputProps('security_group_id')} />
-            </SimpleGrid>
-            {chosenRole && (
-              <Text size="xs" c="dimmed">{chosenRole.description || `${chosenRole.permissions.length} permissions`}
-                {chosenRole.is_admin ? '' : ' · Sees only the vehicles in their security group.'}</Text>
-            )}
-            {groups.length === 0 && (
-              <Alert color="orange" variant="light" p="xs">Create a security group first (Security groups tab).</Alert>
-            )}
-            {editing !== 'new' && <Switch label="Active (can sign in)" {...form.getInputProps('is_active', { type: 'checkbox' })} />}
-            <Group justify="flex-end"><Button variant="default" onClick={() => setEditing(null)}>Cancel</Button>
-              <Button type="submit">{editing === 'new' ? 'Add user' : 'Save'}</Button></Group>
-          </Stack>
-        </form>
-      </Modal>
+      <UserEditor opened={!!editing} user={editing === 'new' ? null : editing} onClose={() => setEditing(null)}
+                  onCreated={(email, password) => setTemp({ email, password })} />
       <TempPassword email={temp?.email ?? ''} password={temp?.password ?? null} onClose={() => setTemp(null)} />
     </Stack>
   );
@@ -261,124 +193,61 @@ function SecurityGroupsTab() {
 // ── Roles ──
 function RolesTab() {
   const qc = useQueryClient();
-  const can = useCan();
-  const manage = can('security.manage');
-  const { data: roles = [] } = useRoles();
-  const { data: permissions = [] } = usePermissions();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<{ name: string; description: string; permissions: string[] } | null>(null);
-  const [creating, setCreating] = useState(false);
-  const selected = roles.find((r) => r.id === selectedId) ?? roles[0];
-  const sections = useMemo(() => [...new Set(permissions.map((p) => p.section))], [permissions]);
-
-  const edit = (r: Role) => { setSelectedId(r.id); setCreating(false); setDraft({ name: r.name, description: r.description ?? '', permissions: [...r.permissions] }); };
-  const startNew = () => { setCreating(true); setDraft({ name: '', description: '', permissions: ['map.view'] }); };
-  const shown = draft ?? (selected ? { name: selected.name, description: selected.description ?? '', permissions: selected.permissions } : null);
-  const readOnly = !manage || !draft || (!creating && selected?.is_admin);
-  const toggle = (key: string) => setDraft((d) => d && { ...d, permissions: d.permissions.includes(key) ? d.permissions.filter((p) => p !== key) : [...d.permissions, key] });
-
-  const save = async () => {
-    if (!draft) return;
-    try {
-      const saved = creating
-        ? await api<Role>('/api/portal/roles', { method: 'POST', json: draft })
-        : await api<Role>(`/api/portal/roles/${selected!.id}`, { method: 'PUT', json: draft });
-      await qc.invalidateQueries({ queryKey: ['roles'] });
-      qc.invalidateQueries({ queryKey: ['me'] });
-      setSelectedId(saved.id); setDraft(null); setCreating(false);
-      notifications.show({ color: 'green', message: `Role “${saved.name}” saved` });
-    } catch (e) { fail(e); }
-  };
+  const manage = useCan()('roles.manage');
+  const { data: roles = [], isFetching } = useRoles();
+  const [editing, setEditing] = useState<Role | 'new' | null>(null);
   const remove = (r: Role) => modals.openConfirmModal({
     title: `Delete role “${r.name}”?`, labels: { confirm: 'Delete', cancel: 'Cancel' }, confirmProps: { color: 'red' },
-    children: <Text size="sm">Only roles with no users can be deleted.</Text>,
-    onConfirm: async () => { try { await api(`/api/portal/roles/${r.id}`, { method: 'DELETE' }); setSelectedId(null); qc.invalidateQueries({ queryKey: ['roles'] }); } catch (e) { fail(e); } },
+    children: <Text size="sm">Only roles that nobody holds can be deleted.</Text>,
+    onConfirm: async () => { try { await api(`/api/portal/roles/${r.id}`, { method: 'DELETE' }); qc.invalidateQueries({ queryKey: ['roles'] }); } catch (e) { fail(e); } },
   });
-
+  const cols: ColDef<Role>[] = [
+    { colId: 'name', headerName: 'Role', field: 'name', flex: 1, minWidth: 200,
+      cellRenderer: (p: ICellRendererParams<Role>) => p.data && (
+        <Group gap={6} wrap="nowrap">
+          <Text size="sm" fw={600}>{p.data.name}</Text>
+          {p.data.is_admin ? <Badge size="xs" color="red" variant="light">Admin</Badge>
+            : p.data.is_system ? <Tooltip label="Built-in role — duplicate it to make your own"><Badge size="xs" variant="default" leftSection={<IconLock size={10} />}>Built-in</Badge></Tooltip> : null}
+        </Group>) },
+    { colId: 'description', headerName: 'What it’s for', field: 'description', flex: 2, minWidth: 260, valueFormatter: (p) => p.value || '—' },
+    { colId: 'features', headerName: 'Features', width: 120, valueGetter: (p) => p.data?.permissions.length ?? 0,
+      valueFormatter: (p) => (p.data?.is_admin ? 'All' : String(p.value)) },
+    { colId: 'users', headerName: 'Users', field: 'user_count', width: 100 },
+    ...(manage ? [{ headerName: '', width: 60, minWidth: 60, sortable: false, filter: false, pinned: 'right' as const,
+      cellRenderer: (p: ICellRendererParams<Role>) => p.data && (
+        <Menu position="bottom-end" withinPortal>
+          <Menu.Target><ActionIcon variant="subtle" color="gray" aria-label="Role actions"><IconDots size={16} /></ActionIcon></Menu.Target>
+          <Menu.Dropdown>
+            <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => setEditing(p.data!)}>{p.data.is_system ? 'Open' : 'Edit'}</Menu.Item>
+            {!p.data.is_system && <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => remove(p.data!)}>Delete</Menu.Item>}
+          </Menu.Dropdown>
+        </Menu>) }] : []),
+  ];
   return (
-    <div className={classes.roles}>
-      <Paper withBorder className={classes.roleList}>
-        <Group justify="space-between" p="sm" className={classes.roleListHead}>
-          <Text fw={650} size="sm">Roles</Text>
-          {manage && <Button size="compact-xs" variant="light" leftSection={<IconPlus size={12} />} onClick={startNew}>New role</Button>}
-        </Group>
-        <ScrollArea type="auto" className={classes.roleScroll}>
-          {roles.map((r) => (
-            <UnstyledButton key={r.id} className={`${classes.roleRow} ${!creating && selected?.id === r.id ? classes.roleActive : ''}`}
-                            onClick={() => { setSelectedId(r.id); setDraft(null); setCreating(false); }}>
-              <Group justify="space-between" wrap="nowrap">
-                <div style={{ minWidth: 0 }}>
-                  <Group gap={6} wrap="nowrap">
-                    <Text size="sm" fw={600} truncate>{r.name}</Text>
-                    {r.is_system && <Tooltip label="Built-in role"><IconLock size={12} opacity={0.5} /></Tooltip>}
-                  </Group>
-                  <Text size="xs" c="dimmed">{r.is_admin ? 'All permissions · all vehicles' : `${r.permissions.length} permissions`}</Text>
-                </div>
-                <Badge size="sm" variant="default">{r.user_count}</Badge>
-              </Group>
-            </UnstyledButton>
-          ))}
-        </ScrollArea>
+    <Stack gap="sm">
+      <Group justify="space-between">
+        <Text size="sm" c="dimmed" maw={720}>
+          A role is a set of features. Users can hold several roles and may do anything one of them allows. Built-in roles are kept up to date for you;
+          duplicate one to make your own.
+        </Text>
+        {manage && <Button size="xs" leftSection={<IconPlus size={14} />} onClick={() => setEditing('new')}>New role</Button>}
+      </Group>
+      <Paper withBorder className={classes.grid}>
+        <DataGrid rowData={roles} columnDefs={cols} loading={isFetching && !roles.length} getRowId={(p) => p.data.id} stateKey="config-roles"
+                  onRowDoubleClicked={(e) => e.data && setEditing(e.data)} />
       </Paper>
-
-      <Paper withBorder p="lg" className={classes.roleDetail}>
-        {shown && (
-          <Stack gap="md">
-            <Group justify="space-between" align="flex-start">
-              {draft && (creating || !selected?.is_system) ? (
-                <TextInput label="Role name" value={draft.name} w={320} data-autofocus
-                           onChange={(e) => { const v = e.currentTarget.value; setDraft((d) => d && { ...d, name: v }); }} />
-              ) : (
-                <div>
-                  <Title order={3}>{shown.name}</Title>
-                  <Text size="sm" c="dimmed">{selected?.is_admin ? 'Can do everything and sees every vehicle. Its permissions can’t be changed.'
-                    : `${selected?.user_count ?? 0} user${selected?.user_count === 1 ? '' : 's'} · sees vehicles in their own security group`}</Text>
-                </div>
-              )}
-              {manage && !draft && selected && !selected.is_admin && (
-                <Group gap="xs">
-                  <Button size="xs" variant="light" leftSection={<IconPencil size={14} />} onClick={() => edit(selected)}>Edit permissions</Button>
-                  {!selected.is_system && <Button size="xs" variant="subtle" color="red" leftSection={<IconTrash size={14} />} onClick={() => remove(selected)}>Delete</Button>}
-                </Group>
-              )}
-            </Group>
-            {draft && (
-              <Textarea label="Description" autosize minRows={1} value={draft.description}
-                        onChange={(e) => { const v = e.currentTarget.value; setDraft((d) => d && { ...d, description: v }); }} />
-            )}
-            {!draft && shown.description && <Text size="sm">{shown.description}</Text>}
-            <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
-              {sections.map((section) => (
-                <Paper key={section} withBorder p="sm" radius="md">
-                  <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb="xs">{section}</Text>
-                  <Stack gap={8}>
-                    {permissions.filter((p) => p.section === section).map((p) => (
-                      <Checkbox key={p.key} label={p.label} checked={shown.permissions.includes(p.key)}
-                                disabled={!!readOnly} onChange={() => toggle(p.key)} />
-                    ))}
-                  </Stack>
-                </Paper>
-              ))}
-            </SimpleGrid>
-            {draft && (
-              <Group justify="flex-end">
-                <Button variant="default" onClick={() => { setDraft(null); setCreating(false); }}>Cancel</Button>
-                <Button onClick={save} disabled={!draft.name.trim()}>{creating ? 'Create role' : 'Save role'}</Button>
-              </Group>
-            )}
-          </Stack>
-        )}
-      </Paper>
-    </div>
+      <RoleEditor opened={!!editing} role={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />
+    </Stack>
   );
 }
 
 /** Configuration → Users → Users */
 export function UsersPage() {
+  const can = useCan();
   return (
     <Stack p="lg" gap={0}>
       <ConfigHeader section="Users" title="Users" description="People who can sign in, with their role and the security group whose vehicles they see." />
-      {useCan()('users.manage') ? <UsersTab /> : <Text c="dimmed">Your role doesn’t include managing users.</Text>}
+      {can('users.view') || can('users.manage') ? <UsersTab /> : <Text c="dimmed">Your roles don’t include seeing users.</Text>}
     </Stack>
   );
 }
@@ -389,7 +258,8 @@ export function SecurityPage() {
   if (params.get('tab') === 'users') return <Navigate to="/configuration/users" replace />;
   const tabs = [
     { value: 'groups', label: 'Security groups', icon: IconUsersGroup, show: can('security.manage') || can('users.manage') },
-    { value: 'roles', label: 'Roles & permissions', icon: IconShieldLock, show: can('security.manage') || can('users.manage') },
+    { value: 'roles', label: 'Roles', icon: IconShieldLock, show: can('roles.manage') || can('users.manage') || can('users.view') },
+    { value: 'audit', label: 'Audit Trail', icon: IconHistory, show: can('audit.view') },
   ].filter((t) => t.show);
   const tab = tabs.some((t) => t.value === params.get('tab')) ? params.get('tab')! : tabs[0]?.value;
 
@@ -402,13 +272,14 @@ export function SecurityPage() {
         </Breadcrumbs>
         <Title order={2}>Security</Title>
       </Stack>
-      {tabs.length === 0 ? <Text c="dimmed">Your role doesn’t include managing users or security.</Text> : (
+      {tabs.length === 0 ? <Text c="dimmed">Your roles don’t include security settings.</Text> : (
         <Tabs value={tab} onChange={(v) => setParams(v ? { tab: v } : {}, { replace: true })} keepMounted={false}>
           <Tabs.List mb="md">
             {tabs.map((t) => <Tabs.Tab key={t.value} value={t.value} leftSection={<t.icon size={16} />}>{t.label}</Tabs.Tab>)}
           </Tabs.List>
           <Tabs.Panel value="groups"><SecurityGroupsTab /></Tabs.Panel>
           <Tabs.Panel value="roles"><RolesTab /></Tabs.Panel>
+          <Tabs.Panel value="audit"><AuditTrail /></Tabs.Panel>
         </Tabs>
       )}
     </Stack>

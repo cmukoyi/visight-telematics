@@ -3095,14 +3095,7 @@ async function loadGroupTags() {
 
     tb.innerHTML = `<tr><td colspan="${colSpan}" style="text-align:center;padding:40px;color:var(--gray)">Loading…</td></tr>`;
 
-    // Fetch domain hint
-    try {
-        const sRes = await apiFetch('/api/portal/settings');
-        const settings = await sRes.json();
-        hint.textContent = settings.email_domain
-            ? `Showing all tags for users with @${settings.email_domain.split(',').map(d => d.trim()).join(' or @')} emails.`
-            : 'No domain configured — contact your administrator to configure the email domain.';
-    } catch (_) { hint.textContent = ''; }
+    hint.textContent = '';
 
     try {
         const tRes = await apiFetch('/api/portal/tags');
@@ -3373,7 +3366,7 @@ async function populateLanguageSelector() {
     });
 }
 
-let _settingsCache   = null;   // /api/portal/settings (email_domain etc.)
+let _settingsCache   = null;   // /api/portal/settings
 let _themeCache      = null;   // /api/portal/theme
 let _notifCache      = null;   // /api/portal/notifications
 let _logoDataPending     = undefined; // undefined = unchanged; null = remove; string = new data-URL

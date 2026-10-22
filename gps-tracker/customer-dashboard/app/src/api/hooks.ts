@@ -4,7 +4,7 @@ import { getSession, saveAccess } from '../auth/session';
 import type {
   Alert, Branding, Category, DataExchangeStatus, DeviceEvent, EventTypes, GroupTheme, Kpis, LivePosition, Me,
   NotificationRule, Permission, Place, PortalUserRow, ReportDef, ReportSchedule, Role, RulesMeta, SecurityGroup, Trip,
-  TripDetail, Vehicle, VehicleStatus, PlaceGroup, EventTypeRow, EventTypeGroup, GeofenceRow, NotificationPrefs, FleetStatusRow,
+  TripDetail, Vehicle, VehicleStatus, PlaceGroup, EventTypeRow, EventTypeGroup, AuditRow, GeofenceRow, NotificationPrefs, FleetStatusRow,
 } from './types';
 import { cachedLook } from '../utils/look';
 
@@ -117,6 +117,11 @@ export const usePermissions = () =>
   useQuery({ queryKey: ['permissions'], queryFn: () => api<Permission[]>('/api/portal/access/permissions'), staleTime: Infinity });
 
 export const useRoles = () => useQuery({ queryKey: ['roles'], queryFn: () => api<Role[]>('/api/portal/roles') });
+
+export interface AuditFilters { date_from?: string; date_to?: string; user_id?: string | null; area?: string | null; outcome?: string | null; search?: string }
+/** Configuration → Security → Audit Trail. */
+export const useAudit = (f: AuditFilters, enabled = true) =>
+  useQuery({ queryKey: ['audit', f], queryFn: () => api<{ rows: AuditRow[]; areas: string[] }>(`/api/portal/audit${qs({ ...f, limit: 2000 })}`), enabled });
 
 export const useSecurityGroups = () =>
   useQuery({ queryKey: ['security-groups'], queryFn: () => api<SecurityGroup[]>('/api/portal/security-groups') });

@@ -30,40 +30,18 @@ def _get_usergroup_device_imeis(usergroup_id: str, db: Session) -> List[str]:
     Get all device IMEIs belonging to a usergroup.
     
     Implements proper multi-tenant isolation by:
-    1. Finding users whose email domain matches the group's domain
-    2. Finding users explicitly linked via PortalUser table
-    3. Querying BLETag where user_id matches OR tag was created by the group
-    4. Returning distinct IMEIs for devices owned by the group
+    1. Finding mobile-app users linked via the PortalUser table
+    2. Querying BLETag where user_id matches OR tag was created by the group
+    3. Returning distinct IMEIs for devices owned by the group
     """
     # Get the usergroup
     group = db.query(UserGroup).filter(UserGroup.id == usergroup_id).first()
     if not group:
         return []
     
-    # Helper to extract domains from group
-    def _domains(g):
-        domain = g.email_domain
-        if not domain or not domain.strip():
-            return []
-        return [d.strip().lower() for d in domain.split(",") if d.strip()]
-    
-    # Helper to build domain filter
-    def _domain_filter(domains):
-        conditions = []
-        for d in domains:
-            conditions.append(User.email.ilike(f"%@{d}"))
-        return or_(*conditions) if conditions else False
-    
-    domains = _domains(group)
     group_id = str(group.id)
-    
-    # Source 1: Domain-matched users (auto-assigned via email domain)
-    domain_user_ids = []
-    if domains:
-        domain_user_rows = db.query(User.id).filter(_domain_filter(domains)).all()
-        domain_user_ids = [str(uid) for (uid,) in domain_user_rows]
-    
-    # Source 2: Manually assigned users (via PortalUser table)
+
+    # Mobile-app users linked to the group (via PortalUser table)
     portal_user_rows = (
         db.query(User.id)
         .join(PortalUser, User.email == PortalUser.email)
@@ -72,8 +50,7 @@ def _get_usergroup_device_imeis(usergroup_id: str, db: Session) -> List[str]:
     )
     portal_user_ids = [str(uid) for (uid,) in portal_user_rows]
     
-    # UNION: All users in this group
-    all_owner_ids = list(set(domain_user_ids + portal_user_ids))
+    all_owner_ids = list(set(portal_user_ids))
     
     # Query BLETag with group scope filter
     tag_scope_filter = (

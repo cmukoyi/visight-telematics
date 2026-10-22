@@ -835,7 +835,6 @@ class UserGroupCreate(BaseModel):
     admin_email: str             # portal admin email
     admin_first_name: str = ""
     admin_last_name: str = ""
-    email_domain: Optional[str] = None   # comma-separated e.g. "acme.com,acme.co.za"
     package_id: Optional[str] = None     # default package UUID (optional)
     allowed_tag_types: Optional[list] = None  # e.g. ["series1", "series2"] — None means all allowed
 
@@ -869,7 +868,6 @@ class UserGroupOut(BaseModel):
     name: str
     slug: str
     is_active: bool
-    email_domain: Optional[str] = None
     default_package_id: Optional[str] = None
     default_package_name: Optional[str] = None
     allowed_sections: Optional[list] = None
@@ -918,7 +916,6 @@ class UserGroupOut(BaseModel):
             name=g.name,
             slug=g.slug,
             is_active=g.is_active,
-            email_domain=g.email_domain,
             default_package_id=default_pkg_id,
             default_package_name=default_pkg_name,
             allowed_sections=g.allowed_sections,
@@ -969,12 +966,6 @@ def create_usergroup(
         slug = f"{base_slug}-{counter}"
         counter += 1
 
-    # Normalise email_domain (strip spaces, lowercase, remove leading @)
-    domain_value = None
-    if data.email_domain:
-        raw_domains = [d.strip().lower().lstrip("@") for d in data.email_domain.split(",") if d.strip()]
-        domain_value = ",".join(raw_domains) if raw_domains else None
-
     # Create group
     import uuid as _uuid
     group = UserGroup(
@@ -982,7 +973,6 @@ def create_usergroup(
         name=data.name,
         slug=slug,
         is_active=True,
-        email_domain=domain_value,
         allowed_tag_types=data.allowed_tag_types,
     )
     db.add(group)
@@ -1114,7 +1104,6 @@ def activate_usergroup(
 
 
 class UserGroupUpdate(BaseModel):
-    email_domain: Optional[str] = None   # empty string clears it; comma-separated for multiple domains
     allowed_sections: Optional[list] = None  # e.g. ["tracking","management","reports"] — None means no change
     allowed_tag_types: Optional[list] = None  # e.g. ["series1","series2"] — None means no change
     default_language: Optional[str] = None  # e.g. "en", "fr" — None means no change
@@ -1127,32 +1116,13 @@ def update_usergroup(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Update UserGroup settings (manager+). Supports comma-separated email_domain for multiple domains."""
+    """Update UserGroup settings (manager+)."""
     admin = get_admin_from_request(request, db)
     if not check_role_permission(admin.role, "manager"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires manager role")
     group = db.query(UserGroup).filter(UserGroup.id == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="User group not found")
-    if data.email_domain is not None:
-        # Parse and normalise the comma-separated list
-        raw_domains = [d.strip().lower().lstrip("@") for d in data.email_domain.split(",")]
-        clean_domains = [d for d in raw_domains if d]
-        domain_value = ",".join(clean_domains) or None
-        # Ensure no other group claims any of these domains
-        if clean_domains:
-            for d in clean_domains:
-                conflict = (
-                    db.query(UserGroup)
-                    .filter(UserGroup.email_domain.ilike(f"%{d}%"), UserGroup.id != group_id)
-                    .first()
-                )
-                if conflict:
-                    # Check exact match within comma-separated list
-                    existing = [x.strip().lower() for x in (conflict.email_domain or "").split(",")]
-                    if d in existing:
-                        raise HTTPException(status_code=409, detail=f"Domain '{d}' is already used by another group")
-        group.email_domain = domain_value
 
     # allowed_sections: use model_fields_set so explicit null = "reset to all"
     if "allowed_sections" in data.model_fields_set:
@@ -1188,7 +1158,6 @@ def update_usergroup(
     return {
         "id": str(group.id),
         "name": group.name,
-        "email_domain": group.email_domain,
         "allowed_sections": group.allowed_sections,
         "allowed_tag_types": group.allowed_tag_types,
         "default_language": group.default_language
@@ -2254,3 +2223,25 @@ def update_tenant_features(
 # ═══════════════════════════════════════════════════════════════════════════
 
 
+
+
+@router.get("/usergroups/{group_id}/audit")
+async def get_usergroup_audit(
+    group_id: str,
+    request: Request,
+    days: int = 30,
+    search: Optional[str] = None,
+    limit: int = 1000,
+    db: Session = Depends(get_db),
+):
+    """What a user group's portal users changed (and their sign-ins), newest first."""
+    from app.services import audit_service
+    admin = get_admin_from_request(request, db)
+    if not check_role_permission(admin.role, "manager"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires manager role")
+    group = db.query(UserGroup).filter(UserGroup.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="User group not found")
+    since = datetime.utcnow() - timedelta(days=max(1, min(days, 365)))
+    return {"group": group.name,
+            "rows": audit_service.search(db, group.id, date_from=since, text=search, limit=min(limit, 5000))}

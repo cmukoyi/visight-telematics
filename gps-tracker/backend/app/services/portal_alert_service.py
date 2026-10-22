@@ -38,8 +38,8 @@ def _groups_for_tag(db: Session, tag: BLETag) -> list[str]:
     Priority order:
       1. POI-based: find all active UserGroups that own POIs this tag is armed to
          (POITrackerLink → POI.usergroup_id).  This is the correct structural link.
-      2. Email-domain fallback: match the tag owner's email domain against
-         UserGroup.email_domain — used for groups that don't use portal-managed POIs.
+      2. The group the device was created for (attributes._created_usergroup_id),
+         e.g. Teltonika devices routed from a Data Exchange.
 
     Returns a deduplicated list of group ID strings (may be empty).
     """
@@ -62,20 +62,11 @@ def _groups_for_tag(db: Session, tag: BLETag) -> list[str]:
         for poi in pois_with_group:
             found[str(poi.usergroup_id)] = True
 
-    # ── 2. Email-domain fallback ───────────────────────────────────────────
+    # ── 2. The group the device was created for ─────────────────────────────
     if not found:
-        user = db.query(User).filter(User.id == tag.user_id).first()
-        if user and user.email and "@" in user.email:
-            domain = user.email.split("@")[-1].lower()
-            groups = (
-                db.query(UserGroup)
-                .filter(UserGroup.email_domain.isnot(None), UserGroup.is_active == True)
-                .all()
-            )
-            for g in groups:
-                domains = [d.strip().lower() for d in (g.email_domain or "").split(",")]
-                if domain in domains:
-                    found[str(g.id)] = True
+        created_for = (tag.attributes or {}).get("_created_usergroup_id")
+        if created_for and db.query(UserGroup.id).filter(UserGroup.id == created_for, UserGroup.is_active == True).first():  # noqa: E712
+            found[str(created_for)] = True
 
     return list(found.keys())
 

@@ -166,7 +166,7 @@ class EventTypeIn(BaseModel):
 
 @router.put("/event-type-list/{code}")
 def update_event_type(code: str, data: EventTypeIn, request: Request, db: Session = Depends(get_db)):
-    me = _me(request, db, "settings.manage", "rules.manage")
+    me = _me(request, db, "events.manage")
     if code not in EVENTS:
         raise HTTPException(status_code=404, detail="Unknown event type")
     st = db.get(EventTypeSetting, (me.usergroup_id, code))
@@ -220,7 +220,7 @@ def list_event_groups(request: Request, db: Session = Depends(get_db)):
 
 @router.post("/event-type-groups", status_code=201)
 def create_event_group(data: EventGroupIn, request: Request, db: Session = Depends(get_db)):
-    me = _me(request, db, "rules.manage", "settings.manage")
+    me = _me(request, db, "events.manage")
     _unique(db, EventTypeGroup, me, data.name)
     g = EventTypeGroup(usergroup_id=me.usergroup_id, name=data.name, codes=data.codes)
     db.add(g)
@@ -230,7 +230,7 @@ def create_event_group(data: EventGroupIn, request: Request, db: Session = Depen
 
 @router.put("/event-type-groups/{gid}")
 def update_event_group(gid: str, data: EventGroupIn, request: Request, db: Session = Depends(get_db)):
-    me = _me(request, db, "rules.manage", "settings.manage")
+    me = _me(request, db, "events.manage")
     g = _own_eg(db, me, gid)
     _unique(db, EventTypeGroup, me, data.name, exclude=g.id)
     g.name, g.codes = data.name, data.codes
@@ -240,7 +240,7 @@ def update_event_group(gid: str, data: EventGroupIn, request: Request, db: Sessi
 
 @router.delete("/event-type-groups/{gid}", status_code=204)
 def delete_event_group(gid: str, request: Request, db: Session = Depends(get_db)):
-    me = _me(request, db, "rules.manage", "settings.manage")
+    me = _me(request, db, "events.manage")
     g = _own_eg(db, me, gid)
     if db.query(NotificationRule.id).filter(NotificationRule.event_group_id == g.id).first():
         raise HTTPException(status_code=409, detail="A notification rule uses this group; change or delete the rule first")

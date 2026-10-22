@@ -77,7 +77,7 @@ def list_events(request: Request, db: Session = Depends(get_db),
     """Device events, newest first. codes: comma-separated event codes."""
     me = get_portal_user_from_request(request, db)
     access = access_service.for_user(me, db)
-    access.require("history.view")
+    access.require("events.view")
     q = db.query(DeviceEvent).filter(DeviceEvent.usergroup_id == me.usergroup_id)
     visible = access.visible_imeis(db)
     if visible is not None:
@@ -127,7 +127,7 @@ def live(request: Request, db: Session = Depends(get_db), imei: str = Query(...)
     """
     me = get_portal_user_from_request(request, db)
     access = access_service.for_user(me, db)
-    access.require("map.view")
+    access.require("live.track")
     if not access.can_see(db, imei):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     base = db.query(DeviceEvent).filter(DeviceEvent.usergroup_id == me.usergroup_id, DeviceEvent.imei == imei,

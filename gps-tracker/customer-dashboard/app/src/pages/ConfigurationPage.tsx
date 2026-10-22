@@ -35,13 +35,13 @@ interface Section { title: string; icon: typeof IconCar; items: MenuItem[] }
 const SECTIONS: Section[] = [
   { title: 'Vehicles', icon: IconCar, items: [
     { label: 'Vehicles', to: 'devices', any: [] },
-    { label: 'Vehicle Groups', to: 'groups', any: ['vehicles.manage'] },
-    { label: 'Data Exchange', to: 'exchange', any: ['settings.manage'] },
+    { label: 'Vehicle Groups', to: 'groups', any: ['vehicle_groups.manage'] },
+    { label: 'Data Exchange', to: 'exchange', any: ['data_exchange.manage'] },
   ] },
   { title: 'Users', icon: IconUsers, items: [
-    { label: 'Users', to: 'users', any: ['users.manage'] },
+    { label: 'Users', to: 'users', any: ['users.view', 'users.manage'] },
     { label: 'User Groups', to: 'user-groups', any: [] },
-    { label: 'Custom Themes', to: 'custom-themes', any: ['settings.manage'] },
+    { label: 'Custom Themes', to: 'custom-themes', any: ['theme.manage'] },
     { label: 'My Account', to: 'account', any: [] },
   ] },
   { title: 'Places', icon: IconMapPin, items: [
@@ -51,11 +51,12 @@ const SECTIONS: Section[] = [
   ] },
   { title: 'Events', icon: IconBolt, items: [
     { label: 'Event Types', to: 'event-types', any: [] },
-    { label: 'Event Type Groups', to: 'event-type-groups', any: ['inbox.view', 'rules.manage', 'settings.manage'] },
+    { label: 'Event Type Groups', to: 'event-type-groups', any: ['events.manage', 'rules.manage'] },
   ] },
   { title: 'Security', icon: IconShieldLock, items: [
-    { label: 'Security Groups', to: 'security?tab=groups', any: ['users.manage', 'security.manage'] },
-    { label: 'Roles', to: 'security?tab=roles', any: ['users.manage', 'security.manage'] },
+    { label: 'Security Groups', to: 'security?tab=groups', any: ['security.manage', 'users.manage'] },
+    { label: 'Roles', to: 'security?tab=roles', any: ['roles.manage', 'users.manage'] },
+    { label: 'Audit Trail', to: 'security?tab=audit', any: ['audit.view'] },
   ] },
   { title: 'Misc', icon: IconDots, items: [
     { label: 'Notification Rules', to: 'misc/notification-rules', any: ['inbox.view', 'rules.manage'] },
@@ -114,7 +115,9 @@ function Devices() {
   const { data: categories = [] } = useCategories();
   const [editing, setEditing] = useState<Vehicle | null>(null);
   const form = useForm({ initialValues: { description: '', category: '', registration: '', make: '', model: '', year: '', driver: '' } });
-  const admin = useCan()('vehicles.manage');
+  const can = useCan();
+  const admin = can('vehicles.manage');
+  const canDelete = can('vehicles.delete');
 
   const open = (v: Vehicle) => {
     form.setValues({ description: v.description ?? '', category: v.category_name ?? '',
@@ -173,7 +176,7 @@ function Devices() {
       cellRenderer: (p: ICellRendererParams<Vehicle>) => p.data && (
         <Group gap={2} wrap="nowrap">
           <Tooltip label="Edit" withinPortal><ActionIcon size="sm" variant="subtle" onClick={() => open(p.data!)} aria-label="Edit vehicle"><IconPencil size={15} /></ActionIcon></Tooltip>
-          <Tooltip label="Delete" withinPortal><ActionIcon size="sm" variant="subtle" color="red" onClick={() => startDelete(p.data!)} aria-label="Delete vehicle"><IconBan size={15} /></ActionIcon></Tooltip>
+          {canDelete && <Tooltip label="Delete" withinPortal><ActionIcon size="sm" variant="subtle" color="red" onClick={() => startDelete(p.data!)} aria-label="Delete vehicle"><IconBan size={15} /></ActionIcon></Tooltip>}
         </Group>) }] : []),
   ];
 

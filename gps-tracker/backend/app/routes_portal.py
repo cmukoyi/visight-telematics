@@ -190,6 +190,12 @@ def _compute_effective_features(user: "PortalUser", group: "UserGroup") -> list:
     return [f for f in result if f not in _DISABLED_FEATURES]
 
 
+def _require(me: PortalUser, db: Session, *permissions: str) -> None:
+    """403 unless the user's roles grant one of these permissions."""
+    from app.services import access_service
+    access_service.for_user(me, db).require_any(*permissions)
+
+
 def _user_can_manage(me, feature: str) -> bool:
     """True if `me` is allowed to perform write actions on `feature`.
 
@@ -238,6 +244,8 @@ class PortalUserOut(BaseModel):
     custom_features: Optional[list] = None
     mobile_user_id: Optional[UUID] = None
     role_id: Optional[UUID] = None
+    role_ids: List[str] = []
+    role_names: List[str] = []
     security_group_id: Optional[UUID] = None
     created_at: Optional[datetime] = None
     last_login_at: Optional[datetime] = None
@@ -245,6 +253,18 @@ class PortalUserOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+def _user_out(db: Session, user: PortalUser) -> "PortalUserOut":
+    """A portal user with the roles they hold."""
+    from app.models import PortalRole
+    from app.services import access_service
+    out = PortalUserOut.model_validate(user)
+    ids = access_service.role_ids(db, user)
+    roles = db.query(PortalRole).filter(PortalRole.id.in_(ids)).all() if ids else []
+    roles.sort(key=lambda r: (not r.is_admin, r.name.lower()))
+    out.role_ids, out.role_names = [str(r.id) for r in roles], [r.name for r in roles]
+    return out
 
 
 class UserGroupOut(BaseModel):
@@ -348,6 +368,10 @@ def portal_login(data: PortalLoginRequest, request: Request, db: Session = Depen
 
     if not user or not verify_password(user.hashed_password, data.password):
         _login_record_failure(ip)
+        if user is not None:
+            from app.services import audit_service
+            audit_service.record(db, user, "Sign-in failed", "Sign-in", "Wrong password", outcome="failed", ip=ip)
+            db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail="Invalid email or password")
 
@@ -368,6 +392,8 @@ def portal_login(data: PortalLoginRequest, request: Request, db: Session = Depen
 
     _login_record_success(ip)
     user.last_login_at = user.last_active_at = datetime.now(timezone.utc)
+    from app.services import audit_service
+    audit_service.record(db, user, "Signed in", "Sign-in", "Signed in", ip=ip)
     db.commit()
     token = _create_portal_token(str(user.id), str(user.usergroup_id))
     effective = _compute_effective_features(user, group)
@@ -375,7 +401,7 @@ def portal_login(data: PortalLoginRequest, request: Request, db: Session = Depen
     return {
         "access_token": token,
         "token_type": "bearer",
-        "portal_user": PortalUserOut.model_validate(user),
+        "portal_user": _user_out(db, user),
         "usergroup": UserGroupOut.model_validate(group),
         "effective_features": effective,
         "access": access_service.profile(db, access_service.for_user(user, db)),
@@ -393,7 +419,7 @@ def portal_me(
     effective = _compute_effective_features(user, group) if group else []
     from app.services import access_service
     return {
-        "portal_user": PortalUserOut.model_validate(user),
+        "portal_user": _user_out(db, user),
         "usergroup":   UserGroupOut.model_validate(group) if group else None,
         "effective_features": effective,
         "access": access_service.profile(db, access_service.for_user(user, db)),
@@ -410,23 +436,43 @@ class PortalUserCreate(BaseModel):
     last_name: Optional[str] = None
     role: str = "admin"              # legacy: admin | manager | reporter | custom
     custom_features: Optional[list] = None  # only used when role='custom'
-    role_id: Optional[UUID] = None           # a portal_roles row; takes precedence over `role`
+    role_id: Optional[UUID] = None           # one role (older clients); role_ids takes precedence
+    role_ids: Optional[List[UUID]] = None    # the roles the user holds
     security_group_id: Optional[UUID] = None
 
 
-def _check_role_and_security_group(db: Session, usergroup_id, role_id, security_group_id):
-    """Validate a role / security group pair for a user in this group. Returns the role."""
+def _check_roles_and_security_group(db: Session, access, role_ids, security_group_id, current_ids=()):
+    """Validate roles / security group for a user in the caller's group. Returns the roles (admin first).
+
+    A non-admin caller may only give roles whose permissions they hold (roles the
+    user already has may stay).
+    """
     from app.models import PortalRole, SecurityGroup
-    role = db.query(PortalRole).filter(PortalRole.id == role_id, PortalRole.usergroup_id == usergroup_id).first()
-    if not role:
-        raise HTTPException(status_code=400, detail="Choose a role for this user")
+    usergroup_id = access.user.usergroup_id
+    ids = list(dict.fromkeys(str(r) for r in role_ids or []))
+    roles = db.query(PortalRole).filter(PortalRole.id.in_(ids), PortalRole.usergroup_id == usergroup_id).all() if ids else []
+    if not roles:
+        raise HTTPException(status_code=400, detail="Choose at least one role for this user")
+    if len(roles) != len(ids):
+        raise HTTPException(status_code=400, detail="Unknown role")
+    current = {str(r) for r in current_ids}
+    for role in roles:
+        if str(role.id) not in current:
+            access.check_grant(role.permissions or [], admin=role.is_admin)
     if security_group_id is not None:
         if not db.query(SecurityGroup).filter(SecurityGroup.id == security_group_id,
                                               SecurityGroup.usergroup_id == usergroup_id).first():
             raise HTTPException(status_code=400, detail="Unknown security group")
-    elif not role.is_admin:
+    elif not any(r.is_admin or "security.all_vehicles" in (r.permissions or []) for r in roles):
         raise HTTPException(status_code=400, detail="Add the user to a security group so they can see vehicles")
-    return role
+    return sorted(roles, key=lambda r: (not r.is_admin, r.name.lower()))
+
+
+def _guard_admin_target(db: Session, access, target: PortalUser) -> None:
+    """Only an administrator may change, reset or delete an administrator."""
+    from app.services import access_service
+    if not access.is_admin and access_service.for_user(target, db).is_admin:
+        raise HTTPException(status_code=403, detail="Only a User Group Administrator can change an administrator")
 
 
 class PortalUserCreateResponse(BaseModel):
@@ -442,11 +488,11 @@ def list_portal_users(
     """List all portal users in the caller's UserGroup."""
     me = get_portal_user_from_request(request, db)
     from app.services import access_service
-    access_service.for_user(me, db).require("users.manage")
+    access_service.for_user(me, db).require_any("users.view", "users.manage")
     users = db.query(PortalUser).filter(
         PortalUser.usergroup_id == me.usergroup_id,
     ).order_by(PortalUser.created_at).all()
-    return [PortalUserOut.model_validate(user) for user in users]
+    return [_user_out(db, user) for user in users]
 
 
 @router.post("/users", response_model=PortalUserCreateResponse)
@@ -457,9 +503,9 @@ def create_portal_user(
 ):
     """Create a new portal user in the same UserGroup (group admin only)."""
     me = get_portal_user_from_request(request, db)
-    if not _user_can_manage(me, "users"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail="You don't have permission to create users")
+    from app.services import access_service
+    access = access_service.for_user(me, db)
+    access.require("users.manage")
 
     email = data.email.lower().strip()
     if db.query(PortalUser).filter(PortalUser.email == email).first():
@@ -467,12 +513,14 @@ def create_portal_user(
 
     valid_roles = {"admin", "manager", "reporter", "custom"}
     role = data.role if data.role in valid_roles else "admin"
-    from app.services import access_service
     access_service.ensure_defaults(db, me.usergroup_id)
-    new_role = None
-    if data.role_id is not None:
-        new_role = _check_role_and_security_group(db, me.usergroup_id, data.role_id, data.security_group_id)
-        role = "admin" if new_role.is_admin else "custom"
+    wanted = data.role_ids if data.role_ids is not None else ([data.role_id] if data.role_id else None)
+    new_roles = []
+    if wanted is not None:
+        new_roles = _check_roles_and_security_group(db, access, wanted, data.security_group_id)
+        role = "admin" if any(r.is_admin for r in new_roles) else "custom"
+    elif not access.is_admin:
+        raise HTTPException(status_code=400, detail="Choose at least one role for this user")
 
     import secrets as _secrets
     import uuid as _uuid
@@ -488,16 +536,18 @@ def create_portal_user(
         is_active=True,
         is_group_admin=False,
         role=role,
-        custom_features=data.custom_features if (role == "custom" and new_role is None) else None,
-        role_id=new_role.id if new_role else None,
-        security_group_id=data.security_group_id if new_role else None,
+        custom_features=data.custom_features if (role == "custom" and not new_roles) else None,
+        security_group_id=data.security_group_id if new_roles else None,
     )
     db.add(new_user)
+    db.flush()
+    if new_roles:
+        access_service.set_roles(db, new_user, new_roles)
     db.commit()
     db.refresh(new_user)
 
     return PortalUserCreateResponse(
-        portal_user=PortalUserOut.model_validate(new_user),
+        portal_user=_user_out(db, new_user),
         temp_password=temp_password,
     )
 
@@ -508,6 +558,7 @@ class PortalUserPatch(BaseModel):
     role: Optional[str] = None
     custom_features: Optional[list] = None
     role_id: Optional[UUID] = None
+    role_ids: Optional[List[UUID]] = None
     security_group_id: Optional[UUID] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
@@ -522,8 +573,9 @@ def patch_portal_user(
 ):
     """Update is_active and/or expires_at for a portal user (group admin only)."""
     me = get_portal_user_from_request(request, db)
-    if not _user_can_manage(me, "users"):
-        raise HTTPException(status_code=403, detail="You don't have permission to modify users")
+    from app.services import access_service
+    access = access_service.for_user(me, db)
+    access.require("users.manage")
 
     target = db.query(PortalUser).filter(
         PortalUser.id == str(user_id),
@@ -538,14 +590,7 @@ def patch_portal_user(
     if target.role == "system_admin":
         raise HTTPException(status_code=403, detail="Built-in system admin accounts cannot be modified")
 
-    # Non-admin portal users cannot deactivate or set expiry on admin users
-    target_is_admin = target.is_group_admin or target.role == "admin"
-    if target_is_admin and not me.is_group_admin:
-        if data.is_active is not None or "expires_at" in data.model_fields_set:
-            raise HTTPException(
-                status_code=403,
-                detail="Only group admins can deactivate or set expiry on admin users"
-            )
+    _guard_admin_target(db, access, target)
 
     if data.is_active is not None:
         target.is_active = data.is_active
@@ -576,86 +621,64 @@ def patch_portal_user(
         target.first_name = data.first_name.strip() or None
     if data.last_name is not None:
         target.last_name = data.last_name.strip() or None
-    if "role_id" in data.model_fields_set or "security_group_id" in data.model_fields_set:
-        role_id = data.role_id if "role_id" in data.model_fields_set else target.role_id
-        sg_id = data.security_group_id if "security_group_id" in data.model_fields_set else target.security_group_id
-        new_role = _check_role_and_security_group(db, me.usergroup_id, role_id, sg_id)
-        target.role_id, target.security_group_id = new_role.id, sg_id
-        target.role = "admin" if new_role.is_admin else "custom"
-        target.custom_features = None
+    fields = data.model_fields_set
+    if fields & {"role_id", "role_ids", "security_group_id"}:
+        current = access_service.role_ids(db, target)
+        wanted = (data.role_ids if "role_ids" in fields else [data.role_id] if "role_id" in fields and data.role_id else current)
+        sg_id = data.security_group_id if "security_group_id" in fields else target.security_group_id
+        new_roles = _check_roles_and_security_group(db, access, wanted, sg_id, current_ids=current)
+        target.security_group_id = sg_id
+        access_service.set_roles(db, target, new_roles)
 
     db.commit()
     db.refresh(target)
-    return PortalUserOut.model_validate(target)
+    return _user_out(db, target)
+
+
+@router.delete("/users/{user_id}", status_code=204)
+def delete_portal_user(user_id: UUID, request: Request, db: Session = Depends(get_db)):
+    """Delete a portal user in the caller's group (needs users.manage; their audit entries stay)."""
+    me = get_portal_user_from_request(request, db)
+    from app.services import access_service
+    access = access_service.for_user(me, db)
+    access.require("users.manage")
+    target = db.query(PortalUser).filter(PortalUser.id == str(user_id), PortalUser.usergroup_id == me.usergroup_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found in your group")
+    if str(target.id) == str(me.id):
+        raise HTTPException(status_code=400, detail="You can't delete your own account")
+    if target.role == "system_admin":
+        raise HTTPException(status_code=403, detail="Built-in system admin accounts can't be deleted")
+    _guard_admin_target(db, access, target)
+    from sqlalchemy.exc import IntegrityError
+    try:
+        db.delete(target)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Older records still point to this user — deactivate them instead")
 
 
 # ---------------------------------------------------------------------------
-# Settings — group admin can configure email domain auto-assignment
+# Settings — the group's identity (used by the classic dashboard)
 # ---------------------------------------------------------------------------
 
 class GroupSettingsOut(BaseModel):
     id: UUID
     name: str
     slug: str
-    email_domain: Optional[str]
 
     class Config:
         from_attributes = True
 
 
-class GroupSettingsUpdate(BaseModel):
-    email_domain: Optional[str] = None   # set to "" or null to clear
-
-
 @router.get("/settings", response_model=GroupSettingsOut)
 def get_settings(request: Request, db: Session = Depends(get_db)):
-    """Return the current UserGroup settings for the logged-in portal user."""
+    """Return the logged-in portal user's UserGroup."""
     me = get_portal_user_from_request(request, db)
     group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="User group not found")
-    return GroupSettingsOut.model_validate(group)
-
-
-@router.put("/settings", response_model=GroupSettingsOut)
-def update_settings(
-    data: GroupSettingsUpdate,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    """Update UserGroup settings (group admin only)."""
-    me = get_portal_user_from_request(request, db)
-    if not _user_can_manage(me, "settings"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail="You don't have permission to update settings")
-
-    group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
-    if not group:
-        raise HTTPException(status_code=404, detail="User group not found")
-
-    # Normalise comma-separated domains: strip whitespace, lowercase, strip leading "@"
-    raw_domains = [d.strip().lower().lstrip("@") for d in (data.email_domain or "").split(",")]
-    clean_domains = [d for d in raw_domains if d]
-    domain_value = ",".join(clean_domains) or None
-
-    # Ensure no other group already uses any of these domains
-    if clean_domains:
-        for d in clean_domains:
-            conflict = db.query(UserGroup).filter(
-                UserGroup.email_domain.ilike(f"%{d}%"),
-                UserGroup.id != group.id,
-            ).first()
-            if conflict:
-                existing = [x.strip().lower() for x in (conflict.email_domain or "").split(",")]
-                if d in existing:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Domain '{d}' is already claimed by another group",
-                    )
-
-    group.email_domain = domain_value
-    db.commit()
-    db.refresh(group)
     return GroupSettingsOut.model_validate(group)
 
 
@@ -706,8 +729,7 @@ def link_data_exchange(data: DataExchangeLinkRequest, request: Request, db: Sess
     from app.services import dataprofiler_service as dp
 
     me = get_portal_user_from_request(request, db)
-    if not _user_can_manage(me, "settings"):
-        raise HTTPException(status_code=403, detail="You don't have permission to change settings")
+    _require(me, db, "data_exchange.manage")
     ip = _client_ip(request)
     _login_check_rate(ip)
 
@@ -832,11 +854,20 @@ def update_theme(
 ):
     """Update branding/theme (group admin only)."""
     me = get_portal_user_from_request(request, db)
-    if not _user_can_manage(me, "settings"):
-        raise HTTPException(status_code=403, detail="You don't have permission to update branding")
     group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="User group not found")
+    # Look (theme.manage) and settings (settings.manage) are separate permissions; a field
+    # that is sent unchanged needs neither, so each page can save the whole form
+    def changed(field, current):
+        value = getattr(data, field)
+        return value is not None and (value or None) != (current or None)
+    if any(changed(f, getattr(group, f)) for f in ("logo_data", "logo_dark_data", "report_logo_data", "theme_primary", "theme_accent")) \
+            or (data.theme_settings is not None and _check_theme_settings(data.theme_settings) != (group.theme_settings or None)):
+        _require(me, db, "theme.manage")
+    if changed("timezone", group.timezone) or (data.history_retention_days is not None
+                                                 and data.history_retention_days != group.history_retention_days):
+        _require(me, db, "settings.manage")
 
     if data.logo_data is not None:
         group.logo_data = _check_logo(data.logo_data, "Platform logo")
@@ -1010,7 +1041,8 @@ def admin_reset_user_password(
     """
     me = get_portal_user_from_request(request, db)
     from app.services import access_service
-    access_service.for_user(me, db).require("users.manage")
+    access = access_service.for_user(me, db)
+    access.require("users.manage")
 
     target = db.query(PortalUser).filter(
         PortalUser.id == str(user_id),
@@ -1020,6 +1052,7 @@ def admin_reset_user_password(
         raise HTTPException(status_code=404, detail="User not found in your group")
     if str(target.id) == str(me.id):
         raise HTTPException(status_code=400, detail="Use change-password to update your own password")
+    _guard_admin_target(db, access, target)
 
     import secrets as _secrets
     temp_password = _secrets.token_urlsafe(12)
@@ -1099,8 +1132,8 @@ def change_email(
 
 
 # ---------------------------------------------------------------------------
-# Tags — all BLE tags belonging to mobile-app users whose email domain
-#         matches the group's configured email_domain
+# Tags — the group's devices, and tags of mobile-app users who
+#         are linked to the group
 # ---------------------------------------------------------------------------
 
 class PortalTagOut(BaseModel):
@@ -1163,11 +1196,10 @@ def _compute_activity_status(last_seen: Optional[datetime]) -> str:
 def list_group_tags(request: Request, db: Session = Depends(get_db)):
     """Return all BLE tags belonging to mobile-app users in this usergroup.
     
-    Includes tags from:
-    1. Users whose email matches the group's email_domain (auto-assigned)
-    2. Users with a PortalUser record in this group (manually assigned)
-    
-    Returns an empty list (not an error) when no users are in the group.
+    Includes devices created for the group (e.g. routed from a Data Exchange)
+    and tags owned by mobile-app users who have a PortalUser record in the group.
+
+    Returns an empty list (not an error) when the group has no devices.
     """
     started_at = perf_counter()
     me = get_portal_user_from_request(request, db)
@@ -1175,17 +1207,9 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
     if not group:
         return []
 
-    domains = _domains(group)
     group_id = str(group.id)
 
-    # Source 1: Domain-matched users (auto-assigned via email domain)
-    domain_user_rows = []
-    domain_user_ids = []
-    if domains:
-        domain_user_rows = db.query(User.id, User.email).filter(_domain_filter(domains)).all()
-        domain_user_ids = [str(uid) for uid, _ in domain_user_rows]
-    
-    # Source 2: Manually assigned users (via PortalUser table, joined to User by email)
+    # Mobile-app users linked to the group (via the PortalUser table, joined to User by email)
     portal_user_rows = (
         db.query(User.id, User.email)
         .join(PortalUser, User.email == PortalUser.email)
@@ -1194,14 +1218,9 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
     )
     portal_user_ids = [str(uid) for uid, _ in portal_user_rows]
     
-    # UNION: All users in this group (domain-matched + manually assigned)
-    all_owner_ids = list(set(domain_user_ids + portal_user_ids))
-    
-    # Build email lookup map for display (combine both sources)
-    owner_email_map = {str(uid): email for uid, email in domain_user_rows}
-    owner_email_map.update({str(uid): email for uid, email in portal_user_rows})
+    all_owner_ids = list(set(portal_user_ids))
+    owner_email_map = {str(uid): email for uid, email in portal_user_rows}
 
-    # Tag filter includes all group users (domain-matched + manually assigned)
     tag_scope_filter = (
         or_(
             BLETag.user_id.in_(all_owner_ids),
@@ -1302,9 +1321,8 @@ def list_group_tags(request: Request, db: Session = Depends(get_db)):
     elapsed_ms = (perf_counter() - started_at) * 1000.0
     if elapsed_ms > 1500:
         logger.warning(
-            "portal-tags slow path: usergroup_id=%s domains=%s owners=%d tags=%d elapsed_ms=%.1f",
+            "portal-tags slow path: usergroup_id=%s owners=%d tags=%d elapsed_ms=%.1f",
             group_id,
-            ",".join(domains),
             len(all_owner_ids),
             len(result),
             elapsed_ms,
@@ -1393,43 +1411,8 @@ def _build_tag_out(tag: BLETag, owner_email: str, db: Optional[Session] = None) 
     )
 
 
-def _get_group_and_assert_domain(me: PortalUser, db: Session) -> UserGroup:
-    group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
-    if not group or not group.email_domain:
-        raise HTTPException(status_code=400, detail="Configure a domain in Settings before managing tags")
-    return group
-
-
-def _domains(group: UserGroup) -> list:
-    """Return a lowercase list of domain strings for the group (supports comma-separated multiple domains)."""
-    if not group or not group.email_domain:
-        return []
-    return [d.strip().lower() for d in group.email_domain.split(",") if d.strip()]
-
-
-def _domain_filter(domains: list):
-    """Return a SQLAlchemy filter clause matching user emails against any of the given domains."""
-    return or_(*(User.email.ilike(f"%@{d}") for d in domains))
-
-
 def _get_group_owner_ids(group: UserGroup, db: Session) -> list:
-    """Return all user IDs that belong to a group (domain-matched + manually assigned).
-    
-    Includes:
-    1. Users whose email matches the group's email_domain (auto-assigned)
-    2. Users with a PortalUser record in this group (manually assigned)
-    """
-    domains = _domains(group)
-    
-    # Domain-matched users
-    domain_user_ids = []
-    if domains:
-        domain_user_ids = [
-            str(uid) for (uid,) in 
-            db.query(User.id).filter(_domain_filter(domains)).all()
-        ]
-    
-    # Manually assigned users (via PortalUser table)
+    """IDs of mobile-app users linked to the group (they have a PortalUser record in it)."""
     portal_user_ids = [
         str(uid) for (uid,) in 
         db.query(User.id)
@@ -1438,7 +1421,7 @@ def _get_group_owner_ids(group: UserGroup, db: Session) -> list:
         .all()
     ]
     
-    return list(set(domain_user_ids + portal_user_ids))
+    return list(set(portal_user_ids))
 
 
 def _group_tag_scope_filter(group: UserGroup, all_owner_ids: list):
@@ -1480,8 +1463,7 @@ VEHICLE_DETAILS = ("make", "model", "year", "registration", "driver")
 def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session = Depends(get_db)):
     """Update a device's description, category or package (group admin only)."""
     me = get_portal_user_from_request(request, db)
-    if not _user_can_manage(me, "asset-mgmt"):
-        raise HTTPException(status_code=403, detail="You don't have permission to edit tags")
+    _require(me, db, "vehicles.manage")
     group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="User group not found")
@@ -1570,8 +1552,7 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
 def delete_tags(data: PortalTagDelete, request: Request, db: Session = Depends(get_db)):
     """Permanently delete one or more devices of the group that the user may see."""
     me = get_portal_user_from_request(request, db)
-    if not _user_can_manage(me, "asset-mgmt"):
-        raise HTTPException(status_code=403, detail="You don't have permission to delete tags")
+    _require(me, db, "vehicles.delete")
     group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="User group not found")
@@ -1607,8 +1588,7 @@ def delete_tags(data: PortalTagDelete, request: Request, db: Session = Depends(g
 def delete_tag_single(tag_id: str, request: Request, db: Session = Depends(get_db)):
     """Permanently delete a single BLE tag by its ID (group admin only)."""
     me = get_portal_user_from_request(request, db)
-    if not _user_can_manage(me, "asset-mgmt"):
-        raise HTTPException(status_code=403, detail="You don't have permission to delete tags")
+    _require(me, db, "vehicles.delete")
     group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="User group not found")
@@ -1693,8 +1673,7 @@ def list_categories(request: Request, db: Session = Depends(get_db)):
 def create_category(data: CategoryCreate, request: Request, db: Session = Depends(get_db)):
     """Create a new category (group admin only)."""
     me = get_portal_user_from_request(request, db)
-    if not _user_can_manage(me, "asset-mgmt"):
-        raise HTTPException(status_code=403, detail="You don't have permission to manage categories")
+    _require(me, db, "vehicle_groups.manage")
     name = data.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="Category name is required")
@@ -1723,8 +1702,7 @@ def create_category(data: CategoryCreate, request: Request, db: Session = Depend
 def update_category(cat_id: str, data: CategoryUpdate, request: Request, db: Session = Depends(get_db)):
     """Rename or deactivate a category (group admin only)."""
     me = get_portal_user_from_request(request, db)
-    if not _user_can_manage(me, "asset-mgmt"):
-        raise HTTPException(status_code=403, detail="You don't have permission to manage categories")
+    _require(me, db, "vehicle_groups.manage")
     cat = db.query(TagCategory).filter(
         TagCategory.id == cat_id,
         TagCategory.usergroup_id == str(me.usergroup_id),
@@ -1754,8 +1732,7 @@ def update_category(cat_id: str, data: CategoryUpdate, request: Request, db: Ses
 def delete_category(cat_id: str, request: Request, db: Session = Depends(get_db)):
     """Soft-delete a category by marking it inactive (group admin only)."""
     me = get_portal_user_from_request(request, db)
-    if not _user_can_manage(me, "asset-mgmt"):
-        raise HTTPException(status_code=403, detail="You don't have permission to manage categories")
+    _require(me, db, "vehicle_groups.manage")
     cat = db.query(TagCategory).filter(
         TagCategory.id == cat_id,
         TagCategory.usergroup_id == str(me.usergroup_id),
@@ -1780,16 +1757,13 @@ def report_geofence_events(
 ):
     """Return geofence entry/exit events for all tags in the caller's group.
 
-    Scoped by joining GeofenceAlert → BLETag → User whose email domain
-    matches the UserGroup's configured email_domain.
-    Returns newest-first, capped at 1000 rows.
+    Scoped to the group's devices. Returns newest-first, capped at 1000 rows.
     """
     me = get_portal_user_from_request(request, db)
     group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
-    if not group or not group.email_domain:
+    if not group:
         return []
 
-    domains = _domains(group)
     all_owner_ids = _get_group_owner_ids(group, db)
     since = datetime.utcnow() - timedelta(days=max(1, min(days, 365)))
 
@@ -2212,8 +2186,7 @@ def arm_location(
     request: Request, db: Session = Depends(get_db),
 ):
     me = get_portal_user_from_request(request, db)
-    if not _user_can_manage(me, "locations"):
-        raise HTTPException(status_code=403, detail="You don't have permission to manage geofences")
+    _require(me, db, "places.arm")
     poi = _get_group_poi(location_id, str(me.usergroup_id), db)
     # Verify tag belongs to this group and is visible to the user
     tag = _resolve_group_tag(tag_id, str(me.usergroup_id), db)
@@ -2249,8 +2222,7 @@ def disarm_location(
     request: Request, db: Session = Depends(get_db),
 ):
     me = get_portal_user_from_request(request, db)
-    if not _user_can_manage(me, "locations"):
-        raise HTTPException(status_code=403, detail="You don't have permission to manage geofences")
+    _require(me, db, "places.arm")
     _get_group_poi(location_id, str(me.usergroup_id), db)
     link = db.query(POITrackerLink).filter(
         POITrackerLink.poi_id == location_id,
@@ -2405,12 +2377,8 @@ def _resolve_group_tag(tag_id: str, usergroup_id: str, db: Session) -> BLETag:
     # Devices created for the group (e.g. routed from a Data Exchange) carry the group id
     if (tag.attributes or {}).get("_created_usergroup_id") == str(group.id):
         return tag
-    # Otherwise the tag's owning user must belong to this group (by email domain)
-    owner = db.query(User).filter(User.id == tag.user_id).first() if tag.user_id else None
-    if not owner:
-        raise HTTPException(status_code=404, detail="Tag not found")
-    domains = _domains(group)
-    if not domains or owner.email.lower().split("@")[-1] not in domains:
+    # Otherwise the tag's owning mobile-app user must be linked to this group
+    if not tag.user_id or str(tag.user_id) not in _get_group_owner_ids(group, db):
         raise HTTPException(status_code=403, detail="Tag does not belong to your group")
     return tag
 

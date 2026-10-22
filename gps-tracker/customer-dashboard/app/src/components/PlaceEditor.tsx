@@ -8,7 +8,7 @@ import { notifications } from '@mantine/notifications';
 import { IconArrowBackUp, IconCar, IconInfoCircle, IconSearch, IconSquare } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, qs } from '../api/client';
-import { usePlaceGroups } from '../api/hooks';
+import { useCan, usePlaceGroups } from '../api/hooks';
 import type { GeocodeResult, Place, Vehicle } from '../api/types';
 import { vehicleName } from '../utils/format';
 import { placeOutline } from '../utils/places';
@@ -139,6 +139,7 @@ export function PlaceEditor({ draft, setDraft, places, vehicles, onLocate, onCan
   const qc = useQueryClient();
   const [saving, setSaving] = useState(false);
   const { data: placeGroups = [] } = usePlaceGroups();
+  const canArm = useCan()('places.arm');
   const set = (patch: Partial<PlaceDraft>) => setDraft((d) => d && { ...d, ...patch });
   const located = vehicles.filter((v) => v.latitude && v.longitude);
 
@@ -170,8 +171,8 @@ export function PlaceEditor({ draft, setDraft, places, vehicles, onLocate, onCan
         : await api<Place>('/api/portal/locations', { method: 'POST', json: body });
       const before = new Set(draft.id ? places.find((p) => p.id === draft.id)?.tags_armed.map((t) => t.id) : []);
       const after = new Set(draft.armed);
-      for (const id of after) if (!before.has(id)) await api(`/api/portal/locations/${saved.id}/arm/${id}`, { method: 'POST' });
-      for (const id of before) if (!after.has(id)) await api(`/api/portal/locations/${saved.id}/arm/${id}`, { method: 'DELETE' });
+      if (canArm) for (const id of after) if (!before.has(id)) await api(`/api/portal/locations/${saved.id}/arm/${id}`, { method: 'POST' });
+      if (canArm) for (const id of before) if (!after.has(id)) await api(`/api/portal/locations/${saved.id}/arm/${id}`, { method: 'DELETE' });
       await qc.invalidateQueries({ queryKey: ['places'] });
       notifications.show({ color: 'green', message: `${draft.name.trim()} saved` });
       onSaved(saved);
@@ -231,7 +232,8 @@ export function PlaceEditor({ draft, setDraft, places, vehicles, onLocate, onCan
       )}
       <Textarea label="Description" autosize minRows={1} value={draft.description}
                 onChange={(e) => set({ description: e.currentTarget.value })} />
-      <MultiSelect label="Armed vehicles" description="These vehicles raise an alert when they enter or leave"
+      <MultiSelect label="Armed vehicles" disabled={!canArm}
+                   description={canArm ? 'These vehicles raise an alert when they enter or leave' : 'Your roles don’t include arming geofences'}
                    placeholder={draft.armed.length ? '' : 'Choose vehicles'} searchable clearable
                    data={vehicles.map((v) => ({ value: v.id, label: vehicleName(v) }))}
                    value={draft.armed} onChange={(v) => set({ armed: v })} />

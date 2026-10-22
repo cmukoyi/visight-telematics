@@ -119,9 +119,9 @@ export function VehiclePanel({ vehicle, plotted, onTogglePlot, plottedTrips, onT
           <ScrollArea h="100%" type="auto">
             <SimpleGrid cols={3} spacing={4} px="xs" py="sm">
               <Action icon={plotted ? IconEyeOff : IconEye} label={plotted ? 'Unplot' : 'Toggle plot'} onClick={onTogglePlot} active={plotted} />
-              {can('map.view') && <Action icon={IconFocus2} label={following ? 'Following' : 'Follow live'} onClick={onFollow} active={following} />}
+              {can('live.track') && <Action icon={IconFocus2} label={following ? 'Following' : 'Follow live'} onClick={onFollow} active={following} />}
               <Action icon={IconShare} label="Share location" onClick={share} />
-              {can('map.view') && <Action icon={IconBroadcast} label="Live track" onClick={() => navigate(`/dashboard?vehicle=${encodeURIComponent(vehicle.imei)}`)} />}
+              {can('live.track') && <Action icon={IconBroadcast} label="Live track" onClick={() => navigate(`/dashboard?vehicle=${encodeURIComponent(vehicle.imei)}`)} />}
               {can('vehicles.manage') && <Action icon={IconPencil} label="Edit vehicle" onClick={() => navigate(`/configuration/devices?edit=${vehicle.id}`)} />}
               {can('reports.view') && <Action icon={IconReportAnalytics} label="View report" onClick={() => navigate('/reports?run=trips')} />}
             </SimpleGrid>

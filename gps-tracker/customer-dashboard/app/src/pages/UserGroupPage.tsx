@@ -138,7 +138,8 @@ function MyNotificationPrefs() {
 
 export function UserGroupPage({ mode }: { mode: 'theme' | 'preferences' }) {
   const qc = useQueryClient();
-  const canEdit = useCan()('settings.manage');
+  const can = useCan();
+  const canEdit = can(mode === 'theme' ? 'theme.manage' : 'settings.manage');
   const { data: theme } = useGroupTheme();
   const [form, setForm] = useState<GroupTheme | null>(null);
   const [saving, setSaving] = useState(false);

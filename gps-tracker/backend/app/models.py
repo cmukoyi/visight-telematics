@@ -235,7 +235,6 @@ class UserGroup(Base):
     id           = get_uuid_column()
     name         = Column(String(200), nullable=False, unique=True)
     slug         = Column(String(100), nullable=False, unique=True)  # URL-safe identifier
-    email_domain = Column(String(500), nullable=True, index=True)   # comma-separated list of domains e.g. "acme.com,acme.co.uk"
     default_package_id = Column(String(36), ForeignKey("tag_packages.id"), nullable=True)  # kept for bulk-import fallback
     default_language = Column(String(5), nullable=False, server_default='en')  # Default language for usergroup
     is_active    = Column(Boolean, nullable=False, default=True)
@@ -332,6 +331,34 @@ class PortalRole(Base):
     is_system    = Column(Boolean, nullable=False, default=False)   # a default role; can't be deleted
     created_at   = Column(DateTime(timezone=True), server_default=func.now())
     updated_at   = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class PortalUserRole(Base):
+    """A role held by a portal user; a user's permissions are the union of their roles'."""
+    __tablename__ = "portal_user_roles"
+
+    user_id = Column(UUID(as_uuid=True), ForeignKey("portal_users.id", ondelete="CASCADE"), primary_key=True)
+    role_id = Column(UUID(as_uuid=True), ForeignKey("portal_roles.id", ondelete="CASCADE"), primary_key=True, index=True)
+
+
+class PortalAuditLog(Base):
+    """Audit trail of what customer-portal users did in their user group (Configuration → Security → Audit Trail)."""
+    __tablename__ = "portal_audit_logs"
+    __table_args__ = (Index("ix_portal_audit_group_created", "usergroup_id", "created_at"),)
+
+    id           = get_uuid_column()
+    usergroup_id = Column(UUID(as_uuid=True), ForeignKey("user_groups.id", ondelete="CASCADE"), nullable=False)
+    user_id      = Column(UUID(as_uuid=True), ForeignKey("portal_users.id", ondelete="SET NULL"), nullable=True)
+    user_email   = Column(String(255), nullable=True)      # kept when the user is deleted
+    user_name    = Column(String(255), nullable=True)
+    action       = Column(String(30), nullable=False)      # Added / Updated / Deleted / Signed in / ...
+    area         = Column(String(50), nullable=False)      # Users, Roles, Vehicles, Places, ...
+    summary      = Column(String(500), nullable=False)
+    resource_id  = Column(String(100), nullable=True)
+    details      = Column(JSON, nullable=True)             # the request (passwords and images removed)
+    outcome      = Column(String(20), nullable=False, default="success")   # success | denied | failed
+    ip_address   = Column(String(45), nullable=True)
+    created_at   = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class NotificationRule(Base):

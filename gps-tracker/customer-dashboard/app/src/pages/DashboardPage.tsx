@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Badge, Card, Group, Select, SimpleGrid, Skeleton, Stack, Text, Title } from '@mantine/core';
 import { IconRoute, IconClock, IconRoad, IconTrendingUp, IconTrendingDown, IconCar } from '@tabler/icons-react';
-import { useCategories, useKpis, useLive, useVehicles } from '../api/hooks';
+import { useCan, useCategories, useKpis, useLive, useVehicles } from '../api/hooks';
 import { FleetMap, type FleetMapHandle, type MapRoute, type MapVehicle } from '../components/FleetMap';
 import { LiveTrack } from '../components/LiveTrack';
 import { ALL_VEHICLES, inGroup, toMapVehicle } from './vehicles';
@@ -53,7 +53,8 @@ export function DashboardPage() {
   const [selected, setSelected] = useState<string | null>(params.get('vehicle'));
   const [follow, setFollow] = useState(true);
   const [showTrail, setShowTrail] = useState(true);
-  const { data: live } = useLive(selected);
+  const canTrack = useCan()('live.track');
+  const { data: live } = useLive(canTrack ? selected : null);
   const tracked = vehicles?.find((v) => v.imei === selected) ?? null;
   useEffect(() => {
     const v = params.get('vehicle');
@@ -123,7 +124,7 @@ export function DashboardPage() {
                     fitPadding={tracked && window.innerWidth >= 720 ? FOLLOW_PADDING : undefined}
                     onVehicleClick={(id) => select(id === selected ? null : id)} />
         )}
-        {tracked && (
+        {tracked && canTrack && (
           <LiveTrack vehicle={tracked} live={live} follow={follow} onFollow={setFollow} trail={showTrail} onTrail={setShowTrail}
                      onClose={() => select(null)}
                      onShowTrip={() => navigate('/workspace')} />
