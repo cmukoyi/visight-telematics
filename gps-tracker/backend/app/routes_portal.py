@@ -465,23 +465,6 @@ def create_portal_user(
     if db.query(PortalUser).filter(PortalUser.email == email).first():
         raise HTTPException(status_code=400, detail="A portal user with that email already exists")
 
-    # ── Domain enforcement ─────────────────────────────────────────────────
-    group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
-    if group and group.email_domain:
-        allowed_domains = [d.strip().lower() for d in group.email_domain.split(",") if d.strip()]
-        if allowed_domains:
-            email_domain = email.split("@")[-1].lower() if "@" in email else ""
-            if email_domain not in allowed_domains:
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        f"This group only accepts users with email domains: "
-                        f"{', '.join('@' + d for d in allowed_domains)}. "
-                        f"The address '{email}' does not qualify."
-                    ),
-                )
-    # ──────────────────────────────────────────────────────────────────────
-
     valid_roles = {"admin", "manager", "reporter", "custom"}
     role = data.role if data.role in valid_roles else "admin"
     from app.services import access_service

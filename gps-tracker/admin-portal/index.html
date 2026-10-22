@@ -1433,7 +1433,6 @@
                                         <tr>
                                             <th data-i18n="table.company_name">Company Name</th>
                                             <th data-i18n="table.slug">Slug</th>
-                                            <th data-i18n="table.email_domain">Email Domain</th>
                                             <th data-i18n="table.default_package">Default Package</th>
                                             <th data-i18n="table.portal_users">Portal Users</th>
                                             <th data-i18n="table.status">Status</th>
@@ -1474,11 +1473,6 @@
                                             <label class="form-label">Last Name</label>
                                             <input type="text" id="cgLast" class="form-input" data-i18n-placeholder="placeholders.smith" placeholder="Smith">
                                         </div>
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Email Domain Auto-Assignment</label>
-                                        <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 10px">Mobile-app users with matching email domains are auto-linked to this group. Separate multiple domains with a comma. Example: <code>acme.com, acme.co.za</code></p>
-                                        <input type="text" id="cgDomain" class="form-input" data-i18n-placeholder="placeholders.eg_acmecom_or_acmecom_acmecoza" placeholder="e.g. acme.com or acme.com, acme.co.za">
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">Default Package <span style="font-weight:normal;color:var(--text-secondary)">(optional)</span></label>
@@ -1528,14 +1522,6 @@
                                 <div id="egAlert" class="alert" style="display:none"><span id="egAlertText"></span></div>
                                 <form id="editGroupForm" onsubmit="submitEditGroup(event)">
                                     <input type="hidden" id="egGroupId">
-                                    <div class="form-group">
-                                        <label class="form-label">Email Domain Auto-Assignment</label>
-                                        <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 10px">All mobile-app users who register with an email matching this domain will automatically have their tags visible in this group's portal. Example: <code>acmecorp.com</code></p>
-                                        <div style="display:flex;gap:8px;align-items:center">
-                                            <span style="font-size:14px;color:var(--text-secondary)">@</span>
-                                            <input type="text" id="egDomain" class="form-input" data-i18n-placeholder="placeholders.eg_acmecorpcom" placeholder="e.g. acmecorp.com" style="flex:1">
-                                        </div>
-                                    </div>
                                     <div class="form-group">
                                         <label class="form-label">Default Language</label>
                                         <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 10px">Portal users in this group will see the platform in this language.</p>
@@ -1592,7 +1578,6 @@
                                         </div>
                                     </div>
                                     <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:8px">
-                                        <button type="button" class="btn btn-secondary" onclick="clearGroupDomain()">Clear Domain</button>
                                         <button type="button" class="btn btn-secondary" onclick="closeModal('editGroupModal')">Cancel</button>
                                         <button type="submit" class="btn btn-primary" id="egSubmitBtn">Save</button>
                                     </div>
@@ -3702,9 +3687,6 @@ dashboard.welcome,Bienvenue</pre>
                         ? `<button class="btn btn-secondary" style="padding:4px 10px;font-size:12px" onclick="deactivateGroup('${g.id}','${escHtml(g.name)}')">Deactivate</button>`
                         : `<button class="btn btn-success" style="padding:4px 10px;font-size:12px" onclick="activateGroup('${g.id}','${escHtml(g.name)}')">Activate</button>`;
                     const portalUsers = g.portal_users || [];
-                    const domainBadge = g.email_domain
-                        ? `<code style="font-size:11px;opacity:.8">@${escHtml(g.email_domain)}</code>`
-                        : '<span style="color:var(--text-secondary);font-size:11px">—</span>';
                     const pkgs = g.packages || [];
                     const pkgBadge = pkgs.length > 0
                         ? pkgs.map(p => `<span class="badge badge-success" style="font-size:11px;margin-right:2px">${escHtml(p.package_name)}${p.is_default ? ' ★' : ''}</span>`).join('')
@@ -3712,7 +3694,6 @@ dashboard.welcome,Bienvenue</pre>
                     return `<tr>
                         <td><strong>${escHtml(g.name)}</strong></td>
                         <td><code>${escHtml(g.slug)}</code></td>
-                        <td>${domainBadge}</td>
                         <td>${pkgBadge}</td>
                         <td title="${portalUsers.map(u=>u.email).join(', ')}">${portalUsers.length}</td>
                         <td>${badge}</td>
@@ -3789,7 +3770,6 @@ dashboard.welcome,Bienvenue</pre>
                 admin_email: document.getElementById('cgEmail').value.trim(),
                 admin_first_name: document.getElementById('cgFirst').value.trim(),
                 admin_last_name: document.getElementById('cgLast').value.trim(),
-                email_domain: document.getElementById('cgDomain').value.trim() || null,
                 package_id: document.getElementById('cgPackage').value || null,
                 default_language: document.getElementById('cgLanguage').value || 'en',
             };
@@ -3972,7 +3952,6 @@ dashboard.welcome,Bienvenue</pre>
         async function openEditGroupModal(groupId, groupName, emailDomain, allowedSections, allowedTagTypes, defaultLanguage) {
             document.getElementById('egGroupId').value = groupId;
             document.getElementById('egGroupName').textContent = groupName;
-            document.getElementById('egDomain').value = emailDomain || '';
             document.getElementById('egAlert').style.display = 'none';
             document.getElementById('egSubmitBtn').disabled = false;
             document.getElementById('egSubmitBtn').textContent = 'Save';
@@ -4091,10 +4070,6 @@ dashboard.welcome,Bienvenue</pre>
             } catch (e) { alert('Network error'); }
         }
 
-        function clearGroupDomain() {
-            document.getElementById('egDomain').value = '';
-        }
-
         async function submitEditGroup(e) {
             e.preventDefault();
             const btn = document.getElementById('egSubmitBtn');
@@ -4102,7 +4077,6 @@ dashboard.welcome,Bienvenue</pre>
             btn.textContent = 'Saving…';
             document.getElementById('egAlert').style.display = 'none';
             const groupId = document.getElementById('egGroupId').value;
-            const domain  = document.getElementById('egDomain').value.trim();
             // Build allowed_sections from checkboxes
             const allowedSections = [];
             if (document.getElementById('egFeatTracking').checked)   allowedSections.push('tracking');
@@ -4113,7 +4087,6 @@ dashboard.welcome,Bienvenue</pre>
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
                     body: JSON.stringify({
-                        email_domain: domain,
                         allowed_sections: allowedSections.length === 3 ? null : allowedSections,
                         default_language: document.getElementById('egLanguage').value || 'en',
                     })
