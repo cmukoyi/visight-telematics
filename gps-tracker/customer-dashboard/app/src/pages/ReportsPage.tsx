@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   ActionIcon, Badge, Button, Drawer, Group, Menu, Modal, NumberInput, Paper, Select, SimpleGrid, Stack, Switch, Tabs, TagsInput,
   Text, TextInput, Title, Tooltip, UnstyledButton,
@@ -200,6 +201,11 @@ export function ReportsPage() {
   const [search, setSearch] = useState('');
   const [favourites, setFavourites] = useState<string[]>(loadFavourites);
   const [running, setRunning] = useState<ReportDef | null>(null);
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    const r = reports.find((x) => x.key === params.get('run'));
+    if (r) { setRunning(r); setParams({}, { replace: true }); }
+  }, [reports, params]); // eslint-disable-line react-hooks/exhaustive-deps
   const [scheduling, setScheduling] = useState<ReportSchedule | { report_key: string } | null>(null);
 
   const toggleFav = (key: string) => setFavourites((f) => {

@@ -330,6 +330,44 @@ class PortalRole(Base):
     updated_at   = Column(DateTime(timezone=True), onupdate=func.now())
 
 
+class NotificationRule(Base):
+    """Configuration → Misc → Notification Rules.
+
+    rule_type 'geofence': vehicles in `category` (a vehicle group; NULL = all
+    vehicles) raise one alert when they enter and one when they leave any of
+    `place_ids` (NULL = every place). Alerts go to the inbox; with
+    email_enabled, `email_message` (placeholders such as {vehicle},
+    {registration}, {event}, {time}) is also emailed to email_recipients.
+    """
+    __tablename__ = "notification_rules"
+
+    id               = get_uuid_column()
+    usergroup_id     = get_uuid_fk("user_groups.id")
+    name             = Column(String(120), nullable=False)
+    rule_type        = Column(String(30), nullable=False, default="geofence")
+    category         = Column(String(100), nullable=True)
+    place_ids        = Column(JSON, nullable=True)
+    on_entry         = Column(Boolean, nullable=False, default=True)
+    on_exit          = Column(Boolean, nullable=False, default=True)
+    email_enabled    = Column(Boolean, nullable=False, default=False)
+    email_recipients = Column(JSON, nullable=True)
+    email_message    = Column(Text, nullable=True)
+    is_active        = Column(Boolean, nullable=False, default=True)
+    created_by       = Column(UUID(as_uuid=True), ForeignKey("portal_users.id", ondelete="SET NULL"), nullable=True)
+    created_at       = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at       = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class GeofenceStatus(Base):
+    """Whether a vehicle is inside or outside a place, as of its last checked fix (geofence_engine)."""
+    __tablename__ = "geofence_states"
+
+    tag_id     = Column(UUID(as_uuid=True), ForeignKey("ble_tags.id", ondelete="CASCADE"), primary_key=True)
+    poi_id     = Column(UUID(as_uuid=True), ForeignKey("pois.id", ondelete="CASCADE"), primary_key=True)
+    inside     = Column(Boolean, nullable=False)
+    checked_at = Column(DateTime(timezone=True), nullable=False)   # device time of the fix
+
+
 class TenantFeature(Base):
     """Tenant-wide feature toggles for customer dashboard.
     

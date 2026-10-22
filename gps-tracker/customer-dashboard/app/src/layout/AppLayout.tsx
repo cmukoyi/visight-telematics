@@ -1,19 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink as RouterLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   ActionIcon, AppShell, Avatar, Badge, Burger, Group, Menu, NavLink, Stack, Text, Title, Tooltip,
   useMantineColorScheme, useComputedColorScheme,
 } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
+import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import {
   IconAdjustmentsHorizontal, IconChartBar, IconExternalLink, IconInbox, IconLayoutDashboard, IconLogout,
-  IconMapRoute, IconMoon, IconSun,
+  IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconMapRoute, IconMoon, IconSearch, IconSun,
 } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useQueryClient } from '@tanstack/react-query';
 import { useBranding, useCan, useGroupTheme, useUnreadCount } from '../api/hooks';
 import { clearSession, getSession } from '../auth/session';
+import { GlobalSearch } from '../components/GlobalSearch';
 import classes from './AppLayout.module.css';
 
 dayjs.extend(utc);
@@ -27,12 +28,19 @@ export const NAV = [
   { to: '/inbox', label: 'Inbox', icon: IconInbox, any: ['inbox.view'] },
 ];
 
-function Clock() {
+function Clock({ compact }: { compact?: boolean }) {
   const [now, setNow] = useState(dayjs());
   useEffect(() => {
     const t = setInterval(() => setNow(dayjs()), 15_000);
     return () => clearInterval(t);
   }, []);
+  if (compact) {
+    return (
+      <Tooltip label={`${now.format('ddd, DD MMM YYYY HH:mm')} local · ${now.utc().format('HH:mm')} UTC`} position="right">
+        <div className={`${classes.clock} ${classes.clockCompact}`}><Text fw={600}>{now.format('HH:mm')}</Text></div>
+      </Tooltip>
+    );
+  }
   return (
     <div className={classes.clock}>
       <Text size="xs" c="dimmed">{now.format('ddd, DD MMM YYYY')}</Text>
@@ -52,6 +60,11 @@ function Clock() {
 
 export function AppLayout() {
   const [opened, { toggle, close }] = useDisclosure();
+  // Collapsed (icons only) on desktop; remembered per browser
+  const [collapsedPref, setCollapsed] = useLocalStorage({ key: 'vt-nav-collapsed', defaultValue: false });
+  const collapsed = collapsedPref && !opened;
+  const searchRef = useRef<HTMLInputElement>(null);
+  const openSearch = () => { setCollapsed(false); setTimeout(() => searchRef.current?.focus(), 250); };
   const { setColorScheme } = useMantineColorScheme();
   const scheme = useComputedColorScheme('dark');
   const { data: branding } = useBranding();
@@ -81,7 +94,8 @@ export function AppLayout() {
   return (
     <AppShell
       header={{ height: 56 }}
-      navbar={{ width: 312, breakpoint: 'sm', collapsed: { mobile: !opened } }}
+      navbar={{ width: collapsed ? 84 : 312, breakpoint: 'sm', collapsed: { mobile: !opened } }}
+      transitionDuration={200}
       padding={0}
       classNames={{ navbar: classes.navbar, header: classes.header, main: classes.main }}
     >
@@ -89,6 +103,12 @@ export function AppLayout() {
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
           <Group gap="sm" wrap="nowrap">
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" aria-label="Menu" />
+            <Tooltip label={collapsed ? 'Expand menu' : 'Collapse menu'}>
+              <ActionIcon variant="subtle" color="gray" size="lg" visibleFrom="sm" onClick={() => setCollapsed(!collapsedPref)}
+                          aria-label={collapsed ? 'Expand menu' : 'Collapse menu'}>
+                {collapsed ? <IconLayoutSidebarLeftExpand size={20} /> : <IconLayoutSidebarLeftCollapse size={20} />}
+              </ActionIcon>
+            </Tooltip>
             <Title order={4} fw={650}>{title}</Title>
           </Group>
           <Group gap="xs" wrap="nowrap">
@@ -121,31 +141,44 @@ export function AppLayout() {
         </Group>
       </AppShell.Header>
 
-      <AppShell.Navbar p="md">
-        {/* Logo area: 280 × 150 (Configuration → User Group → Platform logo) */}
-        <div className={classes.logoBox}>
+      <AppShell.Navbar p={collapsed ? 'xs' : 'md'} className={collapsed ? classes.collapsed : undefined}>
+        {/* Logo area: 280 × 150 (Configuration → User Group → Platform logo); a small square when collapsed */}
+        <div className={collapsed ? classes.logoSmall : classes.logoBox}>
           {logo
             ? <img src={logo} alt={groupTheme?.name ?? group?.name ?? 'Logo'} className={classes.logo} />
-            : <Stack gap={2} align="center">
-                <Text className={classes.brandName}>{branding?.name ?? 'ViSight Track'}</Text>
-                <Text size="xs" c="dimmed">{group?.name}</Text>
-              </Stack>}
+            : collapsed
+              ? <Text className={classes.brandName} fz={20}>{(branding?.name ?? 'V')[0]}</Text>
+              : <Stack gap={2} align="center">
+                  <Text className={classes.brandName}>{branding?.name ?? 'ViSight Track'}</Text>
+                  <Text size="xs" c="dimmed">{group?.name}</Text>
+                </Stack>}
         </div>
-        <Stack gap={6} mt="xl" style={{ flex: 1 }}>
-          {nav.map((n) => (
-            <NavLink
-              key={n.to}
-              component={RouterLink}
-              to={n.to}
-              label={n.label}
-              leftSection={<n.icon size={22} stroke={1.6} />}
-              rightSection={n.to === '/inbox' && unread ? <Badge size="sm" color="red" variant="filled">{unread}</Badge> : null}
-              active={location.pathname.startsWith(n.to)}
-              className={classes.navItem}
-            />
-          ))}
+        <div className={classes.search}>
+          {collapsed
+            ? <Tooltip label="Search (⌘K)" position="right"><ActionIcon variant="subtle" color="gray" size="xl" onClick={openSearch} aria-label="Search">
+                <IconSearch size={20} /></ActionIcon></Tooltip>
+            : <GlobalSearch ref={searchRef} onNavigate={close} />}
+        </div>
+        <Stack gap={6} mt="md" style={{ flex: 1 }}>
+          {nav.map((n) => {
+            const badge = n.to === '/inbox' && unread ? <Badge size="sm" color="red" variant="filled">{unread}</Badge> : null;
+            const link = (
+              <NavLink
+                key={n.to}
+                component={RouterLink}
+                to={n.to}
+                label={collapsed ? null : n.label}
+                aria-label={n.label}
+                leftSection={<span className={classes.navIcon}><n.icon size={22} stroke={1.6} />{collapsed && !!unread && n.to === '/inbox' ? <span className={classes.dotBadge} /> : null}</span>}
+                rightSection={collapsed ? null : badge}
+                active={location.pathname.startsWith(n.to)}
+                className={classes.navItem}
+              />
+            );
+            return collapsed ? <Tooltip key={n.to} label={n.label} position="right">{link}</Tooltip> : link;
+          })}
         </Stack>
-        <Clock />
+        <Clock compact={collapsed} />
       </AppShell.Navbar>
 
       <AppShell.Main className={classes.main}>

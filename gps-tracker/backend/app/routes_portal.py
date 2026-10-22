@@ -1348,7 +1348,9 @@ def _build_tag_out(tag: BLETag, owner_email: str, db: Optional[Session] = None) 
         expiry_date=effective_expiry,
         days_remaining=days_remaining,
         activation_date=tag.activation_date,
+        category_name=((tag.attributes or {}).get("category") or {}).get("value"),
         activity_status=_compute_activity_status(tag.last_seen),
+        attributes=tag.attributes,
     )
 
 
@@ -1424,6 +1426,15 @@ class PortalTagUpdate(BaseModel):
     description: Optional[str] = None
     category: Optional[str] = None  # category name; empty string clears it
     package_id: Optional[str] = None  # UUID string; empty string clears package
+    # Vehicle details, stored in attributes as {key: {"value": ...}}; "" clears one
+    make: Optional[str] = None
+    model: Optional[str] = None
+    year: Optional[str] = None
+    registration: Optional[str] = None
+    driver: Optional[str] = None
+
+
+VEHICLE_DETAILS = ("make", "model", "year", "registration", "driver")
 
 
 @router.put("/tags/{tag_id}", response_model=PortalTagOut)
@@ -1432,17 +1443,34 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
     me = get_portal_user_from_request(request, db)
     if not _user_can_manage(me, "asset-mgmt"):
         raise HTTPException(status_code=403, detail="You don't have permission to edit tags")
-    group = _get_group_and_assert_domain(me, db)
+    group = db.query(UserGroup).filter(UserGroup.id == me.usergroup_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="User group not found")
     all_owner_ids = _get_group_owner_ids(group, db)
+    try:
+        UUID(str(tag_id))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Tag not found in your group")
 
     tag = (
         db.query(BLETag)
         .filter(BLETag.id == tag_id, _group_tag_scope_filter(group, all_owner_ids))
         .first()
     )
-    if not tag:
+    from app.services import access_service
+    if not tag or not access_service.for_user(me, db).can_see(db, tag.imei):
         raise HTTPException(status_code=404, detail="Tag not found in your group")
 
+    details = {k: getattr(data, k) for k in VEHICLE_DETAILS if getattr(data, k) is not None}
+    if details:
+        attrs = dict(tag.attributes or {})
+        for key, value in details.items():
+            value = value.strip()[:100]
+            if value:
+                attrs[key] = {"value": value}
+            else:
+                attrs.pop(key, None)
+        tag.attributes = attrs
     if data.description is not None:
         cleaned = data.description or None
         tag.description = cleaned

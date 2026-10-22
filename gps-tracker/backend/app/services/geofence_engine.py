@@ -1,25 +1,31 @@
 """Geofence engine — entry/exit alerts from Teltonika positions.
 
-Called by the dashboard ingest for every batch of new GPS fixes. For each
-place (POI) the vehicle is armed to, fixes are checked in device-time order
-and the link's last_known_state moves between INSIDE and OUTSIDE; a change
-raises a geofence_entry / geofence_exit alert (inbox, email, SMS).
+Called by the dashboard ingest for every batch of new GPS fixes. A vehicle is
+watched against a place when it is armed to it (Places page) or when an
+active notification rule covers its vehicle group and that place. Fixes are
+checked in device-time order; each change between inside and outside raises
+one geofence_entry / geofence_exit inbox alert, then:
+
+- armed places notify the group's users (email/SMS, per their preferences);
+- each matching rule emails its own recipients with its custom message.
 
 - Circles use 10% hysteresis on the radius so a vehicle parked on the edge
   doesn't flap; polygons and rectangles use the drawn outline.
-- The first fix after arming only records the state (no alert).
-- link.last_state_check is the device time of the last fix checked, so late,
-  buffered records from before it are skipped rather than replayed.
+- The first fix for a vehicle/place only records the state (no alert).
+- geofence_states.checked_at is the device time of the last fix checked, so
+  late, buffered records from before it are skipped rather than replayed.
 """
 import json
 import logging
 import math
+import re
 from datetime import datetime, timezone
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
-from app.models import POI, BLETag, GeofenceState, POITrackerLink
+from app.models import (POI, BLETag, GeofenceState, GeofenceStatus, NotificationRule, POITrackerLink, UserGroup)
 from app.services import portal_alert_service as alerts
 
 logger = logging.getLogger(__name__)
@@ -74,55 +80,127 @@ def _utc(dt: datetime) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
-def _raise(db: Session, tag: BLETag, poi: POI, entered: bool, fix: dict) -> None:
-    label = tag.description or tag.device_name or tag.imei
-    atype = "geofence_entry" if entered else "geofence_exit"
-    verb = "entered" if entered else "left"
-    title = f"{label} {verb} {poi.name}"
+PLACEHOLDERS = {
+    "vehicle": "Vehicle description", "registration": "Registration", "make": "Make", "model": "Model",
+    "year": "Year", "driver": "Driver", "imei": "Device IMEI", "place": "Place name",
+    "event": "entered / left", "time": "Date and time", "speed": "Speed (km/h)",
+}
+DEFAULT_MESSAGE = "{vehicle} ({registration}) {event} {place} at {time}."
+
+
+def vehicle_detail(tag: BLETag, key: str) -> str:
+    """make / model / year / registration / driver from the vehicle's attributes."""
+    value = ((tag.attributes or {}).get(key) or {})
+    return str(value.get("value") or "") if isinstance(value, dict) else str(value or "")
+
+
+def render(template: str, values: dict) -> str:
+    """Replace {placeholder}s that we know; leave anything else as typed."""
+    return re.sub(r"\{(\w+)\}", lambda m: str(values.get(m.group(1), m.group(0))), template)
+
+
+def _values(db: Session, tag: BLETag, poi: POI, entered: bool, fix: dict) -> dict:
     when = _utc(fix["recorded_at"])
-    message = f"{label} {verb} the place '{poi.name}' at {when:%Y-%m-%d %H:%M} UTC ({fix.get('speed') or 0} km/h)."
+    group = db.get(UserGroup, poi.usergroup_id)
+    tz_name = (group.timezone if group else None) or "Africa/Johannesburg"
+    try:
+        local = when.astimezone(ZoneInfo(tz_name))
+    except Exception:
+        local = when
+    return {"vehicle": tag.description or tag.device_name or tag.imei, "imei": tag.imei, "place": poi.name,
+            "event": "entered" if entered else "left", "time": local.strftime("%d %b %Y %H:%M"),
+            "speed": fix.get("speed") or 0,
+            **{k: vehicle_detail(tag, k) or "—" for k in ("registration", "make", "model", "year", "driver")}}
+
+
+def _raise(db: Session, tag: BLETag, poi: POI, entered: bool, fix: dict, armed: bool, rules: list) -> None:
+    atype = "geofence_entry" if entered else "geofence_exit"
+    v = _values(db, tag, poi, entered, fix)
+    title = f"{v['vehicle']} {v['event']} {poi.name}"
+    message = f"{v['vehicle']} {v['event']} the place '{poi.name}' at {v['time']} ({v['speed']} km/h)."
     meta = {"poi_name": poi.name, "poi_id": str(poi.id), "imei": tag.imei,
             "event_type": "entry" if entered else "exit", "latitude": fix["latitude"], "longitude": fix["longitude"],
-            "speed": fix.get("speed"), "recorded_at": when.isoformat()}
+            "speed": fix.get("speed"), "recorded_at": _utc(fix["recorded_at"]).isoformat(),
+            "rules": [r.name for r in rules], "registration": v["registration"]}
     group_id = str(poi.usergroup_id)
     with db.begin_nested():
         alerts.create_alert(db, group_id, str(tag.id), alert_type=atype, title=title, message=message, meta_data=meta)
         db.flush()
-    alerts._notify_group_by_email(db, group_id, atype, title, message, meta, imei=tag.imei)
-    alerts._notify_group_by_sms(db, group_id, atype, title, message, imei=tag.imei)
-    logger.info("Geofence %s: %s %s %s", atype, tag.imei, verb, poi.name)
+    if armed:
+        alerts._notify_group_by_email(db, group_id, atype, title, message, meta, imei=tag.imei)
+        alerts._notify_group_by_sms(db, group_id, atype, title, message, imei=tag.imei)
+    for rule in rules:
+        if rule.email_enabled and rule.email_recipients:
+            text_ = render(rule.email_message or DEFAULT_MESSAGE, v)
+            subject = f"{rule.name}: {title}"
+            for to in rule.email_recipients:
+                try:
+                    alerts._email_svc.send_portal_alert_email(to, atype, subject, text_, meta)
+                except Exception:
+                    logger.exception("Rule %s email to %s failed", rule.id, to)
+    logger.info("Geofence %s: %s %s %s (rules: %s)", atype, tag.imei, v["event"], poi.name, [r.name for r in rules])
+
+
+def _watched(db: Session, tag: BLETag) -> dict:
+    """{poi_id: (poi, armed, [rules])} — the places this vehicle is watched against."""
+    out: dict = {}
+    links = (db.query(POITrackerLink).join(POI, POI.id == POITrackerLink.poi_id)
+             .filter(POITrackerLink.tracker_id == tag.id, POITrackerLink.is_armed == True,  # noqa: E712
+                     POI.is_active == True).all())  # noqa: E712
+    for link in links:
+        out[link.poi_id] = (link.poi, True, [])
+    group_id = (tag.attributes or {}).get("_created_usergroup_id")
+    if not group_id:
+        return out
+    category = ((tag.attributes or {}).get("category") or {}).get("value")
+    rules = [r for r in db.query(NotificationRule).filter(
+                NotificationRule.usergroup_id == group_id, NotificationRule.is_active == True,  # noqa: E712
+                NotificationRule.rule_type == "geofence").all()
+             if not r.category or (category and r.category.lower() == category.lower())]
+    if not rules:
+        return out
+    places = {p.id: p for p in db.query(POI).filter(POI.usergroup_id == group_id, POI.is_active == True).all()}  # noqa: E712
+    for rule in rules:
+        wanted = places.values() if not rule.place_ids else [places[p] for p in places if str(p) in set(map(str, rule.place_ids))]
+        for poi in wanted:
+            poi_, armed, rs = out.get(poi.id, (poi, False, []))
+            out[poi.id] = (poi_, armed, rs + [rule])
+    return out
 
 
 def check_positions(db: Session, tag: BLETag, fixes: list) -> int:
-    """Check new fixes ({recorded_at, latitude, longitude, speed}) against the tag's armed places.
+    """Check new fixes ({recorded_at, latitude, longitude, speed}) against the places the tag is watched against.
 
     Returns the number of alerts raised. Does not commit.
     """
-    links = (db.query(POITrackerLink).join(POI, POI.id == POITrackerLink.poi_id)
-             .filter(POITrackerLink.tracker_id == tag.id, POITrackerLink.is_armed == True,  # noqa: E712
-                     POI.is_active == True)  # noqa: E712
-             .with_for_update(of=POITrackerLink).all())
-    if not links:
+    watched = _watched(db, tag)
+    if not watched:
         return 0
     ordered = sorted((f for f in fixes if f.get("latitude") is not None and f.get("longitude") is not None),
                      key=lambda f: f["recorded_at"])
+    db.flush()   # the session doesn't autoflush: make earlier, still-pending states visible
+    states = {s.poi_id: s for s in db.query(GeofenceStatus).filter(
+        GeofenceStatus.tag_id == tag.id, GeofenceStatus.poi_id.in_(list(watched))).with_for_update().all()}
     raised = 0
-    for link in links:
-        poi = link.poi
-        checked = _utc(link.last_state_check) if link.last_state_check else None
+    for poi_id, (poi, armed, rules) in watched.items():
+        status = states.get(poi_id)
         for fix in ordered:
             at = _utc(fix["recorded_at"])
-            if checked and at <= checked:
+            if status and _utc(status.checked_at) >= at:
                 continue
-            state = link.last_known_state
-            inside = is_inside(poi, fix["latitude"], fix["longitude"], state)
-            new_state = GeofenceState.INSIDE if inside else GeofenceState.OUTSIDE
-            if state in (GeofenceState.INSIDE, GeofenceState.OUTSIDE) and new_state != state:
-                try:
-                    _raise(db, tag, poi, inside, fix)
-                    raised += 1
-                except Exception:
-                    logger.exception("Geofence alert for %s / %s failed", tag.imei, poi.id)
-            link.last_known_state = new_state
-            link.last_state_check = checked = at
+            prev = None if status is None else (GeofenceState.INSIDE if status.inside else GeofenceState.OUTSIDE)
+            inside = is_inside(poi, fix["latitude"], fix["longitude"], prev)
+            if status is None:
+                status = GeofenceStatus(tag_id=tag.id, poi_id=poi_id, inside=inside, checked_at=at)
+                db.add(status)
+                continue
+            if inside != status.inside:
+                wanting = [r for r in rules if (r.on_entry if inside else r.on_exit)]
+                if armed or wanting:
+                    try:
+                        _raise(db, tag, poi, inside, fix, armed, wanting)
+                        raised += 1
+                    except Exception:
+                        logger.exception("Geofence alert for %s / %s failed", tag.imei, poi.id)
+            status.inside, status.checked_at = inside, at
     return raised

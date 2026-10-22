@@ -28,6 +28,16 @@ export interface Vehicle {
   category_id: string | null;
   category_name: string | null;
   activity_status: 'active' | 'idle' | 'offline';
+  attributes: Record<string, unknown> | null;
+}
+
+export const VEHICLE_DETAILS = ['registration', 'make', 'model', 'year', 'driver'] as const;
+export type VehicleDetail = typeof VEHICLE_DETAILS[number];
+
+/** make / model / year / registration / driver from the vehicle's attributes. */
+export function detail(v: Pick<Vehicle, 'attributes'>, key: VehicleDetail): string {
+  const a = v.attributes?.[key] as { value?: unknown } | undefined;
+  return a && a.value != null ? String(a.value) : '';
 }
 
 export interface Category {
@@ -230,4 +240,42 @@ export interface GroupTheme {
   theme_primary: string | null;
   theme_accent: string | null;
   timezone: string | null;
+}
+
+export interface NotificationRule {
+  id: string;
+  name: string;
+  rule_type: string;
+  rule_type_label: string;
+  category: string | null;
+  place_ids: string[];
+  on_entry: boolean;
+  on_exit: boolean;
+  email_enabled: boolean;
+  email_recipients: string[];
+  email_message: string | null;
+  is_active: boolean;
+  created_at: string | null;
+}
+
+export interface RulesMeta {
+  rule_types: { value: string; label: string }[];
+  placeholders: { key: string; label: string }[];
+  default_message: string;
+}
+
+export interface LivePosition {
+  imei: string;
+  position: {
+    latitude: number; longitude: number; speed: number; heading: number | null; recorded_at: string;
+    received_at: string | null; ignition: boolean | null; event: string;
+  } | null;
+  trip: { id: string; started_at: string; distance_km: number; max_speed: number; duration_s: number } | null;
+  trail: [number, number][];
+}
+
+export interface GeocodeResult {
+  label: string;
+  latitude: number;
+  longitude: number;
 }

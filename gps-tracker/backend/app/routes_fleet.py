@@ -3,6 +3,7 @@
 Mounted under /api/portal next to routes_portal; every endpoint is scoped to
 the caller's user group.
 """
+import os
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
@@ -105,6 +106,74 @@ def list_events(request: Request, db: Session = Depends(get_db),
         } for e in rows],
         "next_before_id": rows[-1].id if len(rows) == limit else None,
     }
+
+
+# ---------------------------------------------------------------------------
+# Live tracking
+# ---------------------------------------------------------------------------
+
+@router.get("/live")
+def live(request: Request, db: Session = Depends(get_db), imei: str = Query(...),
+         trail_minutes: int = Query(60, ge=5, le=720)):
+    """A vehicle's latest position, speed, heading and ignition, and its trail.
+
+    The trail is the current (open) trip's route, or the last trail_minutes
+    of positions when the vehicle isn't on a trip. Polled every few seconds by
+    the live-tracking view.
+    """
+    me = get_portal_user_from_request(request, db)
+    access = access_service.for_user(me, db)
+    access.require("map.view")
+    if not access.can_see(db, imei):
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    base = db.query(DeviceEvent).filter(DeviceEvent.usergroup_id == me.usergroup_id, DeviceEvent.imei == imei,
+                                        DeviceEvent.latitude.isnot(None))
+    last = base.order_by(DeviceEvent.recorded_at.desc(), DeviceEvent.id.desc()).first()
+    if not last:
+        return {"imei": imei, "position": None, "trip": None, "trail": []}
+    trip = (db.query(Trip).filter(Trip.usergroup_id == me.usergroup_id, Trip.imei == imei, Trip.status == "open")
+            .order_by(Trip.started_at.desc()).first())
+    since = trip.started_at if trip else last.recorded_at - timedelta(minutes=trail_minutes)
+    trail = (base.filter(DeviceEvent.recorded_at >= since).order_by(DeviceEvent.recorded_at, DeviceEvent.id)
+             .limit(5000).all())
+    io = last.io or {}
+    return {
+        "imei": imei,
+        "position": {"latitude": last.latitude, "longitude": last.longitude, "speed": last.speed or 0,
+                     "heading": last.angle, "recorded_at": last.recorded_at, "received_at": last.created_at,
+                     "ignition": None if io.get("239") is None else bool(io.get("239")),
+                     "event": event_label(last.event_type, last.event_io_id)},
+        "trip": None if not trip else {"id": str(trip.id), "started_at": trip.started_at,
+                                       "distance_km": round((trip.distance_m or 0) / 1000, 1),
+                                       "max_speed": trip.max_speed, "duration_s": trip.duration_s},
+        "trail": [[e.latitude, e.longitude] for e in trail],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Address search (for drawing places)
+# ---------------------------------------------------------------------------
+
+_GEOCODE_COUNTRIES = os.getenv("GEOCODE_COUNTRIES", "za")
+
+
+@router.get("/geocode")
+async def geocode(request: Request, q: str = Query(..., min_length=3, max_length=200), db: Session = Depends(get_db)):
+    """Addresses and places matching q (OpenStreetMap Nominatim), for the place editor."""
+    get_portal_user_from_request(request, db)
+    import httpx
+    params = {"q": q, "format": "jsonv2", "limit": 6, "addressdetails": 0}
+    if _GEOCODE_COUNTRIES:
+        params["countrycodes"] = _GEOCODE_COUNTRIES
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            resp = await client.get("https://nominatim.openstreetmap.org/search", params=params,
+                                    headers={"User-Agent": "ViSight-Track/1.0 (place search)"})
+        resp.raise_for_status()
+    except httpx.HTTPError:
+        raise HTTPException(status_code=502, detail="Address search is unavailable right now")
+    return [{"label": r.get("display_name"), "latitude": float(r["lat"]), "longitude": float(r["lon"])}
+            for r in resp.json()]
 
 
 # ---------------------------------------------------------------------------

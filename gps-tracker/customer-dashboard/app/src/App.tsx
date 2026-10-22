@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { setUnauthorizedHandler } from './api/client';
 import { getSession } from './auth/session';
 import { LoginPage } from './auth/LoginPage';
-import { useCan } from './api/hooks';
+import { useCan, useMe } from './api/hooks';
 import { AppLayout, NAV } from './layout/AppLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { WorkspacePage } from './pages/WorkspacePage';
@@ -18,7 +18,10 @@ function RequireAuth({ children }: { children: JSX.Element }) {
 /** Send users to the first section their role allows when they open one it doesn't. */
 function Allowed({ any, children }: { any: string[]; children: JSX.Element }) {
   const can = useCan();
+  const me = useMe();
   if (any.length === 0 || any.some(can)) return children;
+  // Signed in before roles existed: wait for /me rather than redirecting on missing permissions
+  if (!getSession().access && me.isLoading) return null;
   const first = NAV.find((n) => n.any.length === 0 ? false : n.any.some(can)) ?? NAV.find((n) => n.to === '/configuration')!;
   return <Navigate to={first.to} replace />;
 }

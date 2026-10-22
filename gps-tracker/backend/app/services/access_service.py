@@ -26,6 +26,7 @@ PERMISSIONS: dict = {
     "places.view":      ("View places (geofences)", "Places"),
     "places.manage":    ("Create, edit and arm places", "Places"),
     "inbox.view":       ("Receive and view alerts", "Alerts"),
+    "rules.manage":     ("Create and edit notification rules", "Alerts"),
     "reports.view":     ("Run and download reports", "Reports"),
     "reports.schedule": ("Schedule emailed reports", "Reports"),
     "vehicles.manage":  ("Edit vehicles and vehicle groups", "Administration"),
@@ -40,7 +41,7 @@ ADMIN_ROLE = "User Group Administrator"
 DEFAULT_ROLES: dict = {
     ADMIN_ROLE: ("Full access to everything in the user group, including all vehicles", ALL_PERMISSIONS, True),
     "Operator": ("Day-to-day tracking: live map, trips, places and alerts",
-                 ["map.view", "history.view", "places.view", "places.manage", "inbox.view", "reports.view"], False),
+                 ["map.view", "history.view", "places.view", "places.manage", "inbox.view", "rules.manage", "reports.view"], False),
     "Mapping User": ("Live map, trip history and places",
                      ["map.view", "history.view", "places.view", "places.manage"], False),
     "Maintenance User": ("Vehicle details, live map, alerts and reports",

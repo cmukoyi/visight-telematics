@@ -55,7 +55,8 @@ function UsersTab() {
   const { data: groups = [] } = useSecurityGroups();
   const { data: me } = useMe();
   const [editing, setEditing] = useState<PortalUserRow | 'new' | null>(null);
-  const [search, setSearch] = useState('');
+  const [params] = useSearchParams();
+  const [search, setSearch] = useState(params.get('q') ?? '');
   const [temp, setTemp] = useState<{ email: string; password: string } | null>(null);
   const roleById = useMemo(() => new Map(roles.map((r) => [r.id, r])), [roles]);
   const sgById = useMemo(() => new Map(groups.map((g) => [g.id, g])), [groups]);

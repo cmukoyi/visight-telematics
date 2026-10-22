@@ -11,3 +11,6 @@
 .row { padding: 12px 16px; border-bottom: 1px solid var(--mantine-color-default-border); }
 .row:last-child { border-bottom: 0; }
 .swatch { width: 14px; height: 14px; border-radius: 4px; flex: none; }
+.miscRow { display: block; width: 100%; padding: 14px 16px; border-bottom: 1px solid var(--mantine-color-default-border); }
+.miscRow:last-child { border-bottom: 0; }
+.miscRow:hover { background: var(--mantine-color-default-hover); }

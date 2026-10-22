@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ActionIcon, Badge, Button, Group, Paper, SegmentedControl, Select, Text, TextInput, Title, Tooltip } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconChecks, IconMail, IconMailOpened, IconSearch, IconTable, IconMap } from '@tabler/icons-react';
@@ -29,7 +30,9 @@ export function InboxPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [type, setType] = useState<string | null>(null);
   const [imei, setImei] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
+  const [params] = useSearchParams();
+  const [search, setSearch] = useState(params.get('search') ?? '');
+  useEffect(() => { const q = params.get('search'); if (q) setSearch(q); }, [params]);
   const [view, setView] = useState<'grid' | 'map'>('grid');
   const { data: vehicles = [] } = useVehicles();
   const inbox = useInbox({ range, status, type, imei, search });

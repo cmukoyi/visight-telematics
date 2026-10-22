@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState }
 import Map, { AttributionControl, Layer, MapRef, Marker, NavigationControl, Popup, ScaleControl, Source } from 'react-map-gl/maplibre';
 import type { StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { SegmentedControl } from '@mantine/core';
+import { Button, SegmentedControl } from '@mantine/core';
 import { useBranding } from '../api/hooks';
 import { STATUS } from '../theme';
 import classes from './FleetMap.module.css';
@@ -12,7 +12,16 @@ export interface MapRoute { id: string; color: string; coords: [number, number][
 export interface MapPoint { id: string; lat: number; lng: number; color: string; label: string; detail?: string; icon?: string }
 export interface MapPlace { id: string; name: string; lat: number; lng: number; radius: number; polygon?: [number, number][] | null }
 
-export interface FleetMapHandle { fit: (points: [number, number][]) => void }
+export interface FleetMapHandle {
+  fit: (points: [number, number][]) => void;
+  /** Move to a point keeping the zoom (zoom in to `minZoom` if further out), e.g. to follow a vehicle. */
+  panTo: (lat: number, lng: number, minZoom?: number) => void;
+}
+
+/** Something on the map that was clicked: a vehicle or a point (event). */
+export interface MapTarget { kind: 'vehicle' | 'point'; id: string; label: string; lat: number; lng: number }
+/** A button offered in the popup of a clicked vehicle or point, e.g. "Create place here". */
+export interface MapAction { label: string; onClick: (target: MapTarget) => void }
 
 interface Props {
   vehicles?: MapVehicle[];
@@ -21,6 +30,8 @@ interface Props {
   places?: MapPlace[];
   selectedVehicleId?: string | null;
   onVehicleClick?: (id: string) => void;
+  /** Buttons shown in the popup of a clicked vehicle or point (vehicles get a popup only when set). */
+  actions?: MapAction[];
   /** Called with the clicked position (e.g. to draw a place); the cursor becomes a crosshair. */
   onMapClick?: (lat: number, lng: number) => void;
   /** Extra padding (px) kept clear when fitting, e.g. for a docked panel at the bottom. */
@@ -56,7 +67,7 @@ function circlePolygon(lat: number, lng: number, radiusM: number, steps = 48): [
 }
 
 export const FleetMap = forwardRef<FleetMapHandle, Props>(function FleetMap(
-  { vehicles = [], routes = [], points = [], places = [], selectedVehicleId, onVehicleClick, onMapClick, fitPadding }, ref,
+  { vehicles = [], routes = [], points = [], places = [], selectedVehicleId, onVehicleClick, onMapClick, actions, fitPadding }, ref,
 ) {
   const mapRef = useRef<MapRef>(null);
   const { data: branding } = useBranding();
@@ -65,7 +76,7 @@ export const FleetMap = forwardRef<FleetMapHandle, Props>(function FleetMap(
     setStyle(v);
     try { localStorage.setItem(BASEMAP_KEY, v); } catch { /* storage blocked */ }
   };
-  const [popup, setPopup] = useState<MapPoint | null>(null);
+  const [popup, setPopup] = useState<(MapPoint & { kind: MapTarget['kind'] }) | null>(null);
 
   const mapStyle = useMemo(() => {
     const key = branding?.maptilerKey;
@@ -87,6 +98,11 @@ export const FleetMap = forwardRef<FleetMapHandle, Props>(function FleetMap(
       const lngs = pts.map((p) => p[1]);
       map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
         { padding: pad, maxZoom: 16, duration: 600 });
+    },
+    panTo(lat, lng, minZoom = 13) {
+      const map = mapRef.current;
+      if (!map) return;
+      map.easeTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), minZoom), duration: 800 });
     },
   }), [pad]);
 
@@ -146,14 +162,18 @@ export const FleetMap = forwardRef<FleetMapHandle, Props>(function FleetMap(
 
         {points.map((pt) => (
           <Marker key={pt.id} latitude={pt.lat} longitude={pt.lng} anchor="center"
-                  onClick={(e) => { e.originalEvent.stopPropagation(); setPopup(pt); }}>
+                  onClick={(e) => { e.originalEvent.stopPropagation(); setPopup({ ...pt, kind: 'point' }); }}>
             <div className={classes.point} style={{ background: pt.color }} title={pt.label}>{pt.icon ?? ''}</div>
           </Marker>
         ))}
 
         {vehicles.map((v) => (
           <Marker key={v.id} latitude={v.lat} longitude={v.lng} anchor="bottom"
-                  onClick={(e) => { e.originalEvent.stopPropagation(); onVehicleClick?.(v.id); }}>
+                  onClick={(e) => {
+                    e.originalEvent.stopPropagation();
+                    onVehicleClick?.(v.id);
+                    if (actions?.length) setPopup({ kind: 'vehicle', id: v.id, lat: v.lat, lng: v.lng, color: STATUS[v.status], label: v.name });
+                  }}>
             <div className={`${classes.vehicle} ${v.id === selectedVehicleId ? classes.selected : ''}`}>
               <span className={classes.dot} style={{ background: STATUS[v.status] }} />
               <span className={classes.vehicleName}>{v.name}</span>
@@ -166,6 +186,12 @@ export const FleetMap = forwardRef<FleetMapHandle, Props>(function FleetMap(
                  offset={14} maxWidth="280px" className={classes.popup}>
             <strong>{popup.label}</strong>
             {popup.detail && <div className={classes.popupDetail}>{popup.detail}</div>}
+            {actions?.map((a) => (
+              <Button key={a.label} size="compact-xs" variant="light" mt={8} mr={6}
+                      onClick={() => { a.onClick({ kind: popup.kind, id: popup.id, label: popup.label, lat: popup.lat, lng: popup.lng }); setPopup(null); }}>
+                {a.label}
+              </Button>
+            ))}
           </Popup>
         )}
       </Map>

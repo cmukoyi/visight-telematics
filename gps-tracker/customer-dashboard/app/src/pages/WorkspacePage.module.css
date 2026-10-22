@@ -23,3 +23,5 @@
   .dock { grid-template-columns: 1fr; height: 60vh; }
   .vehicles { display: none; }
 }
+.placePanel { position: absolute; top: 64px; right: 12px; width: 360px; max-height: calc(100% - 88px); z-index: 4; overflow: hidden; display: flex; flex-direction: column; }
+@media (max-width: 48em) { .placePanel { left: 12px; width: auto; } }

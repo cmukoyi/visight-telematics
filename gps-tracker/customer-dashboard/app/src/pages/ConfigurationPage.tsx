@@ -9,18 +9,19 @@ import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import {
   IconArrowUpRight, IconBell, IconCar, IconCategory, IconKey, IconMapPin, IconPencil, IconPlugConnected,
-  IconTrash, IconPlus, IconShieldLock, IconBuilding,
+  IconTrash, IconPlus, IconShieldLock, IconBuilding, IconDots, IconBellRinging, IconChevronRight,
 } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { api } from '../api/client';
 import { useCan, useCategories, useDataExchange, useSecurityGroups, useVehicles } from '../api/hooks';
-import type { Category, Vehicle } from '../api/types';
+import { VEHICLE_DETAILS, detail, type Category, type Vehicle } from '../api/types';
 import { getSession } from '../auth/session';
 import { DataGrid } from '../components/DataGrid';
 import { STATUS } from '../theme';
 import { ago, dateTime, vehicleName } from '../utils/format';
 import classes from './ConfigurationPage.module.css';
+import { NotificationRulesPage } from './NotificationRulesPage';
 import { PlacesPage } from './PlacesPage';
 import { SecurityPage } from './SecurityPage';
 import { UserGroupPage } from './UserGroupPage';
@@ -35,6 +36,7 @@ const TILES: Tile[] = [
   { title: 'Security', description: 'Users, security groups, roles and permissions', icon: IconShieldLock, to: 'security', any: ['users.manage', 'security.manage'] },
   { title: 'User Group', description: 'Theme colours, platform and report logos, timezone', icon: IconBuilding, to: 'user-group', any: ['settings.manage'] },
   { title: 'Data Exchange', description: 'Link the exchange that routes your devices to this account', icon: IconPlugConnected, to: 'exchange', any: ['settings.manage'] },
+  { title: 'Misc', description: 'Notification rules and other tools', icon: IconDots, to: 'misc', any: ['inbox.view', 'rules.manage'] },
   { title: 'Notifications', description: 'Alert email and SMS preferences', icon: IconBell, classic: 'settings', any: ['settings.manage'] },
   { title: 'My account', description: 'Change your password', icon: IconKey, to: 'account', any: [] },
 ];
@@ -82,10 +84,14 @@ function Devices() {
   const { data: vehicles = [], isFetching } = useVehicles();
   const { data: categories = [] } = useCategories();
   const [editing, setEditing] = useState<Vehicle | null>(null);
-  const form = useForm({ initialValues: { description: '', category: '' } });
+  const form = useForm({ initialValues: { description: '', category: '', registration: '', make: '', model: '', year: '', driver: '' } });
   const admin = useCan()('vehicles.manage');
 
-  const open = (v: Vehicle) => { form.setValues({ description: v.description ?? '', category: v.category_name ?? '' }); setEditing(v); };
+  const open = (v: Vehicle) => {
+    form.setValues({ description: v.description ?? '', category: v.category_name ?? '',
+                     ...Object.fromEntries(VEHICLE_DETAILS.map((k) => [k, detail(v, k)])) });
+    setEditing(v);
+  };
   const save = form.onSubmit(async (values) => {
     try {
       await api(`/api/portal/tags/${editing!.id}`, { method: 'PUT', json: values });
@@ -97,6 +103,9 @@ function Devices() {
 
   const cols: ColDef<Vehicle>[] = [
     { headerName: 'Name', valueGetter: (p) => p.data && vehicleName(p.data), flex: 1.3 },
+    { headerName: 'Registration', valueGetter: (p) => p.data && (detail(p.data, 'registration') || '—'), width: 140 },
+    { headerName: 'Make / model', valueGetter: (p) => p.data && ([detail(p.data, 'make'), detail(p.data, 'model'), detail(p.data, 'year')].filter(Boolean).join(' ') || '—'), width: 170 },
+    { headerName: 'Driver', valueGetter: (p) => p.data && (detail(p.data, 'driver') || '—'), width: 150 },
     { headerName: 'IMEI', field: 'imei', width: 170 },
     { headerName: 'Group', field: 'category_name', valueFormatter: (p) => p.value || '—', width: 150 },
     { headerName: 'Status', field: 'activity_status', width: 120,
@@ -118,10 +127,17 @@ function Devices() {
       <Paper withBorder className={classes.gridCard}>
         <DataGrid rowData={vehicles} columnDefs={cols} loading={isFetching && !vehicles.length} getRowId={(p) => p.data.id} />
       </Paper>
-      <Modal opened={!!editing} onClose={() => setEditing(null)} title={editing ? `Edit ${vehicleName(editing)}` : ''}>
+      <Modal opened={!!editing} onClose={() => setEditing(null)} title={editing ? `Edit ${vehicleName(editing)}` : ''} size="lg">
         <form onSubmit={save}>
           <Stack>
-            <TextInput label="Name" placeholder="e.g. Truck 12 — CA 123-456" {...form.getInputProps('description')} data-autofocus />
+            <TextInput label="Name" placeholder="e.g. Truck 12" {...form.getInputProps('description')} data-autofocus />
+            <SimpleGrid cols={2}>
+              <TextInput label="Registration" placeholder="e.g. CA 123-456" {...form.getInputProps('registration')} />
+              <TextInput label="Driver" placeholder="Driver's name" {...form.getInputProps('driver')} />
+              <TextInput label="Make" placeholder="e.g. Toyota" {...form.getInputProps('make')} />
+              <TextInput label="Model" placeholder="e.g. Hilux 2.8 GD-6" {...form.getInputProps('model')} />
+              <TextInput label="Year" placeholder="e.g. 2022" maxLength={4} {...form.getInputProps('year')} />
+            </SimpleGrid>
             <Select label="Group" placeholder="No group" clearable data={categories.map((c) => c.name)}
                     value={form.values.category || null} onChange={(v) => form.setFieldValue('category', v ?? '')} />
             <Group justify="flex-end"><Button variant="default" onClick={() => setEditing(null)}>Cancel</Button><Button type="submit">Save</Button></Group>
@@ -303,6 +319,31 @@ function Account() {
   );
 }
 
+// ── Misc: a list of smaller tools ──
+const MISC = [
+  { to: 'notification-rules', title: 'Notification Rules', description: 'Alert when vehicles enter or leave places; optional emails', icon: IconBellRinging },
+];
+
+function Misc() {
+  const navigate = useNavigate();
+  return (
+    <Stack p="lg" gap={0} className={classes.narrow}>
+      <Header title="Misc" />
+      <Paper withBorder>
+        {MISC.map((m) => (
+          <UnstyledButton key={m.to} className={classes.miscRow} onClick={() => navigate(m.to)}>
+            <Group wrap="nowrap">
+              <ThemeIcon variant="light" size="lg"><m.icon size={20} /></ThemeIcon>
+              <div style={{ flex: 1 }}><Text fw={600}>{m.title}</Text><Text size="sm" c="dimmed">{m.description}</Text></div>
+              <IconChevronRight size={18} opacity={0.5} />
+            </Group>
+          </UnstyledButton>
+        ))}
+      </Paper>
+    </Stack>
+  );
+}
+
 export function ConfigurationPage() {
   return (
     <Routes>
@@ -314,6 +355,8 @@ export function ConfigurationPage() {
       <Route path="places" element={<PlacesPage />} />
       <Route path="security" element={<SecurityPage />} />
       <Route path="user-group" element={<UserGroupPage />} />
+      <Route path="misc" element={<Misc />} />
+      <Route path="misc/notification-rules" element={<NotificationRulesPage />} />
       <Route path="*" element={<Tiles />} />
     </Routes>
   );

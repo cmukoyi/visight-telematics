@@ -2,15 +2,16 @@ import { useQuery } from '@tanstack/react-query';
 import { api, qs } from './client';
 import { getSession, saveAccess } from '../auth/session';
 import type {
-  Alert, Branding, Category, DataExchangeStatus, DeviceEvent, EventTypes, GroupTheme, Kpis, Me, Permission, Place,
-  PortalUserRow, ReportDef, ReportSchedule, Role, SecurityGroup, Trip, TripDetail, Vehicle,
+  Alert, Branding, Category, DataExchangeStatus, DeviceEvent, EventTypes, GroupTheme, Kpis, LivePosition, Me,
+  NotificationRule, Permission, Place, PortalUserRow, ReportDef, ReportSchedule, Role, RulesMeta, SecurityGroup, Trip,
+  TripDetail, Vehicle,
 } from './types';
 
 export const useBranding = () =>
   useQuery({ queryKey: ['branding'], queryFn: () => api<Branding>('/api/branding'), staleTime: Infinity });
 
 export const useVehicles = () =>
-  useQuery({ queryKey: ['vehicles'], queryFn: () => api<Vehicle[]>('/api/portal/tags'), refetchInterval: 30_000 });
+  useQuery({ queryKey: ['vehicles'], queryFn: () => api<Vehicle[]>('/api/portal/tags'), refetchInterval: 15_000 });
 
 export const useCategories = () =>
   useQuery({ queryKey: ['categories'], queryFn: () => api<Category[]>('/api/portal/categories') });
@@ -72,8 +73,8 @@ export const useSchedules = () =>
 export const useDataExchange = () =>
   useQuery({ queryKey: ['data-exchange'], queryFn: () => api<DataExchangeStatus>('/api/portal/data-exchange') });
 
-export const usePortalUsers = () =>
-  useQuery({ queryKey: ['portal-users'], queryFn: () => api<PortalUserRow[]>('/api/portal/users') });
+export const usePortalUsers = (enabled = true) =>
+  useQuery({ queryKey: ['portal-users'], queryFn: () => api<PortalUserRow[]>('/api/portal/users'), enabled });
 
 /** The signed-in user's profile and access; refreshed so role changes apply without signing out. */
 export const useMe = () =>
@@ -110,3 +111,19 @@ export const useRoles = () => useQuery({ queryKey: ['roles'], queryFn: () => api
 
 export const useSecurityGroups = () =>
   useQuery({ queryKey: ['security-groups'], queryFn: () => api<SecurityGroup[]>('/api/portal/security-groups') });
+
+export const useRules = (enabled = true) =>
+  useQuery({ queryKey: ['notification-rules'], queryFn: () => api<NotificationRule[]>('/api/portal/notification-rules'), enabled });
+
+export const useRulesMeta = () =>
+  useQuery({ queryKey: ['notification-rules-meta'], queryFn: () => api<RulesMeta>('/api/portal/notification-rules/meta'), staleTime: Infinity });
+
+/** One vehicle's live position and trail, polled every 5 s while `imei` is set. */
+export const useLive = (imei: string | null) =>
+  useQuery({
+    queryKey: ['live', imei],
+    queryFn: () => api<LivePosition>(`/api/portal/live${qs({ imei })}`),
+    enabled: !!imei,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: false,
+  });

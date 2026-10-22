@@ -40,3 +40,17 @@
 .userButton:hover { background: var(--mantine-color-default-hover); }
 .userText { max-width: 160px; }
 @media (max-width: 48em) { .userText { display: none; } }
+
+.search { margin-top: var(--mantine-spacing-lg); display: flex; justify-content: center; }
+.search > * { width: 100%; }
+.collapsed .search > * { width: auto; }
+.logoSmall {
+  width: 56px; height: 56px; margin: 4px auto 0; flex: none; display: flex; align-items: center; justify-content: center;
+  border-radius: var(--mantine-radius-md); background: rgba(255, 255, 255, 0.05); overflow: hidden;
+}
+.navIcon { position: relative; display: inline-flex; }
+.dotBadge { position: absolute; top: -2px; right: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--mantine-color-red-6); }
+.collapsed .navItem { justify-content: center; padding: 12px 0; }
+.collapsed .navItem :global(.mantine-NavLink-section) { margin: 0; }
+.collapsed .navItem :global(.mantine-NavLink-body) { display: none; }
+.clockCompact { padding: 8px 0; text-align: center; }

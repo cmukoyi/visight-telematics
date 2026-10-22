@@ -505,7 +505,8 @@ Best regards,
         """Send a portal alert notification email (battery_low, tag_offline,
         geofence_entry, geofence_exit).  Called at most once per alert row."""
         try:
-            meta_data = meta_data or {}
+            from html import escape
+            meta_data = {k: escape(str(v)) if isinstance(v, str) else v for k, v in (meta_data or {}).items()}
             # ── Per-type styling ──────────────────────────────────────────
             styles = {
                 "battery_low":           {"emoji": "🔋", "color": "#F59E0B", "bg": "#FEF3C7", "label": "Battery Low"},
@@ -535,6 +536,8 @@ Best regards,
 
             subject = f"{s['emoji']} {title}"
             text_content = f"{title}\n\n{message}\n\n{self.brand_name} Alerts"
+            # Titles and messages can contain user-entered text (vehicle names, rule messages)
+            title, message = escape(title), escape(message).replace("\n", "<br>")
             html_content = f"""
             <html>
               <body style="margin:0;padding:0;background:#f9fafb;font-family:Arial,sans-serif;">

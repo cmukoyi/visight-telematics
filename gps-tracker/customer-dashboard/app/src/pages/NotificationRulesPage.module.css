@@ -1,0 +1,5 @@
+.root { display: flex; flex-direction: column; }
+.grid { height: max(420px, calc(100dvh - 240px)); overflow: hidden; }
+.chip { cursor: pointer; text-transform: none; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 500; }
+.chip:hover { background: var(--mantine-color-default-hover); }
+.preview { background: var(--mantine-color-default-hover); }
