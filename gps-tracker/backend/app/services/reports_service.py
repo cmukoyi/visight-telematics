@@ -66,14 +66,15 @@ def _trips_q(db, group_id, imeis, start, end):
 
 def report_trips(db, group_id, devices, start, end, tz):
     from app.services import vehicle_fuel
-    cols = ["Vehicle", "IMEI", "Start", "End", "Duration", "Distance (km)", "Fuel used (L)", "Max speed (km/h)",
+    cols = ["Vehicle", "IMEI", "Driver", "Start", "End", "Duration", "Distance (km)", "Fuel used (L)", "Max speed (km/h)",
             "Avg speed (km/h)", "Speeding", "Harsh braking", "Harsh acceleration", "Harsh cornering",
             "Start location", "End location", "Start position", "End position"]
     rates = vehicle_fuel.group_rates(db, group_id)
+    vehicle, by_id = _drivers(db, group_id)
     rows = []
     for t in _trips_q(db, group_id, devices, start, end).limit(MAX_ROWS):
         fuel = vehicle_fuel.litres(t.distance_m, rates.get(t.imei))
-        rows.append([devices.get(t.imei, t.imei), t.imei, _local(t.started_at, tz),
+        rows.append([devices.get(t.imei, t.imei), t.imei, _trip_driver(t, vehicle, by_id), _local(t.started_at, tz),
                      _local(t.ended_at, tz) if t.ended_at else "in progress", _dur(t.duration_s),
                      round((t.distance_m or 0) / 1000, 2), "" if fuel is None else fuel, t.max_speed, t.avg_speed or "",
                      t.speeding_count, t.harsh_braking_count, t.harsh_acceleration_count, t.harsh_cornering_count,
@@ -148,11 +149,142 @@ def report_alerts(db, group_id, devices, start, end, tz):
     return cols, rows
 
 
+def _drivers(db, group_id) -> tuple:
+    """({imei: the vehicle's driver}, {driver id: name}) — a trip's own driver (from a key) wins."""
+    from app.services import drivers_service
+    vehicle = {}
+    for tag in db.query(BLETag).filter(BLETag.attributes.op("->>")("_created_usergroup_id") == str(group_id)):
+        name = ((tag.attributes or {}).get("driver") or {}).get("value")
+        if name:
+            vehicle[tag.imei] = name
+    return vehicle, drivers_service.names(db, group_id)
+
+
+def _trip_driver(t, vehicle: dict, by_id: dict) -> str:
+    return (by_id.get(str(t.driver_id)) if t.driver_id else None) or vehicle.get(t.imei, "")
+
+
+def _speed(e) -> int:
+    """The speed of an overspeed event: IO 255 (the over-speeding value), else the record's speed."""
+    v = (e.io or {}).get("255")
+    return int(v) if isinstance(v, (int, float)) and v > 0 else int(e.speed or 0)
+
+
+def report_speeding(db, group_id, devices, start, end, tz):
+    from app.services import address_service
+    cols = ["Vehicle", "IMEI", "Driver", "Time", "Speed (km/h)", "Location", "Latitude", "Longitude"]
+    vehicle, by_id = _drivers(db, group_id)
+    events = _events(db, group_id, devices, start, end, ["overspeed"]).all()
+    trips = {t.id: t for t in db.query(Trip).filter(Trip.id.in_({e.trip_id for e in events if e.trip_id}))} if events else {}
+    rows = []
+    for e in events:
+        t = trips.get(e.trip_id)
+        driver = _trip_driver(t, vehicle, by_id) if t else vehicle.get(e.imei, "")
+        rows.append([devices.get(e.imei, e.imei), e.imei, driver, _local(e.recorded_at, tz), _speed(e),
+                     address_service.cached(db, e.latitude, e.longitude) or "",
+                     e.latitude, e.longitude])
+    return cols, rows
+
+
+def report_speeding_summary(db, group_id, devices, start, end, tz):
+    cols = ["Vehicle", "IMEI", "Assigned driver", "Speeding events", "Top speed (km/h)", "Average speeding speed (km/h)",
+            "Distance (km)", "Speeding per 100 km"]
+    vehicle, _ = _drivers(db, group_id)
+    agg = {imei: [0, 0, 0] for imei in devices}           # count, top, sum of speeds
+    for e in _events(db, group_id, devices, start, end, ["overspeed"]):
+        a, v = agg[e.imei], _speed(e)
+        a[0] += 1
+        a[1] = max(a[1], v)
+        a[2] += v
+    km = {imei: 0.0 for imei in devices}
+    for t in _trips_q(db, group_id, devices, start, end):
+        km[t.imei] += (t.distance_m or 0) / 1000
+    rows = []
+    for imei, name in sorted(devices.items(), key=lambda x: (-agg[x[0]][0], x[1].lower())):
+        n, top, total = agg[imei]
+        rows.append([name, imei, vehicle.get(imei, ""), n, top or "", round(total / n) if n else "", round(km[imei], 1),
+                     round(n / km[imei] * 100, 2) if km[imei] else ""])
+    return cols, rows
+
+
+def _after_hours(db, group_id, devices, start, end, tz):
+    """[(trip, inside s, outside s, profile summary)] using each vehicle's time profile (or the default)."""
+    from app.services import time_profiles
+    by_id, default = time_profiles.profiles(db, group_id)
+    attrs = {tag.imei: tag.attributes or {} for tag in
+             db.query(BLETag).filter(BLETag.attributes.op("->>")("_created_usergroup_id") == str(group_id))}
+    out = []
+    for t in _trips_q(db, group_id, devices, start, end):
+        windows = time_profiles.for_vehicle(attrs.get(t.imei), by_id, default)
+        ends = t.ended_at or t.last_event_at
+        inside, outside = time_profiles.split(time_profiles.utc(t.started_at), time_profiles.utc(ends), windows, tz)
+        out.append((t, inside, outside, time_profiles.describe(windows)))
+    return out
+
+
+def report_after_hours(db, group_id, devices, start, end, tz):
+    cols = ["Vehicle", "IMEI", "Working hours", "Trips", "After-hours trips", "Distance (km)", "After-hours distance (km)",
+            "Driving time", "After-hours driving time", "After hours (% of distance)"]
+    agg = {imei: [0, 0, 0.0, 0.0, 0, 0, ""] for imei in devices}
+    for t, inside, outside, profile in _after_hours(db, group_id, devices, start, end, tz):
+        a, km = agg[t.imei], (t.distance_m or 0) / 1000
+        total = inside + outside
+        a[0] += 1
+        a[1] += 1 if outside > 0 else 0
+        a[2] += km
+        a[3] += km * outside / total if total else 0
+        a[4] += t.duration_s or 0
+        a[5] += outside
+        a[6] = profile
+    rows = []
+    for imei, name in sorted(devices.items(), key=lambda x: (-agg[x[0]][3], x[1].lower())):
+        n, n_out, km, km_out, secs, secs_out, profile = agg[imei]
+        rows.append([name, imei, profile, n, n_out, round(km, 1), round(km_out, 1), _dur(secs), _dur(secs_out),
+                     round(km_out / km * 100) if km else ""])
+    return cols, rows
+
+
+def report_after_hours_trips(db, group_id, devices, start, end, tz):
+    cols = ["Vehicle", "IMEI", "Driver", "Start", "End", "Duration", "After-hours time", "Distance (km)",
+            "After-hours distance (km)", "Start location", "End location"]
+    vehicle, by_id = _drivers(db, group_id)
+    rows = []
+    for t, inside, outside, _ in _after_hours(db, group_id, devices, start, end, tz):
+        if outside <= 0:
+            continue
+        km, total = (t.distance_m or 0) / 1000, inside + outside
+        rows.append([devices.get(t.imei, t.imei), t.imei, _trip_driver(t, vehicle, by_id), _local(t.started_at, tz),
+                     _local(t.ended_at, tz) if t.ended_at else "in progress", _dur(t.duration_s), _dur(outside),
+                     round(km, 2), round(km * outside / total, 2) if total else 0, t.start_address or "", t.end_address or ""])
+    return cols, rows
+
+
+def report_licences(db, group_id, devices, start, end, tz):
+    """Every vehicle's licence: start, expiry and days left (the period isn't used)."""
+    from app.services import licence_service
+    cols = ["Vehicle", "IMEI", "Registration", "Licence start", "Licence expires", "Days left", "Status"]
+    today = datetime.now(tz).date()
+    rows = []
+    for tag in db.query(BLETag).filter(BLETag.imei.in_(list(devices))):
+        attrs = tag.attributes or {}
+        st = licence_service.status(licence_service.licence_start(attrs), today)
+        label = {"valid": "Valid", "expiring": "Expires within 7 days", "expired": "Expired", "unknown": "No licence date"}[st["state"]]
+        rows.append([devices[tag.imei], tag.imei, ((attrs.get("registration") or {}).get("value") or ""), st["start"] or "",
+                     st["expires"] or "", st["days_left"] if st["days_left"] is not None else "", label])
+    rows.sort(key=lambda r: (r[5] == "", r[5] if r[5] != "" else 0))
+    return cols, rows
+
+
 # key → (title, category, description, generator)
 REPORTS: dict[str, tuple[str, str, str, Callable]] = {
     "trips":            ("Trip detail", "Trips", "Every trip with duration, distance, speeds and driving events.", report_trips),
     "vehicle_summary":  ("Vehicle summary", "Utilisation", "Trips, distance and driving time per vehicle.", report_vehicle_summary),
     "driver_behaviour": ("Driving behaviour", "Driving", "Speeding, harsh driving, idling and crash events.", report_driver_behaviour),
+    "speeding":         ("Speeding detail", "Driving", "Every speeding event: vehicle, driver, time, speed and where.", report_speeding),
+    "speeding_summary": ("Speeding summary", "Driving", "Speeding events, top speed and speeding per 100 km per vehicle.", report_speeding_summary),
+    "after_hours":      ("After-hours usage", "Utilisation", "Trips, distance and driving time outside working hours per vehicle (Configuration → Time Profiles).", report_after_hours),
+    "after_hours_trips": ("After-hours trips", "Utilisation", "Every trip that was partly or wholly outside working hours.", report_after_hours_trips),
+    "licences":         ("Vehicle licences", "Vehicles", "Each vehicle's licence start, expiry and days left.", report_licences),
     "events":           ("Event detail", "Events", "All decoded device events (excluding parked updates).", report_events),
     "alerts":           ("Alert history", "Alerts", "Notifications raised for your vehicles.", report_alerts),
 }

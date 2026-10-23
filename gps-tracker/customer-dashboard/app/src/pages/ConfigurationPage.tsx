@@ -9,12 +9,14 @@ import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import {
   IconAlertTriangle, IconArrowUpRight, IconBan, IconBolt, IconCar, IconKey, IconUsers, IconMapPin, IconPencil, IconPlugConnected,
-  IconSearch, IconTrash, IconPlus, IconShieldLock, IconDots, IconBellRinging, IconChevronRight, IconTool,
+  IconSearch, IconTrash, IconPlus, IconShieldLock, IconDots, IconBellRinging, IconChevronRight, IconTool, IconClock,
 } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
+import { DateInput } from '@mantine/dates';
+import dayjs from 'dayjs';
 import { api } from '../api/client';
-import { useCan, useCategories, useDataExchange, useLanguages, useMe, useSecurityGroups, useVehicles } from '../api/hooks';
+import { useCan, useCategories, useDataExchange, useDrivers, useLanguages, useMe, useSecurityGroups, useTimeProfiles, useVehicles } from '../api/hooks';
 import { VEHICLE_DETAILS, detail, type Category, type Vehicle } from '../api/types';
 import { getSession } from '../auth/session';
 import { ConfigHeader } from '../components/ConfigHeader';
@@ -22,6 +24,7 @@ import { DataGrid } from '../components/DataGrid';
 import { EditorShell, firstError } from '../components/EditorShell';
 import { EventTypeGroupsPage, EventTypesPage, GeofencesPage, PlaceGroupsPage } from './CatalogPages';
 import { ItemsPage, LookupPage, SchedulesPage, TypesPage, WorkshopsPage } from './maintenance/MaintenanceConfig';
+import { DriversPage, TimeProfilesPage } from './PeoplePages';
 import { useMaintenanceCatalog } from '../api/maintenance';
 import { STATUS } from '../theme';
 import { ago, dateTime, vehicleName } from '../utils/format';
@@ -44,6 +47,7 @@ const SECTIONS: Section[] = [
   ] },
   { title: msg('app.config.users', 'Users'), icon: IconUsers, items: [
     { label: msg('app.config.users', 'Users'), to: 'users', any: ['users.view', 'users.manage'] },
+    { label: msg('app.config.drivers', 'Drivers'), to: 'drivers', any: ['vehicles.manage', 'users.view'] },
     { label: msg('app.config.user_groups', 'User Groups'), to: 'user-groups', any: [] },
     { label: msg('app.config.custom_themes', 'Custom Themes'), to: 'custom-themes', any: ['theme.manage'] },
   ] },
@@ -73,8 +77,18 @@ const SECTIONS: Section[] = [
   ] },
   { title: msg('app.config.misc', 'Misc'), icon: IconDots, items: [
     { label: msg('app.config.notification_rules', 'Notification Rules'), to: 'misc/notification-rules', any: ['inbox.view', 'rules.manage'] },
+    { label: msg('app.config.time_profiles', 'Time Profiles'), to: 'misc/time-profiles', any: ['settings.manage'] },
   ] },
 ];
+
+/** Licence expiry: 12 months after the start date. */
+function licenceOf(start: string | null | undefined) {
+  if (!start) return null;
+  const expires = dayjs(start).add(12, 'month');
+  const left = expires.startOf('day').diff(dayjs().startOf('day'), 'day');
+  const text = left < 0 ? `Expired ${-left} day${left === -1 ? '' : 's'} ago` : left === 0 ? 'Expires today' : `${left} day${left === 1 ? '' : 's'} left`;
+  return { expires: expires.format('YYYY-MM-DD'), left, text, color: left <= 0 ? 'red' : left <= 7 ? 'orange' : left <= 30 ? 'yellow' : 'green' };
+}
 
 const classicUrl = (tab: string) => `/customer/classic/#tab=${tab}`;
 
@@ -128,7 +142,10 @@ function Devices() {
   const { data: vehicles = [], isFetching } = useVehicles();
   const { data: categories = [] } = useCategories();
   const [editing, setEditing] = useState<Vehicle | null>(null);
-  const form = useForm({ initialValues: { description: '', category: '', registration: '', make: '', model: '', year: '', driver: '', fuel_consumption: '', vehicle_type: '' } });
+  const form = useForm({ initialValues: { description: '', category: '', registration: '', make: '', model: '', year: '', driver: '', fuel_consumption: '',
+                                          vehicle_type: '', driver_id: '', licence_start: '', time_profile_id: '' } });
+  const { data: drivers = [] } = useDrivers();
+  const { data: timeProfiles = [] } = useTimeProfiles();
   const can = useCan();
   const canMaintenance = can('maintenance.configure') || can('maintenance.view');
   const { data: maintenance } = useMaintenanceCatalog(canMaintenance);
@@ -180,6 +197,12 @@ function Devices() {
     { colId: 'registration', headerName: 'Registration', valueGetter: (p) => p.data && (detail(p.data, 'registration') || '—'), flex: 1, minWidth: 140 },
     { colId: 'make_model', headerName: 'Make / model', hide: true, valueGetter: (p) => p.data && ([detail(p.data, 'make'), detail(p.data, 'model'), detail(p.data, 'year')].filter(Boolean).join(' ') || '—'), width: 170 },
     { colId: 'driver', headerName: 'Driver', hide: true, valueGetter: (p) => p.data && (detail(p.data, 'driver') || '—'), width: 150 },
+    { colId: 'licence', headerName: 'Licence Expires', width: 160, valueGetter: (p) => licenceOf(p.data?.attributes ? detail(p.data, 'licence_start') : '')?.expires ?? null,
+      cellRenderer: (p: ICellRendererParams<Vehicle>) => {
+        const l = p.data && licenceOf(detail(p.data, 'licence_start'));
+        if (!l) return <Text size="sm" c="dimmed">—</Text>;
+        return <Tooltip label={l.text} withinPortal><Badge size="sm" variant="light" color={l.color}>{dayjs(l.expires).format('D MMM YYYY')}</Badge></Tooltip>;
+      } },
     { colId: 'group', headerName: 'Group', hide: true, field: 'category_name', valueFormatter: (p) => p.value || '—', width: 150 },
     { colId: 'status', headerName: 'Status', hide: true, field: 'activity_status', width: 120,
       cellRenderer: (p: ICellRendererParams<Vehicle>) => p.data && (
@@ -239,13 +262,22 @@ function Devices() {
                         description="Maintenance schedules for this type apply to the vehicle (Configuration → Vehicle Types)"
                         value={form.values.vehicle_type || null} onChange={(v) => form.setFieldValue('vehicle_type', v ?? '')} />
               )}
+              <Select label="Working hours" clearable
+                      placeholder={`Group default${timeProfiles.find((t) => t.is_default) ? ` — ${timeProfiles.find((t) => t.is_default)!.name}` : ' — Mon–Fri 07:00–17:00'}`}
+                      data={timeProfiles.map((t) => ({ value: t.id, label: `${t.name} · ${t.summary}` }))}
+                      description="Usage outside these hours shows as after hours (Configuration → Time Profiles)"
+                      value={form.values.time_profile_id || null} onChange={(v) => form.setFieldValue('time_profile_id', v ?? '')} />
             </Stack>
           ) },
         { id: 'details', label: 'Vehicle details', keywords: 'registration driver make model year',
           content: (
             <SimpleGrid cols={{ base: 1, sm: 2 }} maw={760}>
               <TextInput label="Registration" placeholder="e.g. CA 123-456" {...form.getInputProps('registration')} />
-              <TextInput label="Driver" placeholder="Driver's name" {...form.getInputProps('driver')} />
+              <Select label="Driver" placeholder="No driver" clearable searchable
+                      data={drivers.filter((d) => d.is_active || d.id === form.values.driver_id).map((d) => ({ value: d.id, label: d.employee_number ? `${d.name} (${d.employee_number})` : d.name }))}
+                      description={<>Trips show this driver unless a driver key says otherwise · <Anchor component={Link} to="/configuration/drivers" size="xs">Drivers</Anchor></>}
+                      value={form.values.driver_id || null} onChange={(v) => form.setFieldValue('driver_id', v ?? '')}
+                      nothingFoundMessage="No drivers — add them under Configuration → Drivers" />
               <TextInput label="Make" placeholder="e.g. Toyota" {...form.getInputProps('make')} />
               <TextInput label="Model" placeholder="e.g. Hilux 2.8 GD-6" {...form.getInputProps('model')} />
               <TextInput label="Year" placeholder="e.g. 2022" maxLength={4} {...form.getInputProps('year')} />
@@ -266,6 +298,19 @@ function Devices() {
               })()}
             </Stack>
           ) },
+        { id: 'licence', label: 'Licence', keywords: 'licence license renewal disc expiry',
+          content: (() => {
+            const l = licenceOf(form.values.licence_start);
+            return (
+              <Stack maw={620}>
+                <DateInput label="Licence start date" placeholder="When the licence was last renewed" clearable valueFormat="D MMM YYYY"
+                           value={form.values.licence_start ? dayjs(form.values.licence_start).toDate() : null}
+                           onChange={(d) => form.setFieldValue('licence_start', d ? dayjs(d).format('YYYY-MM-DD') : '')}
+                           description="A vehicle licence is valid for 12 months. Reminders are sent 7 days before it expires and on the day." />
+                {l && <Group gap="xs"><Badge variant="light" color={l.color}>Expires {dayjs(l.expires).format('D MMM YYYY')}</Badge><Text size="sm" c="dimmed">{l.text}</Text></Group>}
+              </Stack>
+            );
+          })() },
         { id: 'device', label: 'Device', keywords: 'imei unit model package expiry last seen',
           content: (
             <SimpleGrid cols={{ base: 1, sm: 2 }} maw={760} verticalSpacing="sm">
@@ -509,6 +554,7 @@ export function AccountPage() {
 // ── Misc: a list of smaller tools ──
 const MISC = [
   { to: 'notification-rules', title: 'Notification Rules', description: 'Alert when vehicles enter or leave places; optional emails', icon: IconBellRinging },
+  { to: 'time-profiles', title: 'Time Profiles', description: 'Working hours, for after-hours usage reports', icon: IconClock },
 ];
 
 function Misc() {
@@ -551,6 +597,8 @@ export function ConfigurationPage() {
       <Route path="event-type-groups" element={<EventTypeGroupsPage />} />
       <Route path="misc" element={<Misc />} />
       <Route path="misc/notification-rules" element={<NotificationRulesPage />} />
+      <Route path="misc/time-profiles" element={<TimeProfilesPage />} />
+      <Route path="drivers" element={<DriversPage />} />
       <Route path="maintenance/schedules" element={<SchedulesPage />} />
       <Route path="maintenance/types" element={<TypesPage />} />
       <Route path="maintenance/items" element={<ItemsPage />} />

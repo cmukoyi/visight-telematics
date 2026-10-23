@@ -9,6 +9,10 @@ Events are processed per device in device time, from a bookmark
 pick up where it stopped; it also re-classifies each event with the current
 dictionary, which back-fills older rows.
 
+The trip's driver is whoever's one-wire key (IO 78) appears on it first, when
+it matches a driver's key code (drivers_service); otherwise trips show the
+vehicle's assigned driver.
+
 Opening:  trip_start, or a driving position when trip_start was missed.
 Closing:  trip_end, ignition_off, a parked position, a gap > MAX_GAP between
           events (closed at the last event before the gap), or nothing received
@@ -24,6 +28,7 @@ from sqlalchemy.orm import Session
 
 from app.dataprofiler.dictionary import IO_ODOMETER, classify, io_value
 from app.models_dataprofiler import DeviceEvent, Trip, TripBuilderState
+from app.services import drivers_service
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +114,7 @@ def process_device(db: Session, imei: str) -> int:
         return 0
     trip = (db.query(Trip).filter(Trip.imei == imei, Trip.status == "open")
             .order_by(Trip.started_at.desc()).first())
+    keys = None   # the group's driver keys, loaded when a key first shows up
 
     for e in events:
         code = classify(e.event_io_id, e.io or {})
@@ -138,6 +144,11 @@ def process_device(db: Session, imei: str) -> int:
             _add(trip, e, code)
         elif trip:
             _add(trip, e, code)
+        if trip and trip.driver_id is None and e.usergroup_id:
+            key = drivers_service.normalise_key(io_value(e.io or {}, int(drivers_service.IO_DRIVER_KEY)))
+            if key:
+                keys = keys if keys is not None else drivers_service.key_index(db, e.usergroup_id)
+                trip.driver_id = keys.get(key)
 
     state.last_event_id = max(state.last_event_id, max(e.id for e in events))
     return len(events)

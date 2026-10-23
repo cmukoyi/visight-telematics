@@ -22,9 +22,10 @@ const TYPE_LABELS: Record<string, string> = {
   overspeed: 'Speeding', harsh_braking: 'Harsh braking', harsh_acceleration: 'Harsh acceleration', crash: 'Crash',
   towing: 'Towing', power_cut: 'Power cut', panic: 'Panic', package_expiry: 'Package expiry',
   maintenance_due: 'Maintenance due', maintenance_overdue: 'Maintenance overdue',
+  licence_expiring: 'Licence expiring', licence_expired: 'Licence expired',
 };
 const typeLabel = (t: string) => TYPE_LABELS[t] ?? t.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
-const SEVERE = new Set(['crash', 'panic', 'towing', 'power_cut', 'maintenance_overdue']);
+const SEVERE = new Set(['crash', 'panic', 'towing', 'power_cut', 'maintenance_overdue', 'licence_expired']);
 
 const num = (v: unknown) => (typeof v === 'number' ? v : typeof v === 'string' && v !== '' ? Number(v) : NaN);
 

@@ -4,7 +4,7 @@ import { getSession, saveAccess } from '../auth/session';
 import type {
   Alert, Branding, Category, DataExchangeStatus, DeviceEvent, EventTypes, GroupTheme, Kpis, LivePosition, Me,
   NotificationRule, Permission, Place, PortalUserRow, ReportDef, ReportSchedule, Role, RulesMeta, SecurityGroup, Trip,
-  TripDetail, Vehicle, VehicleStatus, PlaceGroup, EventTypeRow, EventTypeGroup, AuditRow, AnalyticsCatalog, AnalyticsPageDef, AnalyticsExpression, AnalyticsResult, Visual, GeofenceRow, NotificationPrefs, FleetStatusRow,
+  TripDetail, Vehicle, VehicleStatus, Driver, TimeProfile, PlaceGroup, EventTypeRow, EventTypeGroup, AuditRow, AnalyticsCatalog, AnalyticsPageDef, AnalyticsExpression, AnalyticsResult, Visual, GeofenceRow, NotificationPrefs, FleetStatusRow,
 } from './types';
 import { cachedLook } from '../utils/look';
 
@@ -191,3 +191,6 @@ export const useLanguages = () =>
     const res = await fetch('/api/languages');
     return res.ok ? ((await res.json()) as { code: string; name: string }[]) : [];
   }, staleTime: 10 * 60_000 });
+
+export const useDrivers = () => useQuery({ queryKey: ['drivers'], queryFn: () => api<Driver[]>('/api/portal/drivers') });
+export const useTimeProfiles = () => useQuery({ queryKey: ['time-profiles'], queryFn: () => api<TimeProfile[]>('/api/portal/time-profiles') });

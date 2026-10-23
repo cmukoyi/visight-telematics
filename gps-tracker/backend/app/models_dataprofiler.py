@@ -194,6 +194,7 @@ class Trip(Base):
     harsh_braking_count      = Column(Integer, nullable=False, default=0)
     harsh_cornering_count    = Column(Integer, nullable=False, default=0)
     idling_count     = Column(Integer, nullable=False, default=0)
+    driver_id        = Column(_TagRefType, ForeignKey("drivers.id", ondelete="SET NULL"), nullable=True)  # from the driver's key (IO 78)
     created_at       = Column(DateTime(timezone=True), server_default=func.now())
 
     @classmethod

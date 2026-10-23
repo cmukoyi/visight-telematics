@@ -74,6 +74,14 @@ def _nominatim(lat: float, lng: float) -> Optional[str]:
     return _short([street, place, city]) or _short((data.get("display_name") or "").split(",")[:3])
 
 
+def cached(db: Session, lat: Optional[float], lng: Optional[float]) -> Optional[str]:
+    """The street address at a position if it's already in the cache (no provider call)."""
+    if lat is None or lng is None:
+        return None
+    row = db.get(GeocodeCache, (round(lat * 10000), round(lng * 10000)))
+    return row.address if row else None
+
+
 def lookup(db: Session, lat: Optional[float], lng: Optional[float]) -> Optional[str]:
     """The street address at a position, from the cache or the provider.
 

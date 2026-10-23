@@ -31,7 +31,8 @@ export interface Vehicle {
   attributes: Record<string, unknown> | null;
 }
 
-export const VEHICLE_DETAILS = ['registration', 'make', 'model', 'year', 'driver', 'fuel_consumption', 'vehicle_type'] as const;
+export const VEHICLE_DETAILS = ['registration', 'make', 'model', 'year', 'driver', 'fuel_consumption', 'vehicle_type', 'driver_id',
+  'licence_start', 'time_profile_id'] as const;
 export type VehicleDetail = typeof VEHICLE_DETAILS[number];
 
 /** make / model / year / registration / driver from the vehicle's attributes. */
@@ -75,6 +76,8 @@ export interface Trip {
   idling_count: number;
   /** Estimated from distance and the vehicle's travelling consumption; null when none is set. */
   fuel_used_l: number | null;
+  /** The driver came from the key presented on the trip (not the vehicle's assigned driver). */
+  driver_from_key?: boolean;
 }
 
 export interface IoValue {
@@ -410,4 +413,13 @@ export interface AnalyticsResult {
   info_columns?: { key: string; label: string }[];
   truncated?: boolean;
   rows: { key: string; label: string; values: Record<string, number | null>; info?: Record<string, string> }[];
+}
+
+export interface Driver {
+  id: string; first_name: string; last_name: string | null; name: string; employee_number: string | null;
+  key_code: string | null; phone: string | null; is_active: boolean; vehicles: string[]; trips: number;
+}
+/** Working hours per weekday ("0" = Monday): [["07:00", "17:00"]]. */
+export interface TimeProfile {
+  id: string; name: string; windows: Record<string, [string, string][]>; is_default: boolean; summary: string; vehicles: number;
 }

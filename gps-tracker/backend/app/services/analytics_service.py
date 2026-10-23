@@ -51,6 +51,9 @@ MEASURES: dict = {
     "Night_duration_hours":     ("Driving time at night", "h", "Time of day", 1),
     "Weekend_distance_km":      ("Distance at weekends", "km", "Time of day", 1),
     "Business_hours_distance_km": ("Distance in business hours", "km", "Time of day", 1),
+    "After_hours_trip_count":   ("After-hours trips", "", "Time of day", 0),
+    "After_hours_distance_km":  ("After-hours distance", "km", "Time of day", 1),
+    "After_hours_duration_hours": ("After-hours driving time", "h", "Time of day", 1),
     "Active_vehicle_count":     ("Active vehicles", "", "Utilisation", 0),
     "Vehicle_count":            ("Vehicles", "", "Utilisation", 0),
     "Utilization_days":         ("Vehicle utilisation (days)", "days", "Utilisation", 0),
@@ -77,7 +80,8 @@ NOT_ADDITIVE = {"Max_speed_kmh", "Active_vehicle_count", "Vehicle_count"}
 
 # What a single trip / place visit has (a list row is one record, so counts of trips etc. mean nothing there)
 RECORD_MEASURES = {
-    "trip": ["Trip_distance_km", "Trip_duration_hours", "Fuel_used_l", "Max_speed_kmh", "Idling_count", "Speeding_count",
+    "trip": ["Trip_distance_km", "Trip_duration_hours", "Fuel_used_l", "After_hours_distance_km", "After_hours_duration_hours",
+             "Max_speed_kmh", "Idling_count", "Speeding_count",
              "Harsh_braking_count", "Harsh_acceleration_count", "Harsh_cornering_count", "Total_exception_count"],
     "place_visit": ["Time_in_place_hours"],
 }
@@ -345,7 +349,12 @@ def _hours_in(v: PlaceVisit, start: datetime, end: datetime) -> Optional[float]:
     return max(0.0, (b - a).total_seconds() / 3600)
 
 
-def _trip_values(t: Trip, rate: Optional[float]) -> dict:
+def _trip_values(t: Trip, rate: Optional[float], windows: Optional[dict] = None, tz: Optional[ZoneInfo] = None) -> dict:
+    """A trip's measures; after-hours ones split its time (and distance, in proportion) by the vehicle's working hours."""
+    from app.services import time_profiles
+    inside, outside = time_profiles.split(_utc(t.started_at), _utc(t.ended_at or t.last_event_at),
+                                          windows if windows is not None else time_profiles.DEFAULT_WINDOWS, tz or timezone.utc)
+    share = outside / (inside + outside) if inside + outside else 0.0
     exceptions = (t.speeding_count or 0) + (t.harsh_braking_count or 0) + (t.harsh_acceleration_count or 0) \
         + (t.harsh_cornering_count or 0)
     return {"Trip_distance_km": (t.distance_m or 0) / 1000, "Trip_duration_hours": (t.duration_s or 0) / 3600,
@@ -353,10 +362,14 @@ def _trip_values(t: Trip, rate: Optional[float]) -> dict:
             "Idling_count": t.idling_count or 0, "Speeding_count": t.speeding_count or 0,
             "Harsh_braking_count": t.harsh_braking_count or 0,
             "Harsh_acceleration_count": t.harsh_acceleration_count or 0,
-            "Harsh_cornering_count": t.harsh_cornering_count or 0, "Total_exception_count": exceptions}
+            "Harsh_cornering_count": t.harsh_cornering_count or 0, "Total_exception_count": exceptions,
+            "After_hours_trip_count": 1 if outside > 0 else 0,
+            "After_hours_distance_km": (t.distance_m or 0) / 1000 * share, "After_hours_duration_hours": outside / 3600}
 
 
 def _trip_list(db, group_id, devices, start, end, tz, measures, trees, sort, descending, limit) -> tuple:
+    from app.services import drivers_service
+    driver_names = drivers_service.names(db, group_id)
     info_columns = [{"key": "vehicle", "label": "Vehicle"}, {"key": "driver", "label": "Driver"},
                     {"key": "start", "label": "Start"}, {"key": "end", "label": "End"},
                     {"key": "from", "label": "From"}, {"key": "to", "label": "To"}]
@@ -366,10 +379,11 @@ def _trip_list(db, group_id, devices, start, end, tz, measures, trees, sort, des
     out = []
     for t in trips[:RECORD_LIMIT]:
         info = devices[t.imei]
-        values = {k: (None if v is None else round(v, 3)) for k, v in _trip_values(t, info.get("fuel_rate")).items()}
+        values = {k: (None if v is None else round(v, 3)) for k, v in
+                  _trip_values(t, info.get("fuel_rate"), info.get("windows"), tz).items()}
         out.append({"key": str(t.id), "label": f"{_utc(t.started_at).astimezone(tz).strftime('%d %b %H:%M')} · {info['name']}",
                     "values": _cells(measures, trees, values),
-                    "info": {"vehicle": info["name"], "driver": info.get("driver") or "",
+                    "info": {"vehicle": info["name"], "driver": (driver_names.get(str(t.driver_id)) if t.driver_id else None) or info.get("driver") or "",
                              "start": _local_text(t.started_at, tz),
                              "end": _local_text(t.ended_at, tz) if t.ended_at else "In progress",
                              "from": t.start_address or "", "to": t.end_address or ""}})
@@ -450,16 +464,24 @@ def query(db: Session, group_id, devices: dict, start: datetime, end: datetime, 
     trip_wanted = bool(used & {k for k, sc in SCOPE.items() if sc in ("trip", "fleet")})
     trips = (db.query(Trip).filter(Trip.usergroup_id == group_id, Trip.imei.in_(imeis), Trip.real(),
                                    Trip.started_at >= start, Trip.started_at < end).all()) if imeis and trip_wanted else []
+    driver_names = {}
+    if dimension == "driver" and trips:
+        from app.services import drivers_service
+        driver_names = drivers_service.names(db, group_id)
     for t in trips:
         local = _utc(t.started_at).astimezone(tz)
-        key, label = key_of(t.imei, local)
+        if dimension == "driver" and t.driver_id and str(t.driver_id) in driver_names:
+            key = label = driver_names[str(t.driver_id)]   # the driver whose key was on this trip
+        else:
+            key, label = key_of(t.imei, local)
         labels[key] = label
         row = acc[key]
-        tv = _trip_values(t, devices[t.imei].get("fuel_rate"))
+        tv = _trip_values(t, devices[t.imei].get("fuel_rate"), devices[t.imei].get("windows"), tz)
         km, hours = tv["Trip_distance_km"], tv["Trip_duration_hours"]
         row["Trip_count"] += 1
         for k in ("Trip_distance_km", "Trip_duration_hours", "Idling_count", "Speeding_count", "Harsh_braking_count",
-                  "Harsh_acceleration_count", "Harsh_cornering_count", "Total_exception_count"):
+                  "Harsh_acceleration_count", "Harsh_cornering_count", "Total_exception_count", "After_hours_trip_count",
+                  "After_hours_distance_km", "After_hours_duration_hours"):
             row[k] += tv[k]
         row["Fuel_used_l"] += tv["Fuel_used_l"] or 0
         row["Max_speed_kmh"] = max(row["Max_speed_kmh"], tv["Max_speed_kmh"])
@@ -552,7 +574,9 @@ def query(db: Session, group_id, devices: dict, start: datetime, end: datetime, 
 
 def devices_for(db: Session, group_id, only: Optional[set], category: Optional[str] = None,
                 imei: Optional[str] = None) -> dict:
-    """{imei: {name, group, driver}} of the group's vehicles the user may see."""
+    """{imei: {name, group, driver, fuel_rate, windows}} of the group's vehicles the user may see."""
+    from app.services import time_profiles
+    by_id, default = time_profiles.profiles(db, group_id)
     out = {}
     for tag in db.query(BLETag).filter(BLETag.attributes.op("->>")("_created_usergroup_id") == str(group_id)).all():
         if only is not None and tag.imei not in only:
@@ -564,7 +588,8 @@ def devices_for(db: Session, group_id, only: Optional[set], category: Optional[s
         if imei and tag.imei != imei:
             continue
         out[tag.imei] = {"name": tag.description or tag.device_name or tag.imei, "group": group,
-                         "driver": (attrs.get("driver") or {}).get("value"), "fuel_rate": vehicle_fuel.rate(attrs)}
+                         "driver": (attrs.get("driver") or {}).get("value"), "fuel_rate": vehicle_fuel.rate(attrs),
+                         "windows": time_profiles.for_vehicle(attrs, by_id, default)}
     return out
 
 

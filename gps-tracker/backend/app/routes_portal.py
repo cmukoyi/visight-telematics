@@ -7,7 +7,7 @@ Routes are mounted at /api/portal (separate from /api/v1 user routes and
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from time import perf_counter
 from typing import List, Optional
 from uuid import UUID
@@ -1496,6 +1496,22 @@ class PortalTagUpdate(BaseModel):
     fuel_consumption: Optional[str] = None
     # Maintenance: the vehicle type (a maintenance_lookups id; "" clears it)
     vehicle_type: Optional[str] = None
+    # The assigned driver (a drivers id; "" clears it); trips show this driver unless a driver key says otherwise
+    driver_id: Optional[str] = None
+    # Vehicle licence: the date it was last renewed (YYYY-MM-DD); it expires 12 months later
+    licence_start: Optional[str] = None
+    # Working hours: a time_profiles id ("" = the group's default)
+    time_profile_id: Optional[str] = None
+
+    @field_validator("licence_start")
+    @classmethod
+    def _licence(cls, v):
+        if v:
+            try:
+                return date.fromisoformat(v.strip()[:10]).isoformat()
+            except ValueError:
+                raise ValueError("Licence start must be a date, e.g. 2026-10-24")
+        return v
 
     @field_validator("fuel_consumption")
     @classmethod
@@ -1512,7 +1528,8 @@ class PortalTagUpdate(BaseModel):
         return f"{value:g}"
 
 
-VEHICLE_DETAILS = ("make", "model", "year", "registration", "driver", "fuel_consumption", "vehicle_type")
+VEHICLE_DETAILS = ("make", "model", "year", "registration", "driver", "fuel_consumption", "vehicle_type", "driver_id",
+                   "licence_start", "time_profile_id")
 
 
 @router.put("/tags/{tag_id}", response_model=PortalTagOut)
@@ -1539,6 +1556,28 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
         raise HTTPException(status_code=404, detail="Tag not found in your group")
 
     details = {k: getattr(data, k) for k in VEHICLE_DETAILS if getattr(data, k) is not None}
+    if "driver_id" in details:
+        # The assigned driver: attributes.driver keeps their name for everything that reads it
+        from app.models import Driver
+        if details["driver_id"]:
+            try:
+                drv = db.query(Driver).filter(Driver.id == UUID(details["driver_id"]), Driver.usergroup_id == me.usergroup_id).first()
+            except ValueError:
+                drv = None
+            if not drv:
+                raise HTTPException(status_code=400, detail="Unknown driver")
+            details["driver"] = drv.name
+        else:
+            details["driver"] = ""
+    if details.get("time_profile_id"):
+        from app.models import TimeProfile
+        try:
+            ok = db.query(TimeProfile.id).filter(TimeProfile.id == UUID(details["time_profile_id"]),
+                                                 TimeProfile.usergroup_id == me.usergroup_id).first()
+        except ValueError:
+            ok = None
+        if not ok:
+            raise HTTPException(status_code=400, detail="Unknown time profile")
     if details.get("vehicle_type"):
         from app.models_maintenance import MaintenanceLookup
         try:
@@ -2655,11 +2694,14 @@ def list_positions(
 # TRIPS (built by app/services/trip_builder.py from Teltonika events)
 # ==============================================================================
 
-def _trip_out(trip, names: dict, drivers: Optional[dict] = None, fuel_rates: Optional[dict] = None) -> dict:
+def _trip_out(trip, names: dict, drivers: Optional[dict] = None, fuel_rates: Optional[dict] = None,
+              driver_names: Optional[dict] = None) -> dict:
+    """drivers: {imei: the vehicle's driver}; driver_names: {driver id: name} for trips with a driver key."""
     from app.services import vehicle_fuel
+    trip_driver = (driver_names or {}).get(str(trip.driver_id)) if getattr(trip, "driver_id", None) else None
     return {
         "id": str(trip.id), "imei": trip.imei, "device_name": names.get(trip.imei),
-        "driver": (drivers or {}).get(trip.imei),
+        "driver": trip_driver or (drivers or {}).get(trip.imei), "driver_from_key": bool(trip_driver),
         "start_address": trip.start_address or None, "end_address": trip.end_address or None,
         "status": trip.status, "start_reason": trip.start_reason, "close_reason": trip.close_reason,
         "started_at": trip.started_at, "ended_at": trip.ended_at, "last_event_at": trip.last_event_at,
@@ -2712,9 +2754,10 @@ def list_trips(request: Request, db: Session = Depends(get_db),
     trips = q.order_by(Trip.started_at.desc()).limit(limit).all()
     names = _group_device_names(db, me.usergroup_id)
     drivers = _group_drivers(db, me.usergroup_id)
-    from app.services import vehicle_fuel
+    from app.services import drivers_service, vehicle_fuel
     rates = vehicle_fuel.group_rates(db, me.usergroup_id)
-    return [_trip_out(t, names, drivers, rates) for t in trips]
+    driver_names = drivers_service.names(db, me.usergroup_id)
+    return [_trip_out(t, names, drivers, rates, driver_names) for t in trips]
 
 
 @router.get("/trips/{trip_id}")
@@ -2750,6 +2793,8 @@ def get_trip(trip_id: str, request: Request, db: Session = Depends(get_db)):
     } for e in events
         if e.event_type in EVENTS and e.event_type not in ("position", "parked_position")]
     from app.services import vehicle_fuel
-    out = _trip_out(trip, _group_device_names(db, me.usergroup_id), fuel_rates=vehicle_fuel.group_rates(db, me.usergroup_id))
+    from app.services import drivers_service
+    out = _trip_out(trip, _group_device_names(db, me.usergroup_id), _group_drivers(db, me.usergroup_id),
+                    fuel_rates=vehicle_fuel.group_rates(db, me.usergroup_id), driver_names=drivers_service.names(db, me.usergroup_id))
     out.update(points=points, events=marked)
     return out

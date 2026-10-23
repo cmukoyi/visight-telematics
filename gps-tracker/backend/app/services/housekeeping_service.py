@@ -104,7 +104,13 @@ def start() -> list[asyncio.Task]:
         asyncio.create_task(_every(PURGE_INTERVAL_S, "alert purge", portal_alert_service.purge_old_alerts)),
         asyncio.create_task(_every(EXPIRY_INTERVAL_S, "package expiry", enforce_expiry)),
         asyncio.create_task(_every(MAINTENANCE_INTERVAL_S, "maintenance notices", send_maintenance_notices)),
+        asyncio.create_task(_every(MAINTENANCE_INTERVAL_S, "licence reminders", send_licence_reminders)),
     ]
+
+
+def send_licence_reminders(db: Session) -> int:
+    from app.services import licence_service
+    return licence_service.send_reminders(db)
 
 
 def send_maintenance_notices(db: Session) -> int:

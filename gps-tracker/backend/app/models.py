@@ -279,6 +279,46 @@ class UserGroup(Base):
                                   cascade="all, delete-orphan")
 
 
+class Driver(Base):
+    """A driver of the group's vehicles.
+
+    Assigned to a vehicle in its editor (attributes.driver_id; attributes.driver
+    keeps the name for older code), or identified per trip by the one-wire key
+    (iButton, Teltonika IO 78) the driver presents — matched on key_code.
+    """
+    __tablename__ = "drivers"
+
+    id              = get_uuid_column()
+    usergroup_id    = Column(UUID(as_uuid=True), ForeignKey("user_groups.id", ondelete="CASCADE"), nullable=False, index=True)
+    first_name      = Column(String(100), nullable=False)
+    last_name       = Column(String(100), nullable=True)
+    employee_number = Column(String(50), nullable=True)
+    key_code        = Column(String(40), nullable=True)      # driver tag ID as printed (hex) or as the device reports it
+    phone           = Column(String(50), nullable=True)
+    is_active       = Column(Boolean, nullable=False, default=True)
+    created_at      = Column(DateTime(timezone=True), server_default=func.now())
+
+    @property
+    def name(self) -> str:
+        return " ".join(x for x in (self.first_name, self.last_name) if x)
+
+
+class TimeProfile(Base):
+    """Working hours per weekday (e.g. Mon–Fri 07:00–17:00), to split usage into inside and after hours.
+
+    windows: {"0": [["07:00", "17:00"]], …} — 0 = Monday; a day without windows is all after hours.
+    The group's default profile applies to vehicles without their own (attributes.time_profile_id).
+    """
+    __tablename__ = "time_profiles"
+
+    id           = get_uuid_column()
+    usergroup_id = Column(UUID(as_uuid=True), ForeignKey("user_groups.id", ondelete="CASCADE"), nullable=False, index=True)
+    name         = Column(String(120), nullable=False)
+    windows      = Column(JSON, nullable=False, default=dict)
+    is_default   = Column(Boolean, nullable=False, default=False)
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class TagCategory(Base):
     """A user-defined asset category scoped to a UserGroup.
 
