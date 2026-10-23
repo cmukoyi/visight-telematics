@@ -233,3 +233,43 @@ def check_positions(db: Session, tag: BLETag, fixes: list) -> int:
                         logger.exception("Geofence alert for %s / %s failed", tag.imei, poi.id)
             status.inside, status.checked_at = inside, at
     return raised
+
+
+def rebuild_visits(db: Session, group_id) -> int:
+    """Rebuild a group's place visits from its stored positions (all history). Does not commit.
+
+    Replays each vehicle's fixes against each active place with the same
+    inside/outside test and hysteresis as check_positions; replaces the
+    group's existing visits. Returns the number of visits recorded.
+    """
+    from app.models_dataprofiler import DeviceEvent
+    places = db.query(POI).filter(POI.usergroup_id == group_id, POI.is_active == True).all()  # noqa: E712
+    tags = db.query(BLETag).filter(BLETag.attributes.op("->>")("_created_usergroup_id") == str(group_id),
+                                   BLETag.imei.isnot(None)).all()
+    db.query(PlaceVisit).filter(PlaceVisit.usergroup_id == group_id).delete(synchronize_session=False)
+    count = 0
+    for tag in tags:
+        fixes = (db.query(DeviceEvent.recorded_at, DeviceEvent.latitude, DeviceEvent.longitude, DeviceEvent.speed)
+                 .filter(DeviceEvent.imei == tag.imei, DeviceEvent.latitude.isnot(None), DeviceEvent.longitude.isnot(None))
+                 .order_by(DeviceEvent.recorded_at, DeviceEvent.id).all())
+        for poi in places:
+            inside, visit = None, None
+            for at, lat, lng, speed in fixes:
+                prev = None if inside is None else (GeofenceState.INSIDE if inside else GeofenceState.OUTSIDE)
+                now_inside = is_inside(poi, lat, lng, prev)
+                if inside is None:
+                    if now_inside:   # inside at the first fix we have: entry unknown
+                        visit = PlaceVisit(usergroup_id=group_id, tag_id=tag.id, imei=tag.imei, poi_id=poi.id)
+                elif now_inside and not inside:
+                    visit = PlaceVisit(usergroup_id=group_id, tag_id=tag.id, imei=tag.imei, poi_id=poi.id,
+                                       entered_at=_utc(at), entry_speed=speed)
+                elif inside and not now_inside and visit is not None:
+                    visit.exited_at, visit.exit_speed = _utc(at), speed
+                    db.add(visit)
+                    count += 1
+                    visit = None
+                inside = now_inside
+            if visit is not None:   # still inside
+                db.add(visit)
+                count += 1
+    return count

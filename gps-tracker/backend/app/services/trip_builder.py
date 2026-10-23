@@ -28,6 +28,9 @@ from app.models_dataprofiler import DeviceEvent, Trip, TripBuilderState
 logger = logging.getLogger(__name__)
 
 MAX_GAP = timedelta(minutes=30)
+# A device can send two start records milliseconds apart (e.g. a driving position, then trip start);
+# a trip_start this soon after the open trip began belongs to it rather than restarting it.
+RESTART_GRACE = timedelta(seconds=10)
 STALE_AFTER = timedelta(hours=2)
 BATCH = 2000
 
@@ -118,7 +121,9 @@ def process_device(db: Session, imei: str) -> int:
         if trip and at < _utc(trip.started_at):
             continue  # late, buffered record from before the open trip
 
-        if code == "trip_start":
+        if code == "trip_start" and trip and at - _utc(trip.started_at) <= RESTART_GRACE:
+            _add(trip, e, code)
+        elif code == "trip_start":
             if trip:
                 _close(trip, "restarted")
             trip = _open(db, e, "trip_start")
