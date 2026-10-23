@@ -191,6 +191,12 @@ def vehicles(request: Request, db: Session = Depends(get_db)):
     return out
 
 
+@router.get("/fleet-status", tags=["Vehicles"], summary="Every vehicle's latest event and address")
+def fleet_status(request: Request, db: Session = Depends(get_db)):
+    """Latest event, speed, ignition, odometer and street address for every vehicle the user may see."""
+    return routes_fleet.fleet_status(request, db)
+
+
 @router.get("/vehicles/{imei}/status", tags=["Vehicles"], summary="A vehicle's current status and readings")
 def vehicle_status(imei: str, request: Request, db: Session = Depends(get_db)):
     """Position and address, ignition, speed, odometer, voltages, GSM signal, satellites, SIM, last event and today's totals."""
