@@ -242,12 +242,19 @@ export function CostEditor({ cost, job, onClose }: { cost: CostRow | 'new' | nul
 
   const linked = jobs.find((j) => j.id === form.values.maintenance_id);
   const linkedType = catalog?.types.find((t) => t.id === linked?.type_id);
-  // With a job chosen, offer its type's items first
-  const items = (catalog?.items ?? []).map((i) => ({ value: i.id, label: i.name, group: linkedType?.item_ids.includes(i.id) ? `In ${linkedType.name}` : 'Other items' }));
-  const grouped = linkedType
-    ? ['In ' + linkedType.name, 'Other items'].map((g) => ({ group: g, items: items.filter((i) => i.group === g).map(({ value, label }) => ({ value, label })) }))
-      .filter((g) => g.items.length)
-    : items.map(({ value, label }) => ({ value, label }));
+  // With a job chosen, only the items of its maintenance type (when the type has any)
+  const limited = !!linkedType && linkedType.item_ids.length > 0;
+  const grouped = (catalog?.items ?? []).filter((i) => !limited || linkedType!.item_ids.includes(i.id)).map((i) => ({ value: i.id, label: i.name }));
+  const [newCentre, setNewCentre] = useState('');
+  const addCentre = async () => {
+    if (!newCentre.trim()) return;
+    try {
+      const c = await mntApi.save<Named>('lookups/cost_centre', null, { name: newCentre.trim() });
+      form.setFieldValue('cost_centre_id', c.id);
+      setNewCentre('');
+      refresh();
+    } catch (e) { fail(e); }
+  };
 
   const save = (andNew: boolean) => form.onSubmit(async (v) => {
     const day = (x: Date | null) => (x ? dayjs(x).format('YYYY-MM-DD') : null);
@@ -277,6 +284,7 @@ export function CostEditor({ cost, job, onClose }: { cost: CostRow | 'new' | nul
                     data={jobs.map((j) => ({ value: j.id, label: `${j.description} · ${dateTime(j.actual_start ?? j.planned_start)} · ${j.status}` }))}
                     value={form.values.maintenance_id} onChange={(v) => form.setFieldValue('maintenance_id', v)} />
             <Select label="Maintenance item" placeholder="None" clearable searchable data={grouped}
+                    description={limited ? `Items of ${linkedType!.name}` : undefined}
                     value={form.values.item_id} onChange={(v) => {
                       form.setFieldValue('item_id', v);
                       const it = catalog?.items.find((i) => i.id === v);
@@ -288,6 +296,11 @@ export function CostEditor({ cost, job, onClose }: { cost: CostRow | 'new' | nul
               <Select label="Cost centre" placeholder="None" clearable searchable data={(catalog?.cost_centre ?? []).map((c: Named) => ({ value: c.id, label: c.name }))}
                       value={form.values.cost_centre_id} onChange={(v) => form.setFieldValue('cost_centre_id', v)} />
             </SimpleGrid>
+            <Group gap={6} wrap="nowrap" justify="flex-end">
+              <TextInput size="xs" w={240} placeholder="New cost centre" value={newCentre} onChange={(e) => setNewCentre(e.currentTarget.value)}
+                         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCentre(); } }} />
+              <Button size="xs" variant="light" leftSection={<IconPlus size={14} />} onClick={addCentre} disabled={!newCentre.trim()}>Add</Button>
+            </Group>
           </Stack>
         ) },
       { id: 'amortisation', label: 'Amortisation', keywords: 'amortisation spread period',

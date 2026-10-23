@@ -9,7 +9,7 @@ export type JobStatus = 'Overdue' | 'Due' | 'Recommended' | 'Booked' | 'In Progr
 
 export interface Named { id: string; name: string }
 export interface LookupRow extends Named { used: number }
-export interface ItemRow extends Named { types: number }
+export interface ItemRow extends Named { types: number; is_system: boolean }
 export interface MaintenanceTypeRow extends Named {
   duration_days: number; duration_hours: number; item_ids: string[]; schedules: number;
 }
@@ -24,6 +24,7 @@ export interface ScheduleRow extends Named {
 }
 export interface WorkshopRow extends Named {
   poi_id: string | null; place: string | null; chain_id: string | null; chain: string | null; phone: string | null;
+  working_hours: string | null; image_data: string | null;
   type_ids: string[]; jobs: number;
 }
 export interface MaintenanceCatalog {

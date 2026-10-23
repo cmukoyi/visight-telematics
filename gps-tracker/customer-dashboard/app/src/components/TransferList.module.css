@@ -1,0 +1,12 @@
+.panes { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: var(--mantine-spacing-sm); align-items: stretch; }
+.pane { overflow: hidden; display: flex; flex-direction: column; }
+.head { padding: 6px 12px; border-bottom: 1px solid var(--mantine-color-default-border); }
+.buttons { min-width: 120px; }
+.row { display: block; width: 100%; padding: 5px 12px; user-select: none; }
+.row:hover { background: var(--mantine-color-default-hover); }
+.row[data-picked] { background: color-mix(in srgb, var(--mantine-color-brand-5) 25%, transparent); }
+
+@media (max-width: 48em) {
+  .panes { grid-template-columns: minmax(0, 1fr); }
+  .buttons { flex-direction: row !important; flex-wrap: wrap; }
+}

@@ -48,6 +48,7 @@ class MaintenanceItem(Base):
     id           = get_uuid_column()
     usergroup_id = _group()
     name         = Column(String(160), nullable=False)
+    is_system    = Column(Boolean, nullable=False, default=False)   # a starter item: can't be renamed or deleted
     created_at   = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -98,6 +99,8 @@ class Workshop(Base):
     poi_id       = Column(UUID(as_uuid=True), ForeignKey("pois.id", ondelete="SET NULL"), nullable=True)
     chain_id     = Column(UUID(as_uuid=True), ForeignKey("maintenance_lookups.id", ondelete="SET NULL"), nullable=True)
     phone        = Column(String(50), nullable=True)
+    working_hours = Column(String(200), nullable=True)               # e.g. "Mon–Fri 07:30–17:00, Sat 08:00–12:00"
+    image_data   = Column(Text, nullable=True)                       # photo as a data URL (≤ 600 KB)
     type_ids     = Column(JSON, nullable=False, default=list)        # workshop_type lookups
     created_at   = Column(DateTime(timezone=True), server_default=func.now())
 

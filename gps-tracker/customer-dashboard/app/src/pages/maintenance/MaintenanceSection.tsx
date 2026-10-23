@@ -221,9 +221,9 @@ function MaintenanceList() {
     onConfirm: () => { mntApi.remove('jobs', j.id).then(refresh).catch(fail); },
   });
   const cols: ColDef<JobRow>[] = [
+    { headerName: 'Reference Number', field: 'reference', width: 150, valueFormatter: (p) => p.value || '—' },
     { headerName: 'Vehicle', field: 'vehicle', minWidth: 150, flex: 1 },
     { headerName: 'Description', field: 'description', minWidth: 170, flex: 1, tooltipValueGetter: (p) => (p.data?.projected ? dueText(p.data) : p.data?.description) },
-    { headerName: 'Reference', field: 'reference', width: 120, valueFormatter: (p) => p.value || '—' },
     { headerName: 'Maintenance Type', field: 'type', minWidth: 150, flex: 1, valueFormatter: (p) => p.value || '—' },
     { headerName: 'Status', field: 'status', width: 130, cellRenderer: (p: ICellRendererParams<JobRow>) => p.data && <StatusBadge status={p.data.status} /> },
     { headerName: 'Planned Start', field: 'planned_start', width: 130, sort: 'asc', valueFormatter: (p) => day(p.value) },

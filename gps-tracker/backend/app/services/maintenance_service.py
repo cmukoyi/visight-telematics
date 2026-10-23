@@ -327,6 +327,20 @@ def summary(db: Session, group_id, fleet: dict) -> list:
              "next": nxt.get(imei), "previous": prev.get(imei)} for imei, v in fleet.items()]
 
 
+def cost_in_period(c: MaintenanceCost, start: date, end: date) -> float:
+    """The part of a cost that falls in [start, end] (dates, inclusive).
+
+    A cost with an amortisation period is spread evenly by day across it;
+    otherwise it all falls on its date.
+    """
+    amount = float(c.amount or 0)
+    if c.amortise_from and c.amortise_to:
+        days = (c.amortise_to - c.amortise_from).days + 1
+        overlap = (min(end, c.amortise_to) - max(start, c.amortise_from)).days + 1
+        return round(amount * max(0, overlap) / days, 2) if days > 0 else 0.0
+    return amount if start <= c.cost_date <= end else 0.0
+
+
 # ---------------------------------------------------------------------------
 # Notifications
 # ---------------------------------------------------------------------------
@@ -397,6 +411,25 @@ _DTC_TEXT = {
 }
 
 
+# SAE J2012: the second character says generic (0, 2, 3x) or manufacturer (1, 3); for powertrain codes the
+# third says which subsystem — enough to describe any code we have no exact text for
+_P_SUBSYSTEM = {"0": "Fuel and air metering, auxiliary emission controls", "1": "Fuel and air metering",
+                "2": "Fuel and air metering (injector circuit)", "3": "Ignition system or misfire",
+                "4": "Auxiliary emission controls", "5": "Vehicle speed, idle control and auxiliary inputs",
+                "6": "Computer and output circuits", "7": "Transmission", "8": "Transmission", "9": "Transmission",
+                "A": "Hybrid propulsion", "B": "Hybrid propulsion", "C": "Hybrid propulsion"}
+
+
+def describe_dtc(code: str) -> str:
+    if code in _DTC_TEXT:
+        return _DTC_TEXT[code]
+    system = _DTC_SYSTEM.get(code[0], "Other")
+    maker = code[1] in ("1", "3") and not (code[0] == "P" and code[1] == "3" and code[2] >= "4")
+    detail = _P_SUBSYSTEM.get(code[2], "") if code[0] == "P" else ""
+    text = f"{system}{': ' + detail if detail else ''}"
+    return f"{text} ({'manufacturer-specific' if maker else 'generic'} code — see the manufacturer's list for the exact fault)"
+
+
 def _fault_codes(raw) -> list:
     """Codes from an IO 281 value (ASCII text, or hex of it), e.g. "P0300,P0171"."""
     text = raw if isinstance(raw, str) else ""
@@ -416,7 +449,7 @@ def dtc_events(db: Session, imei: str, start: datetime, end: datetime) -> list:
     out = []
     for at, io in rows:
         for code in _fault_codes((io or {}).get(IO_FAULT_CODES)):
-            out.append({"code": code, "description": _DTC_TEXT.get(code, "See the manufacturer's code list"),
+            out.append({"code": code, "description": describe_dtc(code),
                         "category": _DTC_SYSTEM.get(code[0], "Other"), "recorded_at": _iso(at)})
     return out
 
@@ -425,6 +458,7 @@ def dtc_events(db: Session, imei: str, start: datetime, end: datetime) -> list:
 # Starting content for a user group
 # ---------------------------------------------------------------------------
 
+# Starter items are "system" items (Is System): they can't be renamed or deleted; groups add their own
 DEFAULT_ITEMS = ["Change engine oil", "Replace oil filter", "Replace air filter", "Replace fuel filter",
                  "Check brakes", "Rotate tyres", "Wheel alignment", "Check lights", "Licence renewal"]
 DEFAULT_LOOKUPS = {"vehicle_type": ["Light vehicle", "Truck"], "cost_centre": ["Operations"]}
@@ -437,7 +471,7 @@ def ensure_defaults(db: Session, group_id) -> None:
             or db.query(MaintenanceLookup.id).filter(MaintenanceLookup.usergroup_id == group_id).first():
         return
     for name in DEFAULT_ITEMS:
-        db.add(MaintenanceItem(usergroup_id=group_id, name=name))
+        db.add(MaintenanceItem(usergroup_id=group_id, name=name, is_system=True))
     for kind, names in DEFAULT_LOOKUPS.items():
         for name in names:
             db.add(MaintenanceLookup(usergroup_id=group_id, kind=kind, name=name))

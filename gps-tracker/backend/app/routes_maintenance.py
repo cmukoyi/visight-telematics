@@ -209,7 +209,7 @@ def list_items(request: Request, db: Session = Depends(get_db)):
     for (ids,) in db.query(MaintenanceType.item_ids).filter(MaintenanceType.usergroup_id == me.usergroup_id):
         for i in ids or []:
             used[i] = used.get(i, 0) + 1
-    return [{"id": str(i.id), "name": i.name, "types": used.get(str(i.id), 0)} for i in
+    return [{"id": str(i.id), "name": i.name, "is_system": i.is_system, "types": used.get(str(i.id), 0)} for i in
             db.query(MaintenanceItem).filter(MaintenanceItem.usergroup_id == me.usergroup_id).order_by(func.lower(MaintenanceItem.name))]
 
 
@@ -217,16 +217,18 @@ def list_items(request: Request, db: Session = Depends(get_db)):
 def create_item(data: NameIn, request: Request, db: Session = Depends(get_db)):
     me, _ = _me(request, db, CONFIGURE)
     _unique(db, MaintenanceItem, me, data.name)
-    row = MaintenanceItem(usergroup_id=me.usergroup_id, name=data.name)
+    row = MaintenanceItem(usergroup_id=me.usergroup_id, name=data.name, is_system=False)
     db.add(row)
     db.commit()
-    return {"id": str(row.id), "name": row.name, "types": 0}
+    return {"id": str(row.id), "name": row.name, "is_system": False, "types": 0}
 
 
 @router.put("/items/{iid}")
 def update_item(iid: str, data: NameIn, request: Request, db: Session = Depends(get_db)):
     me, _ = _me(request, db, CONFIGURE)
     row = _own(db, MaintenanceItem, me, iid, "Item")
+    if row.is_system:
+        raise HTTPException(status_code=409, detail="A system item can't be changed — add your own instead")
     _unique(db, MaintenanceItem, me, data.name, exclude=row.id)
     row.name = data.name
     db.commit()
@@ -237,6 +239,8 @@ def update_item(iid: str, data: NameIn, request: Request, db: Session = Depends(
 def delete_item(iid: str, request: Request, db: Session = Depends(get_db)):
     me, _ = _me(request, db, CONFIGURE)
     row = _own(db, MaintenanceItem, me, iid, "Item")
+    if row.is_system:
+        raise HTTPException(status_code=409, detail="A system item can't be deleted")
     for t in db.query(MaintenanceType).filter(MaintenanceType.usergroup_id == me.usergroup_id):
         if str(row.id) in (t.item_ids or []):
             t.item_ids = [i for i in t.item_ids if i != str(row.id)]
@@ -477,6 +481,8 @@ class WorkshopIn(BaseModel):
     poi_id: Optional[str] = None
     chain_id: Optional[str] = None
     phone: Optional[str] = None
+    working_hours: Optional[str] = None
+    image_data: Optional[str] = None
     type_ids: List[str] = []
 
     @field_validator("name")
@@ -484,10 +490,18 @@ class WorkshopIn(BaseModel):
     def _n(cls, v):
         return _name(v)
 
+    @field_validator("image_data")
+    @classmethod
+    def _image(cls, v):
+        if v and (not v.startswith("data:image/") or len(v) > 800_000):
+            raise ValueError("Use a JPG or PNG image up to 600 KB")
+        return v or None
+
 
 def _workshop_out(w: Workshop, places: dict, chains: dict, jobs: int = 0) -> dict:
     return {"id": str(w.id), "name": w.name, "poi_id": str(w.poi_id) if w.poi_id else None, "place": places.get(w.poi_id),
             "chain_id": str(w.chain_id) if w.chain_id else None, "chain": chains.get(w.chain_id), "phone": w.phone,
+            "working_hours": w.working_hours, "image_data": w.image_data,
             "type_ids": list(w.type_ids or []), "jobs": jobs}
 
 
@@ -510,6 +524,7 @@ def list_workshops(request: Request, db: Session = Depends(get_db)):
 
 def _apply_workshop(db: Session, me: PortalUser, w: Workshop, data: WorkshopIn) -> None:
     w.name, w.phone = data.name, (data.phone or "").strip()[:50] or None
+    w.working_hours, w.image_data = (data.working_hours or "").strip()[:200] or None, data.image_data
     w.poi_id = _own(db, POI, me, data.poi_id, "Place").id if data.poi_id else None
     w.chain_id = _own(db, MaintenanceLookup, me, data.chain_id, "Workshop chain").id if data.chain_id else None
     mine = {str(i) for (i,) in db.query(MaintenanceLookup.id).filter(MaintenanceLookup.usergroup_id == me.usergroup_id,
@@ -748,11 +763,16 @@ def overview(request: Request, db: Session = Depends(get_db), date_from: datetim
         mine = [j for j in jobs if key(j.imei) == name]
         r["in_workshop"] = len({j.imei for j in mine if busy(j, a, b)})
         r["trend"] = [len({j.imei for j in mine if busy(j, *day(d))}) for d in trend_days]
-    for imei, amount in (db.query(MaintenanceCost.imei, func.sum(MaintenanceCost.amount))
-                         .filter(MaintenanceCost.usergroup_id == me.usergroup_id, MaintenanceCost.imei.in_(list(fleet)),
-                                 MaintenanceCost.cost_date >= date_from.date(), MaintenanceCost.cost_date <= date_to.date())
-                         .group_by(MaintenanceCost.imei)) if fleet else []:
-        rows[key(imei)]["cost"] += float(amount or 0)
+    # Costs in the period; an amortised cost counts the share of its days that fall in it
+    d0, d1 = date_from.date(), date_to.date()
+    costs = (db.query(MaintenanceCost)
+             .filter(MaintenanceCost.usergroup_id == me.usergroup_id, MaintenanceCost.imei.in_(list(fleet)),
+                     ((MaintenanceCost.amortise_from.is_(None)) & (MaintenanceCost.cost_date >= d0) & (MaintenanceCost.cost_date <= d1))
+                     | ((MaintenanceCost.amortise_from <= d1) & (MaintenanceCost.amortise_to >= d0))).all()) if fleet else []
+    for c in costs:
+        rows[key(c.imei)]["cost"] += ms.cost_in_period(c, d0, d1)
+    for r in rows.values():
+        r["cost"] = round(r["cost"], 2)
     counts = {"Overdue": 0, "Due": 0}
     for _, _, _, occ in ms.projections(db, me.usergroup_id, fleet):
         if occ.status in counts:

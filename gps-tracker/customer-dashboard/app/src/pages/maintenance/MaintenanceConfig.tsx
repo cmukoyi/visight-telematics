@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
 import {
-  ActionIcon, Badge, Button, Group, NumberInput, Paper, Select, SimpleGrid, Stack, Switch, Text, TextInput, Tooltip,
+  ActionIcon, Badge, Button, FileButton, Group, Image, NumberInput, Paper, Select, SimpleGrid, Stack, Switch, Text, TextInput, Tooltip,
 } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { useForm } from '@mantine/form';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
-import { IconCopy, IconPencil, IconPlus, IconSearch, IconTrash } from '@tabler/icons-react';
+import { IconCopy, IconLock, IconPencil, IconPhoto, IconPlus, IconSearch, IconTrash } from '@tabler/icons-react';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
 import dayjs from 'dayjs';
 import { useCan, useCategories, usePlaces } from '../../api/hooks';
@@ -19,6 +19,7 @@ import { ConfigHeader } from '../../components/ConfigHeader';
 import { DataGrid } from '../../components/DataGrid';
 import { EditorShell, firstError } from '../../components/EditorShell';
 import { CheckList } from '../../components/FeaturePicker';
+import { TransferList } from '../../components/TransferList';
 import classes from '../CatalogPages.module.css';
 
 const SECTION = 'Vehicle Maintenance';
@@ -138,9 +139,13 @@ export function ItemsPage() {
   const shown = rows.filter((r) => !search || r.name.toLowerCase().includes(search.toLowerCase()));
   const cols: ColDef<ItemRow>[] = [
     { headerName: 'Description', field: 'name', flex: 1, sort: 'asc' },
+    { headerName: 'Is System', field: 'is_system', width: 120,
+      cellRenderer: (p: ICellRendererParams<ItemRow>) => p.data && (p.data.is_system
+        ? <Tooltip label="A starter item — it can't be changed or deleted; add your own"><Badge size="sm" variant="light" color="gray" leftSection={<IconLock size={11} />}>System</Badge></Tooltip>
+        : <Text size="sm" c="dimmed">No</Text>) },
     { headerName: 'In maintenance types', field: 'types', width: 190, type: 'numericColumn' },
     ...(manage ? [{ headerName: '', width: 90, minWidth: 90, sortable: false, filter: false, pinned: 'right' as const,
-      cellRenderer: (p: ICellRendererParams<ItemRow>) => p.data && (
+      cellRenderer: (p: ICellRendererParams<ItemRow>) => p.data && !p.data.is_system && (
         <RowActions label="item" onEdit={() => open(p.data!)}
                     onDelete={() => confirmDelete(`Delete “${p.data!.name}”?`, 'It is taken off the maintenance types that include it.', async () => {
                       await mntApi.remove('items', p.data!.id); refresh();
@@ -154,7 +159,7 @@ export function ItemsPage() {
       <Group mb="sm"><SearchBox value={search} onChange={setSearch} /><Text size="sm" c="dimmed">{shown.length} items</Text></Group>
       <Paper withBorder className={classes.grid}>
         <DataGrid rowData={shown} columnDefs={cols} loading={isFetching && !rows.length} getRowId={(p) => p.data.id}
-                  onRowDoubleClicked={(e) => manage && e.data && open(e.data)} />
+                  onRowDoubleClicked={(e) => manage && e.data && !e.data.is_system && open(e.data)} />
       </Paper>
       <EditorShell opened={!!editing} onClose={() => setEditing(null)} title={editing === 'new' ? 'New Maintenance Item' : 'Edit Maintenance Item'}
                    onSave={() => save(false)} onSaveAndNew={() => save(true)} sections={[
@@ -256,10 +261,12 @@ export function WorkshopsPage() {
   const { data: places = [] } = usePlaces();
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<WorkshopRow | 'new' | null>(null);
-  const blank = { name: '', poi_id: null as string | null, chain_id: null as string | null, phone: '', type_ids: [] as string[] };
+  const blank = { name: '', poi_id: null as string | null, chain_id: null as string | null, phone: '', working_hours: '',
+                  image_data: null as string | null, type_ids: [] as string[] };
   const form = useForm({ initialValues: blank, validate: { name: (v) => (v.trim() ? null : 'Enter a description') } });
   const open = (r: WorkshopRow | 'new') => {
-    form.setValues(r === 'new' ? blank : { name: r.name, poi_id: r.poi_id, chain_id: r.chain_id, phone: r.phone ?? '', type_ids: r.type_ids });
+    form.setValues(r === 'new' ? blank : { name: r.name, poi_id: r.poi_id, chain_id: r.chain_id, phone: r.phone ?? '',
+                                           working_hours: r.working_hours ?? '', image_data: r.image_data, type_ids: r.type_ids });
     setEditing(r);
   };
   const save = (andNew: boolean) => form.onSubmit(async (v) => {
@@ -314,6 +321,27 @@ export function WorkshopsPage() {
                 refresh();
               }} />
               <TextInput label="Phone" placeholder="e.g. 011 555 0100" {...form.getInputProps('phone')} />
+              <TextInput label="Working hours" placeholder="e.g. Mon–Fri 07:30–17:00, Sat 08:00–12:00" {...form.getInputProps('working_hours')} />
+              <div>
+                <Text size="sm" fw={500} mb={4}>Image</Text>
+                <Group align="flex-end">
+                  {form.values.image_data
+                    ? <Image src={form.values.image_data} h={110} w={180} radius="md" fit="cover" alt="Workshop" />
+                    : <Paper withBorder h={110} w={180} radius="md" style={{ display: 'grid', placeItems: 'center' }}><IconPhoto size={30} opacity={0.4} /></Paper>}
+                  <Stack gap={6}>
+                    <FileButton accept="image/png,image/jpeg,image/webp" onChange={(file) => {
+                      if (!file) return;
+                      if (file.size > 600_000) { notifications.show({ color: 'orange', message: 'Use an image up to 600 KB' }); return; }
+                      const reader = new FileReader();
+                      reader.onload = () => form.setFieldValue('image_data', String(reader.result));
+                      reader.readAsDataURL(file);
+                    }}>
+                      {(props) => <Button size="xs" variant="default" leftSection={<IconPhoto size={14} />} {...props}>Upload image</Button>}
+                    </FileButton>
+                    {form.values.image_data && <Button size="xs" variant="subtle" color="red" onClick={() => form.setFieldValue('image_data', null)}>Remove</Button>}
+                  </Stack>
+                </Group>
+              </div>
             </Stack>
           ) },
         { id: 'types', label: 'Workshop Types', keywords: 'types tyres electrical',
@@ -375,7 +403,6 @@ export function SchedulesPage() {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<ScheduleRow | null>(null);
   const [editing, setEditing] = useState<ScheduleRow | 'new' | null>(null);
-  const [vehicleGroup, setVehicleGroup] = useState<string | null>(null);
   const form = useForm<ScheduleForm>({
     initialValues: emptySchedule(),
     validate: {
@@ -396,7 +423,6 @@ export function SchedulesPage() {
         until_km: n(r.until_km), until_months: n(r.until_months), until_hours: n(r.until_hours),
       });
     }
-    setVehicleGroup(null);
     setEditing(r);
   };
   const save = (andNew: boolean) => form.onSubmit(async (v) => {
@@ -489,7 +515,12 @@ export function SchedulesPage() {
                         }} error={form.errors.type_id} />
                 <TextInput label="Description" withAsterisk placeholder="e.g. Oil change every 10 000 km" {...form.getInputProps('name')} />
               </SimpleGrid>
-              {!(catalog?.types.length) && <Text size="xs" c="orange">Add a maintenance type first (Configuration → Maintenance Types).</Text>}
+              <InlineAdd placeholder="New maintenance type, e.g. Minor service" onAdd={async (name) => {
+                const t = await mntApi.save<Named>('types', null, { name, duration_days: 1, duration_hours: 0, item_ids: [] });
+                form.setFieldValue('type_id', t.id);
+                if (!form.values.name) form.setFieldValue('name', name);
+                refresh();
+              }} />
               {meterRow('at', 'At', 'When it first falls due: an odometer reading, months after the start date, or engine hours')}
               <Group gap="xl">
                 <Switch label="Recurring" checked={form.values.recurring} onChange={(e) => form.setFieldValue('recurring', e.currentTarget.checked)} />
@@ -523,14 +554,11 @@ export function SchedulesPage() {
                            empty="No vehicle types yet (Configuration → Vehicle Types)." />
               </div>
               <div>
-                <Group justify="space-between" mb={6}>
-                  <Text size="sm" fw={500}>Individual vehicles</Text>
-                  <Select size="xs" w={220} placeholder="All vehicle groups" clearable data={categories.map((c) => c.name)}
-                          value={vehicleGroup} onChange={setVehicleGroup} aria-label="Vehicle group" />
-                </Group>
-                <CheckList items={vehicles.filter((v) => !vehicleGroup || v.group === vehicleGroup).map((v) => ({
-                  value: v.imei, label: v.name, description: [v.group, v.type_id ? typeName.get(v.type_id) : null].filter(Boolean).join(' · ') || undefined }))}
-                           value={form.values.imeis} onChange={(v) => form.setFieldValue('imeis', v)} height={260} />
+                <Text size="sm" fw={500} mb={6}>Individual vehicles</Text>
+                <TransferList items={vehicles.map((v) => ({ value: v.imei, label: v.name, group: v.group, type: v.type_id ? typeName.get(v.type_id) ?? null : null }))}
+                              value={form.values.imeis} onChange={(v) => form.setFieldValue('imeis', v)}
+                              groups={categories.map((c) => c.name)}
+                              types={(catalog?.vehicle_type ?? []).map((t) => ({ value: t.name, label: t.name }))} />
               </div>
             </Stack>
           ) },
