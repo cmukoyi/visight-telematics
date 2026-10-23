@@ -21,6 +21,9 @@ def _has_column(table, column):
 
 
 def _tables():
+    # Every model the new tables point at must be loaded, or their foreign keys can't be resolved
+    # (custom_report_runs.schedule_id → report_schedules, defined in models_dataprofiler)
+    from app import models, models_dataprofiler  # noqa: F401
     from app import models_reports as m
     return [m.CustomReportCategory.__table__, m.CustomReport.__table__, m.CustomReportRun.__table__]
 
