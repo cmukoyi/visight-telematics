@@ -35,7 +35,8 @@ function arrowsAlong(route: MapRoute) {
   }
   return out;
 }
-export interface MapPoint { id: string; lat: number; lng: number; color: string; label: string; detail?: string; icon?: string }
+/** A marker: a dot, or a warning triangle for exceptions (harsh driving, speeding, …). */
+export interface MapPoint { id: string; lat: number; lng: number; color: string; label: string; detail?: string; icon?: string; shape?: 'dot' | 'warning' }
 export interface MapPlace { id: string; name: string; lat: number; lng: number; radius: number; polygon?: [number, number][] | null }
 
 export interface FleetMapHandle {
@@ -195,10 +196,18 @@ export const FleetMap = forwardRef<FleetMapHandle, Props>(function FleetMap(
           </Marker>
         ))}
 
-        {points.map((pt) => (
+        {/* warnings drawn last, so a trip's exceptions sit above its other markers */}
+        {[...points].sort((a, b) => Number(a.shape === 'warning') - Number(b.shape === 'warning')).map((pt) => (
           <Marker key={pt.id} latitude={pt.lat} longitude={pt.lng} anchor="center"
                   onClick={(e) => { e.originalEvent.stopPropagation(); setPopup({ ...pt, kind: 'point' }); }}>
-            <div className={classes.point} style={{ background: pt.color }} title={pt.label}>{pt.icon ?? ''}</div>
+            {pt.shape === 'warning'
+              ? <svg className={classes.warning} width="26" height="24" viewBox="0 0 26 24" role="img" aria-label={pt.label}>
+                  <title>{pt.label}</title>
+                  <path d="M13 2 L24.5 22 H1.5 Z" fill={pt.color} stroke="#fff" strokeWidth="2" strokeLinejoin="round" />
+                  <path d="M13 9 V15" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
+                  <circle cx="13" cy="18.6" r="1.4" fill="#fff" />
+                </svg>
+              : <div className={classes.point} style={{ background: pt.color }} title={pt.label}>{pt.icon ?? ''}</div>}
           </Marker>
         ))}
 

@@ -2689,12 +2689,17 @@ def get_trip(trip_id: str, request: Request, db: Session = Depends(get_db)):
               .order_by(DeviceEvent.recorded_at, DeviceEvent.id).all())
     points = [[e.latitude, e.longitude, e.speed, e.recorded_at.isoformat()]
               for e in events if e.latitude is not None and e.longitude is not None]
+    from app.routes_catalog import event_labels
+    custom = event_labels(db, me.usergroup_id)
+    # Markers: our classified events only; records we can't classify (or a
+    # harsh manoeuvre's second record, see trip_builder.is_repeat) stay off the map.
     marked = [{
-        "id": e.id, "code": e.event_type, "label": event_label(e.event_type, e.event_io_id),
-        "kind": EVENTS[e.event_type][2] if e.event_type in EVENTS else "info",
+        "id": e.id, "code": e.event_type, "label": custom.get(e.event_type) or event_label(e.event_type, e.event_io_id),
+        "kind": EVENTS[e.event_type][2],
         "recorded_at": e.recorded_at, "latitude": e.latitude, "longitude": e.longitude, "speed": e.speed,
         "io": describe_io(e.io or {}),
-    } for e in events if e.event_type not in ("position", "parked_position")]
+    } for e in events
+        if e.event_type in EVENTS and e.event_type not in ("position", "parked_position")]
     out = _trip_out(trip, _group_device_names(db, me.usergroup_id))
     out.update(points=points, events=marked)
     return out

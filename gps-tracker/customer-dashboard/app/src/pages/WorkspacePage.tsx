@@ -118,12 +118,13 @@ export function WorkspacePage() {
       for (const e of t.events) {
         if (e.latitude == null || e.longitude == null) continue;
         out.push({ id: `te-${t.id}-${e.id}`, lat: e.latitude, lng: e.longitude, color: eventColor(e.code, e.kind),
-          label: e.label, detail: `${dateTime(e.recorded_at)} · ${e.speed ?? 0} km/h` });
+          shape: e.kind === 'alert' ? 'warning' : 'dot', label: e.label, detail: `${dateTime(e.recorded_at)} · ${e.speed ?? 0} km/h` });
       }
     }
     for (const e of plottedEvents.values()) {
       if (e.latitude == null || e.longitude == null) continue;
-      out.push({ id: `ev-${e.id}`, lat: e.latitude, lng: e.longitude, color: eventColor(e.code, e.kind), label: `${e.label} — ${e.device_name}`,
+      out.push({ id: `ev-${e.id}`, lat: e.latitude, lng: e.longitude, color: eventColor(e.code, e.kind),
+        shape: e.kind === 'alert' ? 'warning' : 'dot', label: `${e.label} — ${e.device_name}`,
         detail: `${dateTime(e.recorded_at)} · ${e.speed ?? 0} km/h\n${e.io.filter((x) => ['Ignition', 'External voltage', 'Over speeding', 'Green driving value'].includes(x.name)).map((x) => `${x.name}: ${x.display}`).join('\n')}` });
     }
     return out;

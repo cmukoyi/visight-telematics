@@ -90,8 +90,11 @@ def list_events(request: Request, db: Session = Depends(get_db),
         q = q.filter(DeviceEvent.recorded_at < date_to)
     if codes:
         q = q.filter(DeviceEvent.event_type.in_([c.strip() for c in codes.split(",") if c.strip()]))
-    elif not include_parked:
-        q = q.filter((DeviceEvent.event_type.is_(None)) | (DeviceEvent.event_type != "parked_position"))
+    else:
+        # Our events only: records we can't classify (and repeats) are in the admin data profiler.
+        q = q.filter(DeviceEvent.event_type.isnot(None))
+        if not include_parked:
+            q = q.filter(DeviceEvent.event_type != "parked_position")
     if before_id:
         q = q.filter(DeviceEvent.id < before_id)
     rows = q.order_by(DeviceEvent.recorded_at.desc(), DeviceEvent.id.desc()).limit(limit).all()

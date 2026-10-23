@@ -67,6 +67,7 @@ IO_ELEMENTS: dict[int, tuple] = {
     239: ("ignition", "Ignition", None, None, _ON_OFF),
     240: ("movement", "Movement", None, None, _ON_OFF),
     241: ("gsm_operator", "Active GSM operator", None, None, None),
+    243: ("green_driving_duration", "Green driving event duration", "ms", None, None),
     246: ("towing", "Towing", None, None, {0: "Steady", 1: "Towing"}),
     247: ("crash", "Crash detection", None, None, None),
     248: ("immobilizer", "Immobilizer", None, None, None),
@@ -171,6 +172,8 @@ EVENT_SOURCES: dict[str, str] = {
     "harsh_acceleration": "Event IO 253 (Green driving type) = 1, IO 254 = g ×100",
     "harsh_braking": "Event IO 253 (Green driving type) = 2, IO 254 = g ×100",
     "harsh_cornering": "Event IO 253 (Green driving type) = 3, IO 254 = g ×100",
+    # Some firmware sends the green driving record with event IO 243 (duration)
+    # or 254 (value) instead; the type in IO 253 still says which one it is.
     "crash": "Event IO 247 (Crash detection) > 0",
     "towing": "Event IO 246 (Towing) = 1",
     "power_cut": "Event IO 252 (Unplug) = 1",
@@ -204,6 +207,7 @@ CATEGORIES: list[dict] = [
 CATEGORY_KEYS = {c["key"] for c in CATEGORIES}
 
 _GREEN_DRIVING = {1: "harsh_acceleration", 2: "harsh_braking", 3: "harsh_cornering"}
+_GREEN_DRIVING_IOS = (253, 254, 243)  # type, value, duration: each can be the record's event IO
 _ON_OFF_EVENTS = {
     239: ("ignition_off", "ignition_on"),
     240: ("movement_stop", "movement_start"),
@@ -224,8 +228,8 @@ def classify(event_io_id: int, io: dict) -> Optional[str]:
     if event_io_id in _ON_OFF_EVENTS:
         off_code, on_code = _ON_OFF_EVENTS[event_io_id]
         return on_code if value == 1 else off_code if value == 0 else None
-    if event_io_id == 253:
-        return _GREEN_DRIVING.get(value)
+    if event_io_id in _GREEN_DRIVING_IOS:
+        return _GREEN_DRIVING.get(io_value(io, 253))
     if event_io_id == 255:
         return "overspeed"
     if event_io_id == 247:
@@ -246,4 +250,9 @@ def category_of(code: Optional[str]) -> Optional[str]:
 
 
 def event_label(code: Optional[str], event_io_id: int = 0) -> str:
-    return EVENTS[code][0] if code in EVENTS else f"Unmapped (IO {event_io_id})"
+    """Our event's label; for a record we don't classify, the name of its event IO."""
+    if code in EVENTS:
+        return EVENTS[code][0]
+    if event_io_id in IO_ELEMENTS:
+        return IO_ELEMENTS[event_io_id][1]
+    return f"Unmapped (IO {event_io_id})"
