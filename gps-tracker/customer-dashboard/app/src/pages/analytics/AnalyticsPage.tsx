@@ -9,7 +9,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { useAnalyticsPages, useAnalyticsQuery, useCan, useCategories, type Range } from '../../api/hooks';
 import type { AnalyticsPageDef, AnalyticsResult, Visual } from '../../api/types';
+import dayjs from 'dayjs';
 import { ConfigHeader } from '../../components/ConfigHeader';
+import { RangePicker } from '../../components/RangePicker';
 import { HEIGHTS, ResultTable, VisualChart } from '../../components/VisualChart';
 import { PERIODS, periodLabel, periodRange } from '../../utils/periods';
 import classes from './Analytics.module.css';
@@ -84,7 +86,9 @@ export function AnalyticsPage() {
   const [preset, setPreset] = useState<string>('this_month');
   const [category, setCategory] = useState<string | null>(null);
   useEffect(() => { if (page) setPreset(page.date_preset); }, [page?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  const range = useMemo(() => periodRange(preset), [preset]);
+  // A named period (saved as the page's default), or any two dates picked on the calendar
+  const [custom, setCustom] = useState<Range | null>(null);
+  const range = useMemo(() => (preset === 'custom' && custom ? custom : periodRange(preset)), [preset, custom]);
   const [editing, setEditing] = useState<Visual | 'new' | null>(null);
   const [naming, setNaming] = useState<{ mode: 'new' | 'rename'; name: string } | null>(null);
 
@@ -153,7 +157,9 @@ export function AnalyticsPage() {
                 <Menu.Dropdown>
                   <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => setNaming({ mode: 'rename', name: page.name })}>Rename page</Menu.Item>
                   <Menu.Item leftSection={<IconCopy size={14} />} onClick={duplicatePage}>Duplicate page</Menu.Item>
-                  <Menu.Item onClick={() => savePage({ ...page, date_preset: preset })}>Make “{PERIODS.find((p) => p.value === preset)?.label}” this page’s default period</Menu.Item>
+                  {preset !== 'custom' && (
+                    <Menu.Item onClick={() => savePage({ ...page, date_preset: preset })}>Make “{PERIODS.find((p) => p.value === preset)?.label}” this page’s default period</Menu.Item>
+                  )}
                   <Menu.Divider />
                   <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={deletePage}>Delete page</Menu.Item>
                 </Menu.Dropdown>
@@ -162,8 +168,20 @@ export function AnalyticsPage() {
           </div>
           <Paper withBorder radius="lg" p="md">
             <div className={classes.filters}>
-              <Select label="Date range" w={260} allowDeselect={false} data={PERIODS} value={preset} onChange={(v) => setPreset(v ?? 'this_month')}
-                      description={periodLabel(preset, range)} />
+              <Select label="Date range" w={260} allowDeselect={false} value={preset}
+                      data={[...PERIODS, { value: 'custom', label: 'Custom range…' }]}
+                      onChange={(v) => {
+                        if (v === 'custom' && !custom) setCustom({ from: range.from, to: dayjs(range.to).subtract(1, 'second').toDate() });
+                        setPreset(v ?? 'this_month');
+                      }}
+                      description={preset === 'custom' ? 'Pick the dates on the right' : periodLabel(preset, range)} />
+              {preset === 'custom' && custom && (
+                <Stack gap={4} justify="flex-end">
+                  <Text size="sm" fw={500}>From – to</Text>
+                  <RangePicker value={custom} onChange={setCustom} />
+                  <Text size="xs" c="dimmed">&nbsp;</Text>
+                </Stack>
+              )}
               <Select label="Vehicle group" w={260} placeholder="All vehicles" clearable data={categories.filter((c) => c.is_active).map((c) => c.name)}
                       value={category} onChange={setCategory} description=" " />
             </div>

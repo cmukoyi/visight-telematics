@@ -1,0 +1,7 @@
+.target { font-weight: 400; }
+.presets { min-width: 130px; }
+.preset {
+  padding: 6px 10px; border-radius: var(--mantine-radius-sm); font-size: var(--mantine-font-size-sm); white-space: nowrap;
+}
+.preset:hover { background: var(--mantine-color-default-hover); }
+.preset[data-active] { background: var(--mantine-color-default-hover); font-weight: 600; }
