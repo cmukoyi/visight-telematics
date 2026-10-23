@@ -485,12 +485,14 @@ jobs:
               sleep 3
             done
 
+            # `< /dev/null`: this script arrives on stdin (bash -s), and `docker compose exec` would otherwise
+            # read — and swallow — the rest of it, so nothing after the first exec would run
             echo "🔄 Running Alembic migrations..."
-            docker compose exec -T backend alembic upgrade head && \
+            docker compose exec -T backend alembic upgrade head < /dev/null && \
               echo "✅ Migrations complete" || {
               echo "⚠️  Retrying in 15s..."
               sleep 15
-              docker compose exec -T backend alembic upgrade head || {
+              docker compose exec -T backend alembic upgrade head < /dev/null || {
                 echo "❌ Migration failed"
                 docker logs --tail 30 "${BACKEND_CONTAINER}"
                 exit 1
@@ -498,8 +500,11 @@ jobs:
             }
 
             echo "🌍 Synchronizing customer-dashboard translation keys..."
-            docker compose exec -T backend python -c "from app.sync_dashboard_translation_keys import dashboard_path; assert dashboard_path().is_file(); print(f'✅ Sync source: {dashboard_path()}')"
-            docker compose exec -T backend python -m app.sync_dashboard_translation_keys
+            docker compose exec -T backend python -c "from app.sync_dashboard_translation_keys import dashboard_path; assert dashboard_path().is_file(); print(f'✅ Sync source: {dashboard_path()}')" < /dev/null
+            # Missing translations shouldn't take the platform down: warn, and fix them in the admin portal
+            docker compose exec -T backend python -m app.sync_dashboard_translation_keys < /dev/null \
+              || echo "⚠️  Translation sync incomplete — check the admin portal's translations"
+            echo "✅ Translation sync step finished"
           SSHEOF
 
       # ── Install / refresh daily cleanup cron job ─────────────────
