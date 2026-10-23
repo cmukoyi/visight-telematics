@@ -26,6 +26,7 @@ TAG_DELETE_GRACE_DAYS = portal_alert_service.TAG_DELETE_GRACE_DAYS
 OFFLINE_CHECK_INTERVAL_S = 300
 PURGE_INTERVAL_S = 3600
 EXPIRY_INTERVAL_S = 86400
+MAINTENANCE_INTERVAL_S = 900   # due / overdue maintenance notifications
 
 
 def delete_tag(db: Session, tag: BLETag, reason: str = "deleted") -> dict:
@@ -102,4 +103,10 @@ def start() -> list[asyncio.Task]:
         asyncio.create_task(_every(OFFLINE_CHECK_INTERVAL_S, "offline alerts", check_offline)),
         asyncio.create_task(_every(PURGE_INTERVAL_S, "alert purge", portal_alert_service.purge_old_alerts)),
         asyncio.create_task(_every(EXPIRY_INTERVAL_S, "package expiry", enforce_expiry)),
+        asyncio.create_task(_every(MAINTENANCE_INTERVAL_S, "maintenance notices", send_maintenance_notices)),
     ]
+
+
+def send_maintenance_notices(db: Session) -> int:
+    from app.services import maintenance_service
+    return maintenance_service.send_notices(db)

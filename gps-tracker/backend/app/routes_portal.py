@@ -1494,6 +1494,8 @@ class PortalTagUpdate(BaseModel):
     driver: Optional[str] = None
     # Fuel: travelling consumption in L/100 km ("" clears it)
     fuel_consumption: Optional[str] = None
+    # Maintenance: the vehicle type (a maintenance_lookups id; "" clears it)
+    vehicle_type: Optional[str] = None
 
     @field_validator("fuel_consumption")
     @classmethod
@@ -1510,7 +1512,7 @@ class PortalTagUpdate(BaseModel):
         return f"{value:g}"
 
 
-VEHICLE_DETAILS = ("make", "model", "year", "registration", "driver", "fuel_consumption")
+VEHICLE_DETAILS = ("make", "model", "year", "registration", "driver", "fuel_consumption", "vehicle_type")
 
 
 @router.put("/tags/{tag_id}", response_model=PortalTagOut)
@@ -1537,6 +1539,16 @@ def update_tag(tag_id: str, data: PortalTagUpdate, request: Request, db: Session
         raise HTTPException(status_code=404, detail="Tag not found in your group")
 
     details = {k: getattr(data, k) for k in VEHICLE_DETAILS if getattr(data, k) is not None}
+    if details.get("vehicle_type"):
+        from app.models_maintenance import MaintenanceLookup
+        try:
+            ok = db.query(MaintenanceLookup.id).filter(MaintenanceLookup.id == UUID(details["vehicle_type"]),
+                                                       MaintenanceLookup.usergroup_id == me.usergroup_id,
+                                                       MaintenanceLookup.kind == "vehicle_type").first()
+        except ValueError:
+            ok = None
+        if not ok:
+            raise HTTPException(status_code=400, detail="Unknown vehicle type")
     if details:
         attrs = dict(tag.attributes or {})
         for key, value in details.items():

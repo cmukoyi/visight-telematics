@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
 from app.models_dataprofiler import Reseller, DataExchange, ResellerDevice, UnitType, DeviceEvent, Trip, TripBuilderState, ReportSchedule  # noqa: F401 — registers tables
+from app import models_maintenance  # noqa: F401 — registers tables
 from app.routes_admin import router as admin_router, public_router as admin_public_router
 from app.services import housekeeping_service
 from app.services.critical_service_alert_service import critical_service_alerts
@@ -116,11 +117,13 @@ from app.routes_access import router as access_router  # noqa: E402
 from app.routes_rules import router as rules_router  # noqa: E402
 from app.routes_catalog import router as catalog_router  # noqa: E402
 from app.routes_analytics import router as analytics_router  # noqa: E402
+from app.routes_maintenance import router as maintenance_router  # noqa: E402
 app.include_router(fleet_router, include_in_schema=False)
 app.include_router(access_router, include_in_schema=False)
 app.include_router(rules_router, include_in_schema=False)
 app.include_router(catalog_router, include_in_schema=False)
 app.include_router(analytics_router, include_in_schema=False)
+app.include_router(maintenance_router, include_in_schema=False)
 
 # DataProfiler — resellers, data exchanges, IMEI routing (admin auth required)
 from app.routes_dataprofiler import router as dataprofiler_router  # noqa: E402

@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session, object_session
 from app.models import BLETag, PortalRole, PortalUser, PortalUserRole, SecurityGroup, TagCategory
 
 # Sections, in the order the role editor lists them
-SECTIONS = ["Live tracking", "History", "Places", "Alerts", "Reports", "Vehicles", "Users and security", "Configuration"]
+SECTIONS = ["Live tracking", "History", "Places", "Alerts", "Reports", "Maintenance", "Vehicles", "Users and security", "Configuration"]
 
 # key: (label, section, what it allows — shown to admins in the role and user editors)
 PERMISSIONS: dict = {
@@ -42,6 +42,9 @@ PERMISSIONS: dict = {
     "reports.view":          ("Run reports", "Reports", "Run, view and download reports."),
     "reports.schedule":      ("Schedule reports", "Reports", "Email reports to people on a schedule."),
     "analytics.manage":      ("Build analytics", "Reports", "Add and change Analytics pages, charts and Expressions (everyone who can run reports can view them)."),
+    "maintenance.view":      ("See maintenance", "Maintenance", "See due and overdue maintenance, jobs, costs and fault codes (DTC)."),
+    "maintenance.manage":    ("Record maintenance", "Maintenance", "Book, start and complete maintenance jobs and record their costs."),
+    "maintenance.configure": ("Maintenance setup", "Configuration", "Maintenance schedules, types, items, workshops, cost centres and vehicle types."),
     "vehicles.manage":       ("Edit vehicles", "Vehicles", "Change vehicle details: description, registration, make, model, driver and vehicle group."),
     "vehicles.delete":       ("Delete vehicles", "Vehicles", "Remove vehicles and all their history."),
     "vehicle_groups.manage": ("Vehicle groups", "Vehicles", "Create and edit vehicle groups and choose their security group."),
@@ -62,7 +65,7 @@ ALL_PERMISSIONS = list(PERMISSIONS)
 ADMIN_ONLY = {
     "vehicles.manage", "vehicles.delete", "vehicle_groups.manage", "data_exchange.manage",
     "users.view", "users.manage", "roles.manage", "security.manage", "audit.view",
-    "rules.manage", "events.manage", "settings.manage", "theme.manage",
+    "rules.manage", "events.manage", "settings.manage", "theme.manage", "maintenance.configure",
 }
 # What a role can be given (the role builder lists these)
 ROLE_PERMISSIONS = [p for p in ALL_PERMISSIONS if p not in ADMIN_ONLY]
@@ -85,11 +88,12 @@ DEFAULT_ROLES: dict = {
     ADMIN_ROLE: ("Everything, including Configuration, and every vehicle", ALL_PERMISSIONS, True),
     "Operator": ("Day-to-day tracking: live map, live tracking, trips, events, places, geofences, alerts and reports",
                  ["map.view", "live.track", "history.view", "events.view", "places.view", "places.manage", "places.arm",
-                  "inbox.view", "reports.view"], False),
+                  "inbox.view", "reports.view", "maintenance.view"], False),
     "Mapping User": ("Live map, live tracking, trips and places",
                      ["map.view", "live.track", "history.view", "places.view", "places.manage", "places.arm"], False),
-    "Maintenance User": ("Vehicle positions, trips and events, alerts and reports",
-                         ["map.view", "history.view", "events.view", "inbox.view", "reports.view", "reports.schedule"], False),
+    "Maintenance User": ("Vehicle maintenance, positions, trips and events, alerts and reports",
+                         ["map.view", "history.view", "events.view", "inbox.view", "reports.view", "reports.schedule",
+                          "maintenance.view", "maintenance.manage"], False),
     "Reporting User": ("Runs and schedules reports, builds analytics, and receives alerts",
                        ["reports.view", "reports.schedule", "analytics.manage", "inbox.view"], False),
     "MZone Driver": ("Sees their vehicles on the map, live, with their trips",

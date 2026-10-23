@@ -10,6 +10,7 @@ import { WorkspacePage } from './pages/WorkspacePage';
 import { AccountPage, ConfigurationPage } from './pages/ConfigurationPage';
 import { ReportsSection } from './pages/analytics/ReportsHub';
 import { InboxPage } from './pages/InboxPage';
+import { MaintenanceSection } from './pages/maintenance/MaintenanceSection';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   return getSession().token ? children : <Navigate to="/login" replace />;
@@ -41,6 +42,7 @@ export function App() {
         <Route path="/configuration/*" element={<Allowed any={need('/configuration')}><ConfigurationPage /></Allowed>} />
         <Route path="/account" element={<AccountPage />} />
         <Route path="/reports/*" element={<Allowed any={need('/reports')}><ReportsSection /></Allowed>} />
+        <Route path="/maintenance/*" element={<Allowed any={need('/maintenance')}><MaintenanceSection /></Allowed>} />
         <Route path="/inbox" element={<Allowed any={need('/inbox')}><InboxPage /></Allowed>} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

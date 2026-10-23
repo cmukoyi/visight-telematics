@@ -9,7 +9,7 @@ import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import {
   IconAlertTriangle, IconArrowUpRight, IconBan, IconBolt, IconCar, IconKey, IconUsers, IconMapPin, IconPencil, IconPlugConnected,
-  IconSearch, IconTrash, IconPlus, IconShieldLock, IconDots, IconBellRinging, IconChevronRight,
+  IconSearch, IconTrash, IconPlus, IconShieldLock, IconDots, IconBellRinging, IconChevronRight, IconTool,
 } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
@@ -21,6 +21,8 @@ import { ConfigHeader } from '../components/ConfigHeader';
 import { DataGrid } from '../components/DataGrid';
 import { EditorShell, firstError } from '../components/EditorShell';
 import { EventTypeGroupsPage, EventTypesPage, GeofencesPage, PlaceGroupsPage } from './CatalogPages';
+import { ItemsPage, LookupPage, SchedulesPage, TypesPage, WorkshopsPage } from './maintenance/MaintenanceConfig';
+import { useMaintenanceCatalog } from '../api/maintenance';
 import { STATUS } from '../theme';
 import { ago, dateTime, vehicleName } from '../utils/format';
 import { msg, useT, type Msg } from '../i18n';
@@ -58,6 +60,16 @@ const SECTIONS: Section[] = [
     { label: msg('app.config.security_groups', 'Security Groups'), to: 'security?tab=groups', any: ['security.manage', 'users.manage'] },
     { label: msg('app.config.roles', 'Roles'), to: 'security?tab=roles', any: ['roles.manage', 'users.manage'] },
     { label: msg('app.config.audit_trail', 'Audit Trail'), to: 'security?tab=audit', any: ['audit.view'] },
+  ] },
+  { title: msg('app.config.vehicle_maintenance', 'Vehicle Maintenance'), icon: IconTool, items: [
+    { label: msg('app.config.maintenance_schedules', 'Maintenance Schedules'), to: 'maintenance/schedules', any: ['maintenance.configure'] },
+    { label: msg('app.config.maintenance_types', 'Maintenance Types'), to: 'maintenance/types', any: ['maintenance.configure'] },
+    { label: msg('app.config.maintenance_items', 'Maintenance Items'), to: 'maintenance/items', any: ['maintenance.configure'] },
+    { label: msg('app.config.workshops', 'Workshops'), to: 'maintenance/workshops', any: ['maintenance.configure'] },
+    { label: msg('app.config.workshop_chains', 'Workshop Chains'), to: 'maintenance/workshop-chains', any: ['maintenance.configure'] },
+    { label: msg('app.config.workshop_types', 'Workshop Types'), to: 'maintenance/workshop-types', any: ['maintenance.configure'] },
+    { label: msg('app.config.cost_centres', 'Cost Centres'), to: 'maintenance/cost-centres', any: ['maintenance.configure'] },
+    { label: msg('app.config.vehicle_types', 'Vehicle Types'), to: 'maintenance/vehicle-types', any: ['maintenance.configure'] },
   ] },
   { title: msg('app.config.misc', 'Misc'), icon: IconDots, items: [
     { label: msg('app.config.notification_rules', 'Notification Rules'), to: 'misc/notification-rules', any: ['inbox.view', 'rules.manage'] },
@@ -116,8 +128,10 @@ function Devices() {
   const { data: vehicles = [], isFetching } = useVehicles();
   const { data: categories = [] } = useCategories();
   const [editing, setEditing] = useState<Vehicle | null>(null);
-  const form = useForm({ initialValues: { description: '', category: '', registration: '', make: '', model: '', year: '', driver: '', fuel_consumption: '' } });
+  const form = useForm({ initialValues: { description: '', category: '', registration: '', make: '', model: '', year: '', driver: '', fuel_consumption: '', vehicle_type: '' } });
   const can = useCan();
+  const canMaintenance = can('maintenance.configure') || can('maintenance.view');
+  const { data: maintenance } = useMaintenanceCatalog(canMaintenance);
   const admin = can('vehicles.manage');
   const canDelete = can('vehicles.delete');
 
@@ -219,6 +233,12 @@ function Devices() {
               <Select label="Vehicle group" placeholder="No group" clearable data={categories.map((c) => c.name)}
                       description="The group's security group decides who sees this vehicle"
                       value={form.values.category || null} onChange={(v) => form.setFieldValue('category', v ?? '')} />
+              {canMaintenance && (
+                <Select label="Vehicle type" placeholder="No type" clearable
+                        data={(maintenance?.vehicle_type ?? []).map((t) => ({ value: t.id, label: t.name }))}
+                        description="Maintenance schedules for this type apply to the vehicle (Configuration → Vehicle Types)"
+                        value={form.values.vehicle_type || null} onChange={(v) => form.setFieldValue('vehicle_type', v ?? '')} />
+              )}
             </Stack>
           ) },
         { id: 'details', label: 'Vehicle details', keywords: 'registration driver make model year',
@@ -531,6 +551,14 @@ export function ConfigurationPage() {
       <Route path="event-type-groups" element={<EventTypeGroupsPage />} />
       <Route path="misc" element={<Misc />} />
       <Route path="misc/notification-rules" element={<NotificationRulesPage />} />
+      <Route path="maintenance/schedules" element={<SchedulesPage />} />
+      <Route path="maintenance/types" element={<TypesPage />} />
+      <Route path="maintenance/items" element={<ItemsPage />} />
+      <Route path="maintenance/workshops" element={<WorkshopsPage />} />
+      <Route path="maintenance/workshop-chains" element={<LookupPage kind="workshop_chain" />} />
+      <Route path="maintenance/workshop-types" element={<LookupPage kind="workshop_type" />} />
+      <Route path="maintenance/cost-centres" element={<LookupPage kind="cost_centre" />} />
+      <Route path="maintenance/vehicle-types" element={<LookupPage kind="vehicle_type" />} />
       <Route path="*" element={<Tiles />} />
     </Routes>
   );

@@ -7,7 +7,7 @@ import {
 import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import {
   IconAdjustmentsHorizontal, IconBell, IconChartBar, IconExternalLink, IconUserCircle, IconInbox, IconLayoutDashboard, IconLogout,
-  IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconMapRoute, IconMoon, IconSearch, IconSun,
+  IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconMapRoute, IconMoon, IconSearch, IconSun, IconTool,
 } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -25,6 +25,7 @@ export const NAV = [
   { to: '/dashboard', label: msg('app.nav.dashboard', 'Dashboard'), icon: IconLayoutDashboard, any: ['map.view'] },
   { to: '/workspace', label: msg('app.nav.workspace', 'Workspace'), icon: IconMapRoute, any: ['map.view', 'history.view', 'places.view'] },
   { to: '/configuration', label: msg('app.nav.configuration', 'Configuration'), icon: IconAdjustmentsHorizontal, any: ['admin'] },
+  { to: '/maintenance', label: msg('app.nav.maintenance', 'Vehicle Maintenance'), icon: IconTool, any: ['maintenance.view', 'maintenance.manage'] },
   { to: '/reports', label: msg('app.nav.reports', 'Reports'), icon: IconChartBar, any: ['reports.view'] },
   { to: '/inbox', label: msg('app.nav.inbox', 'Inbox'), icon: IconInbox, any: ['inbox.view'] },
 ];

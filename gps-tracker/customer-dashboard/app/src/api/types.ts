@@ -31,7 +31,7 @@ export interface Vehicle {
   attributes: Record<string, unknown> | null;
 }
 
-export const VEHICLE_DETAILS = ['registration', 'make', 'model', 'year', 'driver', 'fuel_consumption'] as const;
+export const VEHICLE_DETAILS = ['registration', 'make', 'model', 'year', 'driver', 'fuel_consumption', 'vehicle_type'] as const;
 export type VehicleDetail = typeof VEHICLE_DETAILS[number];
 
 /** make / model / year / registration / driver from the vehicle's attributes. */

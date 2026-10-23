@@ -21,9 +21,10 @@ const TYPE_LABELS: Record<string, string> = {
   tag_offline: 'Device offline', battery_low: 'Low battery', geofence_enter: 'Place entered', geofence_exit: 'Place exited',
   overspeed: 'Speeding', harsh_braking: 'Harsh braking', harsh_acceleration: 'Harsh acceleration', crash: 'Crash',
   towing: 'Towing', power_cut: 'Power cut', panic: 'Panic', package_expiry: 'Package expiry',
+  maintenance_due: 'Maintenance due', maintenance_overdue: 'Maintenance overdue',
 };
 const typeLabel = (t: string) => TYPE_LABELS[t] ?? t.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
-const SEVERE = new Set(['crash', 'panic', 'towing', 'power_cut']);
+const SEVERE = new Set(['crash', 'panic', 'towing', 'power_cut', 'maintenance_overdue']);
 
 const num = (v: unknown) => (typeof v === 'number' ? v : typeof v === 'string' && v !== '' ? Number(v) : NaN);
 
