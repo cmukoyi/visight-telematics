@@ -30,3 +30,56 @@ body { margin: 0; -webkit-font-smoothing: antialiased; }
   --viz-1: #3987e5; --viz-2: #d95926; --viz-3: #199e70; --viz-4: #c98500;
   --viz-5: #d55181; --viz-6: #008300; --viz-7: #9085e9; --viz-8: #e66767; --viz-other: #6b7a90;
 }
+
+/* Trying a look in this browser (layout/ThemeTrialBanner.tsx) */
+.vt-trial-banner {
+  position: fixed; top: 9px; left: 50%; transform: translateX(-50%); z-index: 250; max-width: calc(100vw - 32px);
+  border-radius: 999px; background: color-mix(in srgb, var(--mantine-color-brand-6) 18%, var(--mantine-color-body));
+  border: 1px solid color-mix(in srgb, var(--mantine-color-brand-6) 55%, transparent);
+}
+
+/* Night style (theme_settings.style = 'night'): near-black canvas, graphite panels, flat, one accent for anything active */
+html[data-vt-style='night'] {
+  --vt-night-panel: #1c1d1f; --vt-night-hover: #282a2c;
+  --mantine-color-text: #ffffff; --mantine-color-dimmed: #888888;
+  --mantine-color-default-border: #34363a;
+  --mantine-color-placeholder: #555555;
+  --viz-1: #8cc63f; --viz-2: #d9822b; --viz-3: #3a8fc7; --viz-4: #8e44ad;
+  --viz-5: #d0312d; --viz-6: #c9b037; --viz-7: #4fb3a6; --viz-8: #b5b5b5; --viz-other: #555555;
+}
+html[data-vt-style='night'] body { background: #080607; }
+html[data-vt-style='night'] .mantine-Paper-root,
+html[data-vt-style='night'] .mantine-Card-root,
+html[data-vt-style='night'] .mantine-Modal-content, html[data-vt-style='night'] .mantine-Modal-header,
+html[data-vt-style='night'] .mantine-Drawer-content, html[data-vt-style='night'] .mantine-Drawer-header,
+html[data-vt-style='night'] .mantine-Popover-dropdown, html[data-vt-style='night'] .mantine-Menu-dropdown,
+html[data-vt-style='night'] .mantine-Combobox-dropdown,
+html[data-vt-style='night'] .mantine-AppShell-header, html[data-vt-style='night'] .mantine-AppShell-navbar {
+  background-color: var(--vt-night-panel); box-shadow: none;
+}
+html[data-vt-style='night'] .mantine-Paper-root, html[data-vt-style='night'] .mantine-Card-root { border-radius: 4px; }
+html[data-vt-style='night'] .mantine-Modal-title { color: var(--mantine-color-brand-6); font-weight: 600; }
+html[data-vt-style='night'] .mantine-Combobox-option[data-combobox-selected],
+html[data-vt-style='night'] .mantine-Combobox-option:hover, html[data-vt-style='night'] .mantine-Menu-item:hover { background: var(--vt-night-hover); }
+/* Pill buttons; secondary (default) buttons are graphite */
+html[data-vt-style='night'] .mantine-Button-root { border-radius: 999px; }
+html[data-vt-style='night'] .mantine-Button-root[data-variant='default'] { background: #4c4f55; border-color: #4c4f55; color: #ffffff; }
+html[data-vt-style='night'] .mantine-Button-root[data-variant='default']:hover { background: #5a5d63; }
+html[data-vt-style='night'] .mantine-SegmentedControl-root { background: #34363a; }
+html[data-vt-style='night'] .mantine-SegmentedControl-indicator { background: #4c4f55; box-shadow: none; }
+html[data-vt-style='night'] .mantine-Tabs-tab[data-active] { border-color: var(--mantine-color-brand-6); color: #ffffff; }
+/* Active menu item: a thin accent bar, accent icon */
+html[data-vt-style='night'] .mantine-AppShell-navbar .mantine-NavLink-root[data-active] {
+  background: var(--vt-night-hover); color: #ffffff; box-shadow: inset 3px 0 0 var(--mantine-color-brand-6);
+}
+html[data-vt-style='night'] .mantine-AppShell-navbar .mantine-NavLink-root[data-active] svg { color: var(--mantine-color-brand-6); }
+html[data-vt-style='night'] .vt-grid {
+  --ag-background-color: var(--vt-night-panel); --ag-odd-row-background-color: #202123;
+  --ag-header-background-color: #141516; --ag-row-hover-color: var(--vt-night-hover);
+  --ag-border-color: #2c2e31; --ag-foreground-color: #ffffff; --ag-header-foreground-color: #cccccc;
+  --ag-selected-row-background-color: color-mix(in srgb, #8cc63f 18%, transparent);
+  --ag-border-radius: 3px; --ag-wrapper-border-radius: 3px;
+}
+html[data-vt-style='night'] .recharts-cartesian-grid line { stroke: #3a3a3a; }
+html[data-vt-style='night'] .recharts-text { fill: #888888; }
+@media (max-width: 48em) { .vt-trial-banner { top: auto; bottom: 12px; } }

@@ -9,6 +9,10 @@ const navy: MantineColorsTuple = [
   '#d3dceb', '#b0bfd6', '#899dbc', '#62789c', '#3f5880', '#2d4a72', '#1d3f66', '#113356', '#0d2b4a', '#09223d',
 ];
 export const DEFAULT_MENU = '#113356';
+// Night: text greys, then graphite steps (4 borders, 5 hover/selected, 6 inputs) on a warm near-black canvas (7 = page)
+const night: MantineColorsTuple = [
+  '#cccccc', '#b4b4b4', '#888888', '#555555', '#404347', '#4c4f55', '#34363a', '#080607', '#050404', '#020202',
+];
 
 const rgbOf = (hex: string) => {
   const n = parseInt(hex.replace('#', '').padEnd(6, '0').slice(0, 6), 16);
@@ -65,8 +69,10 @@ export function buildTheme({ primary, secondary, settings }: ThemeInput = {}) {
     ...base,
     colors: { ...base.colors, brand: isHex(primary) ? shadesOf(primary) : brand,
               accent: isHex(secondary) ? shadesOf(secondary) : shadesOf('#f59e0b'),
-              dark: isHex(s.surface) ? darkShadesOf(s.surface) : navy },
-    ...(isHex(primary) ? { primaryShade: { light: 6, dark: 5 } as const } : {}),
+              dark: s.style === 'night' ? night : isHex(s.surface) ? darkShadesOf(s.surface) : navy },
+    ...(isHex(primary) ? { primaryShade: { light: 6, dark: s.style === 'night' ? 6 : 5 } as const } : {}),
+    // Night: a light accent gets dark text on filled buttons and badges
+    ...(s.style === 'night' ? { autoContrast: true, luminanceThreshold: 0.45 } : {}),
     fontFamily: font,
     headings: { ...base.headings, fontFamily: font },
     defaultRadius: s.radius ?? 'md',
@@ -121,6 +127,8 @@ export const PRESETS: { name: string; primary: string; secondary: string; settin
   { name: 'Forest', primary: '#16a34a', secondary: '#facc15', settings: { menu_bg: '#14532d', surface: '#1a2e22' } },
   { name: 'Burgundy', primary: '#be123c', secondary: '#f59e0b', settings: { menu_bg: '#4c0519', surface: '#2a1419', color_scheme: 'light' } },
   { name: 'Ocean', primary: '#0891b2', secondary: '#22d3ee', settings: { menu_bg: '#083344', surface: '#0c2a33' } },
+  { name: 'Night lime', primary: '#8cc63f', secondary: '#d9822b',
+    settings: { style: 'night', color_scheme: 'dark', lock_scheme: true, menu_bg: '#1c1d1f', surface: '#080607', font: 'Roboto', radius: 'xs' } },
 ];
 
 // Semantic colours (status/alerts) — always paired with a text label in the UI.

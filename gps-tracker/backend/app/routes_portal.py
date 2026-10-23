@@ -819,6 +819,7 @@ THEME_SETTINGS = {
     "font": THEME_FONTS,
     "radius": ("xs", "sm", "md", "lg", "xl"),
     "brand_name": "text",         # platform name in the browser tab and menu (no logo)
+    "style": ("standard", "night"),   # night: near-black canvas, graphite panels, flat, one accent colour
 }
 
 

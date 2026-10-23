@@ -17,6 +17,7 @@ import { clearSession, getSession } from '../auth/session';
 import { GlobalSearch } from '../components/GlobalSearch';
 import { msg, useT } from '../i18n';
 import classes from './AppLayout.module.css';
+import { ThemeTrialBanner } from './ThemeTrialBanner';
 
 dayjs.extend(utc);
 
@@ -198,6 +199,7 @@ export function AppLayout() {
       </AppShell.Navbar>
 
       <AppShell.Main className={classes.main}>
+        <ThemeTrialBanner />
         <Outlet />
       </AppShell.Main>
     </AppShell>

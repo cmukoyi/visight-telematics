@@ -295,6 +295,8 @@ export interface ThemeSettings {
   font?: string;
   radius?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   brand_name?: string;
+  /** night: near-black canvas, graphite panels, flat surfaces and one accent (styles.css [data-vt-style='night']). */
+  style?: 'standard' | 'night';
 }
 
 export interface NotificationRule {

@@ -16,6 +16,7 @@ import { useGroupTheme } from './api/hooks';
 import { buildTheme, cssVariables, loadFont } from './theme';
 import { setDisplayTimezone } from './utils/format';
 import { cachedLook, saveLook, type Look } from './utils/look';
+import { useThemeTrial } from './utils/themeTrial';
 import { App } from './App';
 import { I18nProvider, storedLanguage } from './i18n';
 import { useMe } from './api/hooks';
@@ -46,9 +47,16 @@ function Root() {
   // The group's look and timezone (refetched when the user signs in or out).
   const { data: groupTheme } = useGroupTheme();
   const [cached] = useState(cachedLook);
-  const look: Look | null = groupTheme ?? cached;
+  // A look being tried in this browser (Custom Themes → Try in this browser) wins over the saved one
+  const trial = useThemeTrial();
+  const saved: Look | null = groupTheme ?? cached;
+  const look: Look | null = trial ? { ...saved, timezone: saved?.timezone ?? null, ...trial } : saved;
   useEffect(() => { if (groupTheme) saveLook(groupTheme); }, [groupTheme]);
   const settings = look?.theme_settings ?? null;
+  useEffect(() => {
+    if (settings?.style === 'night') document.documentElement.dataset.vtStyle = 'night';
+    else delete document.documentElement.dataset.vtStyle;
+  }, [settings?.style]);
   const appTheme = useMemo(() => buildTheme({ primary: look?.theme_primary, secondary: look?.theme_accent, settings }),
     [look?.theme_primary, look?.theme_accent, JSON.stringify(settings)]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { loadFont(settings?.font); }, [settings?.font]);

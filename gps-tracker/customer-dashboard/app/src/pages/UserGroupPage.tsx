@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   Box, Button, Checkbox, ColorInput, FileButton, Group, NumberInput, Paper, SegmentedControl, Select, SimpleGrid, Stack, Switch,
-  TagsInput, Text, TextInput, UnstyledButton,
+  TagsInput, Text, TextInput, Tooltip, UnstyledButton,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconPhoto, IconTrash, IconUpload } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { api } from '../api/client';
+import { setTrial } from '../utils/themeTrial';
 import { useCan, useGroupTheme, useNotificationPrefs } from '../api/hooks';
 import type { GroupTheme, NotificationPrefs, ThemeSettings } from '../api/types';
 import { DEFAULT_MENU, FONTS, PRESETS, darkShadesOf, fontStack, isHex, isLight, loadFont } from '../theme';
@@ -201,10 +202,12 @@ export function UserGroupPage({ mode }: { mode: 'theme' | 'preferences' }) {
           {PRESETS.map((p) => (
             <UnstyledButton key={p.name} className={classes.preset} disabled={!canEdit}
                             onClick={() => {
-                              // Colours and mode from the preset; keep the name, font and corners already chosen
+                              // Colours and mode from the preset; keep the name, and the font and corners the user chose
+                              const prev = PRESETS.find((q) => q.primary === form.theme_primary && q.settings.style === settings.style);
+                              const own = <K extends 'font' | 'radius' | 'lock_scheme'>(k: K) =>
+                                p.settings[k] ?? (prev?.settings[k] !== undefined && prev.settings[k] === settings[k] ? undefined : settings[k]);
                               set({ theme_primary: p.primary, theme_accent: p.secondary, theme_settings: null });
-                              setLook({ ...p.settings, brand_name: settings.brand_name, font: settings.font, radius: settings.radius,
-                                        lock_scheme: settings.lock_scheme });
+                              setLook({ ...p.settings, brand_name: settings.brand_name, font: own('font'), radius: own('radius'), lock_scheme: own('lock_scheme') });
                             }}>
               <div className={classes.presetSwatch}>
                 <span style={{ flex: 2, background: p.settings.menu_bg ?? DEFAULT_MENU }} />
@@ -273,9 +276,17 @@ export function UserGroupPage({ mode }: { mode: 'theme' | 'preferences' }) {
           <Paper withBorder p="lg">
             <Group justify="space-between" mb="sm">
               <Text fw={650}>Preview</Text>
-              {(form.theme_primary || form.theme_accent || Object.keys(settings).length > 0) && canEdit &&
-                <Button size="xs" variant="subtle" color="gray" onClick={() => set({ theme_primary: null, theme_accent: null, theme_settings: null })}>
-                  Reset to default</Button>}
+              <Group gap={4}>
+                <Tooltip label="See these settings across the whole platform in this browser only; everyone else keeps the saved look" multiline w={260}>
+                  <Button size="xs" variant="light" onClick={() => setTrial({
+                    name: PRESETS.find((p) => p.primary === form.theme_primary && p.settings.style === settings.style)?.name ?? 'these settings',
+                    theme_primary: form.theme_primary, theme_accent: form.theme_accent, theme_settings: form.theme_settings })}>
+                    Try in this browser</Button>
+                </Tooltip>
+                {(form.theme_primary || form.theme_accent || Object.keys(settings).length > 0) && canEdit &&
+                  <Button size="xs" variant="subtle" color="gray" onClick={() => set({ theme_primary: null, theme_accent: null, theme_settings: null })}>
+                    Reset to default</Button>}
+              </Group>
             </Group>
             <ThemePreview primary={form.theme_primary || DEFAULT_PRIMARY} secondary={form.theme_accent || DEFAULT_SECONDARY}
                           settings={settings} name={form.name ?? 'ViSight Track'} />
