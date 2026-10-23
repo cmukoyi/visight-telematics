@@ -1896,13 +1896,18 @@ def portal_alerts_unread_count(
     return {"unread": count}
 
 
+class AlertProcess(BaseModel):
+    notes: Optional[str] = None
+
+
 @router.put("/alerts/{alert_id}/read")
 def mark_portal_alert_read(
     alert_id: str,
     request: Request,
+    body: Optional[AlertProcess] = None,
     db: Session = Depends(get_db),
 ):
-    """Mark a single alert as read."""
+    """Mark a single alert as read (processed), optionally with notes."""
     me = get_portal_user_from_request(request, db)
     alert = db.query(PortalAlert).filter(
         PortalAlert.id == alert_id,
@@ -1910,9 +1915,18 @@ def mark_portal_alert_read(
     ).first()
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
-    alert.is_read = True
+    if not alert.is_read:
+        alert.is_read = True
+        alert.read_at = datetime.now(timezone.utc)
+        alert.read_by = _user_display_name(me)
+    if body and body.notes is not None:
+        alert.notes = body.notes.strip() or None
     db.commit()
     return _portal_alert_dict(alert)
+
+
+def _user_display_name(u: PortalUser) -> str:
+    return " ".join(x for x in (u.first_name, u.last_name) if x) or u.email
 
 
 @router.put("/alerts/read-all")
@@ -1927,7 +1941,7 @@ def mark_all_portal_alerts_read(
         PortalAlert.usergroup_id == str(me.usergroup_id),
         PortalAlert.created_at >= since,
         PortalAlert.is_read == False,
-    ).update({"is_read": True})
+    ).update({"is_read": True, "read_at": datetime.now(timezone.utc), "read_by": _user_display_name(me)})
     db.commit()
     return {"detail": "All alerts marked as read"}
 
@@ -1967,6 +1981,9 @@ def _portal_alert_dict(a: PortalAlert) -> dict:
         "tag_label":   tag_label,
         "tag_imei":    tag.imei if tag else None,
         "meta_data":   a.meta_data or {},
+        "notes":       a.notes,
+        "read_at":     a.read_at.isoformat() if a.read_at else None,
+        "read_by":     a.read_by,
     }
 
 

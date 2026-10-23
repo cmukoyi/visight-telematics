@@ -314,6 +314,27 @@ def inbox(request: Request, db: Session = Depends(get_db),
     return out
 
 
+@router.get("/inbox/{alert_id}")
+def inbox_alert(alert_id: str, request: Request, db: Session = Depends(get_db)):
+    """One alert for the Inbox details panel, with the street address where it happened."""
+    from app.services import address_service
+    me = get_portal_user_from_request(request, db)
+    access_service.for_user(me, db).require("inbox.view")
+    try:
+        UUID(alert_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    alert = (_scope_alerts(db.query(PortalAlert), db, me)
+             .filter(PortalAlert.id == alert_id, PortalAlert.usergroup_id == str(me.usergroup_id)).first())
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    meta = alert.meta_data or {}
+    lat, lng = meta.get("latitude"), meta.get("longitude")
+    address = address_service.lookup(db, float(lat), float(lng)) if lat not in (None, "") and lng not in (None, "") else None
+    db.commit()   # keep the address in the cache
+    return {**_portal_alert_dict(alert), "address": address or None}
+
+
 # ---------------------------------------------------------------------------
 # Reports
 # ---------------------------------------------------------------------------

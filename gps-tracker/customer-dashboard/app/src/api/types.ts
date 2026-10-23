@@ -137,6 +137,11 @@ export interface Alert {
   tag_label: string | null;
   tag_imei: string | null;
   meta_data: Record<string, unknown>;
+  notes: string | null;
+  read_at: string | null;
+  read_by: string | null;
+  /** Street address where it happened (GET /api/portal/inbox/{id} only). */
+  address?: string | null;
 }
 
 export interface WeekStats {

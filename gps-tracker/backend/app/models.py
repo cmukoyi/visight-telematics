@@ -204,6 +204,9 @@ class PortalAlert(Base):
     is_read      = Column(Boolean, nullable=False, default=False)
     created_at   = Column(DateTime(timezone=True), server_default=func.now())
     meta_data    = Column(JSON, nullable=True)           # e.g. {'poi_name': 'Depot', 'battery': 2}
+    notes        = Column(Text, nullable=True)           # added by whoever processed (read) the alert
+    read_at      = Column(DateTime(timezone=True), nullable=True)
+    read_by      = Column(String(255), nullable=True)    # the portal user's name, kept as text
 
     tag       = relationship("BLETag", foreign_keys=[tag_id])
 

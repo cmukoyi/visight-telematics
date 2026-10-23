@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { ActionIcon, Badge, Button, Group, Paper, SegmentedControl, Select, Text, TextInput, Title, Tooltip } from '@mantine/core';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  ActionIcon, Badge, Button, CloseButton, Group, Loader, Paper, ScrollArea, SegmentedControl, Select, Stack, Text, Textarea,
+  TextInput, Title, Tooltip,
+} from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconChecks, IconMail, IconMailOpened, IconSearch, IconTable, IconMap } from '@tabler/icons-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { api } from '../api/client';
 import { useInbox, useVehicles, type Range } from '../api/hooks';
@@ -24,6 +27,93 @@ const SEVERE = new Set(['crash', 'panic', 'towing', 'power_cut']);
 
 const num = (v: unknown) => (typeof v === 'number' ? v : typeof v === 'string' && v !== '' ? Number(v) : NaN);
 
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <Text size="xs" c="dimmed" mb={2}>{label}</Text>
+      <div className={classes.value}>{children}</div>
+    </div>
+  );
+}
+
+/** The selected alert, on the right of the grid: what happened, notes, and Mark as read. */
+function AlertDetails({ alert, onClose, onSaved }: { alert: Alert; onClose: () => void; onSaved: () => void }) {
+  const navigate = useNavigate();
+  const { data: full } = useQuery({
+    queryKey: ['inbox-alert', alert.id],
+    queryFn: () => api<Alert>(`/api/portal/inbox/${alert.id}`),
+  });
+  const a = { ...alert, ...full };
+  const m = a.meta_data ?? {};
+  const [notes, setNotes] = useState(alert.notes ?? '');
+  const [saving, setSaving] = useState(false);
+  useEffect(() => setNotes(alert.notes ?? ''), [alert.id, alert.notes]);
+
+  const rules = Array.isArray(m.rules) ? (m.rules as string[]) : [];
+  const lat = num(m.latitude), lng = num(m.longitude);
+  const coords = Number.isNaN(lat) || Number.isNaN(lng) ? null : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  const place = typeof m.poi_name === 'string' ? m.poi_name : null;
+  const location = [place, full ? a.address : null].filter(Boolean).join(' — ') || (full ? coords : null);
+  const speed = m.speed == null || m.speed === '' ? null : `${m.speed} km/h`;
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api(`/api/portal/alerts/${a.id}/read`, { method: 'PUT', json: { notes } });
+      notifications.show({ message: a.is_read ? 'Notes saved' : 'Alert marked as read' });
+      onSaved();
+      if (!a.is_read) onClose();
+    } catch (e) {
+      notifications.show({ color: 'red', message: (e as Error).message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Paper className={classes.details} withBorder>
+      <Group justify="space-between" wrap="nowrap" p="md" pb="sm" className={classes.detailsHead}>
+        <Text fw={650} size="lg">Alert details</Text>
+        <CloseButton onClick={onClose} aria-label="Close alert details" />
+      </Group>
+      <ScrollArea className={classes.detailsBody} type="auto">
+        <Stack gap="sm" p="md">
+          <Group gap="xs">
+            <Badge variant="light" color={SEVERE.has(a.alert_type) ? 'red' : 'blue'}>{typeLabel(a.alert_type)}</Badge>
+            <Badge variant="dot" color={a.is_read ? 'gray' : 'red'}>{a.is_read ? 'Read' : 'Unread'}</Badge>
+          </Group>
+          <Text fw={600}>{a.title}</Text>
+          {a.message && <Text size="sm" c="dimmed">{a.message}</Text>}
+          <Field label="Timestamp">{dateTime(typeof m.recorded_at === 'string' ? m.recorded_at : a.created_at)}</Field>
+          {rules.length > 0 && <Field label={rules.length > 1 ? 'Notification rules' : 'Notification rule'}>{rules.join(', ')}</Field>}
+          <Field label="Vehicle">{[a.tag_label, a.tag_imei && a.tag_imei !== a.tag_label ? a.tag_imei : null].filter(Boolean).join(' · ') || '—'}</Field>
+          {(coords || place) && <Field label="Location">{location ?? <Loader size="xs" />}</Field>}
+          {speed && <Field label="Speed">{speed}</Field>}
+          {a.is_read && a.read_by && (
+            <Text size="xs" c="dimmed">Processed by {a.read_by}{a.read_at ? ` on ${dateTime(a.read_at)}` : ''}</Text>
+          )}
+          {rules.length > 0 && (
+            <Group justify="flex-end">
+              <Button size="xs" variant="default" onClick={() => navigate('/configuration/misc/notification-rules')}>Manage notification rule</Button>
+            </Group>
+          )}
+        </Stack>
+      </ScrollArea>
+      <Stack gap="xs" p="md" className={classes.detailsFoot}>
+        <Textarea placeholder="Add notes…" autosize minRows={3} maxRows={6} value={notes}
+                  onChange={(e) => setNotes(e.currentTarget.value)} aria-label="Notes" />
+        <Group grow gap="xs">
+          <Button variant="default" onClick={onClose}>Cancel</Button>
+          <Button loading={saving} onClick={save} leftSection={a.is_read ? undefined : <IconMailOpened size={16} />}
+                  disabled={a.is_read && notes === (a.notes ?? '')}>
+            {a.is_read ? 'Save notes' : 'Mark as read'}
+          </Button>
+        </Group>
+      </Stack>
+    </Paper>
+  );
+}
+
 export function InboxPage() {
   const qc = useQueryClient();
   const [range, setRange] = useState<Range>(defaultRange);
@@ -42,8 +132,14 @@ export function InboxPage() {
   const { data: vehicles = [] } = useVehicles();
   const inbox = useInbox({ range, status, type, imei, search });
   const alerts = inbox.data ?? [];
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = alerts.find((a) => a.id === selectedId) ?? null;
 
-  const refresh = () => { qc.invalidateQueries({ queryKey: ['inbox'] }); qc.invalidateQueries({ queryKey: ['unread'] }); };
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ['inbox'] });
+    qc.invalidateQueries({ queryKey: ['inbox-alert'] });
+    qc.invalidateQueries({ queryKey: ['unread'] });
+  };
   const markRead = async (a: Alert) => {
     try { await api(`/api/portal/alerts/${a.id}/read`, { method: 'PUT' }); refresh(); }
     catch (e) { notifications.show({ color: 'red', message: (e as Error).message }); }
@@ -113,11 +209,16 @@ export function InboxPage() {
         </Group>
       </Paper>
 
-      <Paper className={classes.body} withBorder>
-        {view === 'grid'
-          ? <DataGrid rowData={alerts} columnDefs={cols} loading={inbox.isFetching} getRowId={(p) => p.data.id} tooltipShowDelay={400} stateKey="inbox" />
-          : <FleetMap points={points} />}
-      </Paper>
+      <div className={classes.split}>
+        <Paper className={classes.body} withBorder>
+          {view === 'grid'
+            ? <DataGrid rowData={alerts} columnDefs={cols} loading={inbox.isFetching} getRowId={(p) => p.data.id} tooltipShowDelay={400}
+                        stateKey="inbox" onRowClicked={(e) => e.data && setSelectedId(e.data.id)}
+                        rowClassRules={{ [classes.selectedRow]: (p) => p.data?.id === selectedId }} />
+            : <FleetMap points={points} />}
+        </Paper>
+        {selected && <AlertDetails key={selected.id} alert={selected} onClose={() => setSelectedId(null)} onSaved={refresh} />}
+      </div>
     </div>
   );
 }
