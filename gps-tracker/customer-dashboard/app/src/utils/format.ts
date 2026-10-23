@@ -12,6 +12,8 @@ export function setDisplayTimezone(tz: string | null | undefined) {
 }
 const local = (v: string) => (displayTz ? dayjs(v).tz(displayTz) : dayjs(v));
 
+/** "1 vehicle", "3 vehicles" */
+export const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 export const km = (m: number | null | undefined) => `${((m || 0) / 1000).toFixed(1)} km`;
 
 export function duration(s: number | null | undefined) {

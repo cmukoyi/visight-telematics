@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink as RouterLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
-  ActionIcon, AppShell, Avatar, Badge, Burger, Group, Indicator, Menu, NavLink, Stack, Text, Title, Tooltip,
+  ActionIcon, AppShell, Avatar, Badge, Burger, Group, Indicator, Menu, NavLink, Stack, Text, Tooltip,
   useMantineColorScheme, useComputedColorScheme,
 } from '@mantine/core';
 import { useDisclosure, useLocalStorage } from '@mantine/hooks';
@@ -105,6 +105,7 @@ export function AppLayout() {
       padding={0}
       classNames={{ navbar: classes.navbar, header: classes.header, main: classes.main }}
     >
+      <a href="#main" className="vt-skip-link">{t('app.nav.skip_to_main', 'Skip to main content')}</a>
       <AppShell.Header>
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
           <Group gap="sm" wrap="nowrap">
@@ -115,7 +116,7 @@ export function AppLayout() {
                 {collapsed ? <IconLayoutSidebarLeftExpand size={20} /> : <IconLayoutSidebarLeftCollapse size={20} />}
               </ActionIcon>
             </Tooltip>
-            <Title order={4} fw={650}>{title}</Title>
+            <Text fz={18} fw={650}>{title}</Text>
           </Group>
           <Group gap="xs" wrap="nowrap">
             {nav.some((n) => n.to === '/inbox') && (
@@ -198,7 +199,7 @@ export function AppLayout() {
         <Clock compact={collapsed} />
       </AppShell.Navbar>
 
-      <AppShell.Main className={classes.main}>
+      <AppShell.Main className={classes.main} id="main" tabIndex={-1}>
         <ThemeTrialBanner />
         <Outlet />
       </AppShell.Main>

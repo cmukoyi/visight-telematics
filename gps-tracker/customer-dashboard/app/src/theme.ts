@@ -89,6 +89,8 @@ const base = createTheme({
     Card: { defaultProps: { withBorder: true, radius: 'lg', padding: 'lg' } },
     Paper: { defaultProps: { radius: 'lg' } },
     Button: { defaultProps: { radius: 'md' } },
+    // Sentence case, not ALL CAPS ("Place entered", "25 Oct 2026")
+    Badge: { styles: { root: { textTransform: 'none' } } },
     // Dialogs (confirmations, temporary passwords) open in the middle of the screen, like the editors
     Modal: { defaultProps: { centered: true } },
   },

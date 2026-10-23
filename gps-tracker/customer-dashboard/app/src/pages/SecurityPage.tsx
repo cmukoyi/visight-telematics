@@ -296,7 +296,7 @@ export function SecurityPage() {
           <Anchor component={Link} to="/configuration" size="sm">Configuration</Anchor>
           <Text size="sm">Security</Text>
         </Breadcrumbs>
-        <Title order={2}>Security</Title>
+        <Title order={1} size="h2">Security</Title>
       </Stack>
       {tabs.length === 0 ? <Text c="dimmed">Your roles don’t include security settings.</Text> : (
         <Tabs value={tab} onChange={(v) => setParams(v ? { tab: v } : {}, { replace: true })} keepMounted={false}>

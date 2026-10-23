@@ -77,7 +77,7 @@ export function PlacesPage() {
           <Text size="sm">Places</Text>
         </Breadcrumbs>
         <Group justify="space-between">
-          <Title order={2}>Places</Title>
+          <Title order={1} size="h2">Places</Title>
           {manage && !draft && (
             <Button size="xs" leftSection={<IconPlus size={14} />} onClick={() => setDraft(newDraft())}>Add place</Button>
           )}

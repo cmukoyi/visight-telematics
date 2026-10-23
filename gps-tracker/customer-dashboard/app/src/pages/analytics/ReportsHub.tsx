@@ -22,7 +22,7 @@ function Hub() {
   if (params.get('run')) return <Navigate to={`reports?run=${params.get('run')}`} replace />;   // older links
   return (
     <Stack p="lg" gap="lg">
-      <Title order={2}>{tr('app.nav.reports', 'Reports')}</Title>
+      <Title order={1} size="h2">{tr('app.nav.reports', 'Reports')}</Title>
       <SimpleGrid cols={{ base: 2, sm: 3, lg: 4 }} spacing="lg" maw={980}>
         {TILES.map((t) => (
           <UnstyledButton key={t.to} className={classes.tile} onClick={() => navigate(t.to)}>

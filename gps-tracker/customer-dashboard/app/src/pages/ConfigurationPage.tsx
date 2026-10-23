@@ -27,7 +27,7 @@ import { ItemsPage, LookupPage, SchedulesPage, TypesPage, WorkshopsPage } from '
 import { DriversPage, FleetSettingsPage, TimeProfilesPage } from './PeoplePages';
 import { useMaintenanceCatalog } from '../api/maintenance';
 import { STATUS } from '../theme';
-import { ago, dateTime, vehicleName } from '../utils/format';
+import { ago, dateTime, plural, vehicleName } from '../utils/format';
 import { msg, useT, type Msg } from '../i18n';
 import classes from './ConfigurationPage.module.css';
 import { NotificationRulesPage } from './NotificationRulesPage';
@@ -100,7 +100,7 @@ function Header({ title }: { title: string }) {
         <Anchor component={Link} to="/configuration" size="sm">Configuration</Anchor>
         <Text size="sm">{title}</Text>
       </Breadcrumbs>
-      <Title order={2}>{title}</Title>
+      <Title order={1} size="h2">{title}</Title>
     </Stack>
   );
 }
@@ -113,7 +113,7 @@ function Tiles() {
   const sections = SECTIONS.map((sec) => ({ ...sec, items: sec.items.filter(allowed) })).filter((sec) => sec.items.length);
   return (
     <Stack p="lg" gap="lg">
-      <Title order={2}>{t('app.nav.configuration', 'Configuration')}</Title>
+      <Title order={1} size="h2">{t('app.nav.configuration', 'Configuration')}</Title>
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 3, xl: 4 }} spacing="md">
         {sections.map((sec) => (
           <Paper key={sec.title.key} className={classes.tile}>
@@ -226,7 +226,7 @@ function Devices() {
       <Group mb="sm" justify="space-between">
         <TextInput size="xs" w={280} placeholder="Search IMEI, description, registration, driver" leftSection={<IconSearch size={14} />}
                    value={search} onChange={(e) => setSearch(e.currentTarget.value)} />
-        <Text size="sm" c="dimmed">{shown.length} vehicles · the gear shows more columns</Text>
+        <Text size="sm" c="dimmed">{plural(shown.length, 'vehicle')}</Text>
       </Group>
       <Paper withBorder className={classes.gridCard}>
         <DataGrid rowData={shown} columnDefs={cols} loading={isFetching && !vehicles.length} getRowId={(p) => p.data.id}
@@ -392,7 +392,7 @@ function Groups() {
             {sgName(c.security_group_id)
               ? <Badge variant="light" leftSection={<IconShieldLock size={12} />}>{sgName(c.security_group_id)}</Badge>
               : <Badge variant="light" color="orange">No security group — admins only</Badge>}
-            <Text size="sm" c="dimmed" w={90} ta="right">{vehicles.filter((v) => v.category_name === c.name).length} vehicles</Text>
+            <Text size="sm" c="dimmed" w={90} ta="right">{plural(vehicles.filter((v) => v.category_name === c.name).length, 'vehicle')}</Text>
             <ActionIcon variant="subtle" onClick={() => open(c)} aria-label="Edit group"><IconPencil size={16} /></ActionIcon>
             <ActionIcon variant="subtle" color="red" onClick={() => remove(c)} aria-label="Delete group"><IconTrash size={16} /></ActionIcon>
           </Group>
@@ -519,7 +519,7 @@ export function AccountPage() {
   });
   return (
     <Stack p="lg" gap={0} className={classes.narrow}>
-      <Title order={2} mb="md">{t('app.account.title', 'My account')}</Title>
+      <Title order={1} size="h2" mb="md">{t('app.account.title', 'My account')}</Title>
       <Paper withBorder p="lg" mb="md">
         <Group gap="sm"><ThemeIcon variant="light" size="lg"><IconKey size={20} /></ThemeIcon>
           <div><Text fw={650}>{[user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.email}</Text>

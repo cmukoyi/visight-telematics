@@ -20,6 +20,7 @@ import { DataGrid } from '../../components/DataGrid';
 import { EditorShell, firstError } from '../../components/EditorShell';
 import { CheckList } from '../../components/FeaturePicker';
 import { TransferList } from '../../components/TransferList';
+import { plural } from '../../utils/format';
 import classes from '../CatalogPages.module.css';
 
 const SECTION = 'Vehicle Maintenance';
@@ -549,7 +550,7 @@ export function SchedulesPage() {
               <div>
                 <Text size="sm" fw={500} mb={6}>Vehicle types</Text>
                 <CheckList items={(catalog?.vehicle_type ?? []).map((t) => ({
-                  value: t.id, label: t.name, description: `${vehicles.filter((v) => v.type_id === t.id).length} vehicles` }))}
+                  value: t.id, label: t.name, description: plural(vehicles.filter((v) => v.type_id === t.id).length, 'vehicle') }))}
                            value={form.values.vehicle_type_ids} onChange={(v) => form.setFieldValue('vehicle_type_ids', v)} height={180}
                            empty="No vehicle types yet (Configuration → Vehicle Types)." />
               </div>

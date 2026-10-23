@@ -7,11 +7,12 @@ import { FleetMap, type FleetMapHandle, type MapRoute, type MapVehicle } from '.
 import { LiveTrack } from '../components/LiveTrack';
 import { ALL_VEHICLES, inGroup, toMapVehicle } from './vehicles';
 import { useT } from '../i18n';
+import { plural } from '../utils/format';
 import classes from './DashboardPage.module.css';
 
 function Kpi({ period, title, value, unit, group, icon: Icon, delta }: {
   period: string; title: string; value: string | number; unit?: string; group: string;
-  icon: typeof IconRoute; delta?: number | null;
+  icon: typeof IconRoute; delta?: number | 'new' | null;
 }) {
   const t = useT();
   return (
@@ -29,10 +30,15 @@ function Kpi({ period, title, value, unit, group, icon: Icon, delta }: {
       </Group>
       <Group justify="space-between" mt={6}>
         <Text size="xs" c="dimmed">{group}</Text>
-        {delta != null && Number.isFinite(delta) && (
+        {delta === 'new' ? (
+          <Badge size="sm" variant="light" color="teal" leftSection={<IconTrendingUp size={12} />}>
+            {t('app.dashboard.new_activity', 'New activity vs last week')}
+          </Badge>
+        ) : delta != null && Number.isFinite(delta) && (
           <Badge size="sm" variant="light" color={delta >= 0 ? 'teal' : 'orange'}
                  leftSection={delta >= 0 ? <IconTrendingUp size={12} /> : <IconTrendingDown size={12} />}>
-            {t('app.dashboard.vs_last_week', '{delta}% vs last week', { delta: `${delta >= 0 ? '+' : ''}${Math.round(delta)}` })}
+            {t('app.dashboard.vs_last_week', '{delta}% vs last week',
+               { delta: delta > 999 ? '> 999' : `${delta >= 0 ? '+' : ''}${Math.round(delta)}` })}
           </Badge>
         )}
       </Group>
@@ -95,14 +101,19 @@ export function DashboardPage() {
   const groupLabel = group === ALL_VEHICLES ? t('app.common.all_vehicles', 'All vehicles') : group;
   const cur = kpis?.current_week;
   const prev = kpis?.previous_week;
-  const pct = (a?: number, b?: number) => (a != null && b ? ((a - b) / b) * 100 : null);
+  // Week-on-week change; from (almost) nothing it's "new activity", not +132600%
+  const pct = (a?: number, b?: number): number | 'new' | null => {
+    if (a == null || b == null) return null;
+    if (b <= Math.abs(a) * 0.05) return a > 0 ? 'new' : null;
+    return ((a - b) / b) * 100;
+  };
 
   return (
     <Stack p="lg" gap="lg">
       <Group justify="space-between" wrap="wrap">
         <div>
-          <Title order={3}>{t('app.dashboard.title', 'Where is my fleet')}</Title>
-          <Text c="dimmed" size="sm">{t('app.dashboard.subtitle', '{count} vehicles · positions refresh every 15 s · click a vehicle to track it live', { count: inScope.length })}</Text>
+          <Title order={1} size="h3">{t('app.dashboard.title', 'Where is my fleet')}</Title>
+          <Text c="dimmed" size="sm">{t('app.dashboard.subtitle', '{vehicles} · positions refresh every 15 s · click a vehicle to track it live', { count: inScope.length, vehicles: plural(inScope.length, 'vehicle') })}</Text>
         </div>
         <Group gap="sm">
           <Badge size="lg" variant="dot" color="green">{t('app.status.n_active', '{count} active', { count: counts.active })}</Badge>

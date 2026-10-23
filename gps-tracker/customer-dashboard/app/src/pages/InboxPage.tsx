@@ -18,7 +18,7 @@ import { dateTime, vehicleName } from '../utils/format';
 import classes from './InboxPage.module.css';
 
 const TYPE_LABELS: Record<string, string> = {
-  tag_offline: 'Device offline', battery_low: 'Low battery', geofence_enter: 'Place entered', geofence_exit: 'Place exited',
+  tag_offline: 'Device offline', battery_low: 'Low battery', geofence_entry: 'Place entered', geofence_enter: 'Place entered', geofence_exit: 'Place exited',
   overspeed: 'Speeding', harsh_braking: 'Harsh braking', harsh_acceleration: 'Harsh acceleration', crash: 'Crash',
   towing: 'Towing', power_cut: 'Power cut', panic: 'Panic', package_expiry: 'Package expiry',
   maintenance_due: 'Maintenance due', maintenance_overdue: 'Maintenance overdue',
@@ -184,7 +184,7 @@ export function InboxPage() {
     <div className={classes.root}>
       <Group justify="space-between" mb="md" wrap="wrap">
         <Group gap="sm">
-          <Title order={2}>Inbox</Title>
+          <Title order={1} size="h2">Inbox</Title>
           {unread > 0 && <Badge color="red" variant="filled">{unread} unread</Badge>}
         </Group>
         <Group gap="xs">

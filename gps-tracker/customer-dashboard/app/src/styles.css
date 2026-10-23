@@ -83,3 +83,13 @@ html[data-vt-style='night'] .vt-grid {
 html[data-vt-style='night'] .recharts-cartesian-grid line { stroke: #3a3a3a; }
 html[data-vt-style='night'] .recharts-text { fill: #888888; }
 @media (max-width: 48em) { .vt-trial-banner { top: auto; bottom: 12px; } }
+
+/* Keyboard focus: one visible ring everywhere, distinct from the selected/active style (WCAG 2.4.7) */
+:focus-visible { outline: 2px solid var(--mantine-color-accent-5) !important; outline-offset: 2px; }
+.mantine-Input-input:focus-visible, .ag-cell:focus-visible, #main:focus-visible { outline-offset: 0; }
+#main:focus { outline: none !important; }
+.vt-skip-link {
+  position: fixed; left: 12px; top: -48px; z-index: 400; padding: 8px 14px; border-radius: 6px;
+  background: var(--mantine-color-body); color: var(--mantine-color-text); font-weight: 600;
+}
+.vt-skip-link:focus { top: 10px; }

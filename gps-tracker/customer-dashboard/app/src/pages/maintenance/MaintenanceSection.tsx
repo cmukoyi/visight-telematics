@@ -20,7 +20,7 @@ import {
 import { ConfigHeader } from '../../components/ConfigHeader';
 import { DataGrid } from '../../components/DataGrid';
 import { RangePicker, defaultRange } from '../../components/RangePicker';
-import { dateTime } from '../../utils/format';
+import { dateTime, plural } from '../../utils/format';
 import { msg, useT } from '../../i18n';
 import hub from '../analytics/ReportsHub.module.css';
 import classes from '../CatalogPages.module.css';
@@ -47,7 +47,7 @@ function Hub() {
   const tr = useT();
   return (
     <Stack p="lg" gap="lg">
-      <Title order={2}>{tr('app.nav.maintenance', 'Vehicle Maintenance')}</Title>
+      <Title order={1} size="h2">{tr('app.nav.maintenance', 'Vehicle Maintenance')}</Title>
       <SimpleGrid cols={{ base: 2, sm: 3, lg: 5 }} spacing="lg" maw={1200}>
         {TILES.map((t) => (
           <UnstyledButton key={t.to} className={hub.tile} onClick={() => navigate(t.to)}>
@@ -184,7 +184,7 @@ function Summary() {
     <Stack p="lg" gap={0} className={classes.page}>
       <Header title="Summary by Vehicle" description="Each vehicle’s current odometer, its next maintenance (booked or worked out from schedules) and its last completed one." />
       <Group mb="sm"><TextInput size="xs" w={260} placeholder="Search" leftSection={<IconSearch size={14} />} value={search}
-                                onChange={(e) => setSearch(e.currentTarget.value)} /><Text size="sm" c="dimmed">{shown.length} vehicles</Text></Group>
+                                onChange={(e) => setSearch(e.currentTarget.value)} /><Text size="sm" c="dimmed">{plural(shown.length, 'vehicle')}</Text></Group>
       <Paper withBorder className={classes.grid}>
         <DataGrid rowData={shown} columnDefs={cols} loading={isFetching && !rows.length} getRowId={(p) => p.data.imei} tooltipShowDelay={300}
                   stateKey="maintenance-summary" />

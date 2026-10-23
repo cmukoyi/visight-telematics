@@ -14,7 +14,7 @@ export function ConfigHeader({ section, title, description, children, root = '/c
       </Breadcrumbs>
       <Group justify="space-between" align="flex-end">
         <div>
-          <Title order={2}>{title}</Title>
+          <Title order={1} size="h2">{title}</Title>
           {description && <Text size="sm" c="dimmed">{description}</Text>}
         </div>
         {children && <Group gap="xs">{children}</Group>}

@@ -250,7 +250,7 @@ export function ReportsPage() {
   return (
     <Stack p="lg" gap="md" className={classes.root}>
       <Group justify="space-between">
-        <Title order={2}>Reports</Title>
+        <Title order={1} size="h2">Reports</Title>
         {canSchedule && <Button size="xs" leftSection={<IconPlus size={14} />} onClick={() => setScheduling({ report_key: 'trips' })}>Schedule a report</Button>}
       </Group>
       <Tabs value={tab} onChange={setTab} className={classes.tabs}>

@@ -168,7 +168,7 @@ export function NotificationRulesPage() {
         </Breadcrumbs>
         <Group justify="space-between">
           <div>
-            <Title order={2}>Notification Rules</Title>
+            <Title order={1} size="h2">Notification Rules</Title>
             <Text size="sm" c="dimmed">Alert when a vehicle enters or leaves a place, or reports an event such as speeding or harsh braking. Alerts appear in the Inbox; rules can also email.</Text>
           </div>
           {manage && <Button size="xs" leftSection={<IconPlus size={14} />} onClick={() => open('new')}>Add rule</Button>}
