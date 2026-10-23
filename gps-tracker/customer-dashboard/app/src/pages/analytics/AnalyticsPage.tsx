@@ -4,9 +4,9 @@ import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import {
   IconArrowLeft, IconArrowRight, IconCalendarRepeat, IconChartBar, IconCopy, IconDots, IconDownload, IconFileSpreadsheet,
-  IconFileTypePdf, IconPencil, IconPlus, IconTable, IconTrash,
+  IconFileTypePdf, IconLayoutDashboard, IconPencil, IconPlus, IconRestore, IconTable, IconTrash, IconTrashX,
 } from '@tabler/icons-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, download } from '../../api/client';
 import { analyticsBody, useAnalyticsPages, useAnalyticsQuery, useCan, useCategories, useVehicles, type Range } from '../../api/hooks';
 import { vehicleName } from '../../utils/format';
@@ -35,6 +35,83 @@ function downloadCsv(title: string, r: AnalyticsResult) {
   a.download = `${title || 'visual'}.csv`;
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+interface Template { key: string; name: string; date_preset: string; visuals: number; description: string }
+type DeletedPage = AnalyticsPageDef & { deleted_at: string; purge_at: string };
+
+/** The starting pages, to add again (with any expressions they need). */
+function TemplatesModal({ opened, onClose, onAdded }: { opened: boolean; onClose: () => void; onAdded: (p: AnalyticsPageDef) => void }) {
+  const { data: templates = [] } = useQuery({ queryKey: ['analytics-templates'], queryFn: () => api<Template[]>('/api/portal/analytics/templates'), enabled: opened });
+  const [busy, setBusy] = useState<string | null>(null);
+  const add = async (t: Template) => {
+    setBusy(t.key);
+    try { onAdded(await api<AnalyticsPageDef>('/api/portal/analytics/pages/from-template', { method: 'POST', json: { key: t.key } })); }
+    catch (e) { fail(e); } finally { setBusy(null); }
+  };
+  return (
+    <Modal opened={opened} onClose={onClose} title="New page from a template" size="lg">
+      <Text size="sm" c="dimmed" mb="sm">The starting pages — add any of them again, as often as you like. Expressions they use that were deleted come back too.</Text>
+      <Stack gap="xs">
+        {templates.map((t) => (
+          <Paper key={t.key} withBorder p="sm" radius="md">
+            <Group justify="space-between" wrap="nowrap">
+              <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+                <IconLayoutDashboard size={22} opacity={0.6} />
+                <div style={{ minWidth: 0 }}>
+                  <Text fw={600}>{t.name}</Text>
+                  <Text size="xs" c="dimmed">{t.description} · {t.visuals} visuals</Text>
+                </div>
+              </Group>
+              <Button size="xs" variant="light" style={{ flexShrink: 0 }} loading={busy === t.key} onClick={() => add(t)}>Add page</Button>
+            </Group>
+          </Paper>
+        ))}
+      </Stack>
+    </Modal>
+  );
+}
+
+/** Pages deleted in the last 30 days: restore, or delete for good. */
+function DeletedModal({ opened, onClose, onRestored }: { opened: boolean; onClose: () => void; onRestored: (p: AnalyticsPageDef) => void }) {
+  const qc = useQueryClient();
+  const { data: rows = [], isFetching } = useQuery({ queryKey: ['analytics-deleted'], queryFn: () => api<DeletedPage[]>('/api/portal/analytics/pages-deleted'), enabled: opened });
+  const refresh = () => qc.invalidateQueries({ queryKey: ['analytics-deleted'] });
+  const restore = async (p: DeletedPage) => {
+    try {
+      const r = await api<AnalyticsPageDef & { dropped_values: number }>(`/api/portal/analytics/pages/${p.id}/restore`, { method: 'POST' });
+      refresh();
+      notifications.show({ color: 'green', message: `${p.name} restored${r.dropped_values ? ` — ${r.dropped_values} value(s) used a deleted expression and were left out` : ''}` });
+      onRestored(r);
+    } catch (e) { fail(e); }
+  };
+  const purge = (p: DeletedPage) => modals.openConfirmModal({
+    title: `Delete “${p.name}” for good?`, children: <Text size="sm">It can't be restored after this.</Text>,
+    labels: { confirm: 'Delete for good', cancel: 'Cancel' }, confirmProps: { color: 'red' },
+    onConfirm: async () => { try { await api(`/api/portal/analytics/pages/${p.id}/permanent`, { method: 'DELETE' }); refresh(); } catch (e) { fail(e); } },
+  });
+  return (
+    <Modal opened={opened} onClose={onClose} title="Recently deleted pages" size="lg">
+      <Text size="sm" c="dimmed" mb="sm">Deleted pages are kept for 30 days.</Text>
+      {!rows.length && <Text size="sm" c="dimmed">{isFetching ? 'Loading…' : 'Nothing deleted recently.'}</Text>}
+      <Stack gap="xs">
+        {rows.map((p) => (
+          <Paper key={p.id} withBorder p="sm" radius="md">
+            <Group justify="space-between" wrap="nowrap">
+              <div>
+                <Text fw={600}>{p.name}</Text>
+                <Text size="xs" c="dimmed">{p.visuals.length} visuals · deleted {dayjs(p.deleted_at).format('D MMM YYYY HH:mm')} · kept until {dayjs(p.purge_at).format('D MMM')}</Text>
+              </div>
+              <Group gap={6} wrap="nowrap">
+                <Button size="xs" variant="light" leftSection={<IconRestore size={14} />} onClick={() => restore(p)}>Restore</Button>
+                <Tooltip label="Delete for good"><ActionIcon variant="subtle" color="red" onClick={() => purge(p)} aria-label="Delete for good"><IconTrashX size={16} /></ActionIcon></Tooltip>
+              </Group>
+            </Group>
+          </Paper>
+        ))}
+      </Stack>
+    </Modal>
+  );
 }
 
 /** One visual on the page: title, menu, and the chart (or its table). Clicking a vehicle group or vehicle drills into it. */
@@ -122,6 +199,13 @@ export function AnalyticsPage() {
   const range = useMemo(() => (preset === 'custom' && custom ? custom : periodRange(preset)), [preset, custom]);
   const [editing, setEditing] = useState<Visual | 'new' | null>(null);
   const [naming, setNaming] = useState<{ mode: 'new' | 'rename'; name: string } | null>(null);
+  const [dialog, setDialog] = useState<'templates' | 'deleted' | null>(null);
+  const opened = (p: AnalyticsPageDef) => {
+    qc.invalidateQueries({ queryKey: ['analytics-pages'] });
+    qc.invalidateQueries({ queryKey: ['analytics-expressions'] });
+    setPageId(p.id);
+    setDialog(null);
+  };
 
   const savePage = async (p: AnalyticsPageDef) => {
     qc.setQueryData<AnalyticsPageDef[]>(['analytics-pages'], (old) => old?.map((x) => (x.id === p.id ? p : x)));
@@ -168,7 +252,7 @@ export function AnalyticsPage() {
   };
   const deletePage = () => page && modals.openConfirmModal({
     title: `Delete page “${page.name}”?`, labels: { confirm: 'Delete page', cancel: 'Cancel' }, confirmProps: { color: 'red' },
-    children: <Text size="sm">Its {page.visuals.length} visuals are deleted with it. Expressions stay.</Text>,
+    children: <Text size="sm">It goes to Recently deleted (+ → Recently deleted…), where you can restore it for 30 days.</Text>,
     onConfirm: async () => { try { await api(`/api/portal/analytics/pages/${page.id}`, { method: 'DELETE' }); setPageId(null); qc.invalidateQueries({ queryKey: ['analytics-pages'] }); } catch (e) { fail(e); } },
   });
 
@@ -181,7 +265,17 @@ export function AnalyticsPage() {
             {pages.map((p) => (
               <UnstyledButton key={p.id} className={classes.pill} data-active={page?.id === p.id || undefined} onClick={() => setPageId(p.id)}>{p.name}</UnstyledButton>
             ))}
-            {manage && <Tooltip label="New page"><ActionIcon variant="default" radius="xl" size="lg" onClick={() => setNaming({ mode: 'new', name: '' })} aria-label="New page"><IconPlus size={16} /></ActionIcon></Tooltip>}
+            {manage && (
+              <Menu position="bottom-start" withinPortal>
+                <Menu.Target><Tooltip label="New page"><ActionIcon variant="default" radius="xl" size="lg" aria-label="New page"><IconPlus size={16} /></ActionIcon></Tooltip></Menu.Target>
+                <Menu.Dropdown>
+                  <Menu.Item leftSection={<IconPlus size={14} />} onClick={() => setNaming({ mode: 'new', name: '' })}>Blank page</Menu.Item>
+                  <Menu.Item leftSection={<IconLayoutDashboard size={14} />} onClick={() => setDialog('templates')}>From a template…</Menu.Item>
+                  <Menu.Divider />
+                  <Menu.Item leftSection={<IconRestore size={14} />} onClick={() => setDialog('deleted')}>Recently deleted…</Menu.Item>
+                </Menu.Dropdown>
+              </Menu>
+            )}
             {manage && page && (
               <Menu position="bottom-end" withinPortal>
                 <Menu.Target><ActionIcon variant="subtle" color="gray" radius="xl" size="lg" aria-label="Page options" ml="auto"><IconDots size={18} /></ActionIcon></Menu.Target>
@@ -226,6 +320,15 @@ export function AnalyticsPage() {
               </Breadcrumbs>
             )}
           </Paper>
+          {!page && (
+            <Paper withBorder p="xl" radius="lg"><Stack align="center" gap="xs">
+              <Text c="dimmed">There are no Analytics pages.</Text>
+              {manage && <Group>
+                <Button leftSection={<IconLayoutDashboard size={16} />} onClick={() => setDialog('templates')}>Add a starting page</Button>
+                <Button variant="default" leftSection={<IconRestore size={16} />} onClick={() => setDialog('deleted')}>Recently deleted</Button>
+              </Group>}
+            </Stack></Paper>
+          )}
           {page && page.visuals.length === 0 && (
             <Paper withBorder p="xl" radius="lg"><Stack align="center" gap="xs">
               <Text c="dimmed">This page has no visuals yet.</Text>
@@ -240,10 +343,16 @@ export function AnalyticsPage() {
                                                                             report_title: `${page.name} · ${v.title || 'Chart'}` }) : null}
                             onEdit={() => setEditing(v)} onMove={(d) => move(i, d)}
                             onDuplicate={() => setVisuals([...page.visuals.slice(0, i + 1), { ...v, id: Math.random().toString(36).slice(2, 14), title: `${v.title} (copy)` }, ...page.visuals.slice(i + 1)])}
-                            onDelete={() => modals.openConfirmModal({
-                              title: `Delete “${v.title || 'Untitled'}”?`, labels: { confirm: 'Delete', cancel: 'Cancel' }, confirmProps: { color: 'red' },
-                              onConfirm: () => setVisuals(page.visuals.filter((x) => x.id !== v.id)),
-                            })} />
+                            onDelete={() => {
+                              const before = page.visuals;
+                              setVisuals(before.filter((x) => x.id !== v.id));
+                              const id = `undo-${v.id}`;
+                              notifications.show({ id, autoClose: 8000, message: (
+                                <Group justify="space-between" wrap="nowrap">
+                                  <Text size="sm">“{v.title || 'Untitled'}” deleted</Text>
+                                  <Button size="compact-xs" variant="light" onClick={() => { setVisuals(before); notifications.hide(id); }}>Undo</Button>
+                                </Group>) });
+                            }} />
               ))}
             </div>
           )}
@@ -254,6 +363,8 @@ export function AnalyticsPage() {
           )}
         </>
       )}
+      <TemplatesModal opened={dialog === 'templates'} onClose={() => setDialog(null)} onAdded={opened} />
+      <DeletedModal opened={dialog === 'deleted'} onClose={() => setDialog(null)} onRestored={opened} />
       {scheduling && <ScheduleModal key={scheduling.visual_id} editing={scheduling} onClose={() => setScheduling(null)} />}
       <VisualEditor opened={!!editing} visual={editing === 'new' ? null : editing} range={range} category={category}
                     onSave={saveVisual} onClose={() => setEditing(null)} />

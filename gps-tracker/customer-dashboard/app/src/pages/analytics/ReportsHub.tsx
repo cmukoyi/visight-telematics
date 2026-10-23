@@ -1,8 +1,9 @@
 import { Navigate, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom';
 import { SimpleGrid, Stack, Text, Title, UnstyledButton } from '@mantine/core';
-import { IconChartPie, IconFileAnalytics, IconMathFunction } from '@tabler/icons-react';
+import { IconChartPie, IconFileAnalytics, IconFileSettings, IconMathFunction } from '@tabler/icons-react';
 import { ReportsPage } from '../ReportsPage';
 import { AnalyticsPage } from './AnalyticsPage';
+import { CustomReportsPage } from './CustomReportsPage';
 import { ExpressionsPage } from './ExpressionsPage';
 import { msg, useT } from '../../i18n';
 import classes from './ReportsHub.module.css';
@@ -11,6 +12,7 @@ const TILES = [
   { to: 'reports', title: msg('app.reports.reports', 'Reports'), description: msg('app.reports.reports_desc', 'Run, download and schedule reports'), icon: IconFileAnalytics },
   { to: 'expressions', title: msg('app.reports.expressions', 'Expressions'), description: msg('app.reports.expressions_desc', 'Your own calculations, e.g. exceptions per 100 km'), icon: IconMathFunction },
   { to: 'analytics', title: msg('app.reports.analytics', 'Analytics'), description: msg('app.reports.analytics_desc', 'Charts, tables and figures about your fleet'), icon: IconChartPie },
+  { to: 'custom', title: msg('app.reports.custom', 'Custom Reports'), description: msg('app.reports.custom_desc', 'Design your own reports: rows, columns, parameters; run or schedule them'), icon: IconFileSettings },
 ];
 
 function Hub() {
@@ -42,6 +44,7 @@ export function ReportsSection() {
       <Route path="reports" element={<ReportsPage />} />
       <Route path="expressions" element={<ExpressionsPage />} />
       <Route path="analytics" element={<AnalyticsPage />} />
+      <Route path="custom" element={<CustomReportsPage />} />
       <Route path="*" element={<Navigate to="/reports" replace />} />
     </Routes>
   );

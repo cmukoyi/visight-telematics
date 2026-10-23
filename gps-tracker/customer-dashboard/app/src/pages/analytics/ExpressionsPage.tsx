@@ -169,6 +169,13 @@ export function ExpressionsPage() {
     <Stack p="lg" gap={0}>
       <ConfigHeader section="Reports" title="Expressions" root="/reports" rootLabel="Reports"
                     description="Your own calculations over the data we collect, e.g. exceptions per 100 km. Use them as values in Analytics.">
+        {manage && <Button size="xs" variant="default" onClick={async () => {
+          try {
+            const r = await api<{ added: number }>('/api/portal/analytics/expressions/restore', { method: 'POST' });
+            qc.invalidateQueries({ queryKey: ['analytics-expressions'] });
+            notifications.show({ message: r.added ? `${r.added} starting expression(s) restored` : 'All the starting expressions are here' });
+          } catch (e) { notifications.show({ color: 'red', message: (e as Error).message }); }
+        }}>Restore starting expressions</Button>}
         {manage && <Button size="xs" leftSection={<IconPlus size={14} />} onClick={() => setEditing('new')}>New expression</Button>}
       </ConfigHeader>
       <div className={classes.exprLayout}>

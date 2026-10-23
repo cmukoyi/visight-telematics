@@ -41,6 +41,7 @@ PERMISSIONS: dict = {
     "rules.manage":          ("Notification rules", "Alerts", "Create and edit notification rules, including email subscriptions."),
     "reports.view":          ("Run reports", "Reports", "Run, view and download reports."),
     "reports.schedule":      ("Schedule reports", "Reports", "Email reports to people on a schedule."),
+    "reports.design":        ("Design custom reports", "Reports", "Create and change Custom reports: their columns, parameters and file type."),
     "analytics.manage":      ("Build analytics", "Reports", "Add and change Analytics pages, charts and Expressions (everyone who can run reports can view them)."),
     "maintenance.view":      ("See maintenance", "Maintenance", "See due and overdue maintenance, jobs, costs and fault codes (DTC)."),
     "maintenance.manage":    ("Record maintenance", "Maintenance", "Book, start and complete maintenance jobs and record their costs."),
@@ -95,7 +96,7 @@ DEFAULT_ROLES: dict = {
                          ["map.view", "history.view", "events.view", "inbox.view", "reports.view", "reports.schedule",
                           "maintenance.view", "maintenance.manage"], False),
     "Reporting User": ("Runs and schedules reports, builds analytics, and receives alerts",
-                       ["reports.view", "reports.schedule", "analytics.manage", "inbox.view"], False),
+                       ["reports.view", "reports.schedule", "reports.design", "analytics.manage", "inbox.view"], False),
     "MZone Driver": ("Sees their vehicles on the map, live, with their trips",
                      ["map.view", "live.track", "history.view"], False),
 }

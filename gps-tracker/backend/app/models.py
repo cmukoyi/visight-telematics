@@ -685,3 +685,4 @@ class AnalyticsPage(Base):
     created_by   = Column(UUID(as_uuid=True), ForeignKey("portal_users.id", ondelete="SET NULL"), nullable=True)
     created_at   = Column(DateTime(timezone=True), server_default=func.now())
     updated_at   = Column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at   = Column(DateTime(timezone=True), nullable=True)   # in "Recently deleted" (restorable for 30 days)

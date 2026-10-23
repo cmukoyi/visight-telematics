@@ -1,0 +1,32 @@
+.library { display: grid; grid-template-columns: 240px 300px minmax(0, 1fr); gap: var(--mantine-spacing-sm); align-items: start; }
+.pane { overflow: hidden; max-height: calc(100dvh - 210px); overflow-y: auto; }
+.detail { min-height: 400px; }
+.cat { display: flex; justify-content: space-between; gap: 8px; width: 100%; padding: 7px 12px; font-size: var(--mantine-font-size-sm); }
+.cat span:last-child { color: var(--mantine-color-dimmed); }
+.cat:hover, .report:hover, .colRow:hover { background: var(--mantine-color-default-hover); }
+.cat[data-active], .report[data-active] { background: color-mix(in srgb, var(--mantine-color-brand-5) 18%, transparent); font-weight: 600; }
+.report { display: block; width: 100%; padding: 8px 12px; border-bottom: 1px solid var(--mantine-color-default-border); }
+
+.wizardContent { height: min(900px, 94dvh); }
+.wizardBody { height: 100%; padding: 0; }
+.wizard { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); height: 100%; }
+.wizardMain { display: flex; flex-direction: column; padding: var(--mantine-spacing-lg); min-height: 0; border-right: 1px solid var(--mantine-color-default-border); }
+.stepBody { flex: 1; min-height: 0; }
+.previewPane { padding: var(--mantine-spacing-lg); overflow-y: auto; background: color-mix(in srgb, var(--mantine-color-default) 60%, transparent); }
+.entity { display: block; padding: 10px 12px; border: 1px solid var(--mantine-color-default-border); border-radius: var(--mantine-radius-md); text-align: left; }
+.entity:hover { background: var(--mantine-color-default-hover); }
+.entity[data-active] { border-color: var(--mantine-color-brand-5); background: color-mix(in srgb, var(--mantine-color-brand-5) 15%, transparent); }
+.chip { cursor: pointer; }
+.options { border-top: 1px solid var(--mantine-color-default-border); }
+.paramRow { border-bottom: 1px solid var(--mantine-color-default-border); }
+
+.picker { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: var(--mantine-spacing-sm); }
+.pickerCats { border-right: 1px solid var(--mantine-color-default-border); }
+.colRow { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 6px 10px; }
+.colRow[data-chosen] { opacity: 0.4; }
+
+@media (max-width: 62em) {
+  .library { grid-template-columns: 1fr; }
+  .wizard { grid-template-columns: 1fr; }
+  .wizardMain { border-right: 0; }
+}

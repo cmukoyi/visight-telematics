@@ -493,7 +493,8 @@ def _require_reports_admin(me):
 def list_schedules(request: Request, db: Session = Depends(get_db)):
     me = get_portal_user_from_request(request, db)
     _require_reports_admin(me)
-    rows = (db.query(ReportSchedule).filter(ReportSchedule.usergroup_id == me.usergroup_id)
+    rows = (db.query(ReportSchedule).filter(ReportSchedule.usergroup_id == me.usergroup_id,
+                                            ReportSchedule.report_key != "custom")   # custom reports keep theirs on the report
             .order_by(ReportSchedule.created_at.desc()).all())
     return [_schedule_out(s, db) for s in rows]
 

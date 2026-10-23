@@ -275,11 +275,16 @@ def list_expressions(request: Request, db: Session = Depends(get_db)):
 def _expression_use(db: Session, group_id) -> dict:
     """{"expr:<id>": ["Page · Visual", ...]}"""
     out = {}
-    for page in db.query(AnalyticsPage).filter(AnalyticsPage.usergroup_id == group_id):
+    for page in db.query(AnalyticsPage).filter(AnalyticsPage.usergroup_id == group_id, AnalyticsPage.deleted_at.is_(None)):
         for v in page.visuals or []:
             for m in v.get("measures") or []:
                 if m.startswith("expr:"):
                     out.setdefault(m, []).append(f"{page.name} · {v.get('title') or 'Untitled'}")
+    from app.models_reports import CustomReport
+    for r in db.query(CustomReport).filter(CustomReport.usergroup_id == group_id):
+        for c in r.columns or []:
+            if str(c.get("key", "")).startswith("expr:"):
+                out.setdefault(c["key"], []).append(f"Custom report · {r.title}")
     return out
 
 
@@ -415,7 +420,7 @@ def _page_out(p: AnalyticsPage) -> dict:
 
 
 def _own_page(db: Session, me: PortalUser, page_id: str) -> AnalyticsPage:
-    p = db.query(AnalyticsPage).filter(AnalyticsPage.id == _uuid(page_id, "Page"),
+    p = db.query(AnalyticsPage).filter(AnalyticsPage.id == _uuid(page_id, "Page"), AnalyticsPage.deleted_at.is_(None),
                                        AnalyticsPage.usergroup_id == me.usergroup_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Page not found")
@@ -442,7 +447,8 @@ def _check_visual_measures(db: Session, me: PortalUser, data: PageIn) -> None:
 def list_pages(request: Request, db: Session = Depends(get_db)):
     me, _ = _me(request, db)
     ensure_defaults(db, me.usergroup_id, me.id)
-    rows = db.query(AnalyticsPage).filter(AnalyticsPage.usergroup_id == me.usergroup_id).order_by(AnalyticsPage.position, AnalyticsPage.name).all()
+    rows = (db.query(AnalyticsPage).filter(AnalyticsPage.usergroup_id == me.usergroup_id, AnalyticsPage.deleted_at.is_(None))
+            .order_by(AnalyticsPage.position, AnalyticsPage.name).all())
     return [_page_out(p) for p in rows]
 
 
@@ -470,6 +476,132 @@ def update_page(page_id: str, data: PageIn, request: Request, db: Session = Depe
 
 @router.delete("/pages/{page_id}", status_code=204)
 def delete_page(page_id: str, request: Request, db: Session = Depends(get_db)):
+    """Move the page to Recently deleted (restorable for KEEP_DELETED_DAYS)."""
     me, _ = _me(request, db, manage=True)
-    db.delete(_own_page(db, me, page_id))
+    _own_page(db, me, page_id).deleted_at = datetime.now(timezone.utc)
     db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Getting things back: recently deleted pages, starting pages (templates), starting expressions
+# ---------------------------------------------------------------------------
+
+KEEP_DELETED_DAYS = 30
+
+
+@router.get("/pages-deleted")
+def deleted_pages(request: Request, db: Session = Depends(get_db)):
+    me, _ = _me(request, db)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=KEEP_DELETED_DAYS)
+    db.query(AnalyticsPage).filter(AnalyticsPage.usergroup_id == me.usergroup_id,
+                                   AnalyticsPage.deleted_at < cutoff).delete(synchronize_session=False)
+    db.commit()
+    rows = (db.query(AnalyticsPage).filter(AnalyticsPage.usergroup_id == me.usergroup_id, AnalyticsPage.deleted_at.isnot(None))
+            .order_by(AnalyticsPage.deleted_at.desc()).all())
+    return [{**_page_out(p), "deleted_at": p.deleted_at,
+             "purge_at": p.deleted_at + timedelta(days=KEEP_DELETED_DAYS)} for p in rows]
+
+
+@router.post("/pages/{page_id}/restore")
+def restore_page(page_id: str, request: Request, db: Session = Depends(get_db)):
+    me, _ = _me(request, db, manage=True)
+    p = db.query(AnalyticsPage).filter(AnalyticsPage.id == _uuid(page_id, "Page"), AnalyticsPage.usergroup_id == me.usergroup_id,
+                                       AnalyticsPage.deleted_at.isnot(None)).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Page not found in Recently deleted")
+    missing = [m for v in p.visuals or [] for m in v.get("measures") or []
+               if m.startswith("expr:") and m[5:] not in _expressions(db, me.usergroup_id)]
+    p.deleted_at = None
+    if missing:   # an expression it used has gone since: keep the page, drop the values that can't work
+        p.visuals = [{**v, "measures": [m for m in v.get("measures") or [] if m not in missing]} for v in p.visuals]
+    last = db.query(func.max(AnalyticsPage.position)).filter(AnalyticsPage.usergroup_id == me.usergroup_id,
+                                                             AnalyticsPage.deleted_at.is_(None)).scalar()
+    p.position = (last or 0) + 1
+    db.commit()
+    return {**_page_out(p), "dropped_values": len(missing)}
+
+
+@router.delete("/pages/{page_id}/permanent", status_code=204)
+def delete_page_permanently(page_id: str, request: Request, db: Session = Depends(get_db)):
+    me, _ = _me(request, db, manage=True)
+    db.query(AnalyticsPage).filter(AnalyticsPage.id == _uuid(page_id, "Page"), AnalyticsPage.usergroup_id == me.usergroup_id,
+                                   AnalyticsPage.deleted_at.isnot(None)).delete(synchronize_session=False)
+    db.commit()
+
+
+def _all_starting_expressions() -> list:
+    return list(an.DEFAULT_EXPRESSIONS) + list(an.FLEET_EXPRESSIONS)
+
+
+def _ensure_expressions(db: Session, group_id, user_id=None) -> tuple:
+    """Add any starting expression the group no longer has (matched by name). ({name: "expr:<id>"}, added count)"""
+    have = {e.name: e for e in db.query(AnalyticsExpression).filter(AnalyticsExpression.usergroup_id == group_id)}
+    added = 0
+    for name, category, expression, description, unit, decimals in _all_starting_expressions():
+        if name not in have:
+            have[name] = AnalyticsExpression(usergroup_id=group_id, name=name, category=category, expression=expression,
+                                             description=description or None, unit=unit or None, decimals=decimals,
+                                             created_by=user_id)
+            db.add(have[name])
+            added += 1
+    db.flush()
+    return {name: f"expr:{e.id}" for name, e in have.items()}, added
+
+
+def _templates(ids: dict) -> list:
+    """[(key, name, preset, visuals)] — every starting page."""
+    import re
+    pages = list(an.fleet_pages(ids)) + list(an.default_pages(ids))
+    return [(re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_"), name, preset, visuals) for name, preset, visuals in pages]
+
+
+@router.get("/templates")
+def templates(request: Request, db: Session = Depends(get_db)):
+    """The starting pages, to add again at any time."""
+    _me(request, db)
+    dummy = {name: "expr:x" for name, *_ in _all_starting_expressions()}
+    descriptions = {
+        "fleet_dashboard": "TCO, distance, speeding, idling, after hours, driving scores, top and worst drivers, vehicles",
+        "fleet_cost": "Monthly fleet cost by category, cost by vehicle group",
+        "utilisation_and_availability": "Vehicles and drivers used and available, exceptions per hour",
+        "fleet_overview": "Trips, distance, driving time and vehicles",
+        "driver_behaviour": "Exceptions per 100 km, speeding and harsh driving by week and driver",
+        "utilisation": "Utilisation and downtime, trips by hour, distance by weekday",
+    }
+    return [{"key": key, "name": name, "date_preset": preset, "visuals": len(visuals), "description": descriptions.get(key, "")}
+            for key, name, preset, visuals in _templates(dummy)]
+
+
+class TemplateIn(BaseModel):
+    key: str
+
+
+@router.post("/pages/from-template", status_code=201)
+def page_from_template(data: TemplateIn, request: Request, db: Session = Depends(get_db)):
+    """Add a starting page again (with any expressions it needs that were deleted)."""
+    me, _ = _me(request, db, manage=True)
+    ids, _ = _ensure_expressions(db, me.usergroup_id, me.id)
+    found = next((t for t in _templates(ids) if t[0] == data.key), None)
+    if not found:
+        raise HTTPException(status_code=404, detail="Unknown template")
+    _, name, preset, visuals = found
+    taken = {n for (n,) in db.query(AnalyticsPage.name).filter(AnalyticsPage.usergroup_id == me.usergroup_id,
+                                                              AnalyticsPage.deleted_at.is_(None))}
+    title, n = name, 2
+    while title in taken:
+        title, n = f"{name} ({n})", n + 1
+    last = db.query(func.max(AnalyticsPage.position)).filter(AnalyticsPage.usergroup_id == me.usergroup_id).scalar()
+    p = AnalyticsPage(usergroup_id=me.usergroup_id, name=title, date_preset=preset, visuals=visuals,
+                      position=(last or 0) + 1, created_by=me.id)
+    db.add(p)
+    db.commit()
+    return _page_out(p)
+
+
+@router.post("/expressions/restore")
+def restore_expressions(request: Request, db: Session = Depends(get_db)):
+    """Add back any starting expression (scores, CPK, utilisation …) that was deleted."""
+    me, _ = _me(request, db, manage=True)
+    _, added = _ensure_expressions(db, me.usergroup_id, me.id)
+    db.commit()
+    return {"added": added}

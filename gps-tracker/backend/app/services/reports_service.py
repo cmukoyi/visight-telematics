@@ -342,10 +342,16 @@ def _text(v) -> str:
     return _latin(v)
 
 
-def _pdf(title: str, cols: list, rows: list, subtitle: Optional[str], logo: Optional[str]) -> bytes:
-    """A landscape A4 table: logo, title and subtitle, then the rows with the header repeated on every page."""
+def _rgb(hex_colour: Optional[str]):
+    h = (hex_colour or "").lstrip("#")
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4)) if len(h) == 6 else None
+
+
+def _pdf(title: str, cols: list, rows: list, subtitle: Optional[str], logo: Optional[str],
+         styles: Optional[list] = None, orientation: str = "landscape") -> bytes:
+    """An A4 table: logo, title and subtitle, then the rows with the header repeated on every page."""
     from fpdf import FPDF
-    pdf = FPDF(orientation="L", unit="mm", format="A4")
+    pdf = FPDF(orientation="P" if orientation == "portrait" else "L", unit="mm", format="A4")
     pdf.set_auto_page_break(auto=True, margin=12)
     pdf.add_page()
     if logo and logo.startswith(("data:image/png", "data:image/jpeg", "data:image/jpg")):
@@ -382,10 +388,13 @@ def _pdf(title: str, cols: list, rows: list, subtitle: Optional[str], logo: Opti
         heading = table.row()
         for c in cols:
             heading.cell(_latin(c))
-        for r in rows:
+        for n, r in enumerate(rows):
             row = table.row()
+            style = styles[n] if styles and n < len(styles) else None
             for i in range(len(cols)):
-                row.cell(_text(r[i] if i < len(r) else ""))
+                bg, fg = ((style["cells"].get(i) or style["row"] or (None, None)) if style else (None, None))
+                face = FontFace(fill_color=_rgb(bg), color=_rgb(fg)) if (bg or fg) else None
+                row.cell(_text(r[i] if i < len(r) else ""), style=face)
     pdf.set_font("Helvetica", "", 7)
     pdf.set_text_color(130, 130, 130)
     pdf.cell(0, 6, f"{len(rows)} rows", new_x="LMARGIN", new_y="NEXT")
@@ -429,10 +438,14 @@ def result_table(result: dict) -> tuple:
 
 
 def to_file(title: str, cols: list, rows: list, fmt: str,
-            subtitle: Optional[str] = None, logo: Optional[str] = None) -> tuple[bytes, str, str]:
-    """(content, mime type, extension). Excel files get a heading (logo, title, subtitle) when given."""
+            subtitle: Optional[str] = None, logo: Optional[str] = None, styles: Optional[list] = None,
+            orientation: str = "landscape") -> tuple[bytes, str, str]:
+    """(content, mime type, extension). Excel files get a heading (logo, title, subtitle) when given.
+
+    styles: per row {"row": (bg, fg) | None, "cells": {col index: (bg, fg)}} — conditional colours (Excel, PDF).
+    """
     if fmt == "pdf":
-        return _pdf(title, cols, rows, subtitle, logo), "application/pdf", "pdf"
+        return _pdf(title, cols, rows, subtitle, logo, styles, orientation), "application/pdf", "pdf"
     if fmt == "csv":
         buf = io.StringIO()
         writer = csv.writer(buf)
@@ -461,8 +474,18 @@ def to_file(title: str, cols: list, rows: list, fmt: str,
     ws.append(cols)
     for cell in ws[header_row]:
         cell.font = Font(bold=True)
-    for row in rows:
+    from openpyxl.styles import PatternFill
+    for n, row in enumerate(rows):
         ws.append(row)
+        style = (styles or [None] * len(rows))[n] if styles else None
+        if style:
+            for i in range(len(cols)):
+                bg, fg = style["cells"].get(i) or style["row"] or (None, None)
+                cell = ws.cell(row=ws.max_row, column=i + 1)
+                if bg:
+                    cell.fill = PatternFill("solid", fgColor=bg.lstrip("#").upper())
+                if fg:
+                    cell.font = Font(color=fg.lstrip("#").upper())
     for i, col in enumerate(cols, start=1):
         width = max([len(str(col))] + [len(str(r[i - 1])) for r in rows[:500]]) + 2
         ws.column_dimensions[ws.cell(row=header_row, column=i).column_letter].width = min(width, 50)
@@ -512,10 +535,38 @@ def _creator_scope(db: Session, schedule: ReportSchedule) -> Optional[set]:
     return access_service.for_user(creator, db).visible_imeis(db)
 
 
+def _run_custom(db: Session, schedule: ReportSchedule, email_service, start: datetime, end: datetime, tz: ZoneInfo) -> str:
+    """A scheduled custom report: generate it (kept in the report's history) and e-mail the file."""
+    from uuid import UUID
+    from app.models_reports import CustomReport
+    from app.routes_custom_reports import generate
+    params = schedule.params or {}
+    report = db.query(CustomReport).filter(CustomReport.id == UUID(params["report_id"]),
+                                           CustomReport.usergroup_id == schedule.usergroup_id).first()
+    if not report:
+        return "failed: the report was deleted"
+    values = {**(params.get("values") or {}), "date_range": (start, end)}
+    run = generate(db, report, values, start, end, only=_creator_scope(db, schedule), created_by="schedule",
+                   schedule_id=schedule.id, file_name=params.get("file_name"), compress=bool(params.get("compress")))
+    if run.status != "done":
+        return f"failed: {run.error}"
+    period = f"{start.astimezone(tz):%d %b %Y}" + (
+        "" if schedule.frequency == "daily" else f" – {(end - timedelta(seconds=1)).astimezone(tz):%d %b %Y}")
+    name = schedule.name or report.title
+    subject = params.get("subject") or f"{name} — {period}"
+    text_body = params.get("body") or f"Your {schedule.frequency} report \"{name}\" for {period} is attached ({run.rows} rows)."
+    html_body = "".join(f"<p>{line}</p>" for line in text_body.splitlines() if line.strip())
+    sent = sum(email_service.send_report_email(to, subject, text_body, html_body, run.file_name, run.content, run.mime)
+               for to in schedule.recipients or [])
+    return f"sent to {sent}/{len(schedule.recipients or [])} recipients ({run.rows} rows)"
+
+
 def run_schedule(db: Session, schedule: ReportSchedule, email_service, now: datetime) -> str:
     tz = ZoneInfo(schedule.timezone)
     start, end = period_for(schedule.frequency, now, tz)
     params = schedule.params or {}
+    if schedule.report_key == "custom":
+        return _run_custom(db, schedule, email_service, start, end, tz)
     if schedule.report_key == ANALYTICS_KEY:
         title, cols, rows = analytics_table(db, schedule.usergroup_id, params.get("page_id"), params.get("visual_id"), start, end,
                                             schedule.timezone, only=_creator_scope(db, schedule),
