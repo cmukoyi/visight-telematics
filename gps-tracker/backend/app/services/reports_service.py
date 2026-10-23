@@ -73,13 +73,15 @@ def report_trips(db, group_id, devices, start, end, tz):
     rates = vehicle_fuel.group_rates(db, group_id)
     vehicle, by_id = _drivers(db, group_id)
     rows = []
-    for t in _trips_q(db, group_id, devices, start, end).limit(MAX_ROWS):
+    trips = _trips_q(db, group_id, devices, start, end).limit(MAX_ROWS).all()
+    where = _describer(db, group_id, trips)
+    for t in trips:
         fuel = vehicle_fuel.litres(t.distance_m, rates.get(t.imei))
         rows.append([devices.get(t.imei, t.imei), t.imei, _trip_driver(t, vehicle, by_id), _local(t.started_at, tz),
                      _local(t.ended_at, tz) if t.ended_at else "in progress", _dur(t.duration_s),
                      round((t.distance_m or 0) / 1000, 2), "" if fuel is None else fuel, t.max_speed, t.avg_speed or "",
                      t.speeding_count, t.harsh_braking_count, t.harsh_acceleration_count, t.harsh_cornering_count,
-                     t.start_address or "", t.end_address or "",
+                     *where(t),
                      f"{t.start_latitude:.5f}, {t.start_longitude:.5f}" if t.start_latitude is not None else "",
                      f"{t.end_latitude:.5f}, {t.end_longitude:.5f}" if t.end_latitude is not None else ""])
     return cols, rows
@@ -171,6 +173,15 @@ def _speed(e) -> int:
     return int(v) if isinstance(v, (int, float)) and v > 0 else int(e.speed or 0)
 
 
+def _describer(db, group_id, trips):
+    """(start, end) location text of a trip in the group's Location Description Format."""
+    from app.services.address_service import Describer
+    describe = Describer(db, group_id).prefetch(
+        [(t.start_latitude, t.start_longitude) for t in trips] + [(t.end_latitude, t.end_longitude) for t in trips])
+    return lambda t: (describe(t.start_latitude, t.start_longitude, t.start_address) if t.start_address is not None else "",
+                      describe(t.end_latitude, t.end_longitude, t.end_address) if t.end_address is not None else "")
+
+
 def report_speeding(db, group_id, devices, start, end, tz):
     from app.services import address_service
     cols = ["Vehicle", "IMEI", "Driver", "Time", "Speed (km/h)", "Location", "Latitude", "Longitude"]
@@ -178,11 +189,12 @@ def report_speeding(db, group_id, devices, start, end, tz):
     events = _events(db, group_id, devices, start, end, ["overspeed"]).all()
     trips = {t.id: t for t in db.query(Trip).filter(Trip.id.in_({e.trip_id for e in events if e.trip_id}))} if events else {}
     rows = []
+    describe = address_service.Describer(db, group_id).prefetch((e.latitude, e.longitude) for e in events)
     for e in events:
         t = trips.get(e.trip_id)
         driver = _trip_driver(t, vehicle, by_id) if t else vehicle.get(e.imei, "")
         rows.append([devices.get(e.imei, e.imei), e.imei, driver, _local(e.recorded_at, tz), _speed(e),
-                     address_service.cached(db, e.latitude, e.longitude) or "",
+                     describe(e.latitude, e.longitude) or "",
                      e.latitude, e.longitude])
     return cols, rows
 
@@ -250,13 +262,13 @@ def report_after_hours_trips(db, group_id, devices, start, end, tz):
             "After-hours distance (km)", "Start location", "End location"]
     vehicle, by_id = _drivers(db, group_id)
     rows = []
-    for t, inside, outside, _ in _after_hours(db, group_id, devices, start, end, tz):
-        if outside <= 0:
-            continue
+    trips = [x for x in _after_hours(db, group_id, devices, start, end, tz) if x[2] > 0]
+    where = _describer(db, group_id, [x[0] for x in trips])
+    for t, inside, outside, _ in trips:
         km, total = (t.distance_m or 0) / 1000, inside + outside
         rows.append([devices.get(t.imei, t.imei), t.imei, _trip_driver(t, vehicle, by_id), _local(t.started_at, tz),
                      _local(t.ended_at, tz) if t.ended_at else "in progress", _dur(t.duration_s), _dur(outside),
-                     round(km, 2), round(km * outside / total, 2) if total else 0, t.start_address or "", t.end_address or ""])
+                     round(km, 2), round(km * outside / total, 2) if total else 0, *where(t)])
     return cols, rows
 
 

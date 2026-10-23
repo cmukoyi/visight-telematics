@@ -283,7 +283,11 @@ export interface GroupTheme {
   history_retention_days?: number | null;
   theme_settings: ThemeSettings | null;
   default_language?: string | null;
+  /** Location Description Format: the address parts shown for positions (null = landmark, road, suburb, town). */
+  location_format?: LocationPart[] | null;
 }
+
+export type LocationPart = 'landmark_distance' | 'landmark' | 'poi' | 'road' | 'suburb' | 'town' | 'postal_code' | 'province' | 'country';
 
 /** White-label look for a user group (Configuration → Users → Custom Themes). */
 export interface ThemeSettings {

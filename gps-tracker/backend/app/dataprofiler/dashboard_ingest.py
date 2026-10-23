@@ -18,6 +18,7 @@ TRIP_BUILD_INTERVAL_S, turning stored events into trips.
 import asyncio
 import json
 import logging
+import os
 from datetime import datetime, timezone
 
 import aio_pika
@@ -131,7 +132,8 @@ ADDRESS_INTERVAL_S = 20
 
 def _fill_addresses() -> int:
     with SessionLocal() as db:
-        return address_service.fill_trip_addresses(db) + address_service.fill_vehicle_addresses(db)
+        return (address_service.fill_trip_addresses(db) + address_service.fill_vehicle_addresses(db)
+                + address_service.fill_missing_parts(db, limit=20 if os.getenv("MAPTILER_KEY") else 3))
 
 
 async def address_loop() -> None:

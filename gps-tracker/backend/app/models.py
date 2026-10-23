@@ -255,6 +255,7 @@ class UserGroup(Base):
     timezone              = Column(String(64), nullable=True)    # IANA name, e.g. 'Africa/Johannesburg'
     # Data retention
     history_retention_days = Column(Integer, nullable=True, default=365)  # days to keep tag history
+    location_format = Column(JSON, nullable=True)   # address parts to show (address_service.LOCATION_PARTS); NULL = default
     # SMS add-on
     sms_enabled       = Column(Boolean, nullable=False, default=False)  # tenant-level SMS on/off
     sms_monthly_limit = Column(Integer, nullable=True)                  # NULL = no limit

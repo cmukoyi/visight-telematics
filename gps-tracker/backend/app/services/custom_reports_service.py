@@ -197,7 +197,7 @@ def _expr_values(expressions: dict, measures: list, values: dict) -> dict:
 
 def _trip_rows(db, group_id, vehicles, start, end, tz, params, measures, expressions) -> list:
     from app.services import drivers_service, fleet_settings_service, time_profiles, vehicle_fuel
-    from app.services.address_service import cached  # noqa: F401  (addresses come from the trip)
+    from app.services.address_service import Describer
     if not vehicles:
         return []
     settings = fleet_settings_service.get(db, group_id)
@@ -206,7 +206,11 @@ def _trip_rows(db, group_id, vehicles, start, end, tz, params, measures, express
     q = (db.query(Trip).filter(Trip.usergroup_id == group_id, Trip.imei.in_(list(vehicles)), Trip.real(),
                                Trip.started_at >= start, Trip.started_at < end).order_by(Trip.started_at).limit(MAX_ROWS))
     rows = []
-    for t in q:
+    trips = q.all()
+    describe = Describer(db, group_id).prefetch(
+        [(t.start_latitude, t.start_longitude) for t in trips] + [(t.end_latitude, t.end_longitude) for t in trips])
+    where = lambda address, lat, lng: describe(lat, lng, address) if address is not None else None
+    for t in trips:
         v = vehicles[t.imei]
         driver_id = str(t.driver_id) if t.driver_id else v["driver_id"]
         if params.get("driver") and driver_id != params["driver"]:
@@ -216,7 +220,8 @@ def _trip_rows(db, group_id, vehicles, start, end, tz, params, measures, express
         rows.append({
             "a:start_time": _utc(t.started_at), "a:end_time": _utc(t.ended_at), **{f"a:{k}": x for k, x in _vehicle_cols(v).items()},
             "a:driver": names.get(driver_id) or v["driver"], "a:driver_key": "yes" if t.driver_id else "",
-            "a:start_location": t.start_address, "a:end_location": t.end_address,
+            "a:start_location": where(t.start_address, t.start_latitude, t.start_longitude),
+            "a:end_location": where(t.end_address, t.end_latitude, t.end_longitude),
             "a:start_lat": t.start_latitude, "a:start_lng": t.start_longitude, "a:end_lat": t.end_latitude, "a:end_lng": t.end_longitude,
             "a:start_link": _link(t.start_latitude, t.start_longitude), "a:end_link": _link(t.end_latitude, t.end_longitude),
             "a:start_odometer": t.start_odometer_m / 1000 if t.start_odometer_m else None,
@@ -246,6 +251,7 @@ def _event_rows(db, group_id, vehicles, start, end, tz, params) -> list:
         q = q.filter(DeviceEvent.trip_id.isnot(None))
     events = q.order_by(DeviceEvent.recorded_at).limit(MAX_ROWS).all()
     trips = {t.id: t for t in db.query(Trip).filter(Trip.id.in_({e.trip_id for e in events if e.trip_id}))} if events else {}
+    describe = address_service.Describer(db, group_id).prefetch((e.latitude, e.longitude) for e in events)
     rows = []
     for e in events:
         v, io = vehicles[e.imei], e.io or {}
@@ -260,7 +266,7 @@ def _event_rows(db, group_id, vehicles, start, end, tz, params) -> list:
             "a:event": custom.get(e.event_type) or (EVENTS[e.event_type][0] if e.event_type in EVENTS else event_label(e.event_type, e.event_io_id)),
             "a:speed": e.speed, "a:over_speed": over if isinstance(over, (int, float)) and over > 0 else None,
             "a:lat": e.latitude, "a:lng": e.longitude, "a:link": _link(e.latitude, e.longitude),
-            "a:location": address_service.cached(db, e.latitude, e.longitude),
+            "a:location": describe(e.latitude, e.longitude),
             "a:odometer": odo / 1000 if isinstance(odo, (int, float)) else None,
             "a:ignition": None if io.get("239") is None else ("On" if io.get("239") else "Off"),
             "a:voltage": volts / 1000 if isinstance(volts, (int, float)) else None,

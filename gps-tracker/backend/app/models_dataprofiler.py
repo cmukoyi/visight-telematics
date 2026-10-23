@@ -260,4 +260,6 @@ class GeocodeCache(Base):
     lat_e4     = Column(Integer, primary_key=True)
     lng_e4     = Column(Integer, primary_key=True)
     address    = Column(String(255), nullable=False)
+    # {road, suburb, town, province, postal_code, country, poi} for each group's Location Description Format
+    parts      = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

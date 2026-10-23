@@ -25,3 +25,4 @@
 .mockPage { flex: 1; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .mockCard { padding: 12px; border: 1px solid; }
 .mockButton { display: inline-block; padding: 6px 12px; font-size: 12px; font-weight: 600; color: #fff; }
+.locationSample { border-radius: var(--mantine-radius-md); background: color-mix(in srgb, var(--mantine-color-brand-5) 10%, transparent); }

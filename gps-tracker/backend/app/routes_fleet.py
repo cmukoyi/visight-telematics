@@ -167,8 +167,8 @@ def fleet_status(request: Request, db: Session = Depends(get_db)):
     for big fleets.
     """
     from sqlalchemy import text
-    from app.models_dataprofiler import GeocodeCache
     from app.routes_catalog import event_labels
+    from app.services.address_service import Describer
     me = get_portal_user_from_request(request, db)
     access = access_service.for_user(me, db)
     if not (access.can("map.view") or access.can("history.view")):
@@ -179,25 +179,18 @@ def fleet_status(request: Request, db: Session = Depends(get_db)):
         "io->>'16' AS odometer, io->>'239' AS ignition FROM device_events WHERE usergroup_id = :g "
         "ORDER BY imei, recorded_at DESC, id DESC"), {"g": str(me.usergroup_id)}).mappings().all()
     custom = event_labels(db, me.usergroup_id)
-    keys = {(round(r["latitude"] * 10000), round(r["longitude"] * 10000)) for r in rows if r["latitude"] is not None}
-    addresses = {}
-    if keys:
-        lats = {k[0] for k in keys}
-        for c in db.query(GeocodeCache).filter(GeocodeCache.lat_e4.in_(lats)):
-            if (c.lat_e4, c.lng_e4) in keys:
-                addresses[(c.lat_e4, c.lng_e4)] = c.address or None
+    describe = Describer(db, me.usergroup_id).prefetch((r["latitude"], r["longitude"]) for r in rows)
     out = []
     for r in rows:
         if visible is not None and r["imei"] not in visible:
             continue
-        key = (round(r["latitude"] * 10000), round(r["longitude"] * 10000)) if r["latitude"] is not None else None
         odo = r["odometer"]
         out.append({
             "imei": r["imei"], "event": custom.get(r["event_type"]) or event_label(r["event_type"], r["event_io_id"]),
             "recorded_at": r["recorded_at"], "speed": r["speed"] or 0,
             "ignition": None if r["ignition"] is None else r["ignition"] == "1",
             "odometer_km": round(int(odo) / 1000, 1) if odo and odo.isdigit() else None,
-            "address": addresses.get(key) if key else None,
+            "address": describe(r["latitude"], r["longitude"]),
         })
     return out
 
@@ -230,7 +223,8 @@ def vehicle_status(request: Request, db: Session = Depends(get_db), imei: str = 
     if fix:
         position = {"latitude": fix.latitude, "longitude": fix.longitude, "speed": fix.speed or 0,
                     "heading": fix.angle, "satellites": fix.satellites, "recorded_at": fix.recorded_at,
-                    "address": address_service.lookup(db, fix.latitude, fix.longitude) or None}
+                    "address": address_service.lookup(db, fix.latitude, fix.longitude) is not None
+                               and address_service.Describer(db, me.usergroup_id)(fix.latitude, fix.longitude) or None}
         db.commit()   # keep the address in the cache
     iccid = None
     if latest_io.get("11") is not None and latest_io.get("14") is not None:
@@ -330,7 +324,9 @@ def inbox_alert(alert_id: str, request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Alert not found")
     meta = alert.meta_data or {}
     lat, lng = meta.get("latitude"), meta.get("longitude")
-    address = address_service.lookup(db, float(lat), float(lng)) if lat not in (None, "") and lng not in (None, "") else None
+    address = None
+    if lat not in (None, "") and lng not in (None, "") and address_service.lookup(db, float(lat), float(lng)) is not None:
+        address = address_service.Describer(db, me.usergroup_id)(float(lat), float(lng))
     db.commit()   # keep the address in the cache
     return {**_portal_alert_dict(alert), "address": address or None}
 

@@ -6,12 +6,13 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconPhoto, IconTrash, IconUpload } from '@tabler/icons-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useDebouncedValue } from '@mantine/hooks';
 import dayjs from 'dayjs';
 import { api } from '../api/client';
 import { setTrial } from '../utils/themeTrial';
 import { useCan, useGroupTheme, useNotificationPrefs } from '../api/hooks';
-import type { GroupTheme, NotificationPrefs, ThemeSettings } from '../api/types';
+import type { GroupTheme, LocationPart, NotificationPrefs, ThemeSettings } from '../api/types';
 import { DEFAULT_MENU, FONTS, PRESETS, darkShadesOf, fontStack, isHex, isLight, loadFont } from '../theme';
 import { ConfigHeader } from '../components/ConfigHeader';
 import classes from './UserGroupPage.module.css';
@@ -24,6 +25,55 @@ const DEFAULT_SURFACE = '#113356';
 const RADII = { xs: 2, sm: 4, md: 8, lg: 16, xl: 24 } as const;
 
 /** A small picture of the app in the (unsaved) look: menu, page, a card and a button. */
+// Location Description Format, in the order the parts appear in the text (backend: address_service.LOCATION_PARTS)
+const LOCATION_PARTS: { key: LocationPart; label: string; hint: string }[] = [
+  { key: 'landmark_distance', label: 'Show Distance to Land Mark', hint: '"1.2 km NE of Home" (with Land Mark)' },
+  { key: 'landmark', label: 'Show Land Mark', hint: 'Your nearest place within 5 km, or the place the vehicle is in' },
+  { key: 'poi', label: 'Show POI', hint: 'A named business or building at the spot, when the map knows one' },
+  { key: 'road', label: 'Show Road', hint: 'Street number and road' },
+  { key: 'suburb', label: 'Show Suburb', hint: '' },
+  { key: 'town', label: 'Show Town', hint: 'Town or city' },
+  { key: 'postal_code', label: 'Show Postal Code', hint: '' },
+  { key: 'province', label: 'Show Province', hint: 'Province or state' },
+  { key: 'country', label: 'Show Country', hint: '' },
+];
+const DEFAULT_LOCATION: LocationPart[] = ['landmark', 'road', 'suburb', 'town'];
+
+/** Which parts of an address the platform shows for positions: trips, vehicles, alerts, reports and the mobile app. */
+function LocationFormat({ value, disabled, onChange }: { value: LocationPart[]; disabled: boolean; onChange: (v: LocationPart[]) => void }) {
+  const parts = LOCATION_PARTS.map((p) => p.key).filter((k) => value.includes(k));
+  const [debounced] = useDebouncedValue(parts.join(','), 300);
+  const { data: sample } = useQuery({
+    queryKey: ['location-sample', debounced],
+    queryFn: () => api<{ text: string | null }>(`/api/portal/location-format/sample?parts=${encodeURIComponent(debounced)}`),
+    placeholderData: keepPreviousData,
+  });
+  const toggle = (k: LocationPart, on: boolean) => {
+    let next = on ? [...parts, k] : parts.filter((x) => x !== k);
+    if (k === 'landmark_distance' && on && !next.includes('landmark')) next = [...next, 'landmark'];
+    if (k === 'landmark' && !on) next = next.filter((x) => x !== 'landmark_distance');
+    if (next.length) onChange(LOCATION_PARTS.map((p) => p.key).filter((x) => next.includes(x)));
+  };
+  return (
+    <Paper withBorder p="lg" id="location">
+      <Text fw={650}>Location Description Format</Text>
+      <Text size="sm" c="dimmed" mb="md">
+        How positions are described across the platform: trips, vehicles, alerts, reports and the mobile app. Pick any combination.
+      </Text>
+      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm" verticalSpacing="sm">
+        {LOCATION_PARTS.map((p) => (
+          <Switch key={p.key} label={p.label} description={p.hint || undefined} disabled={disabled}
+                  checked={parts.includes(p.key)} onChange={(e) => toggle(p.key, e.currentTarget.checked)} />
+        ))}
+      </SimpleGrid>
+      <Box mt="md" p="sm" className={classes.locationSample}>
+        <Text size="xs" c="dimmed" mb={2}>Example from your fleet</Text>
+        <Text size="sm" fw={500}>{sample?.text || 'No positions yet: drive a vehicle and an example appears here.'}</Text>
+      </Box>
+    </Paper>
+  );
+}
+
 function ThemePreview({ primary, secondary, settings, name }: { primary: string; secondary: string; settings: ThemeSettings; name: string }) {
   const dark = (settings.color_scheme ?? 'dark') === 'dark';
   const shades = darkShadesOf(isHex(settings.surface) ? settings.surface : DEFAULT_SURFACE);
@@ -175,6 +225,7 @@ export function UserGroupPage({ mode }: { mode: 'theme' | 'preferences' }) {
         logo_data: form.logo_data ?? '', report_logo_data: form.report_logo_data ?? '', timezone: form.timezone ?? '',
         theme_settings: form.theme_settings ?? {},
         ...(form.history_retention_days ? { history_retention_days: form.history_retention_days } : {}),
+        ...(form.location_format ? { location_format: form.location_format } : {}),
       } });
       qc.setQueryData(['theme'], saved);
       setForm(saved);
@@ -323,6 +374,7 @@ export function UserGroupPage({ mode }: { mode: 'theme' | 'preferences' }) {
                 description="Used to show times across the platform, for report periods and as the default for scheduled reports."
                 onChange={(v) => set({ timezone: v })} nothingFoundMessage="No matching timezone" />
       </Paper>
+      <LocationFormat value={form.location_format ?? DEFAULT_LOCATION} disabled={!canEdit} onChange={(v) => set({ location_format: v })} />
       <MyNotificationPrefs />
       </>}
     </Stack>

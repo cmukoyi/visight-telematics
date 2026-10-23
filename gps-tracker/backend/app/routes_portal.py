@@ -803,6 +803,7 @@ class ThemeOut(BaseModel):
     history_retention_days: Optional[int] = 365
     theme_settings: Optional[dict] = None
     default_language: Optional[str] = None
+    location_format: Optional[list] = None   # address parts shown for positions; None = the default
 
     class Config:
         from_attributes = True
@@ -859,6 +860,7 @@ class ThemeUpdate(BaseModel):
     report_logo_data: Optional[str] = None   # data URL, '' clears
     timezone: Optional[str] = None           # IANA name, '' clears
     theme_settings: Optional[dict] = None    # THEME_SETTINGS keys; {} resets to the default look
+    location_format: Optional[list] = None   # address_service.LOCATION_PARTS to show
 
 
 _LOGO_PREFIXES = ("data:image/png", "data:image/jpeg", "data:image/jpg", "data:image/svg+xml")
@@ -904,9 +906,21 @@ def update_theme(
     if any(changed(f, getattr(group, f)) for f in ("logo_data", "logo_dark_data", "report_logo_data", "theme_primary", "theme_accent")) \
             or (data.theme_settings is not None and _check_theme_settings(data.theme_settings) != (group.theme_settings or None)):
         _require(me, db, "theme.manage")
+    from app.services.address_service import LOCATION_PARTS
+    location_format = None
+    if data.location_format is not None:
+        unknown = [k for k in data.location_format if k not in LOCATION_PARTS]
+        if unknown:
+            raise HTTPException(status_code=400, detail=f"Unknown location parts: {', '.join(map(str, unknown))}")
+        location_format = [k for k in LOCATION_PARTS if k in data.location_format]
+        if not location_format:
+            raise HTTPException(status_code=400, detail="Choose at least one part of the location description")
     if changed("timezone", group.timezone) or (data.history_retention_days is not None
-                                                 and data.history_retention_days != group.history_retention_days):
+                                                 and data.history_retention_days != group.history_retention_days) \
+            or (location_format is not None and location_format != group.location_format):
         _require(me, db, "settings.manage")
+    if location_format is not None:
+        group.location_format = location_format
 
     if data.logo_data is not None:
         group.logo_data = _check_logo(data.logo_data, "Platform logo")
@@ -953,6 +967,26 @@ def update_theme(
     db.commit()
     db.refresh(group)
     return ThemeOut.model_validate(group)
+
+
+@router.get("/location-format/sample")
+def location_format_sample(request: Request, db: Session = Depends(get_db), parts: str = Query("")):
+    """A recent position of the group's fleet in the given format (comma-separated parts), for the settings preview."""
+    from app.models_dataprofiler import GeocodeCache, Trip
+    from app.services.address_service import LOCATION_PARTS, Describer
+    me = get_portal_user_from_request(request, db)
+    fmt = tuple(k for k in LOCATION_PARTS if k in parts.split(","))
+    trips = (db.query(Trip).filter(Trip.usergroup_id == me.usergroup_id, Trip.real(), Trip.end_latitude.isnot(None),
+                                   Trip.end_address.isnot(None))
+             .order_by(Trip.started_at.desc()).limit(20).all())
+    describe = Describer(db, me.usergroup_id, fmt).prefetch((t.end_latitude, t.end_longitude) for t in trips)
+    # Prefer a position whose address parts are known
+    for t in trips:
+        row = db.get(GeocodeCache, (round(t.end_latitude * 10000), round(t.end_longitude * 10000)))
+        if row is not None and row.parts:
+            return {"text": describe(t.end_latitude, t.end_longitude, t.end_address)}
+    t = trips[0] if trips else None
+    return {"text": describe(t.end_latitude, t.end_longitude, t.end_address) if t else None}
 
 
 # ---------------------------------------------------------------------------
@@ -2696,14 +2730,20 @@ def list_positions(
 # ==============================================================================
 
 def _trip_out(trip, names: dict, drivers: Optional[dict] = None, fuel_rates: Optional[dict] = None,
-              driver_names: Optional[dict] = None) -> dict:
-    """drivers: {imei: the vehicle's driver}; driver_names: {driver id: name} for trips with a driver key."""
+              driver_names: Optional[dict] = None, describe=None) -> dict:
+    """drivers: {imei: the vehicle's driver}; driver_names: {driver id: name} for trips with a driver key;
+    describe: address_service.Describer for the group's location format (addresses not yet looked up stay None)."""
     from app.services import vehicle_fuel
     trip_driver = (driver_names or {}).get(str(trip.driver_id)) if getattr(trip, "driver_id", None) else None
+    def place(address, lat, lng):
+        if address is None or describe is None:
+            return address or None
+        return describe(lat, lng, address) or None
     return {
         "id": str(trip.id), "imei": trip.imei, "device_name": names.get(trip.imei),
         "driver": trip_driver or (drivers or {}).get(trip.imei), "driver_from_key": bool(trip_driver),
-        "start_address": trip.start_address or None, "end_address": trip.end_address or None,
+        "start_address": place(trip.start_address, trip.start_latitude, trip.start_longitude),
+        "end_address": place(trip.end_address, trip.end_latitude, trip.end_longitude),
         "status": trip.status, "start_reason": trip.start_reason, "close_reason": trip.close_reason,
         "started_at": trip.started_at, "ended_at": trip.ended_at, "last_event_at": trip.last_event_at,
         "start": [trip.start_latitude, trip.start_longitude] if trip.start_latitude is not None else None,
@@ -2758,7 +2798,10 @@ def list_trips(request: Request, db: Session = Depends(get_db),
     from app.services import drivers_service, vehicle_fuel
     rates = vehicle_fuel.group_rates(db, me.usergroup_id)
     driver_names = drivers_service.names(db, me.usergroup_id)
-    return [_trip_out(t, names, drivers, rates, driver_names) for t in trips]
+    from app.services.address_service import Describer
+    describe = Describer(db, me.usergroup_id).prefetch(
+        [(t.start_latitude, t.start_longitude) for t in trips] + [(t.end_latitude, t.end_longitude) for t in trips])
+    return [_trip_out(t, names, drivers, rates, driver_names, describe) for t in trips]
 
 
 @router.get("/trips/{trip_id}")
@@ -2793,9 +2836,9 @@ def get_trip(trip_id: str, request: Request, db: Session = Depends(get_db)):
         "io": describe_io(e.io or {}),
     } for e in events
         if e.event_type in EVENTS and e.event_type not in ("position", "parked_position")]
-    from app.services import vehicle_fuel
-    from app.services import drivers_service
+    from app.services import address_service, drivers_service, vehicle_fuel
     out = _trip_out(trip, _group_device_names(db, me.usergroup_id), _group_drivers(db, me.usergroup_id),
-                    fuel_rates=vehicle_fuel.group_rates(db, me.usergroup_id), driver_names=drivers_service.names(db, me.usergroup_id))
+                    fuel_rates=vehicle_fuel.group_rates(db, me.usergroup_id), driver_names=drivers_service.names(db, me.usergroup_id),
+                    describe=address_service.Describer(db, me.usergroup_id))
     out.update(points=points, events=marked)
     return out

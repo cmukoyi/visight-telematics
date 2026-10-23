@@ -436,6 +436,10 @@ def _trip_list(db, group_id, devices, start, end, tz, measures, trees, sort, des
     trips = (db.query(Trip).filter(Trip.usergroup_id == group_id, Trip.imei.in_(list(devices)), Trip.real(),
                                    Trip.started_at >= start, Trip.started_at < end)
              .order_by(Trip.started_at).limit(RECORD_LIMIT + 1).all()) if devices else []
+    from app.services.address_service import Describer
+    describe = Describer(db, group_id).prefetch(
+        [(t.start_latitude, t.start_longitude) for t in trips] + [(t.end_latitude, t.end_longitude) for t in trips])
+    where = lambda address, lat, lng: (describe(lat, lng, address) or "") if address is not None else ""
     out = []
     for t in trips[:RECORD_LIMIT]:
         info = devices[t.imei]
@@ -446,7 +450,8 @@ def _trip_list(db, group_id, devices, start, end, tz, measures, trees, sort, des
                     "info": {"vehicle": info["name"], "driver": (driver_names.get(str(t.driver_id)) if t.driver_id else None) or info.get("driver") or "",
                              "start": _local_text(t.started_at, tz),
                              "end": _local_text(t.ended_at, tz) if t.ended_at else "In progress",
-                             "from": t.start_address or "", "to": t.end_address or ""}})
+                             "from": where(t.start_address, t.start_latitude, t.start_longitude),
+                             "to": where(t.end_address, t.end_latitude, t.end_longitude)}})
     if sort in measures:
         _sort_rows(out, measures, sort, descending)
     return info_columns, out[:limit] if limit else out, len(trips) > RECORD_LIMIT
