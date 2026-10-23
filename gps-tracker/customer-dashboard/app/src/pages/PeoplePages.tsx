@@ -59,8 +59,8 @@ export function DriversPage() {
     ...(manage ? [{ headerName: '', width: 90, minWidth: 90, sortable: false, filter: false, pinned: 'right' as const,
       cellRenderer: (p: ICellRendererParams<Driver>) => p.data && (
         <Group gap={2} wrap="nowrap">
-          <ActionIcon size="sm" variant="subtle" onClick={() => open(p.data!)} aria-label="Edit driver"><IconPencil size={15} /></ActionIcon>
-          <ActionIcon size="sm" variant="subtle" color="red" aria-label="Delete driver"
+          <ActionIcon size="sm" variant="subtle" onClick={() => open(p.data!)} aria-label={`Edit ${p.data.name}`}><IconPencil size={15} /></ActionIcon>
+          <ActionIcon size="sm" variant="subtle" color="red" aria-label={`Delete ${p.data.name}`}
                       onClick={() => confirmDelete(`Delete ${p.data!.name}?`, 'Their vehicles lose the assignment; trips keep their history without a driver.', async () => {
                         await api(`/api/portal/drivers/${p.data!.id}`, { method: 'DELETE' }); refresh();
                       })}><IconTrash size={15} /></ActionIcon>

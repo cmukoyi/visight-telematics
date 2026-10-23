@@ -9,7 +9,7 @@ export function ConfigHeader({ section, title, description, children, root = '/c
     <Stack gap={4} mb="md">
       <Breadcrumbs>
         <Anchor component={Link} to={root} size="sm">{rootLabel}</Anchor>
-        {section && section !== rootLabel && <Text size="sm" c="dimmed">{section}</Text>}
+        {section && section !== rootLabel && section !== title && <Text size="sm" c="dimmed">{section}</Text>}
         <Text size="sm">{title}</Text>
       </Breadcrumbs>
       <Group justify="space-between" align="flex-end">

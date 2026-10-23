@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Badge, Card, Group, Select, SimpleGrid, Skeleton, Stack, Text, Title } from '@mantine/core';
-import { IconRoute, IconClock, IconRoad, IconTrendingUp, IconTrendingDown, IconCar } from '@tabler/icons-react';
+import { ActionIcon, Badge, Card, Group, Select, SimpleGrid, Skeleton, Stack, Text, Title, Tooltip, UnstyledButton } from '@mantine/core';
+import { IconRoute, IconClock, IconRoad, IconTrendingUp, IconTrendingDown, IconCar, IconPlayerPause, IconPlayerPlay, IconFocus2 } from '@tabler/icons-react';
 import { useCan, useCategories, useKpis, useLive, useVehicles } from '../api/hooks';
 import { FleetMap, type FleetMapHandle, type MapRoute, type MapVehicle } from '../components/FleetMap';
 import { LiveTrack } from '../components/LiveTrack';
@@ -53,7 +53,13 @@ export function DashboardPage() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const [group, setGroup] = useState<string>(params.get('group') ?? ALL_VEHICLES);
-  const { data: vehicles, isLoading } = useVehicles();
+  // Live refresh can be paused (WCAG 2.2.2); "Updated 12 s ago" shows how fresh the positions are
+  const [paused, setPaused] = useState(false);
+  const { data: vehicles, isLoading, dataUpdatedAt } = useVehicles(!paused);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, []);
+  // A status chip filters the map to that status (click again for all)
+  const [status, setStatus] = useState<'active' | 'idle' | 'offline' | null>(null);
   const { data: categories } = useCategories();
   const { data: kpis } = useKpis(group === ALL_VEHICLES ? null : group);
   const mapRef = useRef<FleetMapHandle>(null);
@@ -75,11 +81,12 @@ export function DashboardPage() {
 
   const inScope = useMemo(() => (vehicles ?? []).filter((v) => inGroup(v, group)), [vehicles, group]);
   const markers = useMemo(() => {
-    const out = inScope.map(toMapVehicle).filter(Boolean) as MapVehicle[];
+    const out = inScope.filter((v) => !status || v.activity_status === status || v.imei === selected)
+      .map(toMapVehicle).filter(Boolean) as MapVehicle[];
     const pos = live?.position;
     // The tracked vehicle uses its live (5-second) position
     return pos ? out.map((m) => (m.id === selected ? { ...m, lat: pos.latitude, lng: pos.longitude, status: 'active' as const } : m)) : out;
-  }, [inScope, live, selected]);
+  }, [inScope, live, selected, status]);
   const trail: MapRoute[] = showTrail && live && live.trail.length > 1
     ? [{ id: 'live-trail', color: '#22c55e', coords: live.trail, arrows: true }] : [];
   // Follow: re-centre on every new position (and straight away when switched on)
@@ -95,7 +102,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     if (markers.length && !selected) mapRef.current?.fit(markers.map((m) => [m.lat, m.lng]));
-  }, [markers.length, group]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [markers.length, group, status]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const t = useT();
   const groupLabel = group === ALL_VEHICLES ? t('app.common.all_vehicles', 'All vehicles') : group;
@@ -113,12 +120,36 @@ export function DashboardPage() {
       <Group justify="space-between" wrap="wrap">
         <div>
           <Title order={1} size="h3">{t('app.dashboard.title', 'Where is my fleet')}</Title>
-          <Text c="dimmed" size="sm">{t('app.dashboard.subtitle', '{vehicles} · positions refresh every 15 s · click a vehicle to track it live', { count: inScope.length, vehicles: plural(inScope.length, 'vehicle') })}</Text>
+          <Group gap={6} wrap="nowrap">
+            <Text c="dimmed" size="sm">{t('app.dashboard.subtitle_short', '{vehicles} · click a vehicle to track it live', { count: inScope.length, vehicles: plural(inScope.length, 'vehicle') })}</Text>
+            <Text c="dimmed" size="sm" aria-live="off">·</Text>
+            <Text c={paused ? 'orange' : 'dimmed'} size="sm">
+              {paused ? t('app.dashboard.paused', 'Live updates paused')
+                : dataUpdatedAt ? t('app.dashboard.updated_ago', 'Updated {s} s ago', { s: Math.max(0, Math.round((now - dataUpdatedAt) / 1000)) }) : ''}
+            </Text>
+            <Tooltip label={paused ? t('app.dashboard.resume', 'Resume live updates') : t('app.dashboard.pause', 'Pause live updates')}>
+              <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => setPaused(!paused)}
+                          aria-label={paused ? 'Resume live updates' : 'Pause live updates'}>
+                {paused ? <IconPlayerPlay size={14} /> : <IconPlayerPause size={14} />}
+              </ActionIcon>
+            </Tooltip>
+          </Group>
         </div>
         <Group gap="sm">
-          <Badge size="lg" variant="dot" color="green">{t('app.status.n_active', '{count} active', { count: counts.active })}</Badge>
-          <Badge size="lg" variant="dot" color="yellow">{t('app.status.n_idle', '{count} idle', { count: counts.idle })}</Badge>
-          <Badge size="lg" variant="dot" color="gray">{t('app.status.n_offline', '{count} offline', { count: counts.offline })}</Badge>
+          {([['active', 'green', t('app.status.n_active', '{count} active', { count: counts.active })],
+             ['idle', 'yellow', t('app.status.n_idle', '{count} idle', { count: counts.idle })],
+             ['offline', 'gray', t('app.status.n_offline', '{count} offline', { count: counts.offline })]] as const).map(([key, color, label]) => (
+            <UnstyledButton key={key} aria-pressed={status === key} onClick={() => setStatus(status === key ? null : key)}
+                            title={status === key ? 'Show all vehicles' : `Show only ${key} vehicles`} className={classes.chip}>
+              <Badge size="lg" variant={status === key ? 'filled' : 'dot'} color={color} style={{ cursor: 'pointer' }}>{label}</Badge>
+            </UnstyledButton>
+          ))}
+          <Tooltip label="Show all vehicles on the map">
+            <ActionIcon variant="default" size="lg" aria-label="Fit all vehicles on the map"
+                        onClick={() => { select(null); markers.length && mapRef.current?.fit(markers.map((m) => [m.lat, m.lng])); }}>
+              <IconFocus2 size={18} />
+            </ActionIcon>
+          </Tooltip>
           <Select
             aria-label="Vehicle group"
             leftSection={<IconCar size={16} />}

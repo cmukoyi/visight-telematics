@@ -16,7 +16,7 @@ import type { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { DateInput } from '@mantine/dates';
 import dayjs from 'dayjs';
 import { api } from '../api/client';
-import { useCan, useCategories, useDataExchange, useDrivers, useLanguages, useMe, useSecurityGroups, useTimeProfiles, useVehicles } from '../api/hooks';
+import { useCan, useCategories, useDataExchange, useDrivers, useLanguages, useMe, usePlaces, useSecurityGroups, useTimeProfiles, useVehicles } from '../api/hooks';
 import { VEHICLE_DETAILS, detail, type Category, type Vehicle } from '../api/types';
 import { getSession } from '../auth/session';
 import { ConfigHeader } from '../components/ConfigHeader';
@@ -36,49 +36,49 @@ import { SecurityPage, UsersPage } from './SecurityPage';
 import { MyNotificationPrefs, UserGroupPage } from './UserGroupPage';
 
 // Configuration sections, each a tile with its sub-menu. `any`: shown when the role has one of these permissions.
-interface MenuItem { label: Msg; to?: string; classic?: string; any: string[] }
+interface MenuItem { label: Msg; hint?: Msg; to?: string; classic?: string; any: string[] }
 interface Section { title: Msg; icon: typeof IconCar; items: MenuItem[] }
 
 const SECTIONS: Section[] = [
   { title: msg('app.config.vehicles', 'Vehicles'), icon: IconCar, items: [
-    { label: msg('app.config.vehicles', 'Vehicles'), to: 'devices', any: [] },
-    { label: msg('app.config.vehicle_groups', 'Vehicle Groups'), to: 'groups', any: ['vehicle_groups.manage'] },
-    { label: msg('app.config.data_exchange', 'Data Exchange'), to: 'exchange', any: ['data_exchange.manage'] },
+    { label: msg('app.config.vehicles', 'Vehicles'), to: 'devices', hint: msg('app.config.hint.devices', 'Names, registrations, drivers, fuel and licences'), any: [] },
+    { label: msg('app.config.vehicle_groups', 'Vehicle Groups'), to: 'groups', hint: msg('app.config.hint.groups', 'Group vehicles for reports, maps and access'), any: ['vehicle_groups.manage'] },
+    { label: msg('app.config.vehicle_types', 'Vehicle Types'), to: 'vehicle-types', hint: msg('app.config.hint.vehicle_types', 'Kinds of vehicle that share service schedules'), any: ['maintenance.configure'] },
+    { label: msg('app.config.data_exchange', 'Data Exchange'), to: 'exchange', hint: msg('app.config.hint.exchange', 'Devices arriving from your data feed'), any: ['data_exchange.manage'] },
   ] },
   { title: msg('app.config.users', 'Users'), icon: IconUsers, items: [
-    { label: msg('app.config.users', 'Users'), to: 'users', any: ['users.view', 'users.manage'] },
-    { label: msg('app.config.drivers', 'Drivers'), to: 'drivers', any: ['vehicles.manage', 'users.view'] },
-    { label: msg('app.config.user_groups', 'User Groups'), to: 'user-groups', any: [] },
-    { label: msg('app.config.custom_themes', 'Custom Themes'), to: 'custom-themes', any: ['theme.manage'] },
+    { label: msg('app.config.users', 'Users'), to: 'users', hint: msg('app.config.hint.users', 'People who sign in, and what they can do'), any: ['users.view', 'users.manage'] },
+    { label: msg('app.config.drivers', 'Drivers'), to: 'drivers', hint: msg('app.config.hint.drivers', 'Drivers, driver keys and licence renewals'), any: ['vehicles.manage', 'users.view'] },
+    { label: msg('app.config.user_groups', 'User Groups'), to: 'user-groups', hint: msg('app.config.hint.user_groups', 'Timezone, history, location descriptions and your alerts'), any: [] },
+    { label: msg('app.config.custom_themes', 'Custom Themes'), to: 'custom-themes', hint: msg('app.config.hint.custom_themes', 'Colours, logo, font and platform name'), any: ['theme.manage'] },
   ] },
   { title: msg('app.config.places', 'Places'), icon: IconMapPin, items: [
-    { label: msg('app.config.places', 'Places'), to: 'places', any: ['places.view', 'places.manage'] },
-    { label: msg('app.config.place_groups', 'Place Groups'), to: 'place-groups', any: ['places.view', 'places.manage'] },
-    { label: msg('app.config.geofences', 'Geofences'), to: 'geofences', any: ['places.view', 'places.manage'] },
+    { label: msg('app.config.places', 'Places'), to: 'places', hint: msg('app.config.hint.places', 'Home, depots, customers: places your vehicles visit'), any: ['places.view', 'places.manage'] },
+    { label: msg('app.config.place_groups', 'Place Groups'), to: 'place-groups', hint: msg('app.config.hint.place_groups', 'Group places for reports and rules'), any: ['places.view', 'places.manage'] },
+    { label: msg('app.config.geofences', 'Geofences'), to: 'geofences', hint: msg('app.config.hint.geofences', 'Areas drawn on the map'), any: ['places.view', 'places.manage'] },
   ] },
   { title: msg('app.config.events', 'Events'), icon: IconBolt, items: [
-    { label: msg('app.config.event_types', 'Event Types'), to: 'event-types', any: [] },
-    { label: msg('app.config.event_type_groups', 'Event Type Groups'), to: 'event-type-groups', any: ['events.manage', 'rules.manage'] },
+    { label: msg('app.config.event_types', 'Event Types'), to: 'event-types', hint: msg('app.config.hint.event_types', 'Names of events, as your team calls them'), any: [] },
+    { label: msg('app.config.event_type_groups', 'Event Type Groups'), to: 'event-type-groups', hint: msg('app.config.hint.event_type_groups', 'Sets of events for rules and reports'), any: ['events.manage', 'rules.manage'] },
   ] },
   { title: msg('app.config.security', 'Security'), icon: IconShieldLock, items: [
-    { label: msg('app.config.security_groups', 'Security Groups'), to: 'security?tab=groups', any: ['security.manage', 'users.manage'] },
-    { label: msg('app.config.roles', 'Roles'), to: 'security?tab=roles', any: ['roles.manage', 'users.manage'] },
-    { label: msg('app.config.audit_trail', 'Audit Trail'), to: 'security?tab=audit', any: ['audit.view'] },
+    { label: msg('app.config.security_groups', 'Security Groups'), to: 'security?tab=groups', hint: msg('app.config.hint.security_groups', 'Which vehicles each team can see'), any: ['security.manage', 'users.manage'] },
+    { label: msg('app.config.roles', 'Roles'), to: 'security?tab=roles', hint: msg('app.config.hint.security_roles', 'Bundles of permissions'), any: ['roles.manage', 'users.manage'] },
+    { label: msg('app.config.audit_trail', 'Audit Trail'), to: 'security?tab=audit', hint: msg('app.config.hint.security_audit', 'Who changed what, and when'), any: ['audit.view'] },
   ] },
   { title: msg('app.config.vehicle_maintenance', 'Vehicle Maintenance'), icon: IconTool, items: [
-    { label: msg('app.config.maintenance_schedules', 'Maintenance Schedules'), to: 'maintenance/schedules', any: ['maintenance.configure'] },
-    { label: msg('app.config.maintenance_types', 'Maintenance Types'), to: 'maintenance/types', any: ['maintenance.configure'] },
-    { label: msg('app.config.maintenance_items', 'Maintenance Items'), to: 'maintenance/items', any: ['maintenance.configure'] },
-    { label: msg('app.config.workshops', 'Workshops'), to: 'maintenance/workshops', any: ['maintenance.configure'] },
-    { label: msg('app.config.workshop_chains', 'Workshop Chains'), to: 'maintenance/workshop-chains', any: ['maintenance.configure'] },
-    { label: msg('app.config.workshop_types', 'Workshop Types'), to: 'maintenance/workshop-types', any: ['maintenance.configure'] },
-    { label: msg('app.config.cost_centres', 'Cost Centres'), to: 'maintenance/cost-centres', any: ['maintenance.configure'] },
-    { label: msg('app.config.vehicle_types', 'Vehicle Types'), to: 'maintenance/vehicle-types', any: ['maintenance.configure'] },
+    { label: msg('app.config.maintenance_schedules', 'Maintenance Schedules'), to: 'maintenance/schedules', hint: msg('app.config.hint.maintenance_schedules', 'When each kind of service is due'), any: ['maintenance.configure'] },
+    { label: msg('app.config.maintenance_types', 'Maintenance Types'), to: 'maintenance/types', hint: msg('app.config.hint.maintenance_types', 'Kinds of job, e.g. minor service'), any: ['maintenance.configure'] },
+    { label: msg('app.config.maintenance_items', 'Maintenance Items'), to: 'maintenance/items', hint: msg('app.config.hint.maintenance_items', 'Tasks and parts a job includes'), any: ['maintenance.configure'] },
+    { label: msg('app.config.workshops', 'Workshops'), to: 'maintenance/workshops', hint: msg('app.config.hint.maintenance_workshops', 'Where vehicles are serviced'), any: ['maintenance.configure'] },
+    { label: msg('app.config.workshop_chains', 'Workshop Chains'), to: 'maintenance/workshop-chains', hint: msg('app.config.hint.maintenance_workshop_chains', 'Brands workshops belong to'), any: ['maintenance.configure'] },
+    { label: msg('app.config.workshop_types', 'Workshop Types'), to: 'maintenance/workshop-types', hint: msg('app.config.hint.maintenance_workshop_types', 'What each workshop does'), any: ['maintenance.configure'] },
+    { label: msg('app.config.cost_centres', 'Cost Centres'), to: 'maintenance/cost-centres', hint: msg('app.config.hint.maintenance_cost_centres', 'Who pays for maintenance'), any: ['maintenance.configure'] },
   ] },
   { title: msg('app.config.misc', 'Misc'), icon: IconDots, items: [
-    { label: msg('app.config.notification_rules', 'Notification Rules'), to: 'misc/notification-rules', any: ['inbox.view', 'rules.manage'] },
-    { label: msg('app.config.time_profiles', 'Time Profiles'), to: 'misc/time-profiles', any: ['settings.manage'] },
-    { label: msg('app.config.fleet_costs', 'Fleet Costs & Scoring'), to: 'misc/fleet-costs', any: ['settings.manage', 'reports.view'] },
+    { label: msg('app.config.notification_rules', 'Notification Rules'), to: 'misc/notification-rules', hint: msg('app.config.hint.misc_notification_rules', 'Who is told about which events'), any: ['inbox.view', 'rules.manage'] },
+    { label: msg('app.config.time_profiles', 'Time Profiles'), to: 'misc/time-profiles', hint: msg('app.config.hint.misc_time_profiles', 'Working hours, for after-hours reports'), any: ['settings.manage'] },
+    { label: msg('app.config.fleet_costs', 'Fleet Costs & Scoring'), to: 'misc/fleet-costs', hint: msg('app.config.hint.misc_fleet_costs', 'Cost rates and score weights for dashboards'), any: ['settings.manage', 'reports.view'] },
   ] },
 ];
 
@@ -88,7 +88,9 @@ function licenceOf(start: string | null | undefined) {
   const expires = dayjs(start).add(12, 'month');
   const left = expires.startOf('day').diff(dayjs().startOf('day'), 'day');
   const text = left < 0 ? `Expired ${-left} day${left === -1 ? '' : 's'} ago` : left === 0 ? 'Expires today' : `${left} day${left === 1 ? '' : 's'} left`;
-  return { expires: expires.format('YYYY-MM-DD'), left, text, color: left <= 0 ? 'red' : left <= 7 ? 'orange' : left <= 30 ? 'yellow' : 'green' };
+  // In words too, not only by colour: "Expires tomorrow", "Expired"
+  const short = left < 0 ? 'Expired' : left === 0 ? 'Expires today' : left === 1 ? 'Expires tomorrow' : left <= 30 ? `${left} days left` : null;
+  return { expires: expires.format('YYYY-MM-DD'), left, text, short, color: left <= 0 ? 'red' : left <= 7 ? 'orange' : left <= 30 ? 'yellow' : 'green' };
 }
 
 const classicUrl = (tab: string) => `/customer/classic/#tab=${tab}`;
@@ -110,25 +112,50 @@ function Tiles() {
   const can = useCan();
   const allowed = (i: MenuItem) => i.any.length === 0 || i.any.some(can);
   const t = useT();
-  const sections = SECTIONS.map((sec) => ({ ...sec, items: sec.items.filter(allowed) })).filter((sec) => sec.items.length);
+  const [search, setSearch] = useState('');
+  // How many there are, next to the busiest lists
+  const { data: vehicles } = useVehicles();
+  const { data: categories } = useCategories();
+  const { data: places } = usePlaces();
+  const counts: Record<string, number | undefined> = {
+    devices: vehicles?.length, groups: categories?.filter((c) => c.is_active).length, places: places?.length,
+  };
+  const q = search.trim().toLowerCase();
+  const matches = (i: MenuItem) => !q || `${t(i.label)} ${i.hint ? t(i.hint) : ''}`.toLowerCase().includes(q);
+  const sections = SECTIONS.map((sec) => ({
+    ...sec, items: sec.items.filter(allowed).filter((i) => matches(i) || (!!q && t(sec.title).toLowerCase().includes(q))),
+  })).filter((sec) => sec.items.length);
   return (
     <Stack p="lg" gap="lg">
-      <Title order={1} size="h2">{t('app.nav.configuration', 'Configuration')}</Title>
+      <Group justify="space-between" wrap="wrap">
+        <Title order={1} size="h2">{t('app.nav.configuration', 'Configuration')}</Title>
+        <TextInput w={320} leftSection={<IconSearch size={16} />} placeholder={t('app.config.search', 'Find a setting, e.g. drivers')}
+                   aria-label="Find a setting" value={search} onChange={(e) => setSearch(e.currentTarget.value)}
+                   onKeyDown={(e) => { if (e.key === 'Enter' && sections.length === 1 && sections[0].items.length === 1 && sections[0].items[0].to) navigate(sections[0].items[0].to); }} />
+      </Group>
+      {!sections.length && <Text c="dimmed">{t('app.config.no_match', 'No settings match “{q}”.', { q: search })}</Text>}
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 3, xl: 4 }} spacing="md">
         {sections.map((sec) => (
           <Paper key={sec.title.key} className={classes.tile}>
             <Group gap="md" wrap="nowrap" mb="md">
-              <sec.icon size={34} stroke={1.3} className={classes.tileIcon} />
-              <Text className={classes.tileTitle}>{t(sec.title)}</Text>
+              <sec.icon size={34} stroke={1.3} className={classes.tileIcon} aria-hidden />
+              <Title order={2} className={classes.tileTitle}>{t(sec.title)}</Title>
             </Group>
             <Stack gap={2} className={classes.links}>
-              {sec.items.map((i) => (
-                <UnstyledButton key={i.label.key} className={classes.link}
-                                onClick={() => (i.to ? navigate(i.to) : window.open(classicUrl(i.classic!), '_self'))}>
-                  {t(i.label)}
-                  {i.classic && <IconArrowUpRight size={13} className={classes.ext} />}
-                </UnstyledButton>
-              ))}
+              {sec.items.map((i) => {
+                const n = i.to ? counts[i.to] : undefined;
+                return (
+                  <UnstyledButton key={i.label.key} className={classes.link}
+                                  onClick={() => (i.to ? navigate(i.to) : window.open(classicUrl(i.classic!), '_self'))}>
+                    <span className={classes.linkLabel}>
+                      {t(i.label)}
+                      {n != null && <Badge size="sm" variant="light" color="gray" ml={8}>{n}</Badge>}
+                      {i.classic && <IconArrowUpRight size={13} className={classes.ext} />}
+                    </span>
+                    {i.hint && <span className={classes.linkHint}>{t(i.hint)}</span>}
+                  </UnstyledButton>
+                );
+              })}
             </Stack>
           </Paper>
         ))}
@@ -198,11 +225,16 @@ function Devices() {
     { colId: 'registration', headerName: 'Registration', valueGetter: (p) => p.data && (detail(p.data, 'registration') || '—'), flex: 1, minWidth: 140 },
     { colId: 'make_model', headerName: 'Make / model', hide: true, valueGetter: (p) => p.data && ([detail(p.data, 'make'), detail(p.data, 'model'), detail(p.data, 'year')].filter(Boolean).join(' ') || '—'), width: 170 },
     { colId: 'driver', headerName: 'Driver', hide: true, valueGetter: (p) => p.data && (detail(p.data, 'driver') || '—'), width: 150 },
-    { colId: 'licence', headerName: 'Licence Expires', width: 160, valueGetter: (p) => licenceOf(p.data?.attributes ? detail(p.data, 'licence_start') : '')?.expires ?? null,
+    { colId: 'licence', headerName: 'Licence Expires', width: 240, valueGetter: (p) => licenceOf(p.data?.attributes ? detail(p.data, 'licence_start') : '')?.expires ?? null,
       cellRenderer: (p: ICellRendererParams<Vehicle>) => {
         const l = p.data && licenceOf(detail(p.data, 'licence_start'));
         if (!l) return <Text size="sm" c="dimmed">—</Text>;
-        return <Tooltip label={l.text} withinPortal><Badge size="sm" variant="light" color={l.color}>{dayjs(l.expires).format('D MMM YYYY')}</Badge></Tooltip>;
+        return (
+          <Tooltip label={`${l.text}. A licence is valid for 12 months; reminders go out 7 days before and on the day.`} multiline w={260} withinPortal>
+            <Badge size="sm" variant="light" color={l.color} leftSection={l.short ? <IconAlertTriangle size={12} aria-hidden /> : undefined}>
+              {l.short ? `${l.short} · ` : ''}{dayjs(l.expires).format('D MMM YYYY')}
+            </Badge>
+          </Tooltip>);
       } },
     { colId: 'group', headerName: 'Group', hide: true, field: 'category_name', valueFormatter: (p) => p.value || '—', width: 150 },
     { colId: 'status', headerName: 'Status', hide: true, field: 'activity_status', width: 120,
@@ -215,8 +247,8 @@ function Devices() {
     ...(admin ? [{ colId: 'actions', headerName: '', width: 90, minWidth: 90, sortable: false, filter: false, pinned: 'right' as const,
       cellRenderer: (p: ICellRendererParams<Vehicle>) => p.data && (
         <Group gap={2} wrap="nowrap">
-          <Tooltip label="Edit" withinPortal><ActionIcon size="sm" variant="subtle" onClick={() => open(p.data!)} aria-label="Edit vehicle"><IconPencil size={15} /></ActionIcon></Tooltip>
-          {canDelete && <Tooltip label="Delete" withinPortal><ActionIcon size="sm" variant="subtle" color="red" onClick={() => startDelete(p.data!)} aria-label="Delete vehicle"><IconBan size={15} /></ActionIcon></Tooltip>}
+          <Tooltip label="Edit" withinPortal><ActionIcon size="sm" variant="subtle" onClick={() => open(p.data!)} aria-label={`Edit ${vehicleName(p.data!)}`}><IconPencil size={15} /></ActionIcon></Tooltip>
+          {canDelete && <Tooltip label="Delete" withinPortal><ActionIcon size="sm" variant="subtle" color="red" onClick={() => startDelete(p.data!)} aria-label={`Delete ${vehicleName(p.data!)}`}><IconBan size={15} /></ActionIcon></Tooltip>}
         </Group>) }] : []),
   ];
 
@@ -393,8 +425,8 @@ function Groups() {
               ? <Badge variant="light" leftSection={<IconShieldLock size={12} />}>{sgName(c.security_group_id)}</Badge>
               : <Badge variant="light" color="orange">No security group — admins only</Badge>}
             <Text size="sm" c="dimmed" w={90} ta="right">{plural(vehicles.filter((v) => v.category_name === c.name).length, 'vehicle')}</Text>
-            <ActionIcon variant="subtle" onClick={() => open(c)} aria-label="Edit group"><IconPencil size={16} /></ActionIcon>
-            <ActionIcon variant="subtle" color="red" onClick={() => remove(c)} aria-label="Delete group"><IconTrash size={16} /></ActionIcon>
+            <ActionIcon variant="subtle" onClick={() => open(c)} aria-label={`Edit ${c.name}`}><IconPencil size={16} /></ActionIcon>
+            <ActionIcon variant="subtle" color="red" onClick={() => remove(c)} aria-label={`Delete ${c.name}`}><IconTrash size={16} /></ActionIcon>
           </Group>
         ))}
       </Paper>
@@ -609,7 +641,8 @@ export function ConfigurationPage() {
       <Route path="maintenance/workshop-chains" element={<LookupPage kind="workshop_chain" />} />
       <Route path="maintenance/workshop-types" element={<LookupPage kind="workshop_type" />} />
       <Route path="maintenance/cost-centres" element={<LookupPage kind="cost_centre" />} />
-      <Route path="maintenance/vehicle-types" element={<LookupPage kind="vehicle_type" />} />
+      <Route path="vehicle-types" element={<LookupPage kind="vehicle_type" />} />
+      <Route path="maintenance/vehicle-types" element={<Navigate to="/configuration/vehicle-types" replace />} />
       <Route path="*" element={<Tiles />} />
     </Routes>
   );

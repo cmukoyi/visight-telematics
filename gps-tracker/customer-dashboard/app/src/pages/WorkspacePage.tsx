@@ -278,7 +278,7 @@ export function WorkspacePage() {
           {PlotCell(plottedVehicles.has(p.data.imei), () => toggleVehicle(p.data!.imei), 'vehicle')}
           <Tooltip label="Details" withinPortal><ActionIcon size="sm" variant="subtle" color="gray" aria-label="Vehicle details"
             onClick={() => openDetails(p.data!.imei)}><IconInfoCircle size={15} /></ActionIcon></Tooltip>
-          {can('vehicles.manage') && <Tooltip label="Edit vehicle" withinPortal><ActionIcon size="sm" variant="subtle" color="gray" aria-label="Edit vehicle"
+          {can('vehicles.manage') && <Tooltip label="Edit vehicle" withinPortal><ActionIcon size="sm" variant="subtle" color="gray" aria-label={`Edit ${vehicleName(p.data!)}`}
             onClick={() => navigate(`/configuration/devices?edit=${p.data!.id}`)}><IconPencil size={15} /></ActionIcon></Tooltip>}
           {canPlaces && p.data.latitude && p.data.longitude && <Tooltip label="Draw place at this vehicle" withinPortal>
             <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Draw place at this vehicle"

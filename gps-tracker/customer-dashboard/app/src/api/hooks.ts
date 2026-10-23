@@ -11,8 +11,9 @@ import { cachedLook } from '../utils/look';
 export const useBranding = () =>
   useQuery({ queryKey: ['branding'], queryFn: () => api<Branding>('/api/branding'), staleTime: Infinity });
 
-export const useVehicles = () =>
-  useQuery({ queryKey: ['vehicles'], queryFn: () => api<Vehicle[]>('/api/portal/tags'), refetchInterval: 15_000 });
+/** live = false pauses the 15-second refresh (Dashboard pause button). */
+export const useVehicles = (live = true) =>
+  useQuery({ queryKey: ['vehicles'], queryFn: () => api<Vehicle[]>('/api/portal/tags'), refetchInterval: live ? 15_000 : false });
 
 export const useCategories = () =>
   useQuery({ queryKey: ['categories'], queryFn: () => api<Category[]>('/api/portal/categories') });

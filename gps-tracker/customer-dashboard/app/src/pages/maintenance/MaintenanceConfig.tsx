@@ -102,7 +102,7 @@ export function LookupPage({ kind }: { kind: LookupKind }) {
   ];
   return (
     <Stack p="lg" gap={0} className={classes.page}>
-      <ConfigHeader section={SECTION} title={meta.title} description={meta.description}>
+      <ConfigHeader section={kind === 'vehicle_type' ? 'Vehicles' : SECTION} title={meta.title} description={meta.description}>
         {manage && <Button size="xs" leftSection={<IconPlus size={14} />} onClick={() => open('new')}>Add {meta.one}</Button>}
       </ConfigHeader>
       <Group mb="sm"><SearchBox value={search} onChange={setSearch} /><Text size="sm" c="dimmed">{shown.length} {meta.title.toLowerCase()}</Text></Group>

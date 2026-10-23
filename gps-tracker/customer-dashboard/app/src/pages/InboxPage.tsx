@@ -25,6 +25,15 @@ const TYPE_LABELS: Record<string, string> = {
   licence_expiring: 'Licence expiring', licence_expired: 'Licence expired',
 };
 const typeLabel = (t: string) => TYPE_LABELS[t] ?? t.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+/** "Jeep Compass entered Home" → "Entered Home at 39 km/h": the title without the vehicle (it has its own column). */
+function summary(a: Alert) {
+  const vehicle = a.tag_label ?? '';
+  let s = a.title ?? '';
+  if (vehicle && s.toLowerCase().startsWith(vehicle.toLowerCase())) s = s.slice(vehicle.length).replace(/^[\s:·,-]+/, '');
+  s = s ? s[0].toUpperCase() + s.slice(1) : typeLabel(a.alert_type);
+  const speed = num(a.meta_data?.speed);
+  return !Number.isNaN(speed) && speed > 0 && !/km\/h/.test(s) ? `${s} at ${Math.round(speed)} km/h` : s;
+}
 const SEVERE = new Set(['crash', 'panic', 'towing', 'power_cut', 'maintenance_overdue', 'licence_expired']);
 
 const num = (v: unknown) => (typeof v === 'number' ? v : typeof v === 'string' && v !== '' ? Number(v) : NaN);
@@ -159,7 +168,8 @@ export function InboxPage() {
       cellRenderer: (p: ICellRendererParams<Alert>) => p.data && (
         <Tooltip label={p.data.is_read ? 'Read' : 'Mark as read'} withinPortal>
           <ActionIcon size="sm" variant="subtle" color={p.data.is_read ? 'gray' : 'brand'} disabled={p.data.is_read}
-                      onClick={() => markRead(p.data!)} aria-label="Mark as read">
+                      onClick={() => markRead(p.data!)}
+                      aria-label={p.data.is_read ? `Read: ${p.data.title}` : `Mark as read: ${p.data.title}, ${dateTime(p.data.created_at)}`}>
             {p.data.is_read ? <IconMailOpened size={15} /> : <IconMail size={15} />}
           </ActionIcon>
         </Tooltip>) },
@@ -168,8 +178,8 @@ export function InboxPage() {
       cellRenderer: (p: ICellRendererParams<Alert>) => p.data && (
         <Badge size="sm" variant="light" color={SEVERE.has(p.data.alert_type) ? 'red' : 'blue'}>{typeLabel(p.data.alert_type)}</Badge>) },
     { headerName: 'Vehicle', valueGetter: (p) => p.data?.tag_label ?? p.data?.tag_imei ?? '—', width: 180 },
-    { headerName: 'Title', field: 'title', flex: 1, cellClass: (p) => (p.data?.is_read ? '' : classes.unread) },
-    { headerName: 'Message', field: 'message', flex: 2, tooltipField: 'message' },
+    { headerName: 'Summary', colId: 'summary', valueGetter: (p) => (p.data ? summary(p.data) : ''), flex: 1, minWidth: 220,
+      tooltipValueGetter: (p) => p.data?.message, cellClass: (p) => (p.data?.is_read ? '' : classes.unread) },
   ];
 
   const points: MapPoint[] = alerts.flatMap((a) => {

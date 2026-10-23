@@ -129,9 +129,9 @@ export function PlacesPage() {
                       </div>
                       {manage && (
                         <Group gap={2} wrap="nowrap">
-                          <Tooltip label="Edit"><ActionIcon size="sm" variant="subtle" aria-label="Edit place"
+                          <Tooltip label="Edit"><ActionIcon size="sm" variant="subtle" aria-label={`Edit ${p.name}`}
                             onClick={(e) => { e.stopPropagation(); focus(p); setDraft(draftFromPlace(p)); }}><IconPencil size={15} /></ActionIcon></Tooltip>
-                          <Tooltip label="Delete"><ActionIcon size="sm" variant="subtle" color="red" aria-label="Delete place"
+                          <Tooltip label="Delete"><ActionIcon size="sm" variant="subtle" color="red" aria-label={`Delete ${p.name}`}
                             onClick={(e) => { e.stopPropagation(); remove(p); }}><IconTrash size={15} /></ActionIcon></Tooltip>
                         </Group>
                       )}

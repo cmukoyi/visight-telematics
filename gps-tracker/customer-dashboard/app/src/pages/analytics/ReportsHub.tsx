@@ -9,7 +9,7 @@ import { msg, useT } from '../../i18n';
 import classes from './ReportsHub.module.css';
 
 const TILES = [
-  { to: 'reports', title: msg('app.reports.reports', 'Reports'), description: msg('app.reports.reports_desc', 'Run, download and schedule reports'), icon: IconFileAnalytics },
+  { to: 'reports', title: msg('app.reports.standard', 'Standard Reports'), description: msg('app.reports.reports_desc', 'Run, download and schedule reports'), icon: IconFileAnalytics },
   { to: 'expressions', title: msg('app.reports.expressions', 'Expressions'), description: msg('app.reports.expressions_desc', 'Your own calculations, e.g. exceptions per 100 km'), icon: IconMathFunction },
   { to: 'analytics', title: msg('app.reports.analytics', 'Analytics'), description: msg('app.reports.analytics_desc', 'Charts, tables and figures about your fleet'), icon: IconChartPie },
   { to: 'custom', title: msg('app.reports.custom', 'Custom Reports'), description: msg('app.reports.custom_desc', 'Design your own reports: rows, columns, parameters; run or schedule them'), icon: IconFileSettings },

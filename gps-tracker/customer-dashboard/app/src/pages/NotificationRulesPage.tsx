@@ -149,12 +149,12 @@ export function NotificationRulesPage() {
         : <Text size="sm" c="dimmed">Inbox only</Text>) },
     { headerName: 'Active', field: 'is_active', width: 100,
       cellRenderer: (p: ICellRendererParams<NotificationRule>) => p.data && (
-        <Switch size="xs" checked={p.data.is_active} disabled={!manage} onChange={() => toggleActive(p.data!)} aria-label="Active" />) },
+        <Switch size="xs" checked={p.data.is_active} disabled={!manage} onChange={() => toggleActive(p.data!)} aria-label={`${p.data.name} active`} />) },
     ...(manage ? [{ headerName: '', width: 90, minWidth: 90, sortable: false, filter: false, pinned: 'right' as const,
       cellRenderer: (p: ICellRendererParams<NotificationRule>) => p.data && (
         <Group gap={2} wrap="nowrap">
-          <ActionIcon size="sm" variant="subtle" onClick={() => open(p.data!)} aria-label="Edit rule"><IconPencil size={15} /></ActionIcon>
-          <ActionIcon size="sm" variant="subtle" color="red" onClick={() => remove(p.data!)} aria-label="Delete rule"><IconTrash size={15} /></ActionIcon>
+          <ActionIcon size="sm" variant="subtle" onClick={() => open(p.data!)} aria-label={`Edit ${p.data.name}`}><IconPencil size={15} /></ActionIcon>
+          <ActionIcon size="sm" variant="subtle" color="red" onClick={() => remove(p.data!)} aria-label={`Delete ${p.data.name}`}><IconTrash size={15} /></ActionIcon>
         </Group>) }] : []),
   ];
 

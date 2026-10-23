@@ -166,8 +166,8 @@ function SecurityGroupsTab() {
               </Group>
               {manage && (
                 <Group gap={2} wrap="nowrap">
-                  <ActionIcon variant="subtle" onClick={() => open(g)} aria-label="Edit security group"><IconPencil size={16} /></ActionIcon>
-                  <ActionIcon variant="subtle" color="red" onClick={() => remove(g)} aria-label="Delete security group"><IconTrash size={16} /></ActionIcon>
+                  <ActionIcon variant="subtle" onClick={() => open(g)} aria-label={`Edit ${g.name}`}><IconPencil size={16} /></ActionIcon>
+                  <ActionIcon variant="subtle" color="red" onClick={() => remove(g)} aria-label={`Delete ${g.name}`}><IconTrash size={16} /></ActionIcon>
                 </Group>
               )}
             </Group>
