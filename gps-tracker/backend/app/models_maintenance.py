@@ -25,6 +25,9 @@ from app.database import Base
 from app.models import get_uuid_column
 
 LOOKUP_KINDS = ("vehicle_type", "workshop_chain", "workshop_type", "cost_centre")
+# What a cost item is for: maintenance jobs and parts, or the fleet's other running costs captured by hand
+COST_CATEGORIES = {"maintenance": "Maintenance", "fuel": "Fuel", "tracking": "Tracking", "licence": "Licence",
+                   "fines": "Fines", "insurance": "Insurance", "other": "Other"}
 
 
 def _group():
@@ -144,6 +147,7 @@ class MaintenanceCost(Base):
     item_id         = Column(UUID(as_uuid=True), ForeignKey("maintenance_items.id", ondelete="SET NULL"), nullable=True)
     cost_centre_id  = Column(UUID(as_uuid=True), ForeignKey("maintenance_lookups.id", ondelete="SET NULL"), nullable=True)
     description     = Column(String(200), nullable=True)
+    category        = Column(String(20), nullable=False, default="maintenance")   # COST_CATEGORIES
     amount          = Column(Numeric(12, 2), nullable=False)
     amortise_from   = Column(Date, nullable=True)
     amortise_to     = Column(Date, nullable=True)

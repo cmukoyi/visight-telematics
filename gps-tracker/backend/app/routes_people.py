@@ -232,3 +232,41 @@ def delete_profile(pid: str, request: Request, db: Session = Depends(get_db)):
         if nxt:
             nxt.is_default = True
     db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Fleet cost and scoring settings
+# ---------------------------------------------------------------------------
+
+@router.get("/fleet-settings")
+def get_fleet_settings(request: Request, db: Session = Depends(get_db)):
+    """The settings and how to show them: [{key, label, unit, help, value, default}]."""
+    from app.services import fleet_settings_service as fs
+    me = _me(request, db)
+    values = fs.get(db, me.usergroup_id)
+    return [{"key": k, "label": label, "unit": unit, "help": help_, "value": values[k], "default": default}
+            for k, (default, label, unit, help_) in fs.FIELDS.items()]
+
+
+@router.put("/fleet-settings")
+def save_fleet_settings(data: Dict[str, float], request: Request, db: Session = Depends(get_db)):
+    from app.services import fleet_settings_service as fs
+    me = _me(request, db, "settings.manage")
+    for k, v in data.items():
+        if k not in fs.FIELDS:
+            raise HTTPException(status_code=400, detail=f"Unknown setting {k}")
+        if v is None or v < 0 or v > 1_000_000:
+            raise HTTPException(status_code=400, detail=f"{fs.FIELDS[k][1]}: enter a value from 0")
+    if "speed_limit_kmh" in data and not 20 <= data["speed_limit_kmh"] <= 250:
+        raise HTTPException(status_code=400, detail="Speed limit: 20–250 km/h")
+    fs.save(db, me.usergroup_id, data)
+    db.commit()
+    return get_fleet_settings(request, db)
+
+
+@router.post("/fleet-settings/recalculate")
+def recalculate(request: Request, db: Session = Depends(get_db)):
+    """Work out speeding and idle durations again for the last 120 days (after changing the speed limit or idle threshold)."""
+    from app.services import trip_builder
+    me = _me(request, db, "settings.manage")
+    return {"trips": trip_builder.recompute_recent(db, days=120, group_id=me.usergroup_id)}

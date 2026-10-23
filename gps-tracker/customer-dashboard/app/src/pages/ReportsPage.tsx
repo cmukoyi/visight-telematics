@@ -51,7 +51,7 @@ function RunDrawer({ report, onClose, onSchedule }: { report: ReportDef | null; 
     catch (e) { notifications.show({ color: 'red', message: (e as Error).message }); }
     finally { setLoading(false); }
   };
-  const save = async (format: 'xlsx' | 'csv') => {
+  const save = async (format: 'xlsx' | 'csv' | 'pdf') => {
     try { await download(`/api/portal/reports/${report!.key}${params(format)}`, `${report!.key}.${format}`); }
     catch (e) { notifications.show({ color: 'red', message: (e as Error).message }); }
   };
@@ -75,6 +75,7 @@ function RunDrawer({ report, onClose, onSchedule }: { report: ReportDef | null; 
         <Group gap="xs" ml="auto">
           <Button variant="default" leftSection={<IconFileSpreadsheet size={16} />} onClick={() => save('xlsx')}>Excel</Button>
           <Button variant="default" leftSection={<IconDownload size={16} />} onClick={() => save('csv')}>CSV</Button>
+          <Button variant="default" leftSection={<IconDownload size={16} />} onClick={() => save('pdf')}>PDF</Button>
           {onSchedule && <Button variant="light" leftSection={<IconCalendarRepeat size={16} />} onClick={() => report && onSchedule(report.key)}>Schedule</Button>}
         </Group>
       </Group>
@@ -93,7 +94,10 @@ function RunDrawer({ report, onClose, onSchedule }: { report: ReportDef | null; 
 type ScheduleForm = { report_key: string; name: string; frequency: string; file_format: string; recipients: string[];
   imei: string | null; category: string | null; send_hour: number; is_active: boolean };
 
-function ScheduleModal({ editing, onClose }: { editing: ReportSchedule | { report_key: string } | null; onClose: () => void }) {
+/** A schedule being created: a report, or an Analytics chart (report_key "analytics" with its page and visual). */
+export type NewSchedule = { report_key: string; page_id?: string; visual_id?: string; report_title?: string };
+
+export function ScheduleModal({ editing, onClose }: { editing: ReportSchedule | NewSchedule | null; onClose: () => void }) {
   const qc = useQueryClient();
   const tz = useReportTz();
   const { data: reports = [] } = useReports();
@@ -113,7 +117,8 @@ function ScheduleModal({ editing, onClose }: { editing: ReportSchedule | { repor
   });
   const submit = form.onSubmit(async (values) => {
     try {
-      const json = { ...values, name: values.name || null, timezone: existing?.timezone ?? tz };
+      const json = { ...values, name: values.name || null, timezone: existing?.timezone ?? tz,
+                     page_id: editing?.page_id ?? null, visual_id: editing?.visual_id ?? null };
       if (existing) await api(`/api/portal/report-schedules/${existing.id}`, { method: 'PUT', json });
       else await api('/api/portal/report-schedules', { method: 'POST', json });
       qc.invalidateQueries({ queryKey: ['schedules'] });
@@ -128,7 +133,10 @@ function ScheduleModal({ editing, onClose }: { editing: ReportSchedule | { repor
       { id: 'general', label: 'General', keywords: 'report name active',
         content: (
           <Stack maw={620}>
-            <Select label="Report" data={reports.map((r) => ({ value: r.key, label: r.title }))} allowDeselect={false} {...form.getInputProps('report_key')} />
+            {form.values.report_key === 'analytics'
+              ? <TextInput label="Analytics chart" value={editing?.report_title ?? 'Analytics chart'} readOnly
+                           description="Sent as a table of the chart's data for the period" />
+              : <Select label="Report" data={reports.map((r) => ({ value: r.key, label: r.title }))} allowDeselect={false} {...form.getInputProps('report_key')} />}
             <TextInput label="Name" placeholder="Optional, used as the email subject" {...form.getInputProps('name')} />
             <Switch label="Active" {...form.getInputProps('is_active', { type: 'checkbox' })} />
           </Stack>
@@ -153,14 +161,14 @@ function ScheduleModal({ editing, onClose }: { editing: ReportSchedule | { repor
           <Stack maw={620}>
             <TagsInput label="Recipients" withAsterisk description="Press Enter after each email address" placeholder="name@company.co.za"
                        splitChars={[',', ' ', ';']} clearable {...form.getInputProps('recipients')} />
-            <Select label="File format" allowDeselect={false} data={[{ value: 'xlsx', label: 'Excel (.xlsx)' }, { value: 'csv', label: 'CSV' }]} {...form.getInputProps('file_format')} />
+            <Select label="File format" allowDeselect={false} data={[{ value: 'xlsx', label: 'Excel (.xlsx)' }, { value: 'pdf', label: 'PDF' }, { value: 'csv', label: 'CSV' }]} {...form.getInputProps('file_format')} />
           </Stack>
         ) },
     ]} />
   );
 }
 
-function Scheduled({ onEdit }: { onEdit: (s: ReportSchedule | { report_key: string }) => void }) {
+function Scheduled({ onEdit }: { onEdit: (s: ReportSchedule | NewSchedule) => void }) {
   const qc = useQueryClient();
   const { data: schedules = [], isFetching } = useSchedules();
   const sendNow = async (s: ReportSchedule) => {
@@ -221,7 +229,7 @@ export function ReportsPage() {
     const r = reports.find((x) => x.key === params.get('run'));
     if (r) { setRunning(r); setParams({}, { replace: true }); }
   }, [reports, params]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [scheduling, setScheduling] = useState<ReportSchedule | { report_key: string } | null>(null);
+  const [scheduling, setScheduling] = useState<ReportSchedule | NewSchedule | null>(null);
 
   const toggleFav = (key: string) => setFavourites((f) => {
     const next = f.includes(key) ? f.filter((k) => k !== key) : [...f, key];

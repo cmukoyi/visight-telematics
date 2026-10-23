@@ -195,6 +195,12 @@ class Trip(Base):
     harsh_cornering_count    = Column(Integer, nullable=False, default=0)
     idling_count     = Column(Integer, nullable=False, default=0)
     driver_id        = Column(_TagRefType, ForeignKey("drivers.id", ondelete="SET NULL"), nullable=True)  # from the driver's key (IO 78)
+    # Durations worked out by the trip builder (fleet settings: speed limit, excess-idle threshold)
+    speeding_s       = Column(Integer, nullable=False, default=0)   # time above the speed limit
+    idle_s           = Column(Integer, nullable=False, default=0)   # idling (IO 251 start → end)
+    excess_idle_s    = Column(Integer, nullable=False, default=0)   # idling beyond the threshold, per idle period
+    idle_since       = Column(DateTime(timezone=True), nullable=True)   # an idle period still open
+    last_speed       = Column(Integer, nullable=True)                    # speed at the last record (for speeding time)
     created_at       = Column(DateTime(timezone=True), server_default=func.now())
 
     @classmethod

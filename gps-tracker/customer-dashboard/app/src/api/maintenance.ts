@@ -31,6 +31,7 @@ export interface MaintenanceCatalog {
   vehicle_type: Named[]; workshop_chain: Named[]; workshop_type: Named[]; cost_centre: Named[];
   items: Named[]; types: MaintenanceTypeRow[]; workshops: Named[]; schedules: (Named & { type_id: string })[];
   statuses: JobStatus[];
+  cost_categories: Named[];
   vehicles: { imei: string; name: string; group: string | null; type_id: string | null }[];
 }
 /** A saved job, or one projected from a schedule (projected: true, id "p:<schedule>:<imei>"). */
@@ -53,6 +54,7 @@ export interface CostRow {
   id: string; imei: string; vehicle: string; vehicle_type: string | null; cost_date: string;
   maintenance_id: string | null; maintenance: string | null; item_id: string | null; item: string | null;
   cost_centre_id: string | null; cost_centre: string | null; description: string | null; amount: number;
+  category: string; category_label: string | null;
   amortise_from: string | null; amortise_to: string | null;
 }
 export interface DtcRow { code: string; description: string; category: string; recorded_at: string }

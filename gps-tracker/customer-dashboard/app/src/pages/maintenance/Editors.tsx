@@ -204,7 +204,7 @@ export function JobEditor({ job, imei, onClose, onCost }: {
 
 // ── Cost item editor ──
 type CostForm = {
-  imei: string | null; cost_date: Date | null; maintenance_id: string | null; item_id: string | null; cost_centre_id: string | null;
+  category: string; imei: string | null; cost_date: Date | null; maintenance_id: string | null; item_id: string | null; cost_centre_id: string | null;
   description: string; amount: number | ''; amortise_from: Date | null; amortise_to: Date | null;
 };
 
@@ -213,7 +213,7 @@ export function CostEditor({ cost, job, onClose }: { cost: CostRow | 'new' | nul
   const { data: catalog } = useMaintenanceCatalog();
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const form = useForm<CostForm>({
-    initialValues: { imei: null, cost_date: new Date(), maintenance_id: null, item_id: null, cost_centre_id: null, description: '',
+    initialValues: { category: 'maintenance', imei: null, cost_date: new Date(), maintenance_id: null, item_id: null, cost_centre_id: null, description: '',
                      amount: '', amortise_from: null, amortise_to: null },
     validate: {
       imei: (v) => (v ? null : 'Choose a vehicle'), cost_date: (v) => (v ? null : 'Set the date'),
@@ -224,9 +224,9 @@ export function CostEditor({ cost, job, onClose }: { cost: CostRow | 'new' | nul
     if (!cost) return;
     const d = (v: string | null) => (v ? dayjs(v).toDate() : null);
     form.setValues(cost === 'new'
-      ? { imei: job?.imei ?? null, cost_date: new Date(), maintenance_id: job && !job.projected ? job.id : null, item_id: null,
+      ? { category: 'maintenance', imei: job?.imei ?? null, cost_date: new Date(), maintenance_id: job && !job.projected ? job.id : null, item_id: null,
           cost_centre_id: null, description: '', amount: '', amortise_from: null, amortise_to: null }
-      : { imei: cost.imei, cost_date: d(cost.cost_date), maintenance_id: cost.maintenance_id, item_id: cost.item_id,
+      : { category: cost.category ?? 'maintenance', imei: cost.imei, cost_date: d(cost.cost_date), maintenance_id: cost.maintenance_id, item_id: cost.item_id,
           cost_centre_id: cost.cost_centre_id, description: cost.description ?? '', amount: cost.amount,
           amortise_from: d(cost.amortise_from), amortise_to: d(cost.amortise_to) });
   }, [cost]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -273,6 +273,9 @@ export function CostEditor({ cost, job, onClose }: { cost: CostRow | 'new' | nul
       { id: 'general', label: 'General', keywords: 'vehicle date maintenance item description cost centre',
         content: (
           <Stack maw={680}>
+            <Select label="Category" allowDeselect={false} data={(catalog?.cost_categories ?? []).map((c) => ({ value: c.id, label: c.name }))}
+                    description="Maintenance, or another running cost (fines, tracking, licence…) for the fleet cost dashboards"
+                    value={form.values.category} onChange={(v) => form.setFieldValue('category', v ?? 'maintenance')} />
             <SimpleGrid cols={{ base: 1, sm: 2 }}>
               <Select label="Vehicle" withAsterisk searchable placeholder="Choose…" data={(catalog?.vehicles ?? []).map((v) => ({ value: v.imei, label: v.name }))}
                       value={form.values.imei} onChange={(v) => { form.setFieldValue('imei', v); form.setFieldValue('maintenance_id', null); }}

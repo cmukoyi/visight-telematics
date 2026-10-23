@@ -349,7 +349,7 @@ def report_catalogue(request: Request, db: Session = Depends(get_db)):
 def run_report(key: str, request: Request, db: Session = Depends(get_db),
                date_from: datetime = Query(...), date_to: datetime = Query(...),
                imei: Optional[str] = None, category: Optional[str] = None,
-               format: str = Query("json", pattern="^(json|csv|xlsx)$"),
+               format: str = Query("json", pattern="^(json|csv|xlsx|pdf)$"),
                tz: Optional[str] = None):
     """Run a report for a period; format=json for on-screen, csv/xlsx to download.
 
@@ -394,11 +394,14 @@ class ScheduleIn(BaseModel):
     timezone: str = "Africa/Johannesburg"
     send_hour: int = 6
     is_active: bool = True
+    # A scheduled Analytics chart (report_key "analytics")
+    page_id: Optional[str] = None
+    visual_id: Optional[str] = None
 
     @field_validator("report_key")
     @classmethod
     def _key(cls, v):
-        if v not in reports_service.REPORTS:
+        if v not in reports_service.REPORTS and v != reports_service.ANALYTICS_KEY:
             raise ValueError("Unknown report")
         return v
 
@@ -413,7 +416,7 @@ class ScheduleIn(BaseModel):
     @classmethod
     def _fmt(cls, v):
         if v not in reports_service.FORMATS:
-            raise ValueError("file_format must be xlsx or csv")
+            raise ValueError("file_format must be xlsx, csv or pdf")
         return v
 
     @field_validator("send_hour")
@@ -431,11 +434,22 @@ class ScheduleIn(BaseModel):
         return v
 
 
-def _schedule_out(s: ReportSchedule) -> dict:
+def _schedule_out(s: ReportSchedule, db: Optional[Session] = None) -> dict:
     params = s.params or {}
+    title = reports_service.REPORTS.get(s.report_key, (s.report_key,))[0]
+    if s.report_key == reports_service.ANALYTICS_KEY:
+        title = "Analytics chart"
+        if db is not None and params.get("page_id"):
+            from app.models import AnalyticsPage
+            try:
+                page = db.get(AnalyticsPage, UUID(str(params["page_id"])))
+            except ValueError:
+                page = None
+            visual = next((v for v in ((page.visuals if page else None) or []) if v.get("id") == params.get("visual_id")), None)
+            title = f"{page.name} · {visual.get('title') or 'Chart'}" if visual else "Analytics chart (removed)"
     return {
-        "id": str(s.id), "report_key": s.report_key,
-        "report_title": reports_service.REPORTS.get(s.report_key, (s.report_key,))[0],
+        "id": str(s.id), "report_key": s.report_key, "page_id": params.get("page_id"), "visual_id": params.get("visual_id"),
+        "report_title": title,
         "name": s.name, "frequency": s.frequency, "file_format": s.file_format,
         "recipients": s.recipients or [], "imei": params.get("imei"), "category": params.get("category"),
         "timezone": s.timezone, "send_hour": s.send_hour, "is_active": s.is_active,
@@ -451,7 +465,10 @@ def _apply(s: ReportSchedule, data: ScheduleIn) -> None:
         raise HTTPException(status_code=400, detail="Unknown timezone")
     s.report_key, s.name, s.frequency, s.file_format = data.report_key, data.name, data.frequency, data.file_format
     s.recipients = [str(r).lower() for r in data.recipients]
-    s.params = {k: v for k, v in {"imei": data.imei, "category": data.category}.items() if v}
+    s.params = {k: v for k, v in {"imei": data.imei, "category": data.category,
+                                  "page_id": data.page_id, "visual_id": data.visual_id}.items() if v}
+    if data.report_key == reports_service.ANALYTICS_KEY and not (data.page_id and data.visual_id):
+        raise HTTPException(status_code=400, detail="Choose the Analytics chart to schedule")
     s.timezone, s.send_hour, s.is_active = data.timezone, data.send_hour, data.is_active
     s.next_run_at = reports_service.next_run(data.frequency, data.send_hour, data.timezone, datetime.now(timezone.utc))
 
@@ -478,7 +495,7 @@ def list_schedules(request: Request, db: Session = Depends(get_db)):
     _require_reports_admin(me)
     rows = (db.query(ReportSchedule).filter(ReportSchedule.usergroup_id == me.usergroup_id)
             .order_by(ReportSchedule.created_at.desc()).all())
-    return [_schedule_out(s) for s in rows]
+    return [_schedule_out(s, db) for s in rows]
 
 
 @router.post("/report-schedules", status_code=201)
@@ -490,7 +507,7 @@ def create_schedule(data: ScheduleIn, request: Request, db: Session = Depends(ge
     db.add(s)
     db.commit()
     db.refresh(s)
-    return _schedule_out(s)
+    return _schedule_out(s, db)
 
 
 @router.put("/report-schedules/{schedule_id}")
@@ -501,7 +518,7 @@ def update_schedule(schedule_id: str, data: ScheduleIn, request: Request, db: Se
     _apply(s, data)
     db.commit()
     db.refresh(s)
-    return _schedule_out(s)
+    return _schedule_out(s, db)
 
 
 @router.delete("/report-schedules/{schedule_id}", status_code=204)

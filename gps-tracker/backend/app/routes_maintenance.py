@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import POI, PortalUser
-from app.models_maintenance import (LOOKUP_KINDS, MaintenanceCost, MaintenanceItem, MaintenanceLookup,
+from app.models_maintenance import (COST_CATEGORIES, LOOKUP_KINDS, MaintenanceCost, MaintenanceItem, MaintenanceLookup,
                                     MaintenanceSchedule, MaintenanceType, VehicleMaintenance, Workshop)
 from app.routes_portal import get_portal_user_from_request
 from app.services import access_service, audit_service
@@ -98,7 +98,7 @@ def catalog(request: Request, db: Session = Depends(get_db)):
                  db.query(MaintenanceSchedule).filter(MaintenanceSchedule.usergroup_id == g).order_by(func.lower(MaintenanceSchedule.name))]
     fleet = _fleet(db, me, access)
     return {**lookups, "items": items, "types": types, "workshops": workshops, "schedules": schedules,
-            "statuses": ms.STATUSES,
+            "statuses": ms.STATUSES, "cost_categories": [{"id": k, "name": v} for k, v in COST_CATEGORIES.items()],
             "vehicles": [{"imei": i, "name": v["name"], "group": v["group"], "type_id": v["type_id"]}
                          for i, v in sorted(fleet.items(), key=lambda x: x[1]["name"].lower())]}
 
@@ -794,12 +794,15 @@ class CostIn(BaseModel):
     item_id: Optional[str] = None
     cost_centre_id: Optional[str] = None
     description: Optional[str] = None
+    category: str = "maintenance"
     amount: Decimal
     amortise_from: Optional[date] = None
     amortise_to: Optional[date] = None
 
     @model_validator(mode="after")
     def _check(self):
+        if self.category not in COST_CATEGORIES:
+            raise ValueError("Unknown cost category")
         if self.amount < 0 or self.amount > Decimal("99999999"):
             raise ValueError("Enter a cost from 0")
         if (self.amortise_from is None) != (self.amortise_to is None):
@@ -816,6 +819,7 @@ def _cost_out(c: MaintenanceCost, fleet: dict, names: dict, type_names: dict) ->
             "maintenance": names["jobs"].get(c.maintenance_id), "item_id": str(c.item_id) if c.item_id else None,
             "item": names["items"].get(c.item_id), "cost_centre_id": str(c.cost_centre_id) if c.cost_centre_id else None,
             "cost_centre": names["centres"].get(c.cost_centre_id), "description": c.description, "amount": float(c.amount),
+            "category": c.category or "maintenance", "category_label": COST_CATEGORIES.get(c.category or "maintenance"),
             "amortise_from": c.amortise_from.isoformat() if c.amortise_from else None,
             "amortise_to": c.amortise_to.isoformat() if c.amortise_to else None}
 
@@ -835,7 +839,7 @@ def _cost_names(db: Session, me: PortalUser) -> tuple:
 def list_costs(request: Request, db: Session = Depends(get_db),
                date_from: Optional[date] = None, date_to: Optional[date] = None, vehicle_group: Optional[str] = None,
                vehicle_type_id: Optional[str] = None, type_id: Optional[str] = None, item_id: Optional[str] = None,
-               cost_centre_id: Optional[str] = None, maintenance_id: Optional[str] = None):
+               cost_centre_id: Optional[str] = None, maintenance_id: Optional[str] = None, category: Optional[str] = None):
     me, access = _me(request, db, VIEW, MANAGE)
     fleet = _filtered_fleet(_fleet(db, me, access), vehicle_group, vehicle_type_id, None)
     if not fleet:
@@ -851,6 +855,8 @@ def list_costs(request: Request, db: Session = Depends(get_db),
         q = q.filter(MaintenanceCost.cost_centre_id == _uuid(cost_centre_id, "Cost centre"))
     if maintenance_id:
         q = q.filter(MaintenanceCost.maintenance_id == _uuid(maintenance_id, "Maintenance"))
+    if category:
+        q = q.filter(MaintenanceCost.category == category)
     if type_id:
         q = q.join(VehicleMaintenance, VehicleMaintenance.id == MaintenanceCost.maintenance_id).filter(
             VehicleMaintenance.type_id == _uuid(type_id, "Maintenance type"))
@@ -869,6 +875,7 @@ def _apply_cost(db: Session, me: PortalUser, c: MaintenanceCost, data: CostIn, f
     c.item_id = _own(db, MaintenanceItem, me, data.item_id, "Item").id if data.item_id else None
     c.cost_centre_id = _own(db, MaintenanceLookup, me, data.cost_centre_id, "Cost centre").id if data.cost_centre_id else None
     c.description = (data.description or "").strip()[:200] or None
+    c.category = data.category
     c.amortise_from, c.amortise_to = data.amortise_from, data.amortise_to
 
 

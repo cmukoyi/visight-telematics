@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActionIcon, Button, Group, Loader, Menu, Modal, Paper, Select, Stack, Text, TextInput, Tooltip, UnstyledButton } from '@mantine/core';
+import { ActionIcon, Anchor, Breadcrumbs, Button, Group, Loader, Menu, Modal, Paper, Select, Stack, Text, TextInput, Tooltip, UnstyledButton } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import {
-  IconArrowLeft, IconArrowRight, IconChartBar, IconCopy, IconDots, IconDownload, IconPencil, IconPlus, IconTable, IconTrash,
+  IconArrowLeft, IconArrowRight, IconCalendarRepeat, IconChartBar, IconCopy, IconDots, IconDownload, IconFileSpreadsheet,
+  IconFileTypePdf, IconPencil, IconPlus, IconTable, IconTrash,
 } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { api } from '../../api/client';
-import { useAnalyticsPages, useAnalyticsQuery, useCan, useCategories, type Range } from '../../api/hooks';
+import { api, download } from '../../api/client';
+import { analyticsBody, useAnalyticsPages, useAnalyticsQuery, useCan, useCategories, useVehicles, type Range } from '../../api/hooks';
+import { vehicleName } from '../../utils/format';
+import { ScheduleModal, type NewSchedule } from '../ReportsPage';
 import type { AnalyticsPageDef, AnalyticsResult, Visual } from '../../api/types';
 import dayjs from 'dayjs';
 import { ConfigHeader } from '../../components/ConfigHeader';
@@ -21,8 +24,11 @@ const fail = (e: unknown) => notifications.show({ color: 'red', message: (e as E
 
 function downloadCsv(title: string, r: AnalyticsResult) {
   const esc = (s: string) => `"${s.replace(/"/g, '""')}"`;
-  const head = [...(r.dimension ? [r.dimension_label] : []), ...r.columns.map((c) => (c.unit ? `${c.label} (${c.unit})` : c.label))];
-  const lines = r.rows.map((row) => [...(r.dimension ? [esc(row.label)] : []), ...r.columns.map((c) => row.values[c.key] ?? '')].join(','));
+  const label = r.dimension !== '' && r.kind !== 'record';
+  const info = r.info_columns ?? [];
+  const head = [...(label ? [r.dimension_label] : []), ...info.map((c) => c.label), ...r.columns.map((c) => (c.unit ? `${c.label} (${c.unit})` : c.label))];
+  const lines = r.rows.map((row) => [...(label ? [esc(row.label)] : []), ...info.map((c) => esc(row.info?.[c.key] ?? '')),
+                                     ...r.columns.map((c) => row.values[c.key] ?? '')].join(','));
   const blob = new Blob([[head.map(esc).join(','), ...lines].join('\n')], { type: 'text/csv' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -31,13 +37,19 @@ function downloadCsv(title: string, r: AnalyticsResult) {
   URL.revokeObjectURL(a.href);
 }
 
-/** One visual on the page: title, menu, and the chart (or its table). */
-function VisualCard({ visual, range, category, manage, onEdit, onDuplicate, onMove, onDelete }: {
-  visual: Visual; range: Range; category: string | null; manage: boolean;
+/** One visual on the page: title, menu, and the chart (or its table). Clicking a vehicle group or vehicle drills into it. */
+function VisualCard({ visual, range, category, imei, manage, onEdit, onDuplicate, onMove, onDelete, onDrill, onSchedule }: {
+  visual: Visual; range: Range; category: string | null; imei: string | null; manage: boolean;
   onEdit: () => void; onDuplicate: () => void; onMove: (d: number) => void; onDelete: () => void;
+  onDrill: (dimension: string, key: string, label: string) => void; onSchedule: (() => void) | null;
 }) {
   const [asTable, setAsTable] = useState(false);
-  const { data, isLoading, isError, error, isFetching } = useAnalyticsQuery(visual, range, category);
+  const { data, isLoading, isError, error, isFetching } = useAnalyticsQuery(visual, range, category, imei);
+  const drillable = visual.dimension === 'vehicle_group' || visual.dimension === 'vehicle';
+  const rowClick = drillable ? (r: { key: string; label: string }) => onDrill(visual.dimension, r.key, r.label) : undefined;
+  const save = (format: 'xlsx' | 'pdf' | 'csv') =>
+    download('/api/portal/analytics/export', `${visual.title || 'analytics'}.${format}`,
+             { ...analyticsBody(visual, range, category, imei), title: visual.title || 'Analytics', format }).catch(fail);
   const height = HEIGHTS[visual.height];
   const showTable = asTable && visual.type !== 'kpi' && visual.type !== 'text' && visual.type !== 'table';
   return (
@@ -54,7 +66,15 @@ function VisualCard({ visual, range, category, manage, onEdit, onDuplicate, onMo
               <Menu.Item leftSection={showTable ? <IconChartBar size={14} /> : <IconTable size={14} />} onClick={() => setAsTable(!asTable)}>
                 {showTable ? 'View as chart' : 'View as table'}</Menu.Item>
             )}
-            {data && <Menu.Item leftSection={<IconDownload size={14} />} onClick={() => downloadCsv(visual.title, data)}>Download CSV</Menu.Item>}
+            {data && visual.type !== 'text' && <>
+              <Menu.Label>Download</Menu.Label>
+              <Menu.Item leftSection={<IconFileSpreadsheet size={14} />} onClick={() => save('xlsx')}>Excel (.xlsx)</Menu.Item>
+              <Menu.Item leftSection={<IconFileTypePdf size={14} />} onClick={() => save('pdf')}>PDF</Menu.Item>
+              <Menu.Item leftSection={<IconDownload size={14} />} onClick={() => downloadCsv(visual.title, data)}>CSV</Menu.Item>
+            </>}
+            {onSchedule && visual.type !== 'text' && (
+              <Menu.Item leftSection={<IconCalendarRepeat size={14} />} onClick={onSchedule}>Schedule by email…</Menu.Item>
+            )}
             {manage && <>
               <Menu.Divider />
               <Menu.Item leftSection={<IconPencil size={14} />} onClick={onEdit}>Edit</Menu.Item>
@@ -69,8 +89,8 @@ function VisualCard({ visual, range, category, manage, onEdit, onDuplicate, onMo
       </div>
       {isError ? <Text size="sm" c="red">{(error as Error).message}</Text>
         : isLoading && visual.type !== 'text' ? <Group h={height} justify="center"><Loader size="sm" /></Group>
-        : showTable && data ? <ResultTable result={data} maxHeight={height} />
-        : <VisualChart visual={visual} result={data} height={height} />}
+        : showTable && data ? <ResultTable result={data} maxHeight={height} onRowClick={rowClick} />
+        : <VisualChart visual={visual} result={data} height={height} onRowClick={rowClick} />}
     </Paper>
   );
 }
@@ -85,7 +105,18 @@ export function AnalyticsPage() {
   const page = pages.find((p) => p.id === pageId) ?? pages[0];
   const [preset, setPreset] = useState<string>('this_month');
   const [category, setCategory] = useState<string | null>(null);
+  const [imei, setImei] = useState<string | null>(null);
+  const { data: vehicles = [] } = useVehicles();
+  const canSchedule = useCan()('reports.schedule');
+  const [scheduling, setScheduling] = useState<NewSchedule | null>(null);
   useEffect(() => { if (page) setPreset(page.date_preset); }, [page?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Drill down: a vehicle group, then a vehicle — the whole page follows
+  const drill = (dimension: string, key: string) => {
+    if (dimension === 'vehicle_group') { setCategory(key === 'No group' ? null : key); setImei(null); }
+    if (dimension === 'vehicle') setImei(key);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const vehicleOptions = vehicles.filter((v) => !category || v.category_name === category).map((v) => ({ value: v.imei, label: vehicleName(v) }));
   // A named period (saved as the page's default), or any two dates picked on the calendar
   const [custom, setCustom] = useState<Range | null>(null);
   const range = useMemo(() => (preset === 'custom' && custom ? custom : periodRange(preset)), [preset, custom]);
@@ -182,9 +213,18 @@ export function AnalyticsPage() {
                   <Text size="xs" c="dimmed">&nbsp;</Text>
                 </Stack>
               )}
-              <Select label="Vehicle group" w={260} placeholder="All vehicles" clearable data={categories.filter((c) => c.is_active).map((c) => c.name)}
-                      value={category} onChange={setCategory} description=" " />
+              <Select label="Vehicle group" w={240} placeholder="All vehicles" clearable data={categories.filter((c) => c.is_active).map((c) => c.name)}
+                      value={category} onChange={(c) => { setCategory(c); setImei(null); }} description="Or click a group in a chart" />
+              <Select label="Vehicle" w={240} placeholder="All vehicles" clearable searchable data={vehicleOptions}
+                      value={imei} onChange={setImei} description="Or click a vehicle in a chart" />
             </div>
+            {(category || imei) && (
+              <Breadcrumbs mt="sm" separator="›">
+                <Anchor size="sm" onClick={() => { setCategory(null); setImei(null); }}>All vehicles</Anchor>
+                {category && (imei ? <Anchor size="sm" onClick={() => setImei(null)}>{category}</Anchor> : <Text size="sm" fw={600}>{category}</Text>)}
+                {imei && <Text size="sm" fw={600}>{vehicleOptions.find((v) => v.value === imei)?.label ?? vehicles.find((v) => v.imei === imei)?.description ?? imei}</Text>}
+              </Breadcrumbs>
+            )}
           </Paper>
           {page && page.visuals.length === 0 && (
             <Paper withBorder p="xl" radius="lg"><Stack align="center" gap="xs">
@@ -195,7 +235,9 @@ export function AnalyticsPage() {
           {page && (
             <div className={classes.grid}>
               {page.visuals.map((v, i) => (
-                <VisualCard key={v.id} visual={v} range={range} category={category} manage={manage}
+                <VisualCard key={v.id} visual={v} range={range} category={category} imei={imei} manage={manage} onDrill={drill}
+                            onSchedule={canSchedule ? () => setScheduling({ report_key: 'analytics', page_id: page.id, visual_id: v.id,
+                                                                            report_title: `${page.name} · ${v.title || 'Chart'}` }) : null}
                             onEdit={() => setEditing(v)} onMove={(d) => move(i, d)}
                             onDuplicate={() => setVisuals([...page.visuals.slice(0, i + 1), { ...v, id: Math.random().toString(36).slice(2, 14), title: `${v.title} (copy)` }, ...page.visuals.slice(i + 1)])}
                             onDelete={() => modals.openConfirmModal({
@@ -212,6 +254,7 @@ export function AnalyticsPage() {
           )}
         </>
       )}
+      {scheduling && <ScheduleModal key={scheduling.visual_id} editing={scheduling} onClose={() => setScheduling(null)} />}
       <VisualEditor opened={!!editing} visual={editing === 'new' ? null : editing} range={range} category={category}
                     onSave={saveVisual} onClose={() => setEditing(null)} />
       <Modal opened={!!naming} onClose={() => setNaming(null)} title={naming?.mode === 'new' ? 'New page' : 'Rename page'}>

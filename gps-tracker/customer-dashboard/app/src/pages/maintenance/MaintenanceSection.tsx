@@ -300,6 +300,7 @@ function Costs() {
     { headerName: 'Vehicle', field: 'vehicle', minWidth: 150, flex: 1 },
     { headerName: 'Vehicle Type', field: 'vehicle_type', width: 140, valueFormatter: (p) => p.value || '—' },
     { headerName: 'Date', field: 'cost_date', width: 125, sort: 'desc', valueFormatter: (p) => day(p.value) },
+    { headerName: 'Category', field: 'category_label', width: 130 },
     { headerName: 'Maintenance', field: 'maintenance', minWidth: 150, flex: 1, valueFormatter: (p) => p.value || '—' },
     { headerName: 'Maintenance Item', field: 'item', minWidth: 150, flex: 1, valueFormatter: (p) => p.value || '—' },
     { headerName: 'Description', field: 'description', minWidth: 150, flex: 1, valueFormatter: (p) => p.value || '—' },

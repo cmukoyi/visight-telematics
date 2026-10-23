@@ -319,6 +319,18 @@ class TimeProfile(Base):
     created_at   = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class FleetSettings(Base):
+    """A group's fleet cost and scoring settings (fleet_settings_service.DEFAULTS lists them).
+
+    values: {"fuel_price": 23.0, "speed_limit_kmh": 120, …} — anything missing takes the default.
+    """
+    __tablename__ = "fleet_settings"
+
+    usergroup_id = Column(UUID(as_uuid=True), ForeignKey("user_groups.id", ondelete="CASCADE"), primary_key=True)
+    values       = Column(JSON, nullable=False, default=dict)
+    updated_at   = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class TagCategory(Base):
     """A user-defined asset category scoped to a UserGroup.
 

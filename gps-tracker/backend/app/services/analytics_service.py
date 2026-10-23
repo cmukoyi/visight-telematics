@@ -58,7 +58,27 @@ MEASURES: dict = {
     "Vehicle_count":            ("Vehicles", "", "Utilisation", 0),
     "Utilization_days":         ("Vehicle utilisation (days)", "days", "Utilisation", 0),
     "Downtime_days":            ("Vehicle downtime (days)", "days", "Utilisation", 0),
+    "Speeding_duration_hours":  ("Speeding duration", "h", "Exceptions", 2),
+    "Idle_duration_hours":      ("Idle duration", "h", "Exceptions", 2),
+    "Excess_idle_hours":        ("Excess idle duration", "h", "Exceptions", 2),
+    "Vehicle_days":             ("Vehicle-days", "days", "Utilisation", 0),
+    "Workshop_days":            ("Vehicle-days in the workshop", "days", "Utilisation", 0),
+    "Period_days":              ("Days in the period", "days", "Utilisation", 0),
+    "Driver_count":             ("Drivers", "", "Drivers", 0),
+    "Active_driver_count":      ("Drivers who drove", "", "Drivers", 0),
+    "Driver_utilization_days":  ("Driver-days driven", "days", "Drivers", 0),
     "Fuel_used_l":              ("Fuel used", "L", "Fuel and costs", 1),
+    "Fuel_cost":                ("Fuel cost", "R", "Fuel and costs", 0),
+    "Speeding_cost":            ("Speeding cost", "R", "Fuel and costs", 0),
+    "Excess_idle_cost":         ("Excess idle cost", "R", "Fuel and costs", 0),
+    "After_hours_cost":         ("After-hours cost", "R", "Fuel and costs", 0),
+    "Maintenance_cost":         ("Maintenance cost", "R", "Fleet costs", 0),
+    "Tracking_cost":            ("Tracking cost", "R", "Fleet costs", 0),
+    "Licence_cost":             ("Licence cost", "R", "Fleet costs", 0),
+    "Fines_cost":               ("Fines cost", "R", "Fleet costs", 0),
+    "Insurance_cost":           ("Insurance cost", "R", "Fleet costs", 0),
+    "Other_cost":               ("Other costs", "R", "Fleet costs", 0),
+    "TCO":                      ("Total cost of ownership (TCO)", "R", "Fleet costs", 0),
     "Alert_count":              ("Alerts", "", "Alerts", 0),
     "Geofence_entry_count":     ("Place entries", "", "Places", 0),
     "Geofence_exit_count":      ("Place exits", "", "Places", 0),
@@ -66,22 +86,33 @@ MEASURES: dict = {
     "Time_in_place_hours":      ("Time in place", "h", "Places", 1),
 }
 _SUMS = [k for k in MEASURES if k not in ("Max_speed_kmh", "Active_vehicle_count", "Vehicle_count",
-                                          "Utilization_days", "Downtime_days")]
+                                          "Utilization_days", "Downtime_days", "Vehicle_days", "Period_days",
+                                          "Driver_count", "Active_driver_count", "Driver_utilization_days", "TCO")]
 
 # Where a measure's data comes from
 SCOPE = {k: "trip" for k in MEASURES}
-SCOPE.update({k: "fleet" for k in ("Active_vehicle_count", "Vehicle_count", "Utilization_days", "Downtime_days")})
+SCOPE.update({k: "fleet" for k in ("Active_vehicle_count", "Vehicle_count", "Utilization_days", "Downtime_days",
+                                    "Vehicle_days", "Workshop_days", "Period_days")})
+# Costs: from cost items (amortised by day), fixed fees spread over the days, and fuel from trips
+SCOPE.update({k: "cost" for k in ("Fuel_cost", "Maintenance_cost", "Tracking_cost", "Licence_cost", "Fines_cost",
+                                   "Insurance_cost", "Other_cost", "TCO")})
+SCOPE.update({k: "drivers" for k in ("Driver_count", "Active_driver_count", "Driver_utilization_days")})
+COST_MEASURE = {"maintenance": "Maintenance_cost", "fuel": "Fuel_cost", "tracking": "Tracking_cost",
+                "licence": "Licence_cost", "fines": "Fines_cost", "insurance": "Insurance_cost", "other": "Other_cost"}
+TCO_PARTS = list(COST_MEASURE.values())
 SCOPE["Alert_count"] = "alert"
 SCOPE.update({k: "place" for k in ("Geofence_entry_count", "Geofence_exit_count", "Place_visit_count", "Time_in_place_hours")})
 _PLACE_MEASURES = {k for k, sc in SCOPE.items() if sc == "place"}
 
 # Measures whose rows can't be added up into a total or a share (a top speed, a count of distinct vehicles)
-NOT_ADDITIVE = {"Max_speed_kmh", "Active_vehicle_count", "Vehicle_count"}
+NOT_ADDITIVE = {"Max_speed_kmh", "Active_vehicle_count", "Vehicle_count", "Period_days", "Driver_count",
+                "Active_driver_count"}
 
 # What a single trip / place visit has (a list row is one record, so counts of trips etc. mean nothing there)
 RECORD_MEASURES = {
     "trip": ["Trip_distance_km", "Trip_duration_hours", "Fuel_used_l", "After_hours_distance_km", "After_hours_duration_hours",
-             "Max_speed_kmh", "Idling_count", "Speeding_count",
+             "Speeding_duration_hours", "Idle_duration_hours", "Excess_idle_hours", "Speeding_cost", "Excess_idle_cost",
+             "After_hours_cost", "Max_speed_kmh", "Idling_count", "Speeding_count",
              "Harsh_braking_count", "Harsh_acceleration_count", "Harsh_cornering_count", "Total_exception_count"],
     "place_visit": ["Time_in_place_hours"],
 }
@@ -118,6 +149,9 @@ class ExpressionError(ValueError):
     pass
 
 
+FUNCTIONS = {"min": min, "max": max}   # e.g. a score kept within 0–100: max(0, min(100, …))
+
+
 def parse(expression: str) -> ast.Expression:
     """Parse and check an expression; raises ExpressionError with a readable message."""
     text = (expression or "").strip()
@@ -143,7 +177,13 @@ def parse(expression: str) -> ast.Expression:
             continue
         if isinstance(node, ast.Name) and node.id == "m":
             continue
-        raise ExpressionError("Only numbers, + − × ÷, brackets and m.<measure> are allowed")
+        if isinstance(node, ast.Call):
+            if not (isinstance(node.func, ast.Name) and node.func.id in FUNCTIONS) or node.keywords or len(node.args) < 2:
+                raise ExpressionError("Functions: min(a, b, …) and max(a, b, …), e.g. max(0, 100 - m.Speeding_count)")
+            continue
+        if isinstance(node, ast.Name) and node.id in FUNCTIONS:
+            continue
+        raise ExpressionError("Only numbers, + − × ÷, brackets, min(), max() and m.<measure> are allowed")
     return tree
 
 
@@ -164,6 +204,9 @@ def evaluate(tree: ast.Expression, values: dict) -> Optional[float]:
         if isinstance(node, ast.UnaryOp):
             v = ev(node.operand)
             return None if v is None else (-v if isinstance(node.op, ast.USub) else v)
+        if isinstance(node, ast.Call):
+            args = [ev(a) for a in node.args]
+            return None if any(a is None for a in args) else FUNCTIONS[node.func.id](args)
         a, b = ev(node.left), ev(node.right)
         if a is None or b is None:
             return None
@@ -180,7 +223,7 @@ def evaluate(tree: ast.Expression, values: dict) -> Optional[float]:
 def expression_additive(expression: str) -> bool:
     """True when the expression's rows add up: no division and only additive measures (fuel cost, not km per trip)."""
     tree = parse(expression)
-    return (not any(isinstance(n, ast.Div) for n in ast.walk(tree))
+    return (not any(isinstance(n, (ast.Div, ast.Call)) for n in ast.walk(tree))
             and not (measures_used(expression) & NOT_ADDITIVE))
 
 
@@ -190,7 +233,10 @@ def allowed_measures(dimension: str) -> list:
         return RECORD_MEASURES[dimension]
     if dimension == "place":
         return [k for k in MEASURES if k in _PLACE_MEASURES]
-    return list(MEASURES)
+    kind = DIM_KIND[dimension]
+    return [k for k in MEASURES
+            if not (SCOPE[k] == "cost" and kind == "cycle")                         # a cost by hour of day means nothing
+            and not (SCOPE[k] == "drivers" and dimension not in ("", "driver", "day", "week", "month"))]
 
 
 def _uses(key: str, expressions: dict) -> set:
@@ -349,12 +395,19 @@ def _hours_in(v: PlaceVisit, start: datetime, end: datetime) -> Optional[float]:
     return max(0.0, (b - a).total_seconds() / 3600)
 
 
-def _trip_values(t: Trip, rate: Optional[float], windows: Optional[dict] = None, tz: Optional[ZoneInfo] = None) -> dict:
-    """A trip's measures; after-hours ones split its time (and distance, in proportion) by the vehicle's working hours."""
-    from app.services import time_profiles
+def _trip_values(t: Trip, rate: Optional[float], windows: Optional[dict] = None, tz: Optional[ZoneInfo] = None,
+                 settings: Optional[dict] = None) -> dict:
+    """A trip's measures; after-hours ones split its time (and distance, in proportion) by the vehicle's working hours.
+
+    Costs use the fleet settings: speeding h × R/h, excess idle h × L/h × fuel price, after-hours km × R/km,
+    and fuel (km × the vehicle's L/100 km, or the default) × fuel price.
+    """
+    from app.services import fleet_settings_service, time_profiles
+    st = settings or fleet_settings_service.DEFAULTS
     inside, outside = time_profiles.split(_utc(t.started_at), _utc(t.ended_at or t.last_event_at),
                                           windows if windows is not None else time_profiles.DEFAULT_WINDOWS, tz or timezone.utc)
     share = outside / (inside + outside) if inside + outside else 0.0
+    km, speeding_h, excess_h = (t.distance_m or 0) / 1000, (t.speeding_s or 0) / 3600, (t.excess_idle_s or 0) / 3600
     exceptions = (t.speeding_count or 0) + (t.harsh_braking_count or 0) + (t.harsh_acceleration_count or 0) \
         + (t.harsh_cornering_count or 0)
     return {"Trip_distance_km": (t.distance_m or 0) / 1000, "Trip_duration_hours": (t.duration_s or 0) / 3600,
@@ -364,11 +417,18 @@ def _trip_values(t: Trip, rate: Optional[float], windows: Optional[dict] = None,
             "Harsh_acceleration_count": t.harsh_acceleration_count or 0,
             "Harsh_cornering_count": t.harsh_cornering_count or 0, "Total_exception_count": exceptions,
             "After_hours_trip_count": 1 if outside > 0 else 0,
-            "After_hours_distance_km": (t.distance_m or 0) / 1000 * share, "After_hours_duration_hours": outside / 3600}
+            "After_hours_distance_km": km * share, "After_hours_duration_hours": outside / 3600,
+            "Speeding_duration_hours": speeding_h, "Idle_duration_hours": (t.idle_s or 0) / 3600,
+            "Excess_idle_hours": excess_h,
+            "Speeding_cost": speeding_h * st["speeding_cost_per_hour"],
+            "Excess_idle_cost": excess_h * st["idle_l_per_hour"] * st["fuel_price"],
+            "After_hours_cost": km * share * st["after_hours_cost_per_km"],
+            "_fuel_cost": km * fleet_settings_service.fuel_cost_per_km(st, rate)}
 
 
 def _trip_list(db, group_id, devices, start, end, tz, measures, trees, sort, descending, limit) -> tuple:
-    from app.services import drivers_service
+    from app.services import drivers_service, fleet_settings_service
+    settings = fleet_settings_service.get(db, group_id)
     driver_names = drivers_service.names(db, group_id)
     info_columns = [{"key": "vehicle", "label": "Vehicle"}, {"key": "driver", "label": "Driver"},
                     {"key": "start", "label": "Start"}, {"key": "end", "label": "End"},
@@ -380,7 +440,7 @@ def _trip_list(db, group_id, devices, start, end, tz, measures, trees, sort, des
     for t in trips[:RECORD_LIMIT]:
         info = devices[t.imei]
         values = {k: (None if v is None else round(v, 3)) for k, v in
-                  _trip_values(t, info.get("fuel_rate"), info.get("windows"), tz).items()}
+                  _trip_values(t, info.get("fuel_rate"), info.get("windows"), tz, settings).items() if not k.startswith("_")}
         out.append({"key": str(t.id), "label": f"{_utc(t.started_at).astimezone(tz).strftime('%d %b %H:%M')} · {info['name']}",
                     "values": _cells(measures, trees, values),
                     "info": {"vehicle": info["name"], "driver": (driver_names.get(str(t.driver_id)) if t.driver_id else None) or info.get("driver") or "",
@@ -440,6 +500,8 @@ def query(db: Session, group_id, devices: dict, start: datetime, end: datetime, 
         return {**result, "info_columns": info_columns, "rows": rows, "truncated": truncated}
 
     period_days = max(1, round((end - start).total_seconds() / 86400))
+    from app.services import fleet_settings_service
+    settings = fleet_settings_service.get(db, group_id)
 
     def key_of(imei: str, local: datetime) -> tuple:
         info = devices[imei]
@@ -461,7 +523,8 @@ def query(db: Session, group_id, devices: dict, start: datetime, end: datetime, 
     used_days = defaultdict(set)
     vehicles_in = defaultdict(set)            # which vehicles belong to each row (for downtime)
     imeis = list(devices)
-    trip_wanted = bool(used & {k for k, sc in SCOPE.items() if sc in ("trip", "fleet")})
+    trip_wanted = bool(used & {k for k, sc in SCOPE.items() if sc in ("trip", "fleet", "cost", "drivers")})
+    drivers_used, driver_days = defaultdict(set), defaultdict(set)   # who drove, and on which days, per row
     trips = (db.query(Trip).filter(Trip.usergroup_id == group_id, Trip.imei.in_(imeis), Trip.real(),
                                    Trip.started_at >= start, Trip.started_at < end).all()) if imeis and trip_wanted else []
     driver_names = {}
@@ -476,13 +539,19 @@ def query(db: Session, group_id, devices: dict, start: datetime, end: datetime, 
             key, label = key_of(t.imei, local)
         labels[key] = label
         row = acc[key]
-        tv = _trip_values(t, devices[t.imei].get("fuel_rate"), devices[t.imei].get("windows"), tz)
+        tv = _trip_values(t, devices[t.imei].get("fuel_rate"), devices[t.imei].get("windows"), tz, settings)
         km, hours = tv["Trip_distance_km"], tv["Trip_duration_hours"]
         row["Trip_count"] += 1
         for k in ("Trip_distance_km", "Trip_duration_hours", "Idling_count", "Speeding_count", "Harsh_braking_count",
                   "Harsh_acceleration_count", "Harsh_cornering_count", "Total_exception_count", "After_hours_trip_count",
-                  "After_hours_distance_km", "After_hours_duration_hours"):
+                  "After_hours_distance_km", "After_hours_duration_hours", "Speeding_duration_hours", "Idle_duration_hours",
+                  "Excess_idle_hours", "Speeding_cost", "Excess_idle_cost", "After_hours_cost"):
             row[k] += tv[k]
+        row["Fuel_cost"] += tv["_fuel_cost"]
+        did = str(t.driver_id) if t.driver_id else devices[t.imei].get("driver_id")
+        if did:
+            drivers_used[key].add(did)
+            driver_days[key].add((did, local.date()))
         row["Fuel_used_l"] += tv["Fuel_used_l"] or 0
         row["Max_speed_kmh"] = max(row["Max_speed_kmh"], tv["Max_speed_kmh"])
         if local.hour >= NIGHT_START or local.hour < NIGHT_END:
@@ -531,6 +600,16 @@ def query(db: Session, group_id, devices: dict, start: datetime, end: datetime, 
                 labels[key] = label
                 acc[key]["Time_in_place_hours"] += hours
 
+    # Costs: cost items (amortised by day) and fixed fees spread over the vehicle-days
+    if used & {k for k, sc in SCOPE.items() if sc == "cost"} and imeis:
+        _add_costs(db, group_id, devices, start, end, tz, settings, dimension, key_of, acc, labels)
+    workshop = defaultdict(set)
+    if "Workshop_days" in used and imeis:
+        for imei, d in _workshop_days(db, group_id, imeis, start, end, tz):
+            key, label = key_of(imei, datetime.combine(d, time(12), tzinfo=tz))
+            labels.setdefault(key, label)
+            workshop[key].add((imei, d))
+
     # Rows: every vehicle / group / place / bucket in scope, even those with nothing to count
     if kind in ("time", "cycle"):
         buckets = _all_buckets(dimension, start, end, tz)
@@ -549,7 +628,12 @@ def query(db: Session, group_id, devices: dict, start: datetime, end: datetime, 
             k, lbl = key_of(imei, datetime.now(tz))
             vehicles_in[k].add(imei)
             labels.setdefault(k, lbl)
+        if dimension == "driver":
+            for name in _active_driver_names(db, group_id):
+                labels.setdefault(name, name)
         order = [(k, labels[k]) for k in labels]
+    group_drivers = (len(_active_driver_names(db, group_id))
+                     if used & {"Driver_count", "Driver_utilization_days"} else 0)
 
     out = []
     for key, label in order:
@@ -561,15 +645,98 @@ def query(db: Session, group_id, devices: dict, start: datetime, end: datetime, 
         days = bucket_days.get(key) if dimension in _TIME_DIMS else (None if kind == "cycle" else period_days)
         values["Downtime_days"] = (max(0, values["Vehicle_count"] * days - values["Utilization_days"])
                                    if days is not None else None)
-        out.append({"key": key, "label": label, "values": _cells(measures, trees, values)})
+        values["Vehicle_days"] = values["Vehicle_count"] * days if days is not None else None
+        values["Period_days"] = days
+        values["Workshop_days"] = len(workshop.get(key, ()))
+        values["Driver_count"] = ((0 if key == "No driver" else 1) if dimension == "driver" else group_drivers)
+        values["Active_driver_count"] = len(drivers_used.get(key, ()))
+        values["Driver_utilization_days"] = len(driver_days.get(key, ()))
+        values["TCO"] = round(sum(values.get(k) or 0 for k in TCO_PARTS), 2)
+        r = {"key": key, "label": label, "values": _cells(measures, trees, values)}
+        if dimension == "vehicle":
+            r["info"] = {"registration": devices.get(key, {}).get("registration") or ""}
+        out.append(r)
 
     if kind in ("time", "cycle"):
         out.sort(key=lambda r: r["key"])
     else:
         _sort_rows(out, measures, sort, descending)
     if limit and dimension not in _TIME_DIMS:
-        out = out[:limit]
+        # A top / bottom N: rows without a value (e.g. a driver with no trips has no score) aren't ranked
+        by = sort if sort in measures else (measures[0] if measures else None)
+        out = [r for r in out if by is None or r["values"].get(by) is not None][:limit]
+    if dimension == "vehicle":
+        result["info_columns"] = [{"key": "registration", "label": "Registration"}]
     return {**result, "rows": out}
+
+
+def _active_driver_names(db: Session, group_id) -> list:
+    from app.models import Driver
+    return [d.name for d in db.query(Driver).filter(Driver.usergroup_id == group_id, Driver.is_active == True)]  # noqa: E712
+
+
+def _days(a: date, b: date):
+    d = a
+    while d <= b:
+        yield d
+        d += timedelta(days=1)
+
+
+def _add_costs(db, group_id, devices, start, end, tz, settings, dimension, key_of, acc, labels) -> None:
+    """Cost items (spread by day when amortised) and the daily share of fixed fees, into each row's cost measures."""
+    from app.models_maintenance import MaintenanceCost
+    from app.services.maintenance_service import cost_in_period
+    d0, d1 = start.astimezone(tz).date(), (end - timedelta(seconds=1)).astimezone(tz).date()
+    noon = lambda d: datetime.combine(d, time(12), tzinfo=tz)  # noqa: E731
+    imeis = list(devices)
+    costs = (db.query(MaintenanceCost)
+             .filter(MaintenanceCost.usergroup_id == group_id, MaintenanceCost.imei.in_(imeis),
+                     ((MaintenanceCost.amortise_from.is_(None)) & (MaintenanceCost.cost_date >= d0) & (MaintenanceCost.cost_date <= d1))
+                     | ((MaintenanceCost.amortise_from <= d1) & (MaintenanceCost.amortise_to >= d0))).all())
+    for c in costs:
+        measure = COST_MEASURE.get(c.category or "maintenance", "Other_cost")
+        if c.amortise_from and c.amortise_to:
+            span = (c.amortise_to - c.amortise_from).days + 1
+            for d in _days(max(d0, c.amortise_from), min(d1, c.amortise_to)):
+                key, label = key_of(c.imei, noon(d))
+                labels.setdefault(key, label)
+                acc[key][measure] += float(c.amount) / span
+        else:
+            key, label = key_of(c.imei, noon(c.cost_date))
+            labels.setdefault(key, label)
+            acc[key][measure] += cost_in_period(c, d0, d1)
+    daily = {"Tracking_cost": settings["tracking_fee_per_month"] * 12 / 365, "Licence_cost": settings["licence_fee_per_year"] / 365}
+    if not any(daily.values()):
+        return
+    if dimension in _TIME_DIMS:
+        for d in _days(d0, d1):
+            key, label = _bucket(dimension, noon(d))
+            labels.setdefault(key, label)
+            for measure, rate in daily.items():
+                acc[key][measure] += rate * len(imeis)
+    else:
+        n = (d1 - d0).days + 1
+        for imei in imeis:
+            key, label = key_of(imei, noon(d0))
+            labels.setdefault(key, label)
+            for measure, rate in daily.items():
+                acc[key][measure] += rate * n
+
+
+def _workshop_days(db, group_id, imeis, start, end, tz) -> set:
+    """{(imei, local date)} on which a vehicle was in the workshop (a job started and not yet ended)."""
+    from app.models_maintenance import VehicleMaintenance
+    jobs = (db.query(VehicleMaintenance)
+            .filter(VehicleMaintenance.usergroup_id == group_id, VehicleMaintenance.imei.in_(imeis),
+                    VehicleMaintenance.actual_start.isnot(None), VehicleMaintenance.actual_start < end,
+                    (VehicleMaintenance.actual_end.is_(None)) | (VehicleMaintenance.actual_end >= start)).all())
+    out = set()
+    now = datetime.now(timezone.utc)
+    for j in jobs:
+        a = max(_utc(j.actual_start), start).astimezone(tz).date()
+        b = min(_utc(j.actual_end) if j.actual_end else now, end - timedelta(seconds=1)).astimezone(tz).date()
+        out.update((j.imei, d) for d in _days(a, b))
+    return out
 
 
 def devices_for(db: Session, group_id, only: Optional[set], category: Optional[str] = None,
@@ -589,6 +756,8 @@ def devices_for(db: Session, group_id, only: Optional[set], category: Optional[s
             continue
         out[tag.imei] = {"name": tag.description or tag.device_name or tag.imei, "group": group,
                          "driver": (attrs.get("driver") or {}).get("value"), "fuel_rate": vehicle_fuel.rate(attrs),
+                         "driver_id": (attrs.get("driver_id") or {}).get("value"),
+                         "registration": (attrs.get("registration") or {}).get("value"),
                          "windows": time_profiles.for_vehicle(attrs, by_id, default)}
     return out
 
@@ -650,5 +819,88 @@ def default_pages(expr_ids: dict) -> list:
             _v("column", "Trips by hour of day", "hour", ["Trip_count"], 6, "m"),
             _v("column", "Distance by day of week", "weekday", ["Trip_distance_km"], 6, "m"),
             _v("line", "Driving time per day", "day", ["Trip_duration_hours"], 6, "m"),
+        ]),
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Fleet dashboards: scores, costs, utilisation (added once to every group; all editable)
+# ---------------------------------------------------------------------------
+
+def _score(measure: str, points: int) -> str:
+    """100, less `points` for each event per 100 km, kept within 0–100."""
+    return f"max(0, min(100, 100 - m.{measure} / m.Trip_distance_km * 100 * {points}))"
+
+
+_AFTER_HOURS_SCORE = "max(0, min(100, 100 - m.After_hours_distance_km / m.Trip_distance_km * 100))"
+FLEET_EXPRESSIONS = [
+    # (name, category, expression, description, unit, decimals)
+    ("Speeding score", "Scores", _score("Speeding_count", 5), "100 less 5 points per speeding event per 100 km", "", 0),
+    ("Acceleration score", "Scores", _score("Harsh_acceleration_count", 10), "100 less 10 points per harsh acceleration per 100 km", "", 0),
+    ("Braking score", "Scores", _score("Harsh_braking_count", 10), "100 less 10 points per harsh braking per 100 km", "", 0),
+    ("Cornering score", "Scores", _score("Harsh_cornering_count", 10), "100 less 10 points per harsh cornering per 100 km", "", 0),
+    ("After-hours score", "Scores", _AFTER_HOURS_SCORE, "100 less the share of km driven after hours", "", 0),
+    ("Driving score", "Scores",
+     f"({_score('Speeding_count', 5)} + {_score('Harsh_acceleration_count', 10)} + {_score('Harsh_braking_count', 10)} + "
+     f"{_score('Harsh_cornering_count', 10)} + {_AFTER_HOURS_SCORE}) / 5",
+     "Average of the speeding, acceleration, braking, cornering and after-hours scores", "", 0),
+    ("Cost per km (CPK)", "Fuel and costs", "m.TCO / m.Trip_distance_km", "Total cost of ownership per km driven", "R", 2),
+    ("Vehicle utilisation %", "Utilisation", "m.Utilization_days / m.Vehicle_days * 100", "Vehicle-days with at least one trip", "%", 0),
+    ("Vehicle availability %", "Utilisation", "(m.Vehicle_days - m.Workshop_days) / m.Vehicle_days * 100", "Vehicle-days not in the workshop", "%", 0),
+    ("Driver utilisation %", "Utilisation", "m.Driver_utilization_days / (m.Driver_count * m.Period_days) * 100", "Driver-days with a trip, of all driver-days", "%", 0),
+    ("Driver availability %", "Utilisation", "m.Active_driver_count / m.Driver_count * 100", "Drivers who drove in the period", "%", 0),
+    ("Speeding exceptions per hour", "Exceptions", "m.Speeding_count / m.Trip_duration_hours", "Per driving hour", "", 2),
+    ("Braking exceptions per hour", "Exceptions", "m.Harsh_braking_count / m.Trip_duration_hours", "Per driving hour", "", 2),
+]
+
+
+def fleet_pages(e: dict) -> list:
+    """e: {expression name: "expr:<id>"}."""
+    scores = ["Speeding score", "Acceleration score", "Braking score", "Cornering score", "After-hours score", "Driving score"]
+    return [
+        ("Fleet dashboard", "this_month", [
+            _v("kpi", "Total cost of ownership", "", ["TCO", e["Cost per km (CPK)"]], 4, "s"),
+            _v("kpi", "Distance travelled", "", ["Trip_distance_km", "Trip_count"], 4, "s"),
+            _v("kpi", "Trip duration", "", ["Trip_duration_hours", "Active_vehicle_count"], 4, "s"),
+            _v("kpi", "Speeding", "", ["Speeding_duration_hours", "Speeding_cost"], 4, "s"),
+            _v("kpi", "Excess idling", "", ["Excess_idle_hours", "Excess_idle_cost"], 4, "s"),
+            _v("kpi", "After hours", "", ["After_hours_distance_km", "After_hours_cost"], 4, "s"),
+            *[_v("kpi", name, "", [e[name]], 2, "s") for name in scores],
+            _v("bar", "Top 10 drivers (driving score)", "driver", [e["Driving score"]], 6, "m", limit=10, descending=True, show_values=True),
+            _v("bar", "Worst 10 drivers (driving score)", "driver", [e["Driving score"]], 6, "m", limit=10, descending=False, show_values=True),
+            _v("table", "Vehicles", "vehicle", ["Trip_distance_km", e["Cost per km (CPK)"], "Trip_duration_hours",
+                                               "Speeding_duration_hours", "Speeding_cost", "Excess_idle_cost",
+                                               "After_hours_distance_km", "After_hours_duration_hours"], 12, "l"),
+            _v("table", "Driving scores by vehicle group (click a group to drill down)", "vehicle_group",
+               [e[n] for n in scores], 12, "m"),
+        ]),
+        ("Fleet cost", "this_year", [
+            _v("kpi", "Total cost of ownership", "", ["TCO", e["Cost per km (CPK)"]], 4, "s"),
+            _v("kpi", "Maintenance", "", ["Maintenance_cost"], 4, "s"),
+            _v("kpi", "After hours", "", ["After_hours_cost", "After_hours_distance_km"], 4, "s"),
+            _v("stacked", "Monthly fleet cost", "month", ["Maintenance_cost", "Tracking_cost", "Licence_cost", "Fines_cost",
+                                                          "After_hours_cost", "Fuel_cost"], 12, "l"),
+            _v("table", "Monthly fleet cost", "month", ["Maintenance_cost", "Tracking_cost", "Licence_cost", "Fines_cost",
+                                                        "After_hours_cost", "Fuel_cost", "TCO"], 12, "m"),
+            _v("table", "Cost by vehicle group", "vehicle_group", ["Maintenance_cost", "Tracking_cost", "Licence_cost",
+                                                                   "Fines_cost", "After_hours_cost", "TCO",
+                                                                   e["Cost per km (CPK)"]], 12, "m"),
+        ]),
+        ("Utilisation and availability", "last_month", [
+            _v("kpi", "Vehicles utilised", "", ["Active_vehicle_count", "Vehicle_count"], 3, "s"),
+            _v("kpi", "Distance travelled", "", ["Trip_distance_km"], 3, "s"),
+            _v("kpi", "Vehicle utilisation", "", [e["Vehicle utilisation %"], e["Vehicle availability %"]], 3, "s"),
+            _v("kpi", "Driver utilisation", "", [e["Driver utilisation %"], e["Driver availability %"]], 3, "s"),
+            _v("kpi", "Speeding exceptions per hour", "", [e["Speeding exceptions per hour"]], 3, "s"),
+            _v("kpi", "Braking exceptions per hour", "", [e["Braking exceptions per hour"]], 3, "s"),
+            _v("line", "Vehicle utilisation and availability per week", "week",
+               [e["Vehicle utilisation %"], e["Vehicle availability %"]], 6, "s"),
+            _v("table", "Utilisation per week", "week",
+               ["Active_vehicle_count", "Trip_distance_km", e["Vehicle utilisation %"], e["Vehicle availability %"],
+                e["Driver utilisation %"], e["Driver availability %"], e["Speeding exceptions per hour"],
+                e["Braking exceptions per hour"]], 12, "m"),
+            _v("table", "Utilisation by vehicle group", "vehicle_group",
+               ["Active_vehicle_count", "Vehicle_count", "Trip_distance_km", e["Vehicle utilisation %"],
+                e["Vehicle availability %"], e["Speeding exceptions per hour"], e["Braking exceptions per hour"]], 12, "m"),
         ]),
     ]

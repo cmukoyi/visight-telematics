@@ -43,9 +43,14 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
 }
 
 /** Download a file response (reports) with the auth header. */
-export async function download(path: string, fallbackName: string) {
+/** Save a file the API returns (a GET, or a POST of `json`). */
+export async function download(path: string, fallbackName: string, json?: unknown) {
   const token = getSession().token;
-  const res = await fetch(path, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  const res = await fetch(path, {
+    method: json === undefined ? 'GET' : 'POST',
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(json === undefined ? {} : { 'Content-Type': 'application/json' }) },
+    body: json === undefined ? undefined : JSON.stringify(json),
+  });
   if (!res.ok) throw new ApiError(res.status, detail(await res.json().catch(() => null), 'Download failed'));
   const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') || '')?.[1] || fallbackName;
   const url = URL.createObjectURL(await res.blob());

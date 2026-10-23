@@ -20,7 +20,8 @@ from app.models_dataprofiler import DeviceEvent, ReportSchedule, Trip
 logger = logging.getLogger(__name__)
 
 FREQUENCIES = ("daily", "weekly", "monthly")
-FORMATS = ("xlsx", "csv")
+FORMATS = ("xlsx", "csv", "pdf")
+ANALYTICS_KEY = "analytics"   # a schedule of an Analytics visual (params: page_id, visual_id)
 MAX_ROWS = 50_000
 
 
@@ -321,9 +322,117 @@ def _logo_image(data_url: Optional[str]):
         return None
 
 
+_PDF_CHARS = str.maketrans({"–": "-", "—": "-", "·": "-", "’": "'", "‘": "'", "“": '"', "”": '"', "…": "...",
+                            "→": "->", "≥": ">=", "≤": "<=", "×": "x", "÷": "/", "€": "EUR"})
+
+
+def _latin(value) -> str:
+    """Text the PDF's built-in font can show."""
+    return str("" if value is None else value).translate(_PDF_CHARS).encode("latin-1", "replace").decode("latin-1")
+
+
+def _text(v) -> str:
+    """A cell value as text: thousands separated, floats without trailing zeros."""
+    if isinstance(v, bool):
+        return "yes" if v else "no"
+    if isinstance(v, float):
+        return f"{v:,.2f}".rstrip("0").rstrip(".")
+    if isinstance(v, int):
+        return f"{v:,}"
+    return _latin(v)
+
+
+def _pdf(title: str, cols: list, rows: list, subtitle: Optional[str], logo: Optional[str]) -> bytes:
+    """A landscape A4 table: logo, title and subtitle, then the rows with the header repeated on every page."""
+    from fpdf import FPDF
+    pdf = FPDF(orientation="L", unit="mm", format="A4")
+    pdf.set_auto_page_break(auto=True, margin=12)
+    pdf.add_page()
+    if logo and logo.startswith(("data:image/png", "data:image/jpeg", "data:image/jpg")):
+        try:
+            import base64
+            pdf.image(io.BytesIO(base64.b64decode(logo.split(",", 1)[1])), x=10, y=8, h=14)
+            pdf.set_y(24)
+        except Exception:
+            logger.warning("Report logo could not be used in the PDF", exc_info=True)
+    pdf.set_font("Helvetica", "B", 15)
+    pdf.cell(0, 8, _latin(title), new_x="LMARGIN", new_y="NEXT")
+    if subtitle:
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(110, 110, 110)
+        pdf.cell(0, 6, _latin(subtitle), new_x="LMARGIN", new_y="NEXT")
+        pdf.set_text_color(0, 0, 0)
+    pdf.ln(2)
+    if not cols:
+        return bytes(pdf.output())
+    # Column widths from the measured text (values in full; headers wrap); the table spans the page
+    from fpdf.fonts import FontFace
+    sample = rows[:300]
+    pdf.set_font("Helvetica", "", 7.5)
+    body = [max([0.0] + [pdf.get_string_width(_text(r[i])) for r in sample if i < len(r)]) for i in range(len(cols))]
+    pdf.set_font("Helvetica", "B", 7.5)
+    head = [pdf.get_string_width(_latin(c)) for c in cols]
+    want = [max(b, h * 0.55, 10) + 3 for b, h in zip(body, head)]
+    numeric = [all(isinstance(r[i], (int, float)) or r[i] in ("", None) for r in sample if i < len(r)) for i in range(len(cols))]
+    pdf.set_font("Helvetica", "", 7.5)
+    with pdf.table(col_widths=tuple(want), text_align=tuple("RIGHT" if n else "LEFT" for n in numeric),
+                   line_height=4.2, borders_layout="NONE", cell_fill_color=(246, 248, 251), cell_fill_mode="ROWS",
+                   headings_style=FontFace(emphasis="BOLD", fill_color=(230, 236, 245)), repeat_headings=1,
+                   padding=(1.2, 1.5)) as table:
+        heading = table.row()
+        for c in cols:
+            heading.cell(_latin(c))
+        for r in rows:
+            row = table.row()
+            for i in range(len(cols)):
+                row.cell(_text(r[i] if i < len(r) else ""))
+    pdf.set_font("Helvetica", "", 7)
+    pdf.set_text_color(130, 130, 130)
+    pdf.cell(0, 6, f"{len(rows)} rows", new_x="LMARGIN", new_y="NEXT")
+    return bytes(pdf.output())
+
+
+def analytics_table(db: Session, group_id, page_id: str, visual_id: str, start: datetime, end: datetime, tz_name: str,
+                    only: Optional[set] = None, category: Optional[str] = None, imei: Optional[str] = None) -> tuple:
+    """(title, columns, rows) of an Analytics visual for a period — for scheduled e-mails and downloads."""
+    from uuid import UUID
+    from app.models import AnalyticsExpression, AnalyticsPage
+    from app.services import analytics_service as an
+    page = db.query(AnalyticsPage).filter(AnalyticsPage.id == UUID(str(page_id)), AnalyticsPage.usergroup_id == group_id).first()
+    visual = next((v for v in (page.visuals or []) if v.get("id") == visual_id), None) if page else None
+    if not visual:
+        raise KeyError("The Analytics chart no longer exists")
+    expressions = {str(e.id): (e.name, e.expression, e.decimals, e.unit)
+                   for e in db.query(AnalyticsExpression).filter(AnalyticsExpression.usergroup_id == group_id)}
+    devices = an.devices_for(db, group_id, only, visual.get("category") or category, visual.get("imei") or imei)
+    result = an.query(db, group_id, devices, start, end, ZoneInfo(tz_name), dimension=visual.get("dimension", ""),
+                      measures=visual.get("measures") or [], expressions=expressions, sort=visual.get("sort"),
+                      descending=visual.get("descending", True), limit=visual.get("limit"), place_id=visual.get("place_id"))
+    return f"{page.name} - {visual.get('title') or 'Chart'}", *result_table(result)
+
+
+def result_table(result: dict) -> tuple:
+    """(columns, rows) of an analytics result: the row label, its text columns, then each value (rounded)."""
+    info = result.get("info_columns") or []
+    record = result.get("kind") == "record"
+    cols = ([] if record or result["dimension"] == "" else [result["dimension_label"]]) + [c["label"] for c in info] + [
+        f"{c['label']} ({c['unit']})" if c["unit"] else c["label"] for c in result["columns"]]
+    rows = []
+    for r in result["rows"]:
+        values = []
+        for c in result["columns"]:
+            v = r["values"].get(c["key"])
+            values.append("" if v is None else (round(v) if c["decimals"] == 0 else round(v, c["decimals"])))
+        rows.append(([] if record or result["dimension"] == "" else [r["label"]])
+                    + [(r.get("info") or {}).get(c["key"], "") for c in info] + values)
+    return cols, rows
+
+
 def to_file(title: str, cols: list, rows: list, fmt: str,
             subtitle: Optional[str] = None, logo: Optional[str] = None) -> tuple[bytes, str, str]:
     """(content, mime type, extension). Excel files get a heading (logo, title, subtitle) when given."""
+    if fmt == "pdf":
+        return _pdf(title, cols, rows, subtitle, logo), "application/pdf", "pdf"
     if fmt == "csv":
         buf = io.StringIO()
         writer = csv.writer(buf)
@@ -404,13 +513,18 @@ def _creator_scope(db: Session, schedule: ReportSchedule) -> Optional[set]:
 
 
 def run_schedule(db: Session, schedule: ReportSchedule, email_service, now: datetime) -> str:
-    title = REPORTS[schedule.report_key][0]
     tz = ZoneInfo(schedule.timezone)
     start, end = period_for(schedule.frequency, now, tz)
     params = schedule.params or {}
-    cols, rows = generate(db, schedule.usergroup_id, schedule.report_key, start, end,
-                          imei=params.get("imei"), category=params.get("category"), tz_name=schedule.timezone,
-                          only=_creator_scope(db, schedule))
+    if schedule.report_key == ANALYTICS_KEY:
+        title, cols, rows = analytics_table(db, schedule.usergroup_id, params.get("page_id"), params.get("visual_id"), start, end,
+                                            schedule.timezone, only=_creator_scope(db, schedule),
+                                            category=params.get("category"), imei=params.get("imei"))
+    else:
+        title = REPORTS[schedule.report_key][0]
+        cols, rows = generate(db, schedule.usergroup_id, schedule.report_key, start, end,
+                              imei=params.get("imei"), category=params.get("category"), tz_name=schedule.timezone,
+                              only=_creator_scope(db, schedule))
     period = f"{start.astimezone(tz):%d %b %Y}" + (
         "" if schedule.frequency == "daily" else f" – {(end - timedelta(seconds=1)).astimezone(tz):%d %b %Y}")
     group = db.get(UserGroup, schedule.usergroup_id)

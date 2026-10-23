@@ -20,10 +20,12 @@ export function formatValue(v: number | null | undefined, col?: AnalyticsColumn,
 const withUnit = (text: string, col?: AnalyticsColumn) => (col?.unit ? (col.unit === 'R' ? `R ${text}` : `${text} ${col.unit}`) : text);
 
 /** Rows as a table — every chart can be read this way too (and it's the relief for low-contrast colours). */
-export function ResultTable({ result, maxHeight }: { result: AnalyticsResult; maxHeight?: number }) {
-  // A list (Each trip / Each place visit) shows its text columns instead of the row label
+export type RowClick = (row: AnalyticsResult['rows'][number]) => void;
+
+export function ResultTable({ result, maxHeight, onRowClick }: { result: AnalyticsResult; maxHeight?: number; onRowClick?: RowClick }) {
+  // A list (Each trip / Each place visit) shows its text columns instead of the row label; summaries show both
   const info = result.info_columns ?? [];
-  const dimension = result.dimension !== '' && info.length === 0;
+  const dimension = result.dimension !== '' && result.kind !== 'record';
   return (
     <ScrollArea.Autosize mah={maxHeight} type="auto">
       <Table striped highlightOnHover stickyHeader fz="sm" verticalSpacing={6}>
@@ -36,7 +38,8 @@ export function ResultTable({ result, maxHeight }: { result: AnalyticsResult; ma
         </Table.Thead>
         <Table.Tbody>
           {result.rows.map((r) => (
-            <Table.Tr key={r.key}>
+            <Table.Tr key={r.key} onClick={onRowClick ? () => onRowClick(r) : undefined}
+                      style={onRowClick ? { cursor: 'pointer' } : undefined} title={onRowClick ? `Drill into ${r.label}` : undefined}>
               {dimension && <Table.Td>{r.label}</Table.Td>}
               {info.map((c) => <Table.Td key={c.key} style={{ whiteSpace: c.key === 'from' || c.key === 'to' ? 'normal' : 'nowrap' }}>{r.info?.[c.key] || '—'}</Table.Td>)}
               {result.columns.map((c) => <Table.Td key={c.key} ta="right" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatValue(r.values[c.key], c, false)}</Table.Td>)}
@@ -50,7 +53,9 @@ export function ResultTable({ result, maxHeight }: { result: AnalyticsResult; ma
 }
 
 /** Draw one visual from its query result. */
-export function VisualChart({ visual, result, height }: { visual: Visual; result: AnalyticsResult | undefined; height: number }) {
+export function VisualChart({ visual, result, height, onRowClick }: {
+  visual: Visual; result: AnalyticsResult | undefined; height: number; onRowClick?: RowClick;
+}) {
   if (visual.type === 'text') {
     return <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{visual.text || 'Add text in the visual’s Format tab.'}</Text>;
   }
@@ -77,7 +82,7 @@ export function VisualChart({ visual, result, height }: { visual: Visual; result
       </Stack>
     );
   }
-  if (visual.type === 'table') return <ResultTable result={result} maxHeight={height} />;
+  if (visual.type === 'table') return <ResultTable result={result} maxHeight={height} onRowClick={onRowClick} />;
   if (result.rows.length === 0) return <Text size="sm" c="dimmed">No data in this period.</Text>;
 
   const data = result.rows.map((r) => ({ label: r.label, ...Object.fromEntries(cols.map((c) => [c.key, r.values[c.key] ?? 0])) }));
@@ -128,7 +133,12 @@ export function VisualChart({ visual, result, height }: { visual: Visual; result
   return (
     <BarChart {...common} type={visual.type === 'stacked' ? 'stacked' : 'default'} orientation={horizontal ? 'vertical' : 'horizontal'}
               gridAxis={horizontal ? 'y' : 'x'} maxBarWidth={24} withBarValueLabel={!!visual.show_values && visual.type !== 'stacked'}
-              barProps={{ radius: horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0], stroke: 'var(--mantine-color-body)', strokeWidth: visual.type === 'stacked' ? 2 : 0 }}
+              barProps={{ radius: horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0], stroke: 'var(--mantine-color-body)', strokeWidth: visual.type === 'stacked' ? 2 : 0,
+                          ...(onRowClick ? { cursor: 'pointer', onClick: (d: { payload?: { label?: string } }) => {
+                            const label = d?.payload?.label;
+                            const row = result.rows.find((r) => r.label === label);
+                            if (row) onRowClick(row);
+                          } } as object : {}) }}
               {...(horizontal ? { yAxisProps: { width: 120 } } : {})} />
   );
 }

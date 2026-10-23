@@ -57,8 +57,10 @@ def _expressions(db: Session, group_id) -> dict:
 
 
 def ensure_defaults(db: Session, group_id, user_id=None) -> None:
-    """Give a user group the starting expressions and pages the first time it opens Analytics."""
+    """Give a user group the starting expressions and pages the first time it opens Analytics,
+    and the fleet dashboards (scores, costs, utilisation) once."""
     if db.query(AnalyticsPage.id).filter(AnalyticsPage.usergroup_id == group_id).first():
+        _ensure_fleet_dashboards(db, group_id, user_id)
         return
     have = {e.name: e for e in db.query(AnalyticsExpression).filter(AnalyticsExpression.usergroup_id == group_id)}
     for name, category, expression, description, unit, decimals in an.DEFAULT_EXPRESSIONS:
@@ -72,6 +74,33 @@ def ensure_defaults(db: Session, group_id, user_id=None) -> None:
     for i, (name, preset, visuals) in enumerate(an.default_pages(ids)):
         db.add(AnalyticsPage(usergroup_id=group_id, name=name, position=i, date_preset=preset, visuals=visuals,
                              created_by=user_id))
+    db.commit()
+    _ensure_fleet_dashboards(db, group_id, user_id)
+
+
+FLEET_SEED = "fleet_dashboards_v1"
+
+
+def _ensure_fleet_dashboards(db: Session, group_id, user_id=None) -> None:
+    """Add the score / KPI expressions (missing ones, by name) and the three fleet pages, once per group."""
+    from app.services import fleet_settings_service
+    if FLEET_SEED in fleet_settings_service.seeded(db, group_id):
+        return
+    have = {e.name: e for e in db.query(AnalyticsExpression).filter(AnalyticsExpression.usergroup_id == group_id)}
+    for name, category, expression, description, unit, decimals in an.FLEET_EXPRESSIONS:
+        if name not in have:
+            have[name] = AnalyticsExpression(usergroup_id=group_id, name=name, category=category, expression=expression,
+                                             description=description or None, unit=unit or None, decimals=decimals,
+                                             created_by=user_id)
+            db.add(have[name])
+    db.flush()
+    ids = {name: f"expr:{e.id}" for name, e in have.items()}
+    names = {n for (n,) in db.query(AnalyticsPage.name).filter(AnalyticsPage.usergroup_id == group_id)}
+    for i, (name, preset, visuals) in enumerate(an.fleet_pages(ids)):
+        if name not in names:
+            db.add(AnalyticsPage(usergroup_id=group_id, name=name, position=-3 + i,   # first in the list
+                                 date_preset=preset, visuals=visuals, created_by=user_id))
+    fleet_settings_service.mark_seeded(db, group_id, FLEET_SEED)
     db.commit()
 
 
@@ -134,6 +163,38 @@ def run_query(data: QueryIn, request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+class ExportIn(QueryIn):
+    title: str = "Analytics"
+    format: str = "xlsx"
+
+    @field_validator("format")
+    @classmethod
+    def _format(cls, v):
+        if v not in ("xlsx", "csv", "pdf"):
+            raise ValueError("format must be xlsx, csv or pdf")
+        return v
+
+
+@router.post("/export")
+def export(data: ExportIn, request: Request, db: Session = Depends(get_db)):
+    """A visual's data as an XLSX, CSV or PDF file (with the group's report logo)."""
+    from fastapi.responses import Response
+    from app.models import UserGroup
+    from app.services import reports_service
+    result = run_query(data, request, db)
+    me, _ = _me(request, db)
+    group = db.get(UserGroup, me.usergroup_id)
+    tz = _tz(db, me.usergroup_id)
+    cols, rows = reports_service.result_table(result)
+    period = f"{data.date_from.astimezone(tz):%d %b %Y} – {(data.date_to - timedelta(seconds=1)).astimezone(tz):%d %b %Y}"
+    filters = " · ".join(x for x in (data.category, ) if x)
+    content, mime, ext = reports_service.to_file(data.title[:120] or "Analytics", cols, rows, data.format,
+                                                 subtitle=" · ".join(x for x in (group.name if group else "", period, filters) if x),
+                                                 logo=group.report_logo_data if group else None)
+    name = "".join(ch if ch.isalnum() or ch in " -_" else "_" for ch in (data.title or "analytics")).strip().replace(" ", "_")
+    return Response(content, media_type=mime, headers={"Content-Disposition": f'attachment; filename="{name or "analytics"}.{ext}"'})
 
 
 # ---------------------------------------------------------------------------

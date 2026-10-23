@@ -180,10 +180,13 @@ export interface ReportSchedule {
   report_title: string;
   name: string | null;
   frequency: 'daily' | 'weekly' | 'monthly';
-  file_format: 'xlsx' | 'csv';
+  file_format: 'xlsx' | 'csv' | 'pdf';
   recipients: string[];
   imei: string | null;
   category: string | null;
+  /** A scheduled Analytics chart (report_key "analytics"). */
+  page_id?: string | null;
+  visual_id?: string | null;
   timezone: string;
   send_hour: number;
   is_active: boolean;

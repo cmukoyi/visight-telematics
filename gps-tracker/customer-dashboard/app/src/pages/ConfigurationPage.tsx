@@ -9,7 +9,7 @@ import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import {
   IconAlertTriangle, IconArrowUpRight, IconBan, IconBolt, IconCar, IconKey, IconUsers, IconMapPin, IconPencil, IconPlugConnected,
-  IconSearch, IconTrash, IconPlus, IconShieldLock, IconDots, IconBellRinging, IconChevronRight, IconTool, IconClock,
+  IconSearch, IconTrash, IconPlus, IconShieldLock, IconDots, IconBellRinging, IconChevronRight, IconTool, IconClock, IconCoin,
 } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
@@ -24,7 +24,7 @@ import { DataGrid } from '../components/DataGrid';
 import { EditorShell, firstError } from '../components/EditorShell';
 import { EventTypeGroupsPage, EventTypesPage, GeofencesPage, PlaceGroupsPage } from './CatalogPages';
 import { ItemsPage, LookupPage, SchedulesPage, TypesPage, WorkshopsPage } from './maintenance/MaintenanceConfig';
-import { DriversPage, TimeProfilesPage } from './PeoplePages';
+import { DriversPage, FleetSettingsPage, TimeProfilesPage } from './PeoplePages';
 import { useMaintenanceCatalog } from '../api/maintenance';
 import { STATUS } from '../theme';
 import { ago, dateTime, vehicleName } from '../utils/format';
@@ -78,6 +78,7 @@ const SECTIONS: Section[] = [
   { title: msg('app.config.misc', 'Misc'), icon: IconDots, items: [
     { label: msg('app.config.notification_rules', 'Notification Rules'), to: 'misc/notification-rules', any: ['inbox.view', 'rules.manage'] },
     { label: msg('app.config.time_profiles', 'Time Profiles'), to: 'misc/time-profiles', any: ['settings.manage'] },
+    { label: msg('app.config.fleet_costs', 'Fleet Costs & Scoring'), to: 'misc/fleet-costs', any: ['settings.manage', 'reports.view'] },
   ] },
 ];
 
@@ -555,6 +556,7 @@ export function AccountPage() {
 const MISC = [
   { to: 'notification-rules', title: 'Notification Rules', description: 'Alert when vehicles enter or leave places; optional emails', icon: IconBellRinging },
   { to: 'time-profiles', title: 'Time Profiles', description: 'Working hours, for after-hours usage reports', icon: IconClock },
+  { to: 'fleet-costs', title: 'Fleet Costs & Scoring', description: 'Fuel price, speed limit, idle, after-hours and fixed costs for the dashboards', icon: IconCoin },
 ];
 
 function Misc() {
@@ -598,6 +600,7 @@ export function ConfigurationPage() {
       <Route path="misc" element={<Misc />} />
       <Route path="misc/notification-rules" element={<NotificationRulesPage />} />
       <Route path="misc/time-profiles" element={<TimeProfilesPage />} />
+      <Route path="misc/fleet-costs" element={<FleetSettingsPage />} />
       <Route path="drivers" element={<DriversPage />} />
       <Route path="maintenance/schedules" element={<SchedulesPage />} />
       <Route path="maintenance/types" element={<TypesPage />} />

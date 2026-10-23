@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { ActionIcon, Badge, Button, Checkbox, Group, Paper, SimpleGrid, Stack, Switch, Table, Text, TextInput, Tooltip } from '@mantine/core';
+import { ActionIcon, Badge, Button, Checkbox, Group, NumberInput, Paper, SimpleGrid, Stack, Switch, Table, Text, TextInput, Tooltip } from '@mantine/core';
 import { TimeInput } from '@mantine/dates';
 import { useForm } from '@mantine/form';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
-import { IconKey, IconPencil, IconPlus, IconSearch, IconStar, IconTrash } from '@tabler/icons-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { IconKey, IconPencil, IconPlus, IconRefresh, IconSearch, IconStar, IconTrash } from '@tabler/icons-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { api } from '../api/client';
 import { useCan, useDrivers, useTimeProfiles } from '../api/hooks';
@@ -213,6 +213,75 @@ export function TimeProfilesPage() {
             </Stack>
           ) },
       ]} />
+    </Stack>
+  );
+}
+
+// ── Fleet costs and scoring ──
+interface FleetSetting { key: string; label: string; unit: string; help: string; value: number; default: number }
+const GROUPS: { title: string; keys: string[] }[] = [
+  { title: 'Fuel', keys: ['fuel_price', 'default_l_per_100km', 'idle_l_per_hour'] },
+  { title: 'Exceptions', keys: ['speed_limit_kmh', 'speeding_cost_per_hour', 'excess_idle_minutes', 'after_hours_cost_per_km'] },
+  { title: 'Fixed costs', keys: ['tracking_fee_per_month', 'licence_fee_per_year'] },
+];
+
+export function FleetSettingsPage() {
+  const qc = useQueryClient();
+  const manage = useCan()('settings.manage');
+  const { data: rows = [] } = useQuery({ queryKey: ['fleet-settings'], queryFn: () => api<FleetSetting[]>('/api/portal/fleet-settings') });
+  const [values, setValues] = useState<Record<string, number | ''>>({});
+  const [saving, setSaving] = useState(false);
+  const [recalc, setRecalc] = useState(false);
+  const value = (s: FleetSetting) => (s.key in values ? values[s.key] : s.value);
+  const changed = rows.some((s) => s.key in values && values[s.key] !== s.value);
+  const durationsChanged = ['speed_limit_kmh', 'excess_idle_minutes'].some((k) => k in values && values[k] !== rows.find((s) => s.key === k)?.value);
+  const save = async () => {
+    setSaving(true);
+    try {
+      const body = Object.fromEntries(Object.entries(values).filter(([, v]) => v !== ''));
+      await api('/api/portal/fleet-settings', { method: 'PUT', json: body });
+      qc.invalidateQueries({ queryKey: ['fleet-settings'] });
+      qc.invalidateQueries({ queryKey: ['analytics-query'] });
+      notifications.show({ color: 'green', message: 'Fleet settings saved' });
+      if (durationsChanged) modals.openConfirmModal({
+        title: 'Work out speeding and idle time again?',
+        children: <Text size="sm">The new speed limit or idle threshold applies to new trips. Recalculate the last 120 days too?</Text>,
+        labels: { confirm: 'Recalculate', cancel: 'Only new trips' }, onConfirm: recalculate,
+      });
+      setValues({});
+    } catch (e) { fail(e); } finally { setSaving(false); }
+  };
+  const recalculate = async () => {
+    setRecalc(true);
+    try {
+      const r = await api<{ trips: number }>('/api/portal/fleet-settings/recalculate', { method: 'POST' });
+      qc.invalidateQueries({ queryKey: ['analytics-query'] });
+      notifications.show({ color: 'green', message: `Speeding and idle time worked out again for ${r.trips} trips` });
+    } catch (e) { fail(e); } finally { setRecalc(false); }
+  };
+  return (
+    <Stack p="lg" gap="md" maw={980}>
+      <ConfigHeader section="Misc" title="Fleet Costs & Scoring"
+                    description="What usage costs, for the fleet dashboards (TCO, CPK, speeding, idling and after-hours cost). Capture fines, tracking, licence and other costs as cost items (Vehicle Maintenance → Cost Item).">
+        {manage && <Button size="xs" variant="default" leftSection={<IconRefresh size={14} />} loading={recalc} onClick={recalculate}>Recalculate durations</Button>}
+        {manage && <Button size="xs" onClick={save} loading={saving} disabled={!changed}>Save</Button>}
+      </ConfigHeader>
+      {GROUPS.map((g) => (
+        <Paper key={g.title} withBorder p="md" radius="md">
+          <Text fw={650} mb="sm">{g.title}</Text>
+          <SimpleGrid cols={{ base: 1, sm: 2 }}>
+            {g.keys.map((k) => rows.find((s) => s.key === k)).filter(Boolean).map((s) => (
+              <NumberInput key={s!.key} label={s!.label} description={s!.help} min={0} decimalScale={2} thousandSeparator=" " disabled={!manage}
+                           rightSection={<Text size="xs" c="dimmed" pr={6} style={{ whiteSpace: 'nowrap' }}>{s!.unit}</Text>} rightSectionWidth={110}
+                           value={value(s!)} onChange={(v) => setValues((x) => ({ ...x, [s!.key]: typeof v === 'number' ? v : '' }))} />
+            ))}
+          </SimpleGrid>
+        </Paper>
+      ))}
+      <Text size="sm" c="dimmed">
+        Speeding duration is time driven above the speed limit; excess idle is idling beyond the threshold at each stop.
+        Scores (Reports → Expressions, category “Scores”) are formulas you can change, e.g. how many points a harsh brake costs.
+      </Text>
     </Stack>
   );
 }

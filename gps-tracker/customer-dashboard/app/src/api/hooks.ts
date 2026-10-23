@@ -172,10 +172,17 @@ export const useExpressions = () =>
   useQuery({ queryKey: ['analytics-expressions'], queryFn: () => api<AnalyticsExpression[]>('/api/portal/analytics/expressions') });
 
 /** One visual's data for a period (and the page's vehicle group, unless the visual sets its own). */
-export const useAnalyticsQuery = (v: Visual | null, range: Range, category: string | null) => {
+/** The body of an analytics query for a visual, with the page's filters (vehicle group, vehicle) where the visual has none. */
+export const analyticsBody = (v: Visual, range: Range, category: string | null, imei: string | null = null) => ({
+  date_from: range.from.toISOString(), date_to: range.to.toISOString(), dimension: v.dimension, measures: v.measures,
+  category: v.category || category || null, imei: v.imei || imei || null, place_id: v.place_id || null, sort: v.sort || null,
+  descending: v.descending ?? true, limit: v.limit || null,
+});
+
+export const useAnalyticsQuery = (v: Visual | null, range: Range, category: string | null, imei: string | null = null) => {
   const body = v && v.type !== 'text' && v.measures.length ? {
     date_from: range.from.toISOString(), date_to: range.to.toISOString(), dimension: v.dimension, measures: v.measures,
-    category: v.category || category || null, imei: v.imei || null, place_id: v.place_id || null, sort: v.sort || null, descending: v.descending ?? true,
+    category: v.category || category || null, imei: v.imei || imei || null, place_id: v.place_id || null, sort: v.sort || null, descending: v.descending ?? true,
     limit: v.limit || null,
   } : null;
   return useQuery({
