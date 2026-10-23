@@ -8,8 +8,8 @@ import {
   IconArrowDown, IconArrowUp, IconChartArea, IconChartBar, IconChartDonut, IconChartLine, IconChartPie, IconNumber123, IconStack2,
   IconTable, IconTypography, IconX,
 } from '@tabler/icons-react';
-import { useAnalyticsCatalog, useAnalyticsQuery, useCategories, useVehicles, type Range } from '../../api/hooks';
-import type { Visual, VisualType } from '../../api/types';
+import { useAnalyticsCatalog, useAnalyticsQuery, useCategories, usePlaces, useVehicles, type Range } from '../../api/hooks';
+import type { AnalyticsCatalog, DimensionKind, Visual, VisualType } from '../../api/types';
 import { HEIGHTS, VisualChart } from '../../components/VisualChart';
 import { vehicleName } from '../../utils/format';
 import classes from './Analytics.module.css';
@@ -28,6 +28,34 @@ export const VISUAL_TYPES: { type: VisualType; label: string; icon: typeof IconT
 ];
 const WIDTHS = [{ value: '3', label: '¼' }, { value: '4', label: '⅓' }, { value: '6', label: '½' }, { value: '8', label: '⅔' }, { value: '12', label: 'Full' }];
 
+const KIND_HINT: Record<DimensionKind, string> = {
+  total: 'One figure for everything', category: 'One row per vehicle, group, driver or place',
+  time: 'A trend over time', cycle: 'A daily or weekly profile', record: 'A list — one row per trip or visit',
+};
+
+/** Why a chart type can't show this data honestly (null = fine). Mirrors analytics_service.check_visual. */
+export function visualProblem(type: VisualType, kind: DimensionKind, measures: string[], catalog: AnalyticsCatalog | undefined,
+                              dimensionLabel = ''): string | null {
+  if (type === 'text' || !catalog) return null;
+  const nonAdditive = measures.filter((k) => {
+    const m = catalog.measures.find((x) => x.key === k);
+    if (m) return !m.additive;
+    return catalog.expressions.find((e) => e.key === k)?.additive === false;
+  }).map((k) => catalog.measures.find((x) => x.key === k)?.label ?? catalog.expressions.find((e) => e.key === k)?.name ?? k);
+  if (kind === 'record' && !['table', 'column', 'bar'].includes(type)) return `${dimensionLabel || 'A list'} is a list — use a table, column or bar chart`;
+  if (type === 'pie' || type === 'donut') {
+    if (kind !== 'category' && kind !== 'cycle') return 'A pie shows shares of a whole — break it down by vehicle, group, driver, place, hour or day of week';
+    if (nonAdditive.length) return `“${nonAdditive[0]}” doesn't add up to a whole — use a bar chart`;
+  }
+  if ((type === 'line' || type === 'area') && kind !== 'time' && kind !== 'cycle') return 'Line and area charts show a trend — break them down by day, week, month or hour';
+  if (type === 'stacked') {
+    if (kind === 'total') return 'Stacked columns need a breakdown';
+    if (nonAdditive.length) return `“${nonAdditive[0]}” can't be stacked — stacked parts must add up`;
+  }
+  if (type === 'kpi' && kind !== 'total' && nonAdditive.length) return `A number adds its rows up, and “${nonAdditive[0]}” doesn't — use Total`;
+  return null;
+}
+
 export const newVisual = (): Visual => ({
   id: Math.random().toString(36).slice(2, 14), type: 'column', title: '', dimension: 'day', measures: [], width: 6, height: 'm',
   descending: true, show_values: false,
@@ -42,21 +70,67 @@ export function VisualEditor({ visual, opened, range, category, onSave, onClose 
   const { data: catalog } = useAnalyticsCatalog();
   const { data: categories = [] } = useCategories();
   const { data: vehicles = [] } = useVehicles();
+  const { data: places = [] } = usePlaces();
   const [v, setV] = useState<Visual>(newVisual);
   useEffect(() => { if (opened) setV(visual ? { ...visual } : newVisual()); }, [opened, visual]);
   const set = (patch: Partial<Visual>) => setV((x) => ({ ...x, ...patch }));
   const preview = useAnalyticsQuery(opened ? v : null, range, category);
 
-  // Values to pick: measures by category, then the group's expressions
+  const dim = catalog?.dimensions.find((d) => d.key === v.dimension);
+  const kind: DimensionKind = dim?.kind ?? 'total';
+  // A value fits the rows when every measure it uses does (a place visit has a time in place, not a trip count)
+  const fits = useMemo(() => {
+    const allowed = new Set(dim?.measures ?? catalog?.measures.map((m) => m.key) ?? []);
+    return (key: string) => {
+      if (!catalog) return true;
+      if (!key.startsWith('expr:')) return allowed.has(key);
+      const e = catalog.expressions.find((x) => x.key === key);
+      return !!e && (e.uses ?? []).every((m) => allowed.has(m));
+    };
+  }, [catalog, dim]);
+
+  // Values to pick: measures by category, then the group's expressions — only those that fit the rows
   const valueOptions = useMemo(() => {
     if (!catalog) return [];
     const by = new Map<string, { value: string; label: string }[]>();
-    catalog.measures.forEach((m) => by.set(m.category, [...(by.get(m.category) ?? []), { value: m.key, label: m.unit ? `${m.label} (${m.unit})` : m.label }]));
+    catalog.measures.filter((m) => fits(m.key))
+      .forEach((m) => by.set(m.category, [...(by.get(m.category) ?? []), { value: m.key, label: m.unit ? `${m.label} (${m.unit})` : m.label }]));
     const out = [...by].map(([group, items]) => ({ group, items }));
-    if (catalog.expressions.length) out.push({ group: 'Expressions', items: catalog.expressions.map((e) => ({ value: e.key, label: `ƒ ${e.name}` })) });
+    const exprs = catalog.expressions.filter((e) => fits(e.key));
+    if (exprs.length) out.push({ group: 'Expressions', items: exprs.map((e) => ({ value: e.key, label: `ƒ ${e.name}` })) });
     return out;
+  }, [catalog, fits]);
+  const labelOf = (key: string) => {
+    const m = catalog?.measures.find((x) => x.key === key);
+    if (m) return m.unit ? `${m.label} (${m.unit})` : m.label;
+    const e = catalog?.expressions.find((x) => x.key === key);
+    return e ? `ƒ ${e.name}` : key;
+  };
+  const dimensionOptions = useMemo(() => {
+    const dims = catalog?.dimensions ?? [];
+    const item = (d: (typeof dims)[number]) => ({ value: d.key, label: d.key === '' ? 'Total (no breakdown)' : d.label });
+    return [
+      { group: 'Summarise by', items: dims.filter((d) => d.kind !== 'record').map(item) },
+      { group: 'List each', items: dims.filter((d) => d.kind === 'record').map(item) },
+    ].filter((g) => g.items.length);
   }, [catalog]);
-  const labelOf = (key: string) => valueOptions.flatMap((g) => g.items).find((i) => i.value === key)?.label ?? key;
+  const problemFor = (type: VisualType) => visualProblem(type, kind, v.measures, catalog, dim?.label);
+  const problem = problemFor(v.type);
+  const [dropped, setDropped] = useState<string[]>([]);
+  // New rows: drop the values that don't fit them, and pick a chart that can show them
+  const changeDimension = (d: string) => {
+    const next = catalog?.dimensions.find((x) => x.key === d);
+    const allowed = new Set(next?.measures ?? []);
+    const fitsNext = (key: string) => (key.startsWith('expr:')
+      ? (catalog?.expressions.find((e) => e.key === key)?.uses ?? []).every((m) => allowed.has(m)) : allowed.has(key));
+    const keep = v.measures.filter(fitsNext);
+    setDropped(v.measures.filter((m) => !fitsNext(m)).map(labelOf));
+    const nextKind = next?.kind ?? 'total';
+    const type = visualProblem(v.type, nextKind, keep, catalog) ? (nextKind === 'total' ? 'kpi' : nextKind === 'time' ? 'line' : 'table') : v.type;
+    set({ dimension: d, measures: keep, type, sort: keep.includes(v.sort ?? '') ? v.sort : null });
+  };
+  const usesPlaces = v.dimension === 'place' || v.dimension === 'place_visit'
+    || v.measures.some((k) => catalog?.measures.find((m) => m.key === k)?.scope === 'place');
   const move = (i: number, d: number) => {
     const m = [...v.measures];
     const j = i + d;
@@ -65,7 +139,7 @@ export function VisualEditor({ visual, opened, range, category, onSave, onClose 
     set({ measures: m });
   };
   const single = v.type === 'pie' || v.type === 'donut';
-  const valid = v.type === 'text' ? !!(v.title || v.text) : v.measures.length > 0;
+  const valid = v.type === 'text' ? !!(v.title || v.text) : v.measures.length > 0 && !problem;
   const height = HEIGHTS[v.height];
 
   return (
@@ -75,15 +149,16 @@ export function VisualEditor({ visual, opened, range, category, onSave, onClose 
         <aside className={classes.editorSide}>
           <Text fw={650} mb="sm">Visualization</Text>
           <SimpleGrid cols={5} spacing={6} mb="md">
-            {VISUAL_TYPES.map((t) => (
-              <Tooltip key={t.type} label={<><b>{t.label}</b><br />{t.hint}</>} withinPortal multiline w={200}>
+            {VISUAL_TYPES.map((t) => { const why = t.type === v.type ? null : problemFor(t.type); return (
+              <Tooltip key={t.type} label={<><b>{t.label}</b><br />{why ?? t.hint}</>} withinPortal multiline w={220}>
                 <UnstyledButton className={classes.typeBtn} data-active={v.type === t.type || undefined} aria-label={t.label}
+                                disabled={!!why} data-disabled={why ? true : undefined}
                                 onClick={() => set({ type: t.type, ...(t.type === 'pie' || t.type === 'donut' ? { measures: v.measures.slice(0, 1) } : {}),
                                                      ...(t.type === 'kpi' && !v.title ? { dimension: '' } : {}) })}>
                   <t.icon size={22} style={t.rotate ? { transform: 'rotate(90deg) scaleX(-1)' } : undefined} />
                 </UnstyledButton>
               </Tooltip>
-            ))}
+            ); })}
           </SimpleGrid>
           <Tabs defaultValue="fields" variant="pills" radius="xl">
             <Tabs.List grow mb="md">
@@ -96,13 +171,17 @@ export function VisualEditor({ visual, opened, range, category, onSave, onClose 
                 {v.type === 'text' ? <Text size="sm" c="dimmed">A text visual has no data — write it under Format.</Text> : (
                   <Stack gap="md">
                     <Select label={v.type === 'kpi' ? 'Total, or add up a breakdown' : 'Rows (breakdown)'} allowDeselect={false}
-                            description={v.type === 'kpi' ? undefined : 'What each bar, slice or row is'}
-                            data={(catalog?.dimensions ?? []).map((d) => ({ value: d.key, label: d.key === '' ? 'Total (no breakdown)' : d.label }))}
-                            value={v.dimension} onChange={(d) => set({ dimension: d ?? '' })} />
+                            description={v.type === 'kpi' ? undefined : KIND_HINT[kind]} maxDropdownHeight={360}
+                            data={dimensionOptions} value={v.dimension} onChange={(d) => changeDimension(d ?? '')} />
+                    {dropped.length > 0 && (
+                      <Text size="xs" c="orange">Removed {dropped.join(', ')} — {dropped.length > 1 ? "they don't" : "it doesn't"} apply to {dim?.label.toLowerCase()}.</Text>
+                    )}
                     <MultiSelect label={single ? 'Value' : 'Values (columns)'} searchable placeholder={v.measures.length ? '' : '+ Add data'}
                                  description="Measures we collect, and your Expressions (ƒ)" maxDropdownHeight={360}
                                  data={valueOptions} value={v.measures} maxValues={single ? 1 : 12}
-                                 onChange={(m) => set({ measures: m })} hidePickedOptions />
+                                 onChange={(m) => { setDropped([]); set({ measures: m }); }} hidePickedOptions
+                                 nothingFoundMessage="No values fit these rows" />
+                    {problem && <Text size="xs" c="red">{problem}</Text>}
                     {v.measures.length > 1 && (
                       <Stack gap={4}>
                         <Text size="xs" c="dimmed">Order (first = first colour / column)</Text>
@@ -127,6 +206,10 @@ export function VisualEditor({ visual, opened, range, category, onSave, onClose 
                           data={categories.map((c) => c.name)} value={v.category ?? null} onChange={(c) => set({ category: c })} />
                   <Select label="Vehicle" placeholder="All vehicles" clearable searchable data={vehicles.map((x) => ({ value: x.imei, label: vehicleName(x) }))}
                           value={v.imei ?? null} onChange={(c) => set({ imei: c })} />
+                  {usesPlaces && (
+                    <Select label="Place" placeholder="All places" clearable searchable data={places.map((p) => ({ value: String(p.id), label: p.name }))}
+                            value={v.place_id ?? null} onChange={(c) => set({ place_id: c })} />
+                  )}
                   {!['day', 'week', 'month', 'hour', 'weekday', ''].includes(v.dimension) && (
                     <>
                       <Select label="Sort by" placeholder="First value" clearable data={v.measures.map((m) => ({ value: m, label: labelOf(m) }))}
@@ -165,6 +248,7 @@ export function VisualEditor({ visual, opened, range, category, onSave, onClose 
                 ? <Stack h={height} align="center" justify="center" gap={4}><Text c="dimmed" size="sm">Add a value under Fields to see the chart.</Text></Stack>
                 : <VisualChart visual={v} result={preview.data} height={height} />}
               {preview.isError && <Text size="sm" c="red">{(preview.error as Error).message}</Text>}
+              {preview.data?.truncated && <Text size="xs" c="dimmed" mt={4}>Showing the first 2,000 rows — narrow the period or vehicles to see the rest.</Text>}
             </Paper>
           </div>
           <Group justify="flex-end" className={classes.editorFoot}>

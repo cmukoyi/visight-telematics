@@ -116,7 +116,7 @@ function Devices() {
   const { data: vehicles = [], isFetching } = useVehicles();
   const { data: categories = [] } = useCategories();
   const [editing, setEditing] = useState<Vehicle | null>(null);
-  const form = useForm({ initialValues: { description: '', category: '', registration: '', make: '', model: '', year: '', driver: '' } });
+  const form = useForm({ initialValues: { description: '', category: '', registration: '', make: '', model: '', year: '', driver: '', fuel_consumption: '' } });
   const can = useCan();
   const admin = can('vehicles.manage');
   const canDelete = can('vehicles.delete');
@@ -230,6 +230,21 @@ function Devices() {
               <TextInput label="Model" placeholder="e.g. Hilux 2.8 GD-6" {...form.getInputProps('model')} />
               <TextInput label="Year" placeholder="e.g. 2022" maxLength={4} {...form.getInputProps('year')} />
             </SimpleGrid>
+          ) },
+        { id: 'fuel', label: 'Fuel', keywords: 'fuel consumption travelling litres l/100km',
+          content: (
+            <Stack maw={620}>
+              <TextInput label="Travelling consumption" placeholder="e.g. 10.2" inputMode="decimal" rightSection={<Text size="xs" c="dimmed">L/100 km</Text>}
+                         rightSectionWidth={72}
+                         description="Litres used per 100 km while driving. Fuel used on each trip is estimated from its distance: 50 km at 10.2 L/100 km ≈ 5.1 L."
+                         {...form.getInputProps('fuel_consumption')} />
+              {(() => {
+                const rate = Number(String(form.values.fuel_consumption).replace(',', '.'));
+                return rate > 0 && rate <= 200
+                  ? <Text size="sm" c="dimmed">100 km uses about {rate.toFixed(1)} L · 1 L lasts about {(100 / rate).toFixed(1)} km</Text>
+                  : null;
+              })()}
+            </Stack>
           ) },
         { id: 'device', label: 'Device', keywords: 'imei unit model package expiry last seen',
           content: (

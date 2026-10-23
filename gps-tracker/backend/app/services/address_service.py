@@ -100,7 +100,7 @@ def lookup(db: Session, lat: Optional[float], lng: Optional[float]) -> Optional[
 def fill_trip_addresses(db: Session, limit: int = 25) -> int:
     """Look up missing start addresses (any trip) and end addresses (closed trips), newest first. Commits."""
     trips = (db.query(Trip)
-             .filter(or_(Trip.start_address.is_(None) & Trip.start_latitude.isnot(None),
+             .filter(Trip.real(), or_(Trip.start_address.is_(None) & Trip.start_latitude.isnot(None),
                          (Trip.status == "closed") & Trip.end_address.is_(None) & Trip.end_latitude.isnot(None)))
              .order_by(Trip.started_at.desc()).limit(limit).all())
     filled = 0

@@ -85,9 +85,11 @@ def catalog(request: Request, db: Session = Depends(get_db)):
     me, _ = _me(request, db)
     exprs = db.query(AnalyticsExpression).filter(AnalyticsExpression.usergroup_id == me.usergroup_id).order_by(AnalyticsExpression.name).all()
     return {
-        "measures": [{"key": k, "label": l, "unit": u, "category": c, "decimals": d} for k, (l, u, c, d) in an.MEASURES.items()],
+        "measures": [{"key": k, "label": l, "unit": u, "category": c, "decimals": d, "scope": an.SCOPE[k],
+                      "additive": k not in an.NOT_ADDITIVE} for k, (l, u, c, d) in an.MEASURES.items()],
         "expressions": [_expr_out(e) for e in exprs],
-        "dimensions": [{"key": k, "label": l} for k, l in an.DIMENSIONS.items()],
+        "dimensions": [{"key": k, "label": l, "kind": an.DIM_KIND[k], "measures": an.allowed_measures(k)}
+                       for k, l in an.DIMENSIONS.items()],
     }
 
 
@@ -98,6 +100,7 @@ class QueryIn(BaseModel):
     measures: List[str]
     category: Optional[str] = None
     imei: Optional[str] = None
+    place_id: Optional[str] = None
     sort: Optional[str] = None
     descending: bool = True
     limit: Optional[int] = None
@@ -125,7 +128,8 @@ def run_query(data: QueryIn, request: Request, db: Session = Depends(get_db)):
     try:
         return an.query(db, me.usergroup_id, devices, start, end, _tz(db, me.usergroup_id), dimension=data.dimension,
                         measures=data.measures, expressions=_expressions(db, me.usergroup_id), sort=data.sort,
-                        descending=data.descending, limit=max(1, min(data.limit, 500)) if data.limit else None)
+                        descending=data.descending, limit=max(1, min(data.limit, 500)) if data.limit else None,
+                        place_id=str(_uuid(data.place_id, "Place")) if data.place_id else None)
     except an.ExpressionError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except ValueError as exc:
@@ -159,8 +163,12 @@ class ExpressionIn(BaseModel):
 
 
 def _expr_out(e: AnalyticsExpression) -> dict:
+    try:
+        uses, additive = sorted(an.measures_used(e.expression)), an.expression_additive(e.expression)
+    except an.ExpressionError:
+        uses, additive = [], False
     return {"id": str(e.id), "key": f"expr:{e.id}", "name": e.name, "category": e.category, "expression": e.expression,
-            "description": e.description, "unit": e.unit, "decimals": e.decimals}
+            "description": e.description, "unit": e.unit, "decimals": e.decimals, "uses": uses, "additive": additive}
 
 
 def _check_expression(text: str) -> None:
@@ -285,6 +293,7 @@ class VisualIn(BaseModel):
     limit: Optional[int] = None
     category: Optional[str] = None
     imei: Optional[str] = None
+    place_id: Optional[str] = None
     text: Optional[str] = None
     show_values: bool = False
 
@@ -362,6 +371,10 @@ def _check_visual_measures(db: Session, me: PortalUser, data: PageIn) -> None:
                 raise HTTPException(status_code=400, detail=f"Unknown measure {m}")
         if v.type != "text" and not v.measures:
             raise HTTPException(status_code=400, detail=f"“{v.title or 'A visual'}” needs at least one value")
+        try:
+            an.check_visual(v.type, v.dimension, v.measures, exprs)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"“{v.title or 'A visual'}”: {exc}")
 
 
 @router.get("/pages")

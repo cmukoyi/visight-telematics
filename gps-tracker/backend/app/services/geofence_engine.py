@@ -14,6 +14,10 @@ one geofence_entry / geofence_exit inbox alert, then:
 - The first fix for a vehicle/place only records the state (no alert).
 - geofence_states.checked_at is the device time of the last fix checked, so
   late, buffered records from before it are skipped rather than replayed.
+
+Every active place of the vehicle's group is tracked (not only watched ones)
+so each stay is recorded in place_visits for place reports; only watched
+places raise alerts.
 """
 import json
 import logging
@@ -25,7 +29,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
-from app.models import (POI, BLETag, GeofenceState, GeofenceStatus, NotificationRule, POITrackerLink, UserGroup)
+from app.models import (POI, BLETag, GeofenceState, GeofenceStatus, NotificationRule, PlaceVisit, POITrackerLink, UserGroup)
 from app.services import portal_alert_service as alerts
 
 logger = logging.getLogger(__name__)
@@ -141,8 +145,25 @@ def _raise(db: Session, tag: BLETag, poi: POI, entered: bool, fix: dict, armed: 
     logger.info("Geofence %s: %s %s %s (rules: %s)", atype, tag.imei, v["event"], poi.name, [r.name for r in rules])
 
 
+def _record_visit(db: Session, tag: BLETag, poi: POI, entered: bool, at: Optional[datetime], fix: dict) -> None:
+    """Open a place visit on entry; close the open one on exit (or record an exit whose entry we never saw)."""
+    if poi.usergroup_id is None:   # an old per-user place, not a group's
+        return
+    if entered:
+        db.add(PlaceVisit(usergroup_id=poi.usergroup_id, tag_id=tag.id, imei=tag.imei, poi_id=poi.id,
+                          entered_at=at, entry_speed=fix.get("speed") if at else None))
+        return
+    visit = (db.query(PlaceVisit).filter(PlaceVisit.tag_id == tag.id, PlaceVisit.poi_id == poi.id,
+                                         PlaceVisit.exited_at.is_(None))
+             .order_by(PlaceVisit.id.desc()).first())
+    if visit is None:
+        visit = PlaceVisit(usergroup_id=poi.usergroup_id, tag_id=tag.id, imei=tag.imei, poi_id=poi.id)
+        db.add(visit)
+    visit.exited_at, visit.exit_speed = at, fix.get("speed")
+
+
 def _watched(db: Session, tag: BLETag) -> dict:
-    """{poi_id: (poi, armed, [rules])} — the places this vehicle is watched against."""
+    """{poi_id: (poi, armed, [rules])} — the places this vehicle is checked against (armed/rules: alerts)."""
     out: dict = {}
     links = (db.query(POITrackerLink).join(POI, POI.id == POITrackerLink.poi_id)
              .filter(POITrackerLink.tracker_id == tag.id, POITrackerLink.is_armed == True,  # noqa: E712
@@ -152,6 +173,9 @@ def _watched(db: Session, tag: BLETag) -> dict:
     group_id = (tag.attributes or {}).get("_created_usergroup_id")
     if not group_id:
         return out
+    places = {p.id: p for p in db.query(POI).filter(POI.usergroup_id == group_id, POI.is_active == True).all()}  # noqa: E712
+    for poi in places.values():   # tracked for place visits, without alerts
+        out.setdefault(poi.id, (poi, False, []))
     category = ((tag.attributes or {}).get("category") or {}).get("value")
     rules = [r for r in db.query(NotificationRule).filter(
                 NotificationRule.usergroup_id == group_id, NotificationRule.is_active == True,  # noqa: E712
@@ -159,7 +183,6 @@ def _watched(db: Session, tag: BLETag) -> dict:
              if not r.category or (category and r.category.lower() == category.lower())]
     if not rules:
         return out
-    places = {p.id: p for p in db.query(POI).filter(POI.usergroup_id == group_id, POI.is_active == True).all()}  # noqa: E712
     for rule in rules:
         ids = set(map(str, rule.place_ids or []))
         groups = set(map(str, rule.place_group_ids or []))
@@ -196,8 +219,11 @@ def check_positions(db: Session, tag: BLETag, fixes: list) -> int:
             if status is None:
                 status = GeofenceStatus(tag_id=tag.id, poi_id=poi_id, inside=inside, checked_at=at)
                 db.add(status)
+                if inside:   # already inside when tracking began: the stay's entry is unknown
+                    _record_visit(db, tag, poi, True, None, fix)
                 continue
             if inside != status.inside:
+                _record_visit(db, tag, poi, inside, at, fix)
                 wanting = [r for r in rules if (r.on_entry if inside else r.on_exit)]
                 if armed or wanting:
                     try:

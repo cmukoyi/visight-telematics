@@ -59,20 +59,23 @@ def _dur(seconds: Optional[int]) -> str:
 # ---------------------------------------------------------------------------
 
 def _trips_q(db, group_id, imeis, start, end):
-    return (db.query(Trip).filter(Trip.usergroup_id == group_id, Trip.imei.in_(list(imeis)),
+    return (db.query(Trip).filter(Trip.usergroup_id == group_id, Trip.imei.in_(list(imeis)), Trip.real(),
                                   Trip.started_at >= start, Trip.started_at < end)
             .order_by(Trip.started_at))
 
 
 def report_trips(db, group_id, devices, start, end, tz):
-    cols = ["Vehicle", "IMEI", "Start", "End", "Duration", "Distance (km)", "Max speed (km/h)",
+    from app.services import vehicle_fuel
+    cols = ["Vehicle", "IMEI", "Start", "End", "Duration", "Distance (km)", "Fuel used (L)", "Max speed (km/h)",
             "Avg speed (km/h)", "Speeding", "Harsh braking", "Harsh acceleration", "Harsh cornering",
             "Start location", "End location", "Start position", "End position"]
+    rates = vehicle_fuel.group_rates(db, group_id)
     rows = []
     for t in _trips_q(db, group_id, devices, start, end).limit(MAX_ROWS):
+        fuel = vehicle_fuel.litres(t.distance_m, rates.get(t.imei))
         rows.append([devices.get(t.imei, t.imei), t.imei, _local(t.started_at, tz),
                      _local(t.ended_at, tz) if t.ended_at else "in progress", _dur(t.duration_s),
-                     round((t.distance_m or 0) / 1000, 2), t.max_speed, t.avg_speed or "",
+                     round((t.distance_m or 0) / 1000, 2), "" if fuel is None else fuel, t.max_speed, t.avg_speed or "",
                      t.speeding_count, t.harsh_braking_count, t.harsh_acceleration_count, t.harsh_cornering_count,
                      t.start_address or "", t.end_address or "",
                      f"{t.start_latitude:.5f}, {t.start_longitude:.5f}" if t.start_latitude is not None else "",

@@ -32,7 +32,7 @@ router = APIRouter(prefix="/api/portal", tags=["portal-fleet"])
 def _week_stats(db: Session, group_id, imeis: list, start: datetime, end: datetime) -> dict:
     count, distance, duration = (db.query(func.count(Trip.id), func.coalesce(func.sum(Trip.distance_m), 0),
                                           func.coalesce(func.sum(Trip.duration_s), 0))
-                                 .filter(Trip.usergroup_id == group_id, Trip.imei.in_(imeis),
+                                 .filter(Trip.usergroup_id == group_id, Trip.imei.in_(imeis), Trip.real(),
                                          Trip.started_at >= start, Trip.started_at < end).one())
     return {"trips": count, "distance_km": round(distance / 1000, 1), "driving_hours": round(duration / 3600, 1),
             "avg_trip_km": round(distance / 1000 / count, 1) if count else 0}
@@ -243,7 +243,7 @@ def vehicle_status(request: Request, db: Session = Depends(get_db), imei: str = 
     day_start = datetime.now(tz).replace(hour=0, minute=0, second=0, microsecond=0)
     count, distance, driving = (db.query(func.count(Trip.id), func.coalesce(func.sum(Trip.distance_m), 0),
                                          func.coalesce(func.sum(Trip.duration_s), 0))
-                                .filter(Trip.usergroup_id == me.usergroup_id, Trip.imei == imei,
+                                .filter(Trip.usergroup_id == me.usergroup_id, Trip.imei == imei, Trip.real(),
                                         Trip.started_at >= day_start).one())
     return {
         "imei": imei,

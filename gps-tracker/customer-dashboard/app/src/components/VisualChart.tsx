@@ -21,13 +21,16 @@ const withUnit = (text: string, col?: AnalyticsColumn) => (col?.unit ? (col.unit
 
 /** Rows as a table — every chart can be read this way too (and it's the relief for low-contrast colours). */
 export function ResultTable({ result, maxHeight }: { result: AnalyticsResult; maxHeight?: number }) {
-  const dimension = result.dimension !== '';
+  // A list (Each trip / Each place visit) shows its text columns instead of the row label
+  const info = result.info_columns ?? [];
+  const dimension = result.dimension !== '' && info.length === 0;
   return (
     <ScrollArea.Autosize mah={maxHeight} type="auto">
       <Table striped highlightOnHover stickyHeader fz="sm" verticalSpacing={6}>
         <Table.Thead>
           <Table.Tr>
             {dimension && <Table.Th>{result.dimension_label}</Table.Th>}
+            {info.map((c) => <Table.Th key={c.key}>{c.label}</Table.Th>)}
             {result.columns.map((c) => <Table.Th key={c.key} ta="right">{c.label}{c.unit && c.unit !== 'R' ? ` (${c.unit})` : c.unit === 'R' ? ' (R)' : ''}</Table.Th>)}
           </Table.Tr>
         </Table.Thead>
@@ -35,10 +38,11 @@ export function ResultTable({ result, maxHeight }: { result: AnalyticsResult; ma
           {result.rows.map((r) => (
             <Table.Tr key={r.key}>
               {dimension && <Table.Td>{r.label}</Table.Td>}
+              {info.map((c) => <Table.Td key={c.key} style={{ whiteSpace: c.key === 'from' || c.key === 'to' ? 'normal' : 'nowrap' }}>{r.info?.[c.key] || '—'}</Table.Td>)}
               {result.columns.map((c) => <Table.Td key={c.key} ta="right" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatValue(r.values[c.key], c, false)}</Table.Td>)}
             </Table.Tr>
           ))}
-          {result.rows.length === 0 && <Table.Tr><Table.Td colSpan={result.columns.length + 1}><Text size="sm" c="dimmed">No data.</Text></Table.Td></Table.Tr>}
+          {result.rows.length === 0 && <Table.Tr><Table.Td colSpan={result.columns.length + info.length + 1}><Text size="sm" c="dimmed">No data.</Text></Table.Td></Table.Tr>}
         </Table.Tbody>
       </Table>
     </ScrollArea.Autosize>

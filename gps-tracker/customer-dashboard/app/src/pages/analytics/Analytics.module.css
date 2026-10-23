@@ -26,6 +26,8 @@
   border: 1px solid transparent; color: var(--mantine-color-dimmed);
 }
 .typeBtn:hover { background: var(--mantine-color-default-hover); color: var(--mantine-color-text); }
+.typeBtn[data-disabled] { opacity: 0.3; cursor: not-allowed; }
+.typeBtn[data-disabled]:hover { background: none; color: inherit; }
 .typeBtn[data-active] { border-color: var(--mantine-color-brand-5); color: var(--mantine-color-text); background: color-mix(in srgb, var(--mantine-color-brand-5) 15%, transparent); }
 .measureRow { padding: 2px 4px; border-radius: 6px; }
 .measureRow:hover { background: var(--mantine-color-default-hover); }

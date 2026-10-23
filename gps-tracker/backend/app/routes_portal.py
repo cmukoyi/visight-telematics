@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from time import perf_counter
 from typing import List, Optional
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 import jwt
 import os
 import secrets
@@ -1492,9 +1492,25 @@ class PortalTagUpdate(BaseModel):
     year: Optional[str] = None
     registration: Optional[str] = None
     driver: Optional[str] = None
+    # Fuel: travelling consumption in L/100 km ("" clears it)
+    fuel_consumption: Optional[str] = None
+
+    @field_validator("fuel_consumption")
+    @classmethod
+    def _fuel(cls, v):
+        from app.services import vehicle_fuel
+        if v is None or v.strip() == "":
+            return v
+        try:
+            value = float(v.replace(",", "."))
+        except ValueError:
+            raise ValueError("Enter the travelling consumption as a number, e.g. 10.2")
+        if not 0 < value <= vehicle_fuel.MAX_L_PER_100KM:
+            raise ValueError(f"Travelling consumption must be between 0 and {vehicle_fuel.MAX_L_PER_100KM} L/100 km")
+        return f"{value:g}"
 
 
-VEHICLE_DETAILS = ("make", "model", "year", "registration", "driver")
+VEHICLE_DETAILS = ("make", "model", "year", "registration", "driver", "fuel_consumption")
 
 
 @router.put("/tags/{tag_id}", response_model=PortalTagOut)
@@ -2627,7 +2643,8 @@ def list_positions(
 # TRIPS (built by app/services/trip_builder.py from Teltonika events)
 # ==============================================================================
 
-def _trip_out(trip, names: dict, drivers: Optional[dict] = None) -> dict:
+def _trip_out(trip, names: dict, drivers: Optional[dict] = None, fuel_rates: Optional[dict] = None) -> dict:
+    from app.services import vehicle_fuel
     return {
         "id": str(trip.id), "imei": trip.imei, "device_name": names.get(trip.imei),
         "driver": (drivers or {}).get(trip.imei),
@@ -2641,6 +2658,7 @@ def _trip_out(trip, names: dict, drivers: Optional[dict] = None) -> dict:
         "speeding_count": trip.speeding_count, "harsh_acceleration_count": trip.harsh_acceleration_count,
         "harsh_braking_count": trip.harsh_braking_count, "harsh_cornering_count": trip.harsh_cornering_count,
         "idling_count": trip.idling_count,
+        "fuel_used_l": vehicle_fuel.litres(trip.distance_m, (fuel_rates or {}).get(trip.imei)),
     }
 
 
@@ -2669,7 +2687,7 @@ def list_trips(request: Request, db: Session = Depends(get_db),
     me = get_portal_user_from_request(request, db)
     access = access_service.for_user(me, db)
     access.require("history.view")
-    q = db.query(Trip).filter(Trip.usergroup_id == me.usergroup_id)
+    q = db.query(Trip).filter(Trip.usergroup_id == me.usergroup_id, Trip.real())
     visible = access.visible_imeis(db)
     if visible is not None:
         q = q.filter(Trip.imei.in_(list(visible)))
@@ -2682,7 +2700,9 @@ def list_trips(request: Request, db: Session = Depends(get_db),
     trips = q.order_by(Trip.started_at.desc()).limit(limit).all()
     names = _group_device_names(db, me.usergroup_id)
     drivers = _group_drivers(db, me.usergroup_id)
-    return [_trip_out(t, names, drivers) for t in trips]
+    from app.services import vehicle_fuel
+    rates = vehicle_fuel.group_rates(db, me.usergroup_id)
+    return [_trip_out(t, names, drivers, rates) for t in trips]
 
 
 @router.get("/trips/{trip_id}")
@@ -2717,6 +2737,7 @@ def get_trip(trip_id: str, request: Request, db: Session = Depends(get_db)):
         "io": describe_io(e.io or {}),
     } for e in events
         if e.event_type in EVENTS and e.event_type not in ("position", "parked_position")]
-    out = _trip_out(trip, _group_device_names(db, me.usergroup_id))
+    from app.services import vehicle_fuel
+    out = _trip_out(trip, _group_device_names(db, me.usergroup_id), fuel_rates=vehicle_fuel.group_rates(db, me.usergroup_id))
     out.update(points=points, events=marked)
     return out

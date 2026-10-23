@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, Float, Text, Enum, JSON, UniqueConstraint, Index
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, BigInteger, Float, Text, Enum, JSON, UniqueConstraint, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 import uuid
@@ -437,6 +437,31 @@ class GeofenceStatus(Base):
     poi_id     = Column(UUID(as_uuid=True), ForeignKey("pois.id", ondelete="CASCADE"), primary_key=True)
     inside     = Column(Boolean, nullable=False)
     checked_at = Column(DateTime(timezone=True), nullable=False)   # device time of the fix
+
+
+class PlaceVisit(Base):
+    """A vehicle's stay in a place: entered … exited (geofence_engine), for place reports.
+
+    Recorded for every active place of the group, watched or not. entered_at is
+    None when the vehicle was already inside when tracking began; exited_at is
+    None while it is still inside.
+    """
+    __tablename__ = "place_visits"
+    __table_args__ = (
+        Index("ix_place_visits_group_entered", "usergroup_id", "entered_at"),
+        Index("ix_place_visits_group_exited", "usergroup_id", "exited_at"),
+        Index("ix_place_visits_open", "tag_id", "poi_id", "exited_at"),
+    )
+
+    id           = Column(BigInteger, primary_key=True, autoincrement=True)
+    usergroup_id = Column(UUID(as_uuid=True), ForeignKey("user_groups.id", ondelete="CASCADE"), nullable=False)
+    tag_id       = Column(UUID(as_uuid=True), ForeignKey("ble_tags.id", ondelete="CASCADE"), nullable=False)
+    imei         = Column(String(20), nullable=False)
+    poi_id       = Column(UUID(as_uuid=True), ForeignKey("pois.id", ondelete="CASCADE"), nullable=False)
+    entered_at   = Column(DateTime(timezone=True), nullable=True)
+    exited_at    = Column(DateTime(timezone=True), nullable=True)
+    entry_speed  = Column(Integer, nullable=True)
+    exit_speed   = Column(Integer, nullable=True)
 
 
 class TenantFeature(Base):

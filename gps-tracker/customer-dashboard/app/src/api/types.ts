@@ -31,7 +31,7 @@ export interface Vehicle {
   attributes: Record<string, unknown> | null;
 }
 
-export const VEHICLE_DETAILS = ['registration', 'make', 'model', 'year', 'driver'] as const;
+export const VEHICLE_DETAILS = ['registration', 'make', 'model', 'year', 'driver', 'fuel_consumption'] as const;
 export type VehicleDetail = typeof VEHICLE_DETAILS[number];
 
 /** make / model / year / registration / driver from the vehicle's attributes. */
@@ -73,6 +73,8 @@ export interface Trip {
   harsh_braking_count: number;
   harsh_cornering_count: number;
   idling_count: number;
+  /** Estimated from distance and the vehicle's travelling consumption; null when none is set. */
+  fuel_used_l: number | null;
 }
 
 export interface IoValue {
@@ -382,18 +384,30 @@ export interface Visual {
   limit?: number | null;
   category?: string | null;
   imei?: string | null;
+  place_id?: string | null;
   text?: string | null;
   show_values?: boolean;
 }
 export interface AnalyticsPageDef { id: string; name: string; position: number; date_preset: string; visuals: Visual[] }
-export interface AnalyticsMeasure { key: string; label: string; unit: string; category: string; decimals: number }
+export interface AnalyticsMeasure {
+  key: string; label: string; unit: string; category: string; decimals: number;
+  scope: 'trip' | 'fleet' | 'alert' | 'place'; additive: boolean;
+}
 export interface AnalyticsExpression {
   id: string; key: string; name: string; category: string | null; expression: string; description: string | null;
   unit: string | null; decimals: number; used_in?: string[];
+  /** Measures it uses, and whether its rows add up (no division, no top speed). */
+  uses?: string[]; additive?: boolean;
 }
-export interface AnalyticsCatalog { measures: AnalyticsMeasure[]; expressions: AnalyticsExpression[]; dimensions: { key: string; label: string }[] }
+/** total · category (vehicle, group, driver, place) · time (day/week/month) · cycle (hour, weekday) · record (each trip / visit) */
+export type DimensionKind = 'total' | 'category' | 'time' | 'cycle' | 'record';
+export interface AnalyticsDimension { key: string; label: string; kind: DimensionKind; measures: string[] }
+export interface AnalyticsCatalog { measures: AnalyticsMeasure[]; expressions: AnalyticsExpression[]; dimensions: AnalyticsDimension[] }
 export interface AnalyticsColumn { key: string; label: string; unit: string; decimals: number }
 export interface AnalyticsResult {
-  dimension: string; dimension_label: string; columns: AnalyticsColumn[];
-  rows: { key: string; label: string; values: Record<string, number | null> }[];
+  dimension: string; dimension_label: string; kind?: DimensionKind; columns: AnalyticsColumn[];
+  /** Text columns of a list (Each trip: vehicle, start, end, from, to …), shown before the values. */
+  info_columns?: { key: string; label: string }[];
+  truncated?: boolean;
+  rows: { key: string; label: string; values: Record<string, number | null>; info?: Record<string, string> }[];
 }

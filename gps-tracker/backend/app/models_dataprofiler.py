@@ -5,7 +5,7 @@ to the main UserGroup on the customer dashboard. When a device is routed
 through the exchange it is provisioned on the customer dashboard as a BLETag
 in that group, carrying a TagPackage that sets its validity and visible events.
 """
-from sqlalchemy import Column, String, Boolean, DateTime, Text, ForeignKey, Index, text, BigInteger, Integer, Float, JSON
+from sqlalchemy import Column, String, Boolean, DateTime, Text, ForeignKey, Index, text, BigInteger, Integer, Float, JSON, or_
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -151,6 +151,9 @@ class DeviceEvent(Base):
     created_at   = Column(DateTime(timezone=True), server_default=func.now())
 
 
+PHANTOM_MAX_M = 50   # under this a 0-second trip shows as 0.0 km (see Trip.real)
+
+
 class Trip(Base):
     """A journey built from a device's events: trip_start … positions/alerts … trip_end.
 
@@ -192,6 +195,17 @@ class Trip(Base):
     harsh_cornering_count    = Column(Integer, nullable=False, default=0)
     idling_count     = Column(Integer, nullable=False, default=0)
     created_at       = Column(DateTime(timezone=True), server_default=func.now())
+
+    @classmethod
+    def real(cls):
+        """Filter for trips worth showing and counting.
+
+        A device can produce a closed trip of 0 s that went nowhere (shown as
+        "0m 00s · 0.0 km"); it isn't driving or idling (idling takes time), so
+        trip lists, counts, reports and analytics leave it out. Open trips
+        always count: one that just started has no duration yet.
+        """
+        return or_(cls.status == "open", cls.duration_s > 0, cls.distance_m >= PHANTOM_MAX_M)
     updated_at       = Column(DateTime(timezone=True), onupdate=func.now())
 
 

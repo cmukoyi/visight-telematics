@@ -175,7 +175,7 @@ export const useExpressions = () =>
 export const useAnalyticsQuery = (v: Visual | null, range: Range, category: string | null) => {
   const body = v && v.type !== 'text' && v.measures.length ? {
     date_from: range.from.toISOString(), date_to: range.to.toISOString(), dimension: v.dimension, measures: v.measures,
-    category: v.category || category || null, imei: v.imei || null, sort: v.sort || null, descending: v.descending ?? true,
+    category: v.category || category || null, imei: v.imei || null, place_id: v.place_id || null, sort: v.sort || null, descending: v.descending ?? true,
     limit: v.limit || null,
   } : null;
   return useQuery({
