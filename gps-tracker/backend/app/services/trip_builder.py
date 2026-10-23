@@ -39,24 +39,6 @@ _COUNTERS = {
     "harsh_cornering": "harsh_cornering_count",
     "idling_start": "idling_count",
 }
-# One harsh manoeuvre can arrive as two records (event IO 253, and 243 with
-# its duration). Only the first is kept as the event; a second of the same
-# code this close is stored unclassified, so maps, counts, reports and
-# notifications see it once.
-REPEAT_WINDOW = timedelta(seconds=10)
-GREEN_DRIVING = ("harsh_acceleration", "harsh_braking", "harsh_cornering")
-
-
-def is_repeat(db: Session, imei: str, code: Optional[str], at: datetime, exclude_id: Optional[int] = None) -> bool:
-    """True when the device already has a stored `code` event within REPEAT_WINDOW of `at`."""
-    if code not in GREEN_DRIVING:
-        return False
-    q = db.query(DeviceEvent.id).filter(DeviceEvent.imei == imei, DeviceEvent.event_type == code,
-                                        DeviceEvent.recorded_at >= at - REPEAT_WINDOW,
-                                        DeviceEvent.recorded_at <= at + REPEAT_WINDOW)
-    if exclude_id is not None:
-        q = q.filter(DeviceEvent.id != exclude_id)
-    return db.query(q.exists()).scalar()
 
 
 def _utc(dt: datetime) -> datetime:
@@ -127,8 +109,6 @@ def process_device(db: Session, imei: str) -> int:
 
     for e in events:
         code = classify(e.event_io_id, e.io or {})
-        if is_repeat(db, imei, code, e.recorded_at, exclude_id=e.id):
-            code = None
         if e.event_type != code:
             e.event_type = code
         at = _utc(e.recorded_at)

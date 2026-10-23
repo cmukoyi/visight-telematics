@@ -58,16 +58,6 @@ def store_delivery(db: Session, message: dict) -> int:
         "latitude": e.get("latitude"), "longitude": e.get("longitude"), "altitude": e.get("altitude"),
         "angle": e.get("angle"), "satellites": e.get("satellites"), "speed": e.get("speed"), "io": e.get("io") or {},
     } for e in events]
-    # A harsh manoeuvre's second record (trip_builder.is_repeat) is stored unclassified.
-    kept: list = []
-    for r in sorted(rows, key=lambda r: r["recorded_at"]):
-        code = r["event_type"]
-        if code in trip_builder.GREEN_DRIVING:
-            if (any(k["event_type"] == code and abs(k["recorded_at"] - r["recorded_at"]) <= trip_builder.REPEAT_WINDOW for k in kept)
-                    or trip_builder.is_repeat(db, imei, code, r["recorded_at"])):
-                r["event_type"] = None
-            else:
-                kept.append(r)
     inserted = db.execute(
         pg_insert(DeviceEvent.__table__).values(rows)
         .on_conflict_do_nothing(index_elements=["dp_event_id"])

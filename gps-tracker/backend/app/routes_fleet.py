@@ -91,7 +91,7 @@ def list_events(request: Request, db: Session = Depends(get_db),
     if codes:
         q = q.filter(DeviceEvent.event_type.in_([c.strip() for c in codes.split(",") if c.strip()]))
     else:
-        # Our events only: records we can't classify (and repeats) are in the admin data profiler.
+        # Our events only: records we can't classify are in the admin data profiler.
         q = q.filter(DeviceEvent.event_type.isnot(None))
         if not include_parked:
             q = q.filter(DeviceEvent.event_type != "parked_position")

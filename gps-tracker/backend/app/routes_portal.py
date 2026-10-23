@@ -2728,8 +2728,8 @@ def get_trip(trip_id: str, request: Request, db: Session = Depends(get_db)):
               for e in events if e.latitude is not None and e.longitude is not None]
     from app.routes_catalog import event_labels
     custom = event_labels(db, me.usergroup_id)
-    # Markers: our classified events only; records we can't classify (or a
-    # harsh manoeuvre's second record, see trip_builder.is_repeat) stay off the map.
+    # Markers: our classified events only; records we can't classify (such as the
+    # duration-only IO 243 record that follows each harsh driving event) stay off the map.
     marked = [{
         "id": e.id, "code": e.event_type, "label": custom.get(e.event_type) or event_label(e.event_type, e.event_io_id),
         "kind": EVENTS[e.event_type][2],
