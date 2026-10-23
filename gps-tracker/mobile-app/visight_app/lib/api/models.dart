@@ -115,6 +115,7 @@ class LiveTrack {
         speed = ((j['position'] as Map?)?['speed'] as num?)?.toInt() ?? 0,
         heading = _num((j['position'] as Map?)?['heading']),
         recordedAt = _date((j['position'] as Map?)?['recorded_at']),
+        ignition = (j['position'] as Map?)?['ignition'],
         onTrip = j['trip'] != null,
         trail = [
           for (final p in (j['trail'] as List? ?? const [])) ?_latLng(p[0], p[1])
@@ -124,6 +125,7 @@ class LiveTrack {
   final int speed;
   final double? heading;
   final DateTime? recordedAt;
+  final bool? ignition;
   final bool onTrip;
   final List<LatLng> trail;
 }

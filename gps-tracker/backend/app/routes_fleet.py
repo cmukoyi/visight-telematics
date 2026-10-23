@@ -141,8 +141,9 @@ def live(request: Request, db: Session = Depends(get_db), imei: str = Query(...)
     trip = (db.query(Trip).filter(Trip.usergroup_id == me.usergroup_id, Trip.imei == imei, Trip.status == "open")
             .order_by(Trip.started_at.desc()).first())
     since = trip.started_at if trip else last.recorded_at - timedelta(minutes=trail_minutes)
-    trail = (base.filter(DeviceEvent.recorded_at >= since).order_by(DeviceEvent.recorded_at, DeviceEvent.id)
-             .limit(5000).all())
+    # The newest 5000 points, oldest first, so a long trip's line reaches the vehicle.
+    trail = (base.filter(DeviceEvent.recorded_at >= since).order_by(DeviceEvent.recorded_at.desc(), DeviceEvent.id.desc())
+             .limit(5000).all())[::-1]
     io = last.io or {}
     return {
         "imei": imei,

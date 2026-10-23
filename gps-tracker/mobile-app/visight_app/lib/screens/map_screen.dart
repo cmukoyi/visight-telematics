@@ -13,6 +13,9 @@ import '../widgets/common.dart';
 import 'vehicle_screen.dart';
 
 /// Every vehicle on the map, a swipeable card per vehicle, places and live follow.
+///
+/// The selected vehicle is watched live (position, status and trail every
+/// 10 s while this tab shows); "Follow live" also keeps the camera on it.
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
 
@@ -29,7 +32,8 @@ class _MapScreenState extends State<MapScreen> {
   List<Place>? _places;
   bool _showPlaces = false;
 
-  String? _followImei;
+  String? _followImei;  // camera follows this vehicle
+  String? _liveImei;    // the vehicle _live is for (the selected one)
   LiveTrack? _live;
   Timer? _liveTimer;
   late Session _session;
@@ -40,16 +44,29 @@ class _MapScreenState extends State<MapScreen> {
     _session = SessionScope.of(context);
     _session.follow.removeListener(_onFollowRequest);
     _session.follow.addListener(_onFollowRequest);
+    _session.tab.removeListener(_onTab);
+    _session.tab.addListener(_onTab);
     final imei = _session.selected?.imei;
     if (imei != _shownImei) {
       _shownImei = imei;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _focusSelected());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _focusSelected();
+        _watch(_session.selected?.imei);
+      });
     }
+  }
+
+  bool get _onMapTab => _session.tab.value == Session.tabMap;
+
+  // Back on the Map tab: refresh the watched vehicle straight away.
+  void _onTab() {
+    if (_onMapTab) _pollLive();
   }
 
   @override
   void dispose() {
     _session.follow.removeListener(_onFollowRequest);
+    _session.tab.removeListener(_onTab);
     _liveTimer?.cancel();
     _pages.dispose();
     super.dispose();
@@ -112,36 +129,48 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  Future<void> _startFollow(String imei) async {
+  /// Watch this vehicle live: its position, status and trail every 10 s while the Map tab shows.
+  void _watch(String? imei) {
+    if (imei == _liveImei) return;
     _liveTimer?.cancel();
     setState(() {
-      _followImei = imei;
+      _liveImei = imei;
       _live = null;
     });
-    await _pollLive();
-    if (_followImei == imei) _liveTimer = Timer.periodic(const Duration(seconds: 10), (_) => _pollLive());
+    if (imei == null) return;
+    _pollLive();
+    _liveTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (_onMapTab) _pollLive();
+    });
   }
 
-  void _stopFollow() {
-    _liveTimer?.cancel();
-    setState(() {
-      _followImei = null;
-      _live = null;
-    });
+  void _startFollow(String imei) {
+    setState(() => _followImei = imei);
+    _session.select(imei);
+    _watch(imei);
+    final pos = _live?.position;
+    if (_ready && pos != null && _liveImei == imei) _map.move(pos, _map.camera.zoom < 14 ? 16 : _map.camera.zoom);
   }
+
+  void _stopFollow() => setState(() => _followImei = null);
 
   Future<void> _pollLive() async {
-    final imei = _followImei;
+    final imei = _liveImei;
     if (imei == null) return;
     try {
       final live = LiveTrack.fromJson(await _session.api.get('/api/v2/vehicles/$imei/live'));
-      if (!mounted || _followImei != imei) return;
+      if (!mounted || _liveImei != imei) return;
       setState(() => _live = live);
-      if (_ready && live.position != null) _map.move(live.position!, _map.camera.zoom < 14 ? 16 : _map.camera.zoom);
+      if (_ready && _followImei == imei && live.position != null) {
+        _map.move(live.position!, _map.camera.zoom < 14 ? 16 : _map.camera.zoom);
+      }
     } on ApiException catch (e) {
-      if (!mounted) return;
-      _stopFollow();
-      showError(context, e);
+      if (!mounted || _liveImei != imei) return;
+      if (e.isForbidden) _liveTimer?.cancel();  // no "Follow a vehicle live": cards fall back to fleet status
+      if (_followImei == imei) {
+        _stopFollow();
+        showError(context, e);
+      }
     }
   }
 
@@ -160,7 +189,7 @@ class _MapScreenState extends State<MapScreen> {
     final vehicles = session.vehicles;
     final selected = session.selected;
     final live = _live;
-    final liveVehicle = _followImei == null ? null : session.vehicle(_followImei!);
+    final liveVehicle = _liveImei == null || live?.position == null ? null : session.vehicle(_liveImei!);
 
     return Stack(children: [
       FlutterMap(
@@ -206,11 +235,11 @@ class _MapScreenState extends State<MapScreen> {
             PolylineLayer(polylines: [Polyline(points: live.trail, strokeWidth: 4, color: AppColors.blue)]),
           MarkerLayer(markers: [
             for (final v in vehicles)
-              if (v.position != null && v.imei != _followImei)
+              if (v.position != null && v.imei != liveVehicle?.imei)
                 vehicleMarker(v, selected: v.imei == selected?.imei, onTap: () => session.select(v.imei)),
-            if (liveVehicle != null && (live?.position ?? liveVehicle.position) != null)
+            if (liveVehicle != null)
               Marker(
-                point: live?.position ?? liveVehicle.position!,
+                point: live!.position!,
                 width: VehicleMarker.size,
                 height: VehicleMarker.size,
                 alignment: Alignment.topCenter,
@@ -237,7 +266,7 @@ class _MapScreenState extends State<MapScreen> {
           ),
         ]),
       ),
-      if (_followImei != null)
+      if (_followImei != null && _followImei == _liveImei)
         Positioned(
           left: 16,
           top: MediaQuery.paddingOf(context).top + 90,
@@ -267,7 +296,11 @@ class _MapScreenState extends State<MapScreen> {
                   if (_swiping) return;
                   session.select(vehicles[i].imei);
                 },
-                itemBuilder: (_, i) => _VehicleCard(vehicle: vehicles[i], status: session.fleet[vehicles[i].imei]),
+                itemBuilder: (_, i) => _VehicleCard(
+                  vehicle: vehicles[i],
+                  status: session.fleet[vehicles[i].imei],
+                  live: vehicles[i].imei == _liveImei ? live : null,
+                ),
               ),
             ),
           ]),
@@ -277,14 +310,26 @@ class _MapScreenState extends State<MapScreen> {
 }
 
 class _VehicleCard extends StatelessWidget {
-  const _VehicleCard({required this.vehicle, required this.status});
+  const _VehicleCard({required this.vehicle, required this.status, this.live});
   final Vehicle vehicle;
   final FleetStatus? status;
+  final LiveTrack? live;  // when this is the watched vehicle: fresher than status
 
   @override
   Widget build(BuildContext context) {
     final v = vehicle;
-    final moving = v.isMoving && (status?.speed ?? 0) > 0;
+    // As the web Live Track: moving above 3 km/h, stopped with the ignition on, else parked.
+    final speed = live?.speed ?? status?.speed ?? 0;
+    final ignition = live?.ignition ?? status?.ignition;
+    final at = live?.recordedAt ?? status?.recordedAt ?? v.lastSeen;
+    final fresh = at != null && DateTime.now().difference(at) < const Duration(minutes: 5);
+    final (IconData icon, String state) = !fresh
+        ? (Icons.local_parking, ignition == true ? 'Not reporting · ${fmtAgo(at)}' : 'Parked · ${fmtAgo(at)}')
+        : speed > 3
+            ? (Icons.navigation, 'Moving · $speed km/h')
+            : ignition == true
+                ? (Icons.pause_circle_outline, 'Stopped, ignition on')
+                : (Icons.local_parking, 'Parked · ${fmtAgo(at)}');
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6),
       child: Container(
@@ -319,11 +364,11 @@ class _VehicleCard extends StatelessWidget {
                     maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted)),
                 const Spacer(),
                 Row(children: [
-                  Icon(moving ? Icons.navigation : Icons.local_parking, size: 18, color: AppColors.navy),
+                  Icon(icon, size: 18, color: AppColors.navy),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      moving ? 'Moving · ${status!.speed} km/h' : 'Parked · ${fmtAgo(status?.recordedAt ?? v.lastSeen)}',
+                      state,
                       style: const TextStyle(color: AppColors.muted),
                     ),
                   ),
