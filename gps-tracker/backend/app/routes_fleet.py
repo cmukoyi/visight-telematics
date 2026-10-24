@@ -38,9 +38,27 @@ def _week_stats(db: Session, group_id, imeis: list, start: datetime, end: dateti
             "avg_trip_km": round(distance / 1000 / count, 1) if count else 0}
 
 
+def _weekly(db: Session, group_id, imeis: list, first: datetime, weeks: int) -> list:
+    """Trip totals per week, oldest first, from `first` (a Monday) for `weeks` weeks; weeks without trips are zero."""
+    week = func.date_trunc("week", func.timezone("UTC", Trip.started_at))   # Monday 00:00 UTC, like _week_stats
+    rows = (db.query(week, func.count(Trip.id), func.coalesce(func.sum(Trip.distance_m), 0), func.coalesce(func.sum(Trip.duration_s), 0))
+            .filter(Trip.usergroup_id == group_id, Trip.imei.in_(imeis), Trip.real(),
+                    Trip.started_at >= first, Trip.started_at < first + timedelta(days=7 * weeks))
+            .group_by(week).all()) if imeis else []
+    by_week = {w.date(): (n, d, s) for w, n, d, s in rows}
+    out = []
+    for i in range(weeks):
+        start = (first + timedelta(days=7 * i)).date()
+        n, d, s = by_week.get(start, (0, 0, 0))
+        out.append({"week_start": start.isoformat(), "trips": n, "distance_km": round(d / 1000, 1),
+                    "driving_hours": round(s / 3600, 1), "avg_trip_km": round(d / 1000 / n, 1) if n else 0})
+    return out
+
+
 @router.get("/dashboard/kpis")
 def dashboard_kpis(request: Request, db: Session = Depends(get_db), category: Optional[str] = None):
-    """Trip totals for this week and last week (weeks start Monday, UTC), optionally for one vehicle group."""
+    """Trip totals for this week and last week (weeks start Monday, UTC), optionally for one vehicle group,
+    and the last 8 weeks (`weeks`, oldest first; the last is the current week) for the cards' sparklines."""
     me = get_portal_user_from_request(request, db)
     visible = access_service.for_user(me, db).visible_imeis(db)
     imeis = list(reports_service.group_devices(db, me.usergroup_id, category, visible))
@@ -51,6 +69,7 @@ def dashboard_kpis(request: Request, db: Session = Depends(get_db), category: Op
         "vehicles": len(imeis),
         "current_week": _week_stats(db, me.usergroup_id, imeis, this_week, this_week + timedelta(days=7)),
         "previous_week": _week_stats(db, me.usergroup_id, imeis, last_week, this_week),
+        "weeks": _weekly(db, me.usergroup_id, imeis, this_week - timedelta(days=7 * 7), 8),
     }
 
 

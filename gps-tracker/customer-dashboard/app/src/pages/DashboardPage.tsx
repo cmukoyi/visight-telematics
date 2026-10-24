@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ActionIcon, Badge, Card, Group, Select, SimpleGrid, Skeleton, Stack, Text, Title, Tooltip, UnstyledButton } from '@mantine/core';
+import { ActionIcon, Anchor, Badge, Card, Group, Select, SimpleGrid, Skeleton, Stack, Text, Title, Tooltip, UnstyledButton } from '@mantine/core';
 import { IconRoute, IconClock, IconRoad, IconTrendingUp, IconTrendingDown, IconCar, IconPlayerPause, IconPlayerPlay, IconFocus2 } from '@tabler/icons-react';
 import { useCan, useCategories, useKpis, useLive, useVehicles } from '../api/hooks';
 import { FleetMap, type FleetMapHandle, type MapRoute, type MapVehicle } from '../components/FleetMap';
@@ -8,42 +8,63 @@ import { LiveTrack } from '../components/LiveTrack';
 import { ALL_VEHICLES, inGroup, toMapVehicle } from './vehicles';
 import { useT } from '../i18n';
 import { plural } from '../utils/format';
+import { Sparkline } from '../components/Sparkline';
+import type { Kpis } from '../api/types';
+import dayjs from 'dayjs';
 import classes from './DashboardPage.module.css';
 
-function Kpi({ period, title, value, unit, group, icon: Icon, delta }: {
-  period: string; title: string; value: string | number; unit?: string; group: string;
-  icon: typeof IconRoute; delta?: number | 'new' | null;
+type Measure = 'distance_km' | 'driving_hours' | 'trips' | 'avg_trip_km';
+
+/** This week's figure, the change from last week, and a sparkline of the last 8 weeks. */
+function Kpi({ title, measure, unit, group, icon: Icon, kpis }: {
+  title: string; measure: Measure; unit?: string; group: string; icon: typeof IconRoute; kpis?: Kpis;
 }) {
   const t = useT();
+  const navigate = useNavigate();
+  const weeks = kpis?.weeks ?? [];
+  const cur = kpis?.current_week[measure], prev = kpis?.previous_week[measure];
+  const fmt = (v: number) => `${v.toLocaleString()}${unit ? ` ${unit}` : ''}`;
+  const delta = weekChange(cur, prev);
+  const labels = weeks.map((w, i) => (i === weeks.length - 1 ? 'This week' : `Week of ${dayjs(w.week_start).format('D MMM')}`));
   return (
     <Card className={classes.kpi}>
-      <Group justify="space-between" align="flex-start" wrap="nowrap">
-        <div>
-          <Text size="xs" c="dimmed" tt="uppercase" fw={600} lts={0.4}>{period}</Text>
-          <Text fw={600} mt={2}>{title}</Text>
+      <Group justify="space-between" align="flex-start" wrap="nowrap" gap="xs">
+        <Text fw={600} truncate>{title}</Text>
+        <Anchor size="xs" component="button" onClick={() => navigate('/workspace')} className={classes.kpiLink}
+                aria-label={`View trips: ${title}`}>
+          <Group gap={4} wrap="nowrap"><Icon size={16} stroke={1.6} aria-hidden />{t('app.dashboard.view_trips', 'View trips')} →</Group>
+        </Anchor>
+      </Group>
+      <Text size="xs" c="dimmed" truncate>{t('app.dashboard.this_week', 'This week')} · {group}</Text>
+      <Group gap="md" align="flex-end" mt="md" wrap="nowrap">
+        <Group gap={6} align="baseline" wrap="nowrap">
+          <Text className={classes.kpiValue}>{cur == null ? '—' : cur.toLocaleString()}</Text>
+          {unit && <Text c="dimmed" fw={500}>{unit}</Text>}
+        </Group>
+        <div className={classes.spark}>
+          <Sparkline values={weeks.map((w) => w[measure])} labels={labels} format={fmt}
+                     summary={`${title}, last 8 weeks: ${weeks.map((w) => fmt(w[measure])).join(', ')}`} />
         </div>
-        <Icon size={22} stroke={1.5} className={classes.kpiIcon} />
       </Group>
-      <Group gap={6} align="baseline" mt="md">
-        <Text className={classes.kpiValue}>{value}</Text>
-        {unit && <Text c="dimmed" fw={500}>{unit}</Text>}
-      </Group>
-      <Group justify="space-between" mt={6}>
-        <Text size="xs" c="dimmed">{group}</Text>
-        {delta === 'new' ? (
-          <Badge size="sm" variant="light" color="teal" leftSection={<IconTrendingUp size={12} />}>
-            {t('app.dashboard.new_activity', 'New activity vs last week')}
-          </Badge>
-        ) : delta != null && Number.isFinite(delta) && (
-          <Badge size="sm" variant="light" color={delta >= 0 ? 'teal' : 'orange'}
-                 leftSection={delta >= 0 ? <IconTrendingUp size={12} /> : <IconTrendingDown size={12} />}>
-            {t('app.dashboard.vs_last_week', '{delta}% vs last week',
-               { delta: delta > 999 ? '> 999' : `${delta >= 0 ? '+' : ''}${Math.round(delta)}` })}
-          </Badge>
-        )}
+      <Group mt="sm" gap={6} wrap="nowrap" miw={0}>
+          {delta === 'new' ? (
+            <Badge size="sm" variant="light" color="gray" style={{ flex: 'none' }} leftSection={<IconTrendingUp size={12} />}>{t('app.dashboard.new_activity', 'New activity')}</Badge>
+          ) : delta != null && (
+            <Badge size="sm" variant="light" color="gray" style={{ flex: 'none' }} leftSection={delta >= 0 ? <IconTrendingUp size={12} /> : <IconTrendingDown size={12} />}>
+              {delta > 999 ? '> 999%' : `${delta >= 0 ? '+' : ''}${Math.round(delta)}%`}
+            </Badge>
+          )}
+          {prev != null && <Text size="xs" c="dimmed" truncate>{t('app.dashboard.vs_prev', 'vs {value} last week', { value: fmt(prev) })}</Text>}
       </Group>
     </Card>
   );
+}
+
+/** Week-on-week change in %; from (almost) nothing it's "new activity", not +132600% */
+function weekChange(a?: number, b?: number): number | 'new' | null {
+  if (a == null || b == null) return null;
+  if (b <= Math.abs(a) * 0.05) return a > 0 ? 'new' : null;
+  return ((a - b) / b) * 100;
 }
 
 // Keeps a followed vehicle clear of the live-tracking card (top left, 320 px wide)
@@ -106,23 +127,15 @@ export function DashboardPage() {
 
   const t = useT();
   const groupLabel = group === ALL_VEHICLES ? t('app.common.all_vehicles', 'All vehicles') : group;
-  const cur = kpis?.current_week;
-  const prev = kpis?.previous_week;
-  // Week-on-week change; from (almost) nothing it's "new activity", not +132600%
-  const pct = (a?: number, b?: number): number | 'new' | null => {
-    if (a == null || b == null) return null;
-    if (b <= Math.abs(a) * 0.05) return a > 0 ? 'new' : null;
-    return ((a - b) / b) * 100;
-  };
 
   return (
     <Stack p="lg" gap="lg">
       <Group justify="space-between" wrap="wrap">
         <div>
           <Title order={1} size="h3">{t('app.dashboard.title', 'Where is my fleet')}</Title>
-          <Group gap={6} wrap="nowrap">
+          <Group gap={6} wrap="wrap" style={{ rowGap: 0 }}>
             <Text c="dimmed" size="sm">{t('app.dashboard.subtitle_short', '{vehicles} · click a vehicle to track it live', { count: inScope.length, vehicles: plural(inScope.length, 'vehicle') })}</Text>
-            <Text c="dimmed" size="sm" aria-live="off">·</Text>
+            <Text c="dimmed" size="sm" aria-hidden>·</Text>
             <Text c={paused ? 'orange' : 'dimmed'} size="sm">
               {paused ? t('app.dashboard.paused', 'Live updates paused')
                 : dataUpdatedAt ? t('app.dashboard.updated_ago', 'Updated {s} s ago', { s: Math.max(0, Math.round((now - dataUpdatedAt) / 1000)) }) : ''}
@@ -176,16 +189,11 @@ export function DashboardPage() {
         )}
       </Card>
 
-      <SimpleGrid cols={{ base: 1, xs: 2, md: 3 }} spacing="lg">
-        <Kpi period={t('app.dashboard.current_week', 'Current week')} title={t('app.dashboard.avg_journey', 'Average journey length')} value={cur?.avg_trip_km ?? '—'} unit="km" group={groupLabel}
-             icon={IconRoute} delta={pct(cur?.avg_trip_km, prev?.avg_trip_km)} />
-        <Kpi period={t('app.dashboard.current_week', 'Current week')} title={t('app.dashboard.distance', 'Distance driven')} value={cur?.distance_km.toLocaleString() ?? '—'} unit="km" group={groupLabel}
-             icon={IconRoad} delta={pct(cur?.distance_km, prev?.distance_km)} />
-        <Kpi period={t('app.dashboard.current_week', 'Current week')} title={t('app.dashboard.driving_time', 'Driving time')} value={cur?.driving_hours ?? '—'} unit="h" group={groupLabel}
-             icon={IconClock} delta={pct(cur?.driving_hours, prev?.driving_hours)} />
-        <Kpi period={t('app.dashboard.previous_week', 'Previous week')} title={t('app.dashboard.avg_journey', 'Average journey length')} value={prev?.avg_trip_km ?? '—'} unit="km" group={groupLabel} icon={IconRoute} />
-        <Kpi period={t('app.dashboard.previous_week', 'Previous week')} title={t('app.dashboard.distance', 'Distance driven')} value={prev?.distance_km.toLocaleString() ?? '—'} unit="km" group={groupLabel} icon={IconRoad} />
-        <Kpi period={t('app.dashboard.previous_week', 'Previous week')} title={t('app.dashboard.trips', 'Trips')} value={prev?.trips ?? '—'} group={groupLabel} icon={IconCar} />
+      <SimpleGrid cols={{ base: 1, xs: 2, lg: 4 }} spacing="lg">
+        <Kpi title={t('app.dashboard.distance', 'Distance driven')} measure="distance_km" unit="km" group={groupLabel} icon={IconRoad} kpis={kpis} />
+        <Kpi title={t('app.dashboard.driving_time', 'Driving time')} measure="driving_hours" unit="h" group={groupLabel} icon={IconClock} kpis={kpis} />
+        <Kpi title={t('app.dashboard.trips', 'Trips')} measure="trips" group={groupLabel} icon={IconCar} kpis={kpis} />
+        <Kpi title={t('app.dashboard.avg_trip', 'Average trip')} measure="avg_trip_km" unit="km" group={groupLabel} icon={IconRoute} kpis={kpis} />
       </SimpleGrid>
     </Stack>
   );

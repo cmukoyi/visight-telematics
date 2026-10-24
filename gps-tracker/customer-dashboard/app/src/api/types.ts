@@ -160,6 +160,8 @@ export interface Kpis {
   vehicles: number;
   current_week: WeekStats;
   previous_week: WeekStats;
+  /** The last 8 weeks, oldest first; the last is the current week. */
+  weeks?: (WeekStats & { week_start: string })[];
 }
 
 export interface ReportDef {

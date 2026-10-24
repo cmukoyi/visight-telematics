@@ -7,3 +7,5 @@
 .kpiValue { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums; }
 .kpiIcon { color: var(--mantine-color-brand-4); }
 .chip { border-radius: 999px; }
+.spark { flex: 1; min-width: 0; max-width: 220px; margin-left: auto; padding-bottom: 2px; }
+.kpiLink { white-space: nowrap; flex: none; }
