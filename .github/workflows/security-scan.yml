@@ -37,7 +37,7 @@ jobs:
         continue-on-error: true
       
       - name: Upload Bandit Report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v7
         with:
           name: bandit-security-report
           path: bandit-report.json
@@ -74,7 +74,7 @@ jobs:
         continue-on-error: true
       
       - name: Upload Safety Report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v7
         with:
           name: safety-vulnerability-report
           path: safety-report.json
@@ -123,7 +123,7 @@ jobs:
         continue-on-error: true
       
       - name: Upload Semgrep Report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v7
         with:
           name: semgrep-sast-report
           path: semgrep-report.json
