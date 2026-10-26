@@ -299,6 +299,10 @@ jobs:
           cat .env-snapshot/before.txt || echo "(none)"
           echo "── end snapshot ──"
 
+      - name: Stamp the backend build
+        # app/build_info.py reads it; every API answer carries it as X-Server-Build
+        run: echo "${GITHUB_SHA::7} $(date -u +%Y-%m-%dT%H:%MZ)" > gps-tracker/backend/BUILD
+
       - name: Sync code to server
         env:
           DO_SERVER_IP: ${{ secrets.DO_SERVER_IP }}

@@ -251,6 +251,7 @@ class PortalUserOut(BaseModel):
     created_at: Optional[datetime] = None
     last_login_at: Optional[datetime] = None
     last_active_at: Optional[datetime] = None
+    app_version: Optional[str] = None   # the mobile app build they last used
 
     class Config:
         from_attributes = True
@@ -343,11 +344,16 @@ def get_portal_user_from_request(request: Request, db: Session) -> PortalUser:
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail="Portal user not found or inactive")
-    # Last activity, recorded at most every 5 minutes
+    # Last activity, recorded at most every 5 minutes; and the mobile app build they use (when it changes)
     now = datetime.now(timezone.utc)
     last = user.last_active_at
+    app_version = (request.headers.get("x-app-version") or "").strip()[:120] or None
+    changed = False
     if last is None or (last if last.tzinfo else last.replace(tzinfo=timezone.utc)) < now - timedelta(minutes=5):
-        user.last_active_at = now
+        user.last_active_at, changed = now, True
+    if app_version and app_version != user.app_version:
+        user.app_version, changed = app_version, True
+    if changed:
         db.commit()
     return user
 

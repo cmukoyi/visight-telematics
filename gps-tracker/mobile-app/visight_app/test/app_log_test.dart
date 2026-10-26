@@ -43,9 +43,14 @@ void main() {
   });
 
   test('requests are logged with status and time; a server error with its message and code', () async {
-    final api = ApiClient(client: MockClient((req) async => req.url.path == '/ok'
-        ? http.Response('{}', 200)
-        : http.Response(jsonEncode({'detail': 'Something went wrong on our side (error F1DFD2).'}), 500)));
+    final sent = <String?>[];
+    final api = ApiClient(client: MockClient((req) async {
+      sent.add(req.headers['X-App-Version']);
+      return req.url.path == '/ok'
+          ? http.Response('{}', 200, headers: {'x-server-build': '96c92b6 2026-10-27T08:15Z'})
+          : http.Response(jsonEncode({'detail': 'Something went wrong on our side (error F1DFD2).'}), 500,
+              headers: {'x-server-build': '96c92b6 2026-10-27T08:15Z'});
+    }));
     await api.get('/ok', {'imei': '861'});
     await expectLater(api.post('/api/portal/breakdowns', {'imei': '861', 'password': 'never logged'}), throwsA(isA<ApiException>()));
     final text = await (await AppLog.files()).last.readAsString();
@@ -53,6 +58,8 @@ void main() {
     expect(text, contains('ERROR POST /api/portal/breakdowns → 500'));
     expect(text, contains('error F1DFD2'));
     expect(text, isNot(contains('never logged')));   // request bodies stay out of the log
+    expect(sent.every((v) => v != null && v.contains(' dev ')), isTrue);   // the app build goes with every request
+    expect(RegExp('Server build: 96c92b6').allMatches(text).length, 1);  // logged once, when it changes
   });
 
   test('the problem report zips report.txt and the day files', () async {

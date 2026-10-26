@@ -93,7 +93,10 @@ jobs:
 
       - name: Build APK
         # The run number is the versionCode, so every build installs as an update.
-        run: flutter build apk --release --build-number=${{ github.run_number }}
+        # The commit and branch show in the app's menu, its log and problem reports (lib/build_info.dart).
+        run: >-
+          flutter build apk --release --build-number=${{ github.run_number }}
+          --dart-define=GIT_SHA=${GITHUB_SHA::7} --dart-define=GIT_BRANCH=${GITHUB_REF_NAME}
 
       - name: Name the APK
         id: apk

@@ -5,9 +5,10 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:intl/intl.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'api/api_client.dart';
+import 'build_info.dart';
 import 'config.dart';
 
 /// The app's own log: one text file per day (logs/2026-10-26.log in the app's private storage), kept
@@ -80,11 +81,7 @@ class AppLog {
   static Future<File> buildReport({required String description, required Map<String, String?> about}) async {
     info('Problem report created');
     final device = await _device();
-    String version = '?';
-    try {
-      final p = await PackageInfo.fromPlatform();
-      version = '${p.version} (build ${p.buildNumber})';
-    } catch (_) {}
+    await AppBuild.load();
     final now = DateTime.now();
     final report = [
       'ViSight Track — problem report',
@@ -93,8 +90,8 @@ class AppLog {
       'What happened:',
       description.trim().isEmpty ? '(not described)' : description.trim(),
       '',
-      'App: $version',
-      'Server: ${Config.apiBaseUrl}',
+      'App: ${AppBuild.label}',
+      'Server: ${Config.apiBaseUrl} (build ${ApiClient.serverBuild ?? 'unknown'})',
       ...device.entries.map((e) => '${e.key}: ${e.value}'),
       ...about.entries.where((e) => e.value != null && e.value!.isNotEmpty).map((e) => '${e.key}: ${e.value}'),
       '',

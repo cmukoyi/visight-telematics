@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import 'app_log.dart';
+import 'build_info.dart';
 
 import 'screens/login_screen.dart';
 import 'screens/shell.dart';
@@ -22,7 +23,7 @@ void main() {
     AppLog.error('Uncaught error', error, stack);
     return false;
   };
-  unawaited(AppLog.init().then((_) => AppLog.info('App started')));
+  unawaited(AppLog.init().then((_) => AppBuild.load()).then((_) => AppLog.info('App started: ${AppBuild.label}')));
   final session = Session()..restore();
   runApp(VisightApp(session: session));
 }

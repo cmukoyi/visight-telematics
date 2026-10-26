@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../api/api_client.dart';
 import '../app_log.dart';
+import '../build_info.dart';
 import '../api/models.dart';
 import '../config.dart';
 import '../session.dart';
@@ -115,6 +116,11 @@ void showAccountSheet(BuildContext context) {
             Navigator.pop(ctx);
             session.signOut();
           },
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          child: Text('Version ${AppBuild.label}${ApiClient.serverBuild == null ? '' : '\nServer ${ApiClient.serverBuild}'}',
+              style: const TextStyle(fontSize: 12, color: AppColors.muted)),
         ),
       ]),
     ),

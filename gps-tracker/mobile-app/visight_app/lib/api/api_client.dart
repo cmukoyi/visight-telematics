@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import '../app_log.dart';
+import '../build_info.dart';
 import '../config.dart';
 
 /// An error answer from the backend, with FastAPI's `detail` as the message.
@@ -42,7 +43,11 @@ class ApiClient {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
+        'X-App-Version': AppBuild.header,
       };
+
+  /// The server build that last answered (X-Server-Build), logged when it changes.
+  static String? serverBuild;
 
   Future<dynamic> get(String path, [Map<String, String?>? query]) async {
     final uri = _uri(path, query), took = Stopwatch()..start();
@@ -67,6 +72,11 @@ class ApiClient {
   }
 
   dynamic _handle(String method, Uri uri, Stopwatch took, http.Response res) {
+    final build = res.headers['x-server-build'];
+    if (build != serverBuild) {
+      serverBuild = build;
+      AppLog.info('Server build: ${build ?? 'unknown (older than version reporting)'}');
+    }
     final what = '$method ${uri.path}${uri.hasQuery ? '?${uri.query}' : ''} → ${res.statusCode} (${took.elapsedMilliseconds} ms)';
     if (res.statusCode >= 400) {
       (res.statusCode >= 500 ? AppLog.error : AppLog.warn)('$what: ${logSnippet(res.body)}');

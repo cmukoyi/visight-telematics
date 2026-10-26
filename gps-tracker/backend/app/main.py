@@ -144,6 +144,15 @@ logger = logging.getLogger(__name__)
 _PORTAL_VERBOSE_LOGGING = os.getenv("PORTAL_VERBOSE_LOGGING", "0").strip().lower() in ("1", "true", "yes", "on")
 _PORTAL_VERBOSE_SLOW_MS = int(os.getenv("PORTAL_VERBOSE_SLOW_MS", "800"))
 
+@app.middleware("http")
+async def server_build_header(request, call_next):
+    """X-Server-Build on every answer: the mobile app logs it, so a report shows which server build it talked to."""
+    from app.build_info import SERVER_BUILD
+    response = await call_next(request)
+    response.headers["X-Server-Build"] = SERVER_BUILD
+    return response
+
+
 @app.exception_handler(Exception)
 async def unhandled_error(request, exc):
     """Any error the code didn't handle: log the traceback under a short reference and give the caller that
@@ -282,9 +291,11 @@ def health_check():
 
 @app.get("/api/health", include_in_schema=False)
 def api_health_check():
-    """API health check endpoint"""
+    """API health check endpoint, with the running build (commit and deploy time)"""
+    from app.build_info import SERVER_BUILD
     return {
         "status": "healthy",
+        "build": SERVER_BUILD,
         "timestamp": datetime.utcnow().isoformat()
     }
 

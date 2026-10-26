@@ -225,6 +225,8 @@ export interface PortalUserRow {
   created_at: string | null;
   last_login_at: string | null;
   last_active_at: string | null;
+  /** The mobile app build they last used, e.g. "0.1.0+57 96c92b6 android" (null: never used the app). */
+  app_version?: string | null;
 }
 
 export interface Me {

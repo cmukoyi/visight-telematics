@@ -582,6 +582,7 @@ class PortalUser(Base):
     security_group_id = Column(UUID(as_uuid=True), ForeignKey("security_groups.id", ondelete="SET NULL"), nullable=True, index=True)
     last_login_at     = Column(DateTime(timezone=True), nullable=True)
     last_active_at    = Column(DateTime(timezone=True), nullable=True)
+    app_version       = Column(String(120), nullable=True)   # last mobile app build used (X-App-Version)
     language          = Column(String(10), nullable=True)   # e.g. 'fr'; None = the user group's default_language
     created_at      = Column(DateTime(timezone=True), server_default=func.now())
     updated_at      = Column(DateTime(timezone=True), onupdate=func.now())

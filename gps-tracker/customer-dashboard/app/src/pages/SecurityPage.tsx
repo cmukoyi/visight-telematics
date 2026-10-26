@@ -78,6 +78,9 @@ function UsersTab() {
     { colId: 'username', headerName: 'Username', field: 'email', flex: 1.2, minWidth: 200 },
     { colId: 'last_login', headerName: 'Last login', field: 'last_login_at', valueFormatter: (p) => dateTime(p.value), width: 170 },
     { colId: 'last_activity', headerName: 'Last activity', field: 'last_active_at', valueFormatter: (p) => dateTime(p.value), width: 170 },
+    { colId: 'app_version', headerName: 'Mobile app', field: 'app_version', width: 200, tooltipField: 'app_version',
+      // "0.1.0+57 96c92b6 android" → "0.1.0 build 57 · 96c92b6 · android"
+      valueFormatter: (p) => (p.value ? String(p.value).replace(/^([^+ ]+)\+(\S+) (\S+) (\S+)$/, '$1 build $2 · $3 · $4') : 'Not used') },
     { colId: 'role', headerName: 'Roles', valueGetter: (p) => (p.data?.role_names ?? []).join(', ') || '—', flex: 1.3, minWidth: 200,
       tooltipValueGetter: (p) => (p.data?.role_names ?? []).join(', ') },
     { colId: 'security_group', headerName: 'Security group', flex: 1, minWidth: 150,
