@@ -114,19 +114,27 @@ export const FleetMap = forwardRef<FleetMapHandle, Props>(function FleetMap(
   }, [branding?.maptilerKey, style]);
 
   const pad = fitPadding ?? { top: 60, bottom: 60, left: 60, right: 60 };
+  // A fit asked for before the map has loaded is kept and done on load (else the first view stays at the default)
+  const pendingFit = useRef<[number, number][] | null>(null);
+  const fitTo = (pts: [number, number][]) => {
+    const map = mapRef.current;
+    if (!pts.length) return;
+    if (!map || !map.loaded()) {
+      pendingFit.current = pts;
+      return;
+    }
+    pendingFit.current = null;
+    if (pts.length === 1) {
+      map.flyTo({ center: [pts[0][1], pts[0][0]], zoom: 14, duration: 600 });
+      return;
+    }
+    const lats = pts.map((p) => p[0]);
+    const lngs = pts.map((p) => p[1]);
+    map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+      { padding: pad, maxZoom: 16, duration: 600 });
+  };
   useImperativeHandle(ref, () => ({
-    fit(pts) {
-      const map = mapRef.current;
-      if (!map || !pts.length) return;
-      if (pts.length === 1) {
-        map.flyTo({ center: [pts[0][1], pts[0][0]], zoom: 14, duration: 600 });
-        return;
-      }
-      const lats = pts.map((p) => p[0]);
-      const lngs = pts.map((p) => p[1]);
-      map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-        { padding: pad, maxZoom: 16, duration: 600 });
-    },
+    fit: fitTo,
     panTo(lat, lng, minZoom = 13) {
       const map = mapRef.current;
       if (!map) return;
@@ -159,6 +167,7 @@ export const FleetMap = forwardRef<FleetMapHandle, Props>(function FleetMap(
     <div className={classes.wrap}>
       <Map
         ref={mapRef}
+        onLoad={() => { if (pendingFit.current) fitTo(pendingFit.current); }}
         initialViewState={{ latitude: -26.2, longitude: 28.05, zoom: 9 }}
         mapStyle={mapStyle}
         style={{ width: '100%', height: '100%' }}
