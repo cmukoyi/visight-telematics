@@ -235,7 +235,8 @@ class Seeder:
             db.add(s)
         db.flush()
         # Trucks
-        for (key, desc, make, model, year, reg, vgroup, lper100, odo_km, lic) in D.TRUCKS:
+        for (key, desc, make, model, year, reg, vgroup, lper100, odo_km, lic_days) in D.TRUCKS:
+            lic = (self.now - timedelta(days=lic_days)).astimezone(TZ).date().isoformat()
             emp = next(e for (_, _, e, _, _, t, _) in D.DRIVERS if t == key)
             d = self.drivers[emp]
             imei = "35999" + str(abs(hash((self.gid, key))) % 10**10).zfill(10)
@@ -365,7 +366,8 @@ class Seeder:
                              "registration": tag.attributes["registration"]["value"]})
         # Licences: the MAN's expired last week
         man = self.trucks["man"]
-        ends = date.fromisoformat(man.attributes["licence_start"]["value"]).replace(year=2026)
+        from app.services.licence_service import expiry
+        ends = expiry(date.fromisoformat(man.attributes["licence_start"]["value"]))
         at = datetime.combine(ends, time(7, 0), tzinfo=TZ).astimezone(UTC)
         if at < self.now:
             self._alert(man, "licence_expired", f"{man.description}: licence expired",

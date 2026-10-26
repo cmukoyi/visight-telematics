@@ -73,13 +73,14 @@ SLOW = [(-28.37, 29.38, 25), (-33.45, 19.85, 20), (-32.60, 28.05, 30), (-31.30, 
 # Coastal and Highveld altitude, roughly
 INLAND = lambda lat, lng: 1350 if (lat > -32.6 and 23.0 < lng < 29.5) else 180
 
-# Trucks: (key, description, make, model, year, registration, vehicle group, L/100 km, odometer km at the start, licence start)
+# Trucks: (key, description, make, model, year, registration, vehicle group, L/100 km, odometer km at the start,
+#          licence renewed this many days before the run: the Volvo's expires in 18 days, the MAN's expired 6 days ago)
 TRUCKS = [
-    ("volvo", "UT01 Volvo FH16 750", "Volvo", "FH16 750 Globetrotter XL", "2022", "ND 452-118", "N3 Corridor", "37.8", 386_420, "2025-11-14"),
-    ("scania", "UT02 Scania R 560", "Scania", "R 560 Highline", "2021", "LJ 47 XK GP", "N1 Corridor", "35.6", 472_890, "2026-03-02"),
-    ("actros", "UT03 Mercedes-Benz Actros 2645", "Mercedes-Benz", "Actros 2645 LS", "2023", "CA 718-342", "Coastal N2", "34.2", 211_340, "2026-06-18"),
-    ("man", "UT04 MAN TGX 26.540", "MAN", "TGX 26.540 XLX", "2020", "ND 873-560", "Coastal N2", "36.4", 538_700, "2025-10-21"),
-    ("daf", "UT05 DAF XF 530", "DAF", "XF 530 Space Cab", "2022", "HZ 21 PB GP", "Regional", "33.9", 302_150, "2026-01-30"),
+    ("volvo", "UT01 Volvo FH16 750", "Volvo", "FH16 750 Globetrotter XL", "2022", "ND 452-118", "N3 Corridor", "37.8", 386_420, 347),
+    ("scania", "UT02 Scania R 560", "Scania", "R 560 Highline", "2021", "LJ 47 XK GP", "N1 Corridor", "35.6", 472_890, 238),
+    ("actros", "UT03 Mercedes-Benz Actros 2645", "Mercedes-Benz", "Actros 2645 LS", "2023", "CA 718-342", "Coastal N2", "34.2", 211_340, 130),
+    ("man", "UT04 MAN TGX 26.540", "MAN", "TGX 26.540 XLX", "2020", "ND 873-560", "Coastal N2", "36.4", 538_700, 371),
+    ("daf", "UT05 DAF XF 530", "DAF", "XF 530 Space Cab", "2022", "HZ 21 PB GP", "Regional", "33.9", 302_150, 270),
 ]
 VEHICLE_GROUPS = {"N3 Corridor": ("#2563eb", "KZN Operations"), "Coastal N2": ("#0891b2", "KZN Operations"),
                   "N1 Corridor": ("#7c3aed", "Inland Operations"), "Regional": ("#ea580c", "Inland Operations")}
