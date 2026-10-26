@@ -217,3 +217,40 @@ class Place {
     return [for (final c in m) LatLng(double.parse(c[1]!), double.parse(c[2]!))];
   }
 }
+
+/// A phase the driver logged during a breakdown (e.g. "Mechanic en route").
+class BreakdownPhase {
+  BreakdownPhase.fromJson(Map<String, dynamic> j)
+      : phase = j['phase'] ?? '',
+        at = _date(j['at']) ?? DateTime.now();
+
+  final String phase;
+  final DateTime at;
+}
+
+/// /api/portal/breakdowns — a breakdown logged in the app; it also runs as a
+/// "Breakdown" job in Vehicle Maintenance on the customer dashboard.
+class Breakdown {
+  Breakdown.fromJson(Map<String, dynamic> j)
+      : id = j['id'],
+        imei = j['imei'],
+        vehicle = j['vehicle'] ?? j['imei'],
+        cause = j['cause'],
+        reportedBy = j['reported_by'],
+        startedAt = _date(j['started_at']) ?? DateTime.now(),
+        endedAt = _date(j['ended_at']),
+        downtimeS = (j['downtime_s'] as num?)?.toInt() ?? 0,
+        location = j['location'],
+        notes = j['notes'],
+        phases = [for (final p in (j['phases'] as List? ?? const [])) BreakdownPhase.fromJson(p)];
+
+  final String id, imei, vehicle;
+  final String? cause, reportedBy, location, notes;
+  final DateTime startedAt;
+  final DateTime? endedAt;
+  final int downtimeS;
+  final List<BreakdownPhase> phases;
+
+  bool get isActive => endedAt == null;
+  String? get currentPhase => phases.isEmpty ? null : phases.last.phase;
+}

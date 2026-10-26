@@ -22,7 +22,7 @@ const TYPE_LABELS: Record<string, string> = {
   overspeed: 'Speeding', harsh_braking: 'Harsh braking', harsh_acceleration: 'Harsh acceleration', crash: 'Crash',
   towing: 'Towing', power_cut: 'Power cut', panic: 'Panic', package_expiry: 'Package expiry',
   maintenance_due: 'Maintenance due', maintenance_overdue: 'Maintenance overdue',
-  licence_expiring: 'Licence expiring', licence_expired: 'Licence expired',
+  licence_expiring: 'Licence expiring', licence_expired: 'Licence expired', breakdown: 'Breakdown',
 };
 const typeLabel = (t: string) => TYPE_LABELS[t] ?? t.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
 /** "Jeep Compass entered Home" → "Entered Home at 39 km/h": the title without the vehicle (it has its own column). */
@@ -34,7 +34,7 @@ function summary(a: Alert) {
   const speed = num(a.meta_data?.speed);
   return !Number.isNaN(speed) && speed > 0 && !/km\/h/.test(s) ? `${s} at ${Math.round(speed)} km/h` : s;
 }
-const SEVERE = new Set(['crash', 'panic', 'towing', 'power_cut', 'maintenance_overdue', 'licence_expired']);
+const SEVERE = new Set(['breakdown', 'crash', 'panic', 'towing', 'power_cut', 'maintenance_overdue', 'licence_expired']);
 
 const num = (v: unknown) => (typeof v === 'number' ? v : typeof v === 'string' && v !== '' ? Number(v) : NaN);
 

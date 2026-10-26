@@ -118,6 +118,7 @@ from app.routes_rules import router as rules_router  # noqa: E402
 from app.routes_catalog import router as catalog_router  # noqa: E402
 from app.routes_analytics import router as analytics_router  # noqa: E402
 from app.routes_maintenance import router as maintenance_router  # noqa: E402
+from app.routes_breakdowns import router as breakdowns_router  # noqa: E402
 from app.routes_people import router as people_router  # noqa: E402
 from app.routes_custom_reports import router as custom_reports_router  # noqa: E402
 app.include_router(fleet_router, include_in_schema=False)
@@ -126,6 +127,7 @@ app.include_router(rules_router, include_in_schema=False)
 app.include_router(catalog_router, include_in_schema=False)
 app.include_router(analytics_router, include_in_schema=False)
 app.include_router(maintenance_router, include_in_schema=False)
+app.include_router(breakdowns_router, include_in_schema=False)
 app.include_router(people_router, include_in_schema=False)
 app.include_router(custom_reports_router, include_in_schema=False)
 

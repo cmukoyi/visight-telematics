@@ -162,3 +162,40 @@ class MaintenanceNotice(Base):
     usergroup_id = _group()
     occurrence   = Column(String(200), nullable=False, unique=True)   # schedule:imei:threshold:status
     sent_at      = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class VehicleBreakdown(Base):
+    """A breakdown a driver logs in the mobile app (Assets → vehicle → Log breakdown).
+
+    It runs as a "Breakdown" maintenance job (job_id), so the vehicle shows in the
+    workshop on the Overview and in the Maintenance List while it lasts. Here are
+    the parts a job doesn't have: who logged it, where the phone was, the phases
+    the driver went through, and the manager's review. The tracker evidence (did
+    the vehicle move, was the ignition on) is worked out from its data, see
+    app/services/breakdown_service.py.
+    """
+    __tablename__ = "vehicle_breakdowns"
+
+    id             = get_uuid_column()
+    usergroup_id   = _group()
+    imei           = Column(String(20), nullable=False, index=True)
+    job_id         = Column(UUID(as_uuid=True), ForeignKey("vehicle_maintenance.id", ondelete="SET NULL"), nullable=True)
+    reported_by_id = Column(UUID(as_uuid=True), nullable=True)            # portal user who logged it
+    reported_by    = Column(String(255), nullable=True)                   # their name when they logged it
+    driver         = Column(String(200), nullable=True)                   # the vehicle's assigned driver then
+    cause          = Column(String(60), nullable=True)                    # BREAKDOWN_CAUSES
+    started_at     = Column(DateTime(timezone=True), nullable=False)
+    ended_at       = Column(DateTime(timezone=True), nullable=True)
+    start_lat      = Column(Float, nullable=True)                         # the phone's position
+    start_lng      = Column(Float, nullable=True)
+    start_accuracy = Column(Float, nullable=True)                         # metres
+    end_lat        = Column(Float, nullable=True)
+    end_lng        = Column(Float, nullable=True)
+    phases         = Column(JSON, nullable=False, default=list)           # [{phase, at, lat, lng}]
+    notes          = Column(Text, nullable=True)                          # the driver's, when resolving
+    review         = Column(String(20), nullable=True)                    # accepted | disputed
+    review_note    = Column(Text, nullable=True)
+    reviewed_by    = Column(String(255), nullable=True)
+    created_at     = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (Index("ix_breakdown_group_started", "usergroup_id", "started_at"),)

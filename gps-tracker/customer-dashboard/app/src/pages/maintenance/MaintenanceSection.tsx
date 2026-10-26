@@ -8,6 +8,7 @@ import { Sparkline } from '@mantine/charts';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import {
+  IconCarCrash,
   IconCar, IconCurrencyDollar, IconEye, IconListDetails, IconPencil, IconPlus, IconSearch, IconStethoscope, IconTool, IconTrash,
 } from '@tabler/icons-react';
 import type { ColDef, ColGroupDef, ICellRendererParams } from 'ag-grid-community';
@@ -25,6 +26,7 @@ import { msg, useT } from '../../i18n';
 import hub from '../analytics/ReportsHub.module.css';
 import classes from '../CatalogPages.module.css';
 import { CostEditor, JobEditor, StatusBadge, dueText, money } from './Editors';
+import { Breakdowns } from './Breakdowns';
 
 const ROOT = '/maintenance';
 const fail = (e: unknown) => notifications.show({ color: 'red', message: (e as Error).message });
@@ -39,6 +41,7 @@ const TILES = [
   { to: 'summary', title: msg('app.maintenance.summary', 'Summary by Vehicle'), description: msg('app.maintenance.summary_desc', 'Each vehicle’s next and previous maintenance'), icon: IconCar },
   { to: 'list', title: msg('app.maintenance.list', 'Maintenance List'), description: msg('app.maintenance.list_desc', 'Due, overdue, booked and completed jobs'), icon: IconTool },
   { to: 'costs', title: msg('app.maintenance.costs', 'Cost Item'), description: msg('app.maintenance.costs_desc', 'What maintenance costs, per vehicle and cost centre'), icon: IconCurrencyDollar },
+  { to: 'breakdowns', title: msg('app.maintenance.breakdowns', 'Breakdowns'), description: msg('app.maintenance.breakdowns_desc', 'Breakdowns drivers log in the app, checked against the tracker'), icon: IconCarCrash },
   { to: 'dtc', title: msg('app.maintenance.dtc', 'DTC'), description: msg('app.maintenance.dtc_desc', 'Engine fault codes the vehicles report'), icon: IconStethoscope },
 ];
 
@@ -48,7 +51,7 @@ function Hub() {
   return (
     <Stack p="lg" gap="lg">
       <Title order={1} size="h2">{tr('app.nav.maintenance', 'Vehicle Maintenance')}</Title>
-      <SimpleGrid cols={{ base: 2, sm: 3, lg: 5 }} spacing="lg" maw={1200}>
+      <SimpleGrid cols={{ base: 2, sm: 3, lg: 6 }} spacing="lg" maw={1400}>
         {TILES.map((t) => (
           <UnstyledButton key={t.to} className={hub.tile} onClick={() => navigate(t.to)}>
             <span className={hub.icon}><t.icon size={44} stroke={1.3} /></span>
@@ -410,6 +413,7 @@ export function MaintenanceSection() {
       <Route path="list" element={<MaintenanceList />} />
       <Route path="costs" element={<Costs />} />
       <Route path="dtc" element={<Dtc />} />
+      <Route path="breakdowns" element={<Breakdowns />} />
       <Route path="*" element={<Navigate to={ROOT} replace />} />
     </Routes>
   );

@@ -6,9 +6,10 @@ import '../session.dart';
 import '../theme.dart';
 import '../widgets/actions.dart';
 import '../widgets/common.dart';
+import 'breakdown_screen.dart';
 
 /// A vehicle's details, where it is, today's driving and its latest readings.
-/// Read-only: vehicles are edited in the customer dashboard.
+/// Read-only (vehicles are edited in the customer dashboard), apart from logging a breakdown.
 class VehicleScreen extends StatelessWidget {
   const VehicleScreen({super.key, required this.imei});
   final String imei;
@@ -52,6 +53,7 @@ class VehicleScreen extends StatelessWidget {
           _Action(Icons.share, 'Share', () => shareLocation(context, v)),
         ]),
         const SizedBox(height: 16),
+        if (session.me?.permissions.contains('breakdowns.log') ?? false) BreakdownButton(vehicle: v),
         _Section('Details', [
           ('Make', v.make),
           ('Model', v.model),

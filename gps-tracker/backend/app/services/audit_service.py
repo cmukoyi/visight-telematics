@@ -23,6 +23,7 @@ _MAX_BODY = 64 * 1024
 # (path pattern under /api/portal, area, noun, {method: verb override}); None area = not audited
 ROUTES = [
     (r"/login|/auth/.*|/alerts/.*|/analytics/query|/analytics/expressions/test", None, None, {}),
+    (r"/breakdowns(?:/.*)?", None, None, {}),   # routes_breakdowns records its own entries
     (r"/analytics/pages(?:/(?P<id>[^/]+))?", "Analytics", "analytics page", {}),
     (r"/analytics/expressions(?:/(?P<id>[^/]+))?", "Expressions", "expression", {}),
     (r"/users/(?P<id>[^/]+)/reset-password", "Users", "user", {"POST": "Reset password"}),
