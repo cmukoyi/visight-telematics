@@ -147,6 +147,8 @@ export interface Alert {
   read_by: string | null;
   /** Street address where it happened (GET /api/portal/inbox/{id} only). */
   address?: string | null;
+  /** One line: vehicle and registration, what happened, where and what's worth knowing (Inbox endpoints). */
+  summary?: string | null;
 }
 
 export interface WeekStats {

@@ -24,9 +24,11 @@ const TYPE_LABELS: Record<string, string> = {
   maintenance_due: 'Maintenance due', maintenance_overdue: 'Maintenance overdue',
   licence_expiring: 'Licence expiring', licence_expired: 'Licence expired', breakdown: 'Breakdown',
 };
-const typeLabel = (t: string) => TYPE_LABELS[t] ?? t.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
-/** "Jeep Compass entered Home" → "Entered Home at 39 km/h": the title without the vehicle (it has its own column). */
+const typeLabel = (t: string) => TYPE_LABELS[t] ?? t.replace(/^event_/, '').replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+/** The server's summary line ("Jeep Compass (DH68DMZN) left Home at 32 km/h after 2h 05m there"),
+ *  else the title with its speed. */
 function summary(a: Alert) {
+  if (a.summary) return a.summary;
   const vehicle = a.tag_label ?? '';
   let s = a.title ?? '';
   if (vehicle && s.toLowerCase().startsWith(vehicle.toLowerCase())) s = s.slice(vehicle.length).replace(/^[\s:·,-]+/, '');
@@ -93,7 +95,7 @@ function AlertDetails({ alert, onClose, onSaved }: { alert: Alert; onClose: () =
             <Badge variant="light" color={SEVERE.has(a.alert_type) ? 'red' : 'blue'}>{typeLabel(a.alert_type)}</Badge>
             <Badge variant="dot" color={a.is_read ? 'gray' : 'red'}>{a.is_read ? 'Read' : 'Unread'}</Badge>
           </Group>
-          <Text fw={600}>{a.title}</Text>
+          <Text fw={600}>{a.summary ?? a.title}</Text>
           {a.message && <Text size="sm" c="dimmed">{a.message}</Text>}
           <Field label="Timestamp">{dateTime(typeof m.recorded_at === 'string' ? m.recorded_at : a.created_at)}</Field>
           {rules.length > 0 && <Field label={rules.length > 1 ? 'Notification rules' : 'Notification rule'}>{rules.join(', ')}</Field>}
@@ -179,7 +181,7 @@ export function InboxPage() {
         <Badge size="sm" variant="light" color={SEVERE.has(p.data.alert_type) ? 'red' : 'blue'}>{typeLabel(p.data.alert_type)}</Badge>) },
     { headerName: 'Vehicle', valueGetter: (p) => p.data?.tag_label ?? p.data?.tag_imei ?? '—', width: 180 },
     { headerName: 'Summary', colId: 'summary', valueGetter: (p) => (p.data ? summary(p.data) : ''), flex: 1, minWidth: 220,
-      tooltipValueGetter: (p) => p.data?.message, cellClass: (p) => (p.data?.is_read ? '' : classes.unread) },
+      tooltipValueGetter: (p) => (p.data ? summary(p.data) : ''), cellClass: (p) => (p.data?.is_read ? '' : classes.unread) },
   ];
 
   const points: MapPoint[] = alerts.flatMap((a) => {

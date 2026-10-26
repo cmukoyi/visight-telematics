@@ -321,7 +321,9 @@ def inbox(request: Request, db: Session = Depends(get_db),
         like = f"%{search.strip()}%"
         q = q.filter(PortalAlert.title.ilike(like) | PortalAlert.message.ilike(like))
     alerts = q.order_by(PortalAlert.created_at.desc()).limit(limit).all()
-    out = [_portal_alert_dict(a) for a in alerts]
+    from app.services.alert_summary import summaries
+    lines = summaries(db, me.usergroup_id, alerts)
+    out = [{**_portal_alert_dict(a), "summary": lines.get(str(a.id))} for a in alerts]
     if imei:
         out = [a for a in out if a["tag_imei"] == imei]
     return out
@@ -347,7 +349,9 @@ def inbox_alert(alert_id: str, request: Request, db: Session = Depends(get_db)):
     if lat not in (None, "") and lng not in (None, "") and address_service.lookup(db, float(lat), float(lng)) is not None:
         address = address_service.Describer(db, me.usergroup_id)(float(lat), float(lng))
     db.commit()   # keep the address in the cache
-    return {**_portal_alert_dict(alert), "address": address or None}
+    from app.services.alert_summary import summaries
+    return {**_portal_alert_dict(alert), "address": address or None,
+            "summary": summaries(db, me.usergroup_id, [alert]).get(str(alert.id))}
 
 
 # ---------------------------------------------------------------------------
