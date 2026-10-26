@@ -288,6 +288,38 @@ def report_licences(db, group_id, devices, start, end, tz):
     return cols, rows
 
 
+def report_breakdowns(db, group_id, devices, start, end, tz):
+    """Breakdowns logged in the mobile app that started in the period, with the tracker check and the review."""
+    from app.models_maintenance import VehicleBreakdown
+    from app.services import breakdown_service
+    from app.services.address_service import Describer
+    cols = ["Vehicle", "Registration", "Driver", "Logged by", "Cause", "Breakdown start", "Breakdown end", "Duration",
+            "Start location", "End location", "Phases", "Driver's notes", "Tracker check", "Review"]
+    rows_q = (db.query(VehicleBreakdown).filter(VehicleBreakdown.usergroup_id == group_id,
+                                                VehicleBreakdown.imei.in_(list(devices)),
+                                                VehicleBreakdown.started_at >= start, VehicleBreakdown.started_at < end)
+              .order_by(VehicleBreakdown.started_at).limit(MAX_ROWS).all()) if devices else []
+    regs = {t.imei: ((t.attributes or {}).get("registration") or {}).get("value") or ""
+            for t in db.query(BLETag).filter(BLETag.imei.in_({b.imei for b in rows_q}))} if rows_q else {}
+    describe = Describer(db, group_id).prefetch([(b.start_lat, b.start_lng) for b in rows_q] + [(b.end_lat, b.end_lng) for b in rows_q])
+    verdicts = {"consistent": "Consistent", "check": "Check", "unconfirmed": "Unconfirmed"}
+    rows = []
+    for b in rows_q:
+        ev = breakdown_service.evidence(db, b)
+        lat, lng = (b.start_lat, b.start_lng) if b.start_lat is not None else tuple(ev["vehicle_position"] or (None, None))
+        ended = b.ended_at
+        seconds = ((breakdown_service._utc(ended) or datetime.now(timezone.utc)) - breakdown_service._utc(b.started_at)).total_seconds()
+        phases = "; ".join(f"{_local(datetime.fromisoformat(p['at']), tz)[11:16]} {p['phase']}" for p in (b.phases or []))
+        where = lambda la, ln: (describe(la, ln) or f"{la:.5f}, {ln:.5f}") if la is not None else ""
+        check = ": ".join(x for x in (verdicts[ev["verdict"]], "; ".join(f["text"] for f in ev["flags"])) if x)
+        review = (b.review.capitalize() + (f" by {b.reviewed_by}" if b.reviewed_by else "") + (f": {b.review_note}" if b.review_note else "")
+                  if b.review else "Not reviewed")
+        rows.append([devices.get(b.imei, b.imei), regs.get(b.imei, ""), b.driver or "", b.reported_by or "", b.cause or "",
+                     _local(b.started_at, tz), _local(ended, tz) if ended else "in progress", _dur(seconds),
+                     where(lat, lng), where(b.end_lat, b.end_lng), phases, b.notes or "", check, review])
+    return cols, rows
+
+
 # key → (title, category, description, generator)
 REPORTS: dict[str, tuple[str, str, str, Callable]] = {
     "trips":            ("Trip detail", "Trips", "Every trip with duration, distance, speeds and driving events.", report_trips),
@@ -298,6 +330,8 @@ REPORTS: dict[str, tuple[str, str, str, Callable]] = {
     "after_hours":      ("After-hours usage", "Utilisation", "Trips, distance and driving time outside working hours per vehicle (Configuration → Time Profiles).", report_after_hours),
     "after_hours_trips": ("After-hours trips", "Utilisation", "Every trip that was partly or wholly outside working hours.", report_after_hours_trips),
     "licences":         ("Vehicle licences", "Vehicles", "Each vehicle's licence start, expiry and days left.", report_licences),
+    "breakdowns":       ("Breakdowns", "Maintenance", "Every breakdown drivers logged in the mobile app: vehicle, registration, "
+                         "driver, start, end, duration, locations, notes, the tracker check and your review.", report_breakdowns),
     "events":           ("Event detail", "Events", "All decoded device events (excluding parked updates).", report_events),
     "alerts":           ("Alert history", "Alerts", "Notifications raised for your vehicles.", report_alerts),
 }

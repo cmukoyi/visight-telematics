@@ -79,12 +79,24 @@ def ensure_defaults(db: Session, group_id, user_id=None) -> None:
 
 
 FLEET_SEED = "fleet_dashboards_v1"
+BREAKDOWN_SEED = "breakdown_dashboard_v1"
 
 
 def _ensure_fleet_dashboards(db: Session, group_id, user_id=None) -> None:
-    """Add the score / KPI expressions (missing ones, by name) and the three fleet pages, once per group."""
+    """Add the score / KPI expressions (missing ones, by name) and the three fleet pages, once per group;
+    and the breakdowns page, once."""
     from app.services import fleet_settings_service
-    if FLEET_SEED in fleet_settings_service.seeded(db, group_id):
+    seeded = fleet_settings_service.seeded(db, group_id)
+    if BREAKDOWN_SEED not in seeded:
+        names = {n for (n,) in db.query(AnalyticsPage.name).filter(AnalyticsPage.usergroup_id == group_id)}
+        last = db.query(func.max(AnalyticsPage.position)).filter(AnalyticsPage.usergroup_id == group_id).scalar()
+        for name, preset, visuals in an.breakdown_pages():
+            if name not in names:
+                db.add(AnalyticsPage(usergroup_id=group_id, name=name, position=(last or 0) + 1, date_preset=preset,
+                                     visuals=visuals, created_by=user_id))
+        fleet_settings_service.mark_seeded(db, group_id, BREAKDOWN_SEED)
+        db.commit()
+    if FLEET_SEED in seeded:
         return
     have = {e.name: e for e in db.query(AnalyticsExpression).filter(AnalyticsExpression.usergroup_id == group_id)}
     for name, category, expression, description, unit, decimals in an.FLEET_EXPRESSIONS:
@@ -551,7 +563,7 @@ def _ensure_expressions(db: Session, group_id, user_id=None) -> tuple:
 def _templates(ids: dict) -> list:
     """[(key, name, preset, visuals)] — every starting page."""
     import re
-    pages = list(an.fleet_pages(ids)) + list(an.default_pages(ids))
+    pages = list(an.fleet_pages(ids)) + list(an.default_pages(ids)) + list(an.breakdown_pages())
     return [(re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_"), name, preset, visuals) for name, preset, visuals in pages]
 
 
@@ -567,6 +579,7 @@ def templates(request: Request, db: Session = Depends(get_db)):
         "fleet_overview": "Trips, distance, driving time and vehicles",
         "driver_behaviour": "Exceptions per 100 km, speeding and harsh driving by week and driver",
         "utilisation": "Utilisation and downtime, trips by hour, distance by weekday",
+        "breakdowns_and_downtime": "Breakdowns logged in the mobile app: downtime per month, by cause, vehicle and driver",
     }
     return [{"key": key, "name": name, "date_preset": preset, "visuals": len(visuals), "description": descriptions.get(key, "")}
             for key, name, preset, visuals in _templates(dummy)]

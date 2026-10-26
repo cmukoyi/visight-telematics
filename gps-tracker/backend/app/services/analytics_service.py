@@ -84,10 +84,16 @@ MEASURES: dict = {
     "Geofence_exit_count":      ("Place exits", "", "Places", 0),
     "Place_visit_count":        ("Place visits", "", "Places", 0),
     "Time_in_place_hours":      ("Time in place", "h", "Places", 1),
+    "Breakdown_count":          ("Breakdowns", "", "Breakdowns", 0),
+    "Breakdown_hours":          ("Breakdown downtime", "h", "Breakdowns", 1),
+    "Breakdown_avg_hours":      ("Average breakdown", "h", "Breakdowns", 1),
+    "Breakdown_check_count":    ("Breakdowns to check", "", "Breakdowns", 0),
+    "Breakdown_disputed_count": ("Disputed breakdowns", "", "Breakdowns", 0),
 }
 _SUMS = [k for k in MEASURES if k not in ("Max_speed_kmh", "Active_vehicle_count", "Vehicle_count",
                                           "Utilization_days", "Downtime_days", "Vehicle_days", "Period_days",
-                                          "Driver_count", "Active_driver_count", "Driver_utilization_days", "TCO")]
+                                          "Driver_count", "Active_driver_count", "Driver_utilization_days", "TCO",
+                                          "Breakdown_avg_hours")]
 
 # Where a measure's data comes from
 SCOPE = {k: "trip" for k in MEASURES}
@@ -103,10 +109,14 @@ TCO_PARTS = list(COST_MEASURE.values())
 SCOPE["Alert_count"] = "alert"
 SCOPE.update({k: "place" for k in ("Geofence_entry_count", "Geofence_exit_count", "Place_visit_count", "Time_in_place_hours")})
 _PLACE_MEASURES = {k for k, sc in SCOPE.items() if sc == "place"}
+# Breakdowns logged in the mobile app (counted when they start; downtime up to the end of the period)
+SCOPE.update({k: "breakdown" for k in ("Breakdown_count", "Breakdown_hours", "Breakdown_avg_hours", "Breakdown_check_count",
+                                        "Breakdown_disputed_count")})
+_BREAKDOWN_MEASURES = {k for k, sc in SCOPE.items() if sc == "breakdown"}
 
 # Measures whose rows can't be added up into a total or a share (a top speed, a count of distinct vehicles)
 NOT_ADDITIVE = {"Max_speed_kmh", "Active_vehicle_count", "Vehicle_count", "Period_days", "Driver_count",
-                "Active_driver_count"}
+                "Active_driver_count", "Breakdown_avg_hours"}
 
 # What a single trip / place visit has (a list row is one record, so counts of trips etc. mean nothing there)
 RECORD_MEASURES = {
@@ -132,11 +142,12 @@ DIMENSIONS: dict = {
     "place": "Place",
     "trip": "Each trip",
     "place_visit": "Each place visit",
+    "breakdown_cause": "Breakdown cause",
 }
 # total · category (who/where) · time (a trend) · cycle (hour/weekday profile) · record (a list)
 DIM_KIND = {"": "total", "vehicle": "category", "vehicle_group": "category", "driver": "category", "place": "category",
             "day": "time", "week": "time", "month": "time", "hour": "cycle", "weekday": "cycle",
-            "trip": "record", "place_visit": "record"}
+            "trip": "record", "place_visit": "record", "breakdown_cause": "category"}
 _TIME_DIMS = {"day", "week", "month"}
 _WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
@@ -233,6 +244,8 @@ def allowed_measures(dimension: str) -> list:
         return RECORD_MEASURES[dimension]
     if dimension == "place":
         return [k for k in MEASURES if k in _PLACE_MEASURES]
+    if dimension == "breakdown_cause":
+        return [k for k in MEASURES if k in _BREAKDOWN_MEASURES]
     kind = DIM_KIND[dimension]
     return [k for k in MEASURES
             if not (SCOPE[k] == "cost" and kind == "cycle")                         # a cost by hour of day means nothing
@@ -605,6 +618,10 @@ def query(db: Session, group_id, devices: dict, start: datetime, end: datetime, 
                 labels[key] = label
                 acc[key]["Time_in_place_hours"] += hours
 
+    if used & _BREAKDOWN_MEASURES and imeis:
+        _add_breakdowns(db, group_id, imeis, start, end, tz, dimension, key_of, acc, labels,
+                        check="Breakdown_check_count" in used)
+
     # Costs: cost items (amortised by day) and fixed fees spread over the vehicle-days
     if used & {k for k, sc in SCOPE.items() if sc == "cost"} and imeis:
         _add_costs(db, group_id, devices, start, end, tz, settings, dimension, key_of, acc, labels)
@@ -626,6 +643,12 @@ def query(db: Session, group_id, devices: dict, start: datetime, end: datetime, 
         bucket_days = {}
         for pid, name in places.items():
             labels.setdefault(pid, name)
+        order = [(k, labels[k]) for k in labels]
+    elif dimension == "breakdown_cause":
+        from app.services.breakdown_service import CAUSES
+        bucket_days = {}
+        for c in CAUSES:
+            labels.setdefault(c, c)
         order = [(k, labels[k]) for k in labels]
     else:
         bucket_days = {}
@@ -657,6 +680,8 @@ def query(db: Session, group_id, devices: dict, start: datetime, end: datetime, 
         values["Active_driver_count"] = len(drivers_used.get(key, ()))
         values["Driver_utilization_days"] = len(driver_days.get(key, ()))
         values["TCO"] = round(sum(values.get(k) or 0 for k in TCO_PARTS), 2)
+        values["Breakdown_avg_hours"] = (round(values["Breakdown_hours"] / values["Breakdown_count"], 3)
+                                         if values.get("Breakdown_count") else None)
         r = {"key": key, "label": label, "values": _cells(measures, trees, values)}
         if dimension == "vehicle":
             r["info"] = {"registration": devices.get(key, {}).get("registration") or ""}
@@ -673,6 +698,29 @@ def query(db: Session, group_id, devices: dict, start: datetime, end: datetime, 
     if dimension == "vehicle":
         result["info_columns"] = [{"key": "registration", "label": "Registration"}]
     return {**result, "rows": out}
+
+
+def _add_breakdowns(db, group_id, imeis, start, end, tz, dimension, key_of, acc, labels, check: bool) -> None:
+    """Breakdowns that started in the period: count, downtime (to the end of the period or now), flagged, disputed."""
+    from app.models_maintenance import VehicleBreakdown
+    from app.services import breakdown_service
+    now = datetime.now(timezone.utc)
+    for b in (db.query(VehicleBreakdown).filter(VehicleBreakdown.usergroup_id == group_id, VehicleBreakdown.imei.in_(imeis),
+                                                VehicleBreakdown.started_at >= start, VehicleBreakdown.started_at < end)):
+        began = _utc(b.started_at)
+        if dimension == "breakdown_cause":
+            key = label = b.cause or "Not given"
+        elif dimension == "driver":
+            key = label = b.driver or "No driver"
+        else:
+            key, label = key_of(b.imei, began.astimezone(tz))
+        labels[key] = label
+        row = acc[key]
+        row["Breakdown_count"] += 1
+        row["Breakdown_hours"] += max(0.0, (min(_utc(b.ended_at) if b.ended_at else now, end, now) - began).total_seconds()) / 3600
+        row["Breakdown_disputed_count"] += b.review == "disputed"
+        if check:
+            row["Breakdown_check_count"] += breakdown_service.evidence(db, b)["verdict"] == "check"
 
 
 def _active_driver_names(db: Session, group_id) -> list:
@@ -907,5 +955,25 @@ def fleet_pages(e: dict) -> list:
             _v("table", "Utilisation by vehicle group", "vehicle_group",
                ["Active_vehicle_count", "Vehicle_count", "Trip_distance_km", e["Vehicle utilisation %"],
                 e["Vehicle availability %"], e["Speeding exceptions per hour"], e["Braking exceptions per hour"]], 12, "m"),
+        ]),
+    ]
+
+
+def breakdown_pages() -> list:
+    """Downtime from breakdowns drivers log in the mobile app (added once to every group; editable)."""
+    every = ["Breakdown_count", "Breakdown_hours", "Breakdown_avg_hours", "Breakdown_check_count", "Breakdown_disputed_count"]
+    return [
+        ("Breakdowns and downtime", "this_year", [
+            _v("kpi", "Breakdowns", "", ["Breakdown_count"], 3, "s"),
+            _v("kpi", "Breakdown downtime", "", ["Breakdown_hours"], 3, "s"),
+            _v("kpi", "Average breakdown", "", ["Breakdown_avg_hours"], 3, "s"),
+            _v("kpi", "To check (tracker disagrees)", "", ["Breakdown_check_count", "Breakdown_disputed_count"], 3, "s"),
+            _v("column", "Downtime per month", "month", ["Breakdown_hours"], 8, "m"),
+            _v("donut", "Downtime by cause", "breakdown_cause", ["Breakdown_hours"], 4, "m"),
+            _v("bar", "Most downtime (top 10 vehicles)", "vehicle", ["Breakdown_hours"], 6, "m", limit=10, descending=True,
+               show_values=True),
+            _v("column", "Breakdowns by hour of day", "hour", ["Breakdown_count"], 6, "m"),
+            _v("table", "Downtime by vehicle", "vehicle", every, 12, "l"),
+            _v("table", "Downtime by driver", "driver", every, 12, "m"),
         ]),
     ]
