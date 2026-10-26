@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api/api_client.dart';
+import '../app_log.dart';
 import '../api/models.dart';
 import '../config.dart';
 import '../session.dart';
@@ -95,6 +97,15 @@ void showAccountSheet(BuildContext context) {
           onTap: () {
             Navigator.pop(ctx);
             session.refreshVehicles();
+          },
+        ),
+        ListTile(
+          leading: const Icon(Icons.bug_report_outlined),
+          title: const Text('Report a problem'),
+          subtitle: const Text("Share the app's logs from the last 7 days"),
+          onTap: () {
+            Navigator.pop(ctx);
+            reportProblem(context);
           },
         ),
         ListTile(
@@ -342,3 +353,60 @@ BoxDecoration cardDecoration() => BoxDecoration(
       borderRadius: BorderRadius.circular(10),
       boxShadow: const [BoxShadow(color: Color(0x1F000000), blurRadius: 8, offset: Offset(0, 3))],
     );
+
+
+/// Menu → Report a problem: ask what went wrong, zip the last 7 days' logs with it, and open the phone's
+/// share sheet (email, WhatsApp, Drive…) so the user sends it to support themselves.
+Future<void> reportProblem(BuildContext context) async {
+  final session = SessionScope.read(context);
+  final text = TextEditingController();
+  final send = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Report a problem'),
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text("What happened? The app's logs from the last 7 days are attached as a zip file.",
+            style: TextStyle(color: AppColors.muted)),
+        const SizedBox(height: 12),
+        TextField(
+          controller: text,
+          autofocus: true,
+          maxLines: 4,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(hintText: 'e.g. "Something went wrong" when I log a breakdown'),
+        ),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+        FilledButton(
+          style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Share report'),
+        ),
+      ],
+    ),
+  );
+  if (send != true || !context.mounted) return;
+  final box = context.findRenderObject() as RenderBox?;
+  try {
+    final me = session.me;
+    final zip = await AppLog.buildReport(description: text.text, about: {
+      'User': me == null ? null : '${me.displayName} <${me.email}>',
+      'User group': me?.usergroup,
+      'Roles': me?.roles.join(', '),
+      'Security group': me?.securityGroup,
+      'Vehicles loaded': '${session.vehicles.length}',
+    });
+    await SharePlus.instance.share(ShareParams(
+      files: [XFile(zip.path, mimeType: 'application/zip')],
+      subject: 'ViSight Track problem report',
+      text: text.text.trim().isEmpty ? 'ViSight Track problem report' : 'ViSight Track problem: ${text.text.trim()}',
+      sharePositionOrigin: box == null ? null : box.localToGlobal(Offset.zero) & box.size,   // iPad
+    ));
+  } catch (e, st) {
+    AppLog.error('Problem report failed', e, st);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Couldn't create the report: $e")));
+    }
+  }
+}

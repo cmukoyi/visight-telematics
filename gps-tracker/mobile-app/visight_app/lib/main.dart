@@ -1,4 +1,9 @@
+import 'dart:async';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+
+import 'app_log.dart';
 
 import 'screens/login_screen.dart';
 import 'screens/shell.dart';
@@ -7,6 +12,17 @@ import 'theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // Crashes and errors go to the app log too ("Report a problem" shares it)
+  final showError = FlutterError.onError;
+  FlutterError.onError = (details) {
+    AppLog.error('Flutter error: ${details.exceptionAsString()}', null, details.stack);
+    showError?.call(details);
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    AppLog.error('Uncaught error', error, stack);
+    return false;
+  };
+  unawaited(AppLog.init().then((_) => AppLog.info('App started')));
   final session = Session()..restore();
   runApp(VisightApp(session: session));
 }

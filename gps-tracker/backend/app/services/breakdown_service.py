@@ -12,6 +12,7 @@ ignition was on, trips that started, and how far the phone was from the
 vehicle when the breakdown was logged. Any of those raises a flag for the
 manager to check; a breakdown with no tracker data can't be confirmed.
 """
+import logging
 import math
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -22,6 +23,8 @@ from sqlalchemy.orm import Session
 from app.models import BLETag, PortalUser
 from app.models_dataprofiler import DeviceEvent, Trip
 from app.models_maintenance import MaintenanceType, VehicleBreakdown, VehicleMaintenance
+
+logger = logging.getLogger(__name__)
 
 CAUSES = ("Engine", "Flat tyre", "Electrical", "Overheating", "Battery", "Accident", "Fuel", "Other")
 PHASES = ("Waiting for dispatch", "Mechanic en route", "Under repair", "Being towed", "Waiting for parts")
@@ -97,11 +100,16 @@ def start(db: Session, me: PortalUser, imei: str, lat: Optional[float], lng: Opt
                          driver=driver, cause=cause, started_at=now, start_lat=lat, start_lng=lng, start_accuracy=accuracy,
                          phases=[])
     db.add(b)
-    portal_alert_service.create_alert(
-        db, str(me.usergroup_id), str(tag.id), "breakdown", f"{name} broke down",
-        f"{who} logged a breakdown{f' ({cause.lower()})' if cause else ''} for {name}.",
-        {"latitude": lat, "longitude": lng, "breakdown_id": str(b.id)} if lat is not None else {"breakdown_id": str(b.id)})
     db.commit()
+    try:
+        portal_alert_service.create_alert(
+            db, str(me.usergroup_id), str(tag.id), "breakdown", f"{name} broke down",
+            f"{who} logged a breakdown{f' ({cause.lower()})' if cause else ''} for {name}.",
+            {"latitude": lat, "longitude": lng, "breakdown_id": str(b.id)} if lat is not None else {"breakdown_id": str(b.id)})
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Breakdown %s: inbox alert failed", b.id)
     return b
 
 
@@ -208,10 +216,35 @@ def evidence(db: Session, b: VehicleBreakdown, with_track: bool = False) -> dict
     return out
 
 
+def _safe_evidence(db: Session, b: VehicleBreakdown, with_track: bool) -> dict:
+    """evidence(), or an "unconfirmed" stand-in if the tracker data can't be read (logged), so the driver's
+    breakdown is never lost to a reporting problem."""
+    try:
+        with db.begin_nested():
+            return evidence(db, b, with_track)
+    except Exception:
+        logger.exception("Breakdown %s: tracker check failed", b.id)
+        return {"verdict": "unconfirmed", "flags": [{"level": "info", "text": "The tracker data couldn't be checked"}],
+                "moved_km": None, "furthest_m": None, "ignition_on_s": 0, "trips": 0, "trip_km": 0, "max_speed": 0,
+                "phone_gap_m": None, "vehicle_position": None, "reports": 0, "last_report": None,
+                **({"track": []} if with_track else {})}
+
+
+def _safe_place(db: Session, describe, lat, lng) -> Optional[str]:
+    if describe is None or lat is None or lng is None:
+        return None
+    try:
+        with db.begin_nested():
+            return describe(lat, lng)
+    except Exception:
+        logger.exception("Describing %s,%s failed", lat, lng)
+        return None
+
+
 def row(db: Session, b: VehicleBreakdown, names: dict, describe=None, with_track: bool = False) -> dict:
     """A breakdown for the dashboard and the app: times, downtime, place, phases and the evidence."""
     start, end = _utc(b.started_at), _utc(b.ended_at)
-    ev = evidence(db, b, with_track)
+    ev = _safe_evidence(db, b, with_track)
     lat, lng = (b.start_lat, b.start_lng) if b.start_lat is not None else tuple(ev["vehicle_position"] or (None, None))
     return {
         "id": str(b.id), "imei": b.imei, "vehicle": names.get(b.imei, b.imei), "job_id": str(b.job_id) if b.job_id else None,
@@ -220,7 +253,7 @@ def row(db: Session, b: VehicleBreakdown, names: dict, describe=None, with_track
         "downtime_s": round(((end or datetime.now(timezone.utc)) - start).total_seconds()),
         "status": "resolved" if end else "active",
         "latitude": lat, "longitude": lng, "accuracy": b.start_accuracy,
-        "location": describe(lat, lng) if describe and lat is not None else None,
+        "location": _safe_place(db, describe, lat, lng),
         "end_latitude": b.end_lat, "end_longitude": b.end_lng,
         "phases": b.phases or [], "notes": b.notes,
         "review": b.review, "review_note": b.review_note, "reviewed_by": b.reviewed_by,

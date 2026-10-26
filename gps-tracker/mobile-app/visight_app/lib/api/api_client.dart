@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import '../app_log.dart';
 import '../config.dart';
 
 /// An error answer from the backend, with FastAPI's `detail` as the message.
@@ -44,23 +45,34 @@ class ApiClient {
       };
 
   Future<dynamic> get(String path, [Map<String, String?>? query]) async {
-    return _handle(await _send(() => _http.get(_uri(path, query), headers: _headers)));
+    final uri = _uri(path, query), took = Stopwatch()..start();
+    return _handle('GET', uri, took, await _send('GET', uri, took, () => _http.get(uri, headers: _headers)));
   }
 
   Future<dynamic> post(String path, Object body) async {
-    return _handle(await _send(() => _http.post(_uri(path, null), headers: _headers, body: jsonEncode(body))));
+    final uri = _uri(path, null), took = Stopwatch()..start();
+    return _handle('POST', uri, took,
+        await _send('POST', uri, took, () => _http.post(uri, headers: _headers, body: jsonEncode(body))));
   }
 
-  Future<http.Response> _send(Future<http.Response> Function() call) async {
+  // Every request goes in the app log (AppLog): method, path, status and time; error answers with their message
+  Future<http.Response> _send(String method, Uri uri, Stopwatch took, Future<http.Response> Function() call) async {
     try {
       return await call().timeout(const Duration(seconds: 30));
     } on Exception catch (e) {
+      AppLog.warn('$method ${uri.path}${uri.hasQuery ? '?${uri.query}' : ''} failed after ${took.elapsedMilliseconds} ms: $e');
       if (e is! http.ClientException && e is! SocketException && e is! TimeoutException) rethrow;
       throw ApiException(0, "Can't reach the server. Check your connection and try again.");
     }
   }
 
-  dynamic _handle(http.Response res) {
+  dynamic _handle(String method, Uri uri, Stopwatch took, http.Response res) {
+    final what = '$method ${uri.path}${uri.hasQuery ? '?${uri.query}' : ''} → ${res.statusCode} (${took.elapsedMilliseconds} ms)';
+    if (res.statusCode >= 400) {
+      (res.statusCode >= 500 ? AppLog.error : AppLog.warn)('$what: ${logSnippet(res.body)}');
+    } else {
+      AppLog.info(what);
+    }
     final body = res.body.isEmpty ? null : _tryDecode(res.body);
     if (res.statusCode >= 200 && res.statusCode < 300) return body;
     if (res.statusCode == 401 && token != null) onUnauthorized?.call();

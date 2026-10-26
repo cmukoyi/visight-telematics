@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'api/api_client.dart';
+import 'app_log.dart';
 import 'api/models.dart';
 
 /// The signed-in user, the vehicles their security group lets them see, and
@@ -84,6 +85,7 @@ class Session extends ChangeNotifier {
   }
 
   Future<void> signOut({bool expired = false}) async {
+    AppLog.info(expired ? 'Session ended (token rejected)' : 'Signed out');
     _poll?.cancel();
     api.token = null;
     me = null;
@@ -99,6 +101,7 @@ class Session extends ChangeNotifier {
 
   Future<void> _loadUser() async {
     me = Me.fromJson(await api.get('/api/v2/me'));
+    AppLog.info('Signed in as ${me!.email} (${me!.usergroup ?? '-'}; roles: ${me!.roles.join(', ')})');
     await refreshVehicles();
     _poll?.cancel();
     _poll = Timer.periodic(const Duration(seconds: 30), (_) => refreshVehicles());

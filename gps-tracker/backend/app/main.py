@@ -144,6 +144,18 @@ logger = logging.getLogger(__name__)
 _PORTAL_VERBOSE_LOGGING = os.getenv("PORTAL_VERBOSE_LOGGING", "0").strip().lower() in ("1", "true", "yes", "on")
 _PORTAL_VERBOSE_SLOW_MS = int(os.getenv("PORTAL_VERBOSE_SLOW_MS", "800"))
 
+@app.exception_handler(Exception)
+async def unhandled_error(request, exc):
+    """Any error the code didn't handle: log the traceback under a short reference and give the caller that
+    reference (the mobile app's problem reports and the dashboard show it), instead of a bare 500."""
+    from fastapi.responses import JSONResponse
+    ref = secrets.token_hex(3).upper()
+    logger.error("Unhandled error ref=%s %s %s", ref, request.method, request.url.path, exc_info=exc)
+    return JSONResponse(status_code=500, content={
+        "detail": f"Something went wrong on our side (error {ref}). Please try again; if it keeps happening, report it with this code.",
+        "error_ref": ref})
+
+
 def _is_verbose_path(path: str) -> bool:
     return path.startswith("/api/portal/") or path.startswith("/api/assets")
 
