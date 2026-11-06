@@ -1669,7 +1669,7 @@
                     <div id="tenant-features" class="tab-content">
                         <div class="page-header">
                             <h2 class="page-title">Tenant Features</h2>
-                            <p class="page-subtitle">Control which customer dashboard features are available to all users in each tenant. Features disabled here are hidden for everyone regardless of their role.</p>
+                            <p class="page-subtitle">Choose which modules each customer has. A module that is off is off for everyone in that tenant, whatever their role.</p>
                         </div>
 
                         <div id="tfAlertBanner" class="alert" style="display:none"><span id="tfAlertText"></span></div>
@@ -1684,86 +1684,18 @@
 
                         <div id="tfFeaturesCard" class="card" style="display:none">
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-                                <h3 class="card-title" style="margin:0">Customer Dashboard Features</h3>
+                                <h3 class="card-title" style="margin:0">Modules</h3>
                                 <button class="btn btn-primary" onclick="saveTenantFeatures()" id="tfSaveBtn">Save Changes</button>
                             </div>
                             <p style="font-size:13px;color:var(--text-secondary);margin-bottom:18px">
-                                Enable or disable features for <strong id="tfTenantName"></strong>. Disabled features are hidden from all users in this tenant.
+                                Choose what <strong id="tfTenantName"></strong> has bought. Each module is an item in the customer portal's left menu.
                             </p>
 
-                            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">
-                                <label class="feature-checkbox-item">
-                                    <input type="checkbox" id="tf_livemap" data-feature="livemap">
-                                    <div>
-                                        <div class="feature-name">🗺️ Live Map</div>
-                                        <div class="feature-desc">Real-time GPS tracking map with tag positions</div>
-                                    </div>
-                                </label>
-
-                                <label class="feature-checkbox-item">
-                                    <input type="checkbox" id="tf_history" data-feature="history">
-                                    <div>
-                                        <div class="feature-name">📅 History</div>
-                                        <div class="feature-desc">Journey history with playback and filtering</div>
-                                    </div>
-                                </label>
-
-                                <label class="feature-checkbox-item">
-                                    <input type="checkbox" id="tf_alerts" data-feature="alerts">
-                                    <div>
-                                        <div class="feature-name">🔔 Alerts</div>
-                                        <div class="feature-desc">Alert configuration and notifications</div>
-                                    </div>
-                                </label>
-
-                                <label class="feature-checkbox-item">
-                                    <input type="checkbox" id="tf_geofences" data-feature="geofences">
-                                    <div>
-                                        <div class="feature-name">📍 Geofences</div>
-                                        <div class="feature-desc">Geofence management and boundary alerts</div>
-                                    </div>
-                                </label>
-
-                                <label class="feature-checkbox-item">
-                                    <input type="checkbox" id="tf_reports" data-feature="reports">
-                                    <div>
-                                        <div class="feature-name">📊 Reports</div>
-                                        <div class="feature-desc">Reports and analytics dashboards</div>
-                                    </div>
-                                </label>
-
-                                <label class="feature-checkbox-item">
-                                    <input type="checkbox" id="tf_management" data-feature="management">
-                                    <div>
-                                        <div class="feature-name">⚙️ Management</div>
-                                        <div class="feature-desc">Tag management and configuration</div>
-                                    </div>
-                                </label>
-
-                                <label class="feature-checkbox-item">
-                                    <input type="checkbox" id="tf_settings" data-feature="settings">
-                                    <div>
-                                        <div class="feature-name">⚙️ Settings</div>
-                                        <div class="feature-desc">User settings and preferences</div>
-                                    </div>
-                                </label>
-
-                                <label class="feature-checkbox-item">
-                                    <input type="checkbox" id="tf_developers" data-feature="developers">
-                                    <div>
-                                        <div class="feature-name">👨‍💻 Developers</div>
-                                        <div class="feature-desc">API tokens and developer tools</div>
-                                    </div>
-                                </label>
-
-
-                            </div>
+                            <div id="tfModules" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px"></div>
 
                             <div style="margin-top:20px;padding:14px;background:var(--bg-secondary);border-radius:8px;border-left:4px solid var(--primary-color)">
                                 <p style="margin:0;font-size:13px;color:var(--text-secondary)">
-                                    <strong>ℹ️ How it works:</strong> Features enabled here are the <strong>master switch</strong> for all users in this tenant. 
-                                    Individual users can be further restricted via their Role in the customer portal (Admin, Manager, Reporter, Custom), 
-                                    but they cannot access features disabled at the tenant level.
+                                    <strong>ℹ️ How it works:</strong> Modules are the <strong>master switch</strong> for everyone in this tenant, administrators included. A module that is off disappears from the menu and is refused by the API and mobile app, whatever their role allows. Roles can restrict users further within the modules that are on. Changes reach users within a minute.
                                 </p>
                             </div>
                         </div>
@@ -6326,19 +6258,40 @@ dashboard.welcome,Bienvenue</pre>
 
             const features = await response.json();
 
-            // Build a map of enabled features
+            const modulesResponse = await fetch('/api/admin/tenant-modules', {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            if (!modulesResponse.ok) throw new Error('Failed to load modules');
+            const modules = await modulesResponse.json();
+
             const enabledMap = {};
             features.forEach(f => {
                 enabledMap[f.feature_name] = f.enabled;
             });
 
-            // Update checkboxes
-            ['livemap', 'history', 'alerts', 'geofences', 'reports', 'management', 'settings', 'developers'].forEach(feature => {
-                const checkbox = document.getElementById(`tf_${feature}`);
-                if (checkbox) {
-                    checkbox.checked = enabledMap[feature] !== false; // Default to true if missing
-                }
-            });
+            const select = document.getElementById('tfTenantSelect');
+            document.getElementById('tfTenantName').textContent = select.options[select.selectedIndex].textContent;
+
+            // A module with no record is on
+            const grid = document.getElementById('tfModules');
+            grid.replaceChildren(...modules.map(m => {
+                const row = document.createElement('label');
+                row.className = 'feature-checkbox-item';
+                const box = document.createElement('input');
+                box.type = 'checkbox';
+                box.dataset.feature = m.key;
+                box.checked = enabledMap[m.key] !== false;
+                const name = document.createElement('div');
+                name.className = 'feature-name';
+                name.textContent = m.label;
+                const desc = document.createElement('div');
+                desc.className = 'feature-desc';
+                desc.textContent = m.description;
+                const text = document.createElement('div');
+                text.append(name, desc);
+                row.append(box, text);
+                return row;
+            }));
 
             featuresCard.style.display = 'block';
         } catch (e) {
@@ -6360,11 +6313,8 @@ dashboard.welcome,Bienvenue</pre>
 
         try {
             const features = {};
-            ['livemap', 'history', 'alerts', 'geofences', 'reports', 'management', 'settings', 'developers'].forEach(feature => {
-                const checkbox = document.getElementById(`tf_${feature}`);
-                if (checkbox) {
-                    features[feature] = checkbox.checked;
-                }
+            document.querySelectorAll('#tfModules input[data-feature]').forEach(box => {
+                features[box.dataset.feature] = box.checked;
             });
 
             const response = await fetch(`/api/admin/tenant-features/${usergroupId}`, {
@@ -6381,7 +6331,7 @@ dashboard.welcome,Bienvenue</pre>
                 throw new Error(error.detail || 'Failed to save features');
             }
 
-            alert('Tenant features updated successfully! Users will see changes on next login.');
+            alert('Modules updated. Users will see the change within a minute.');
         } catch (e) {
             alert('Error saving features: ' + e.message);
         } finally {

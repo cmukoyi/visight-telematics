@@ -8,6 +8,10 @@ Within a user group (a customer company):
 - **Configuration is for administrators only**: the ADMIN_ONLY permissions
   (users, roles, security, vehicle setup, rules, themes, audit, ...) are never
   granted through a custom role — only the administrator role has them.
+- a **module** is what a customer buys: one per item in the portal's left menu,
+  switched on or off for the whole user group in the Admin Portal (MODULES). A
+  module that is off is off for everyone, administrators included, and overrides
+  every role.
 - a **security group** decides which vehicles a user sees: each vehicle group
   (tag category) belongs to a security group, and a user sees only the
   vehicles whose vehicle group is in the user's security group (unless a role
@@ -23,7 +27,7 @@ from typing import Iterable, Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, object_session
 
-from app.models import BLETag, PortalRole, PortalUser, PortalUserRole, SecurityGroup, TagCategory
+from app.models import BLETag, PortalRole, PortalUser, PortalUserRole, SecurityGroup, TagCategory, TenantFeature
 
 # Sections, in the order the role editor lists them
 SECTIONS = ["Live tracking", "History", "Places", "Alerts", "Reports", "Maintenance", "Vehicles", "Users and security", "Configuration"]
@@ -83,6 +87,39 @@ LEGACY_IMPLIES = {
     "settings.manage": ["theme.manage", "data_exchange.manage", "events.manage"],
     "rules.manage": ["events.manage"],
 }
+
+# The modules a customer can buy, one per item in the portal's left menu (NAV in AppLayout.tsx), in menu
+# order. key: (label, what it gives the customer, the permissions that belong to it). They're on unless
+# switched off. A permission shared by several modules keeps working until all of them are off, so
+# Dashboard and Workspace can be sold separately though both need the vehicles' positions.
+MODULES: dict = {
+    "dashboard": ("Dashboard", "Live map of the fleet and following a vehicle.", ["map.view", "live.track"]),
+    "workspace": ("Workspace", "Trips, route replay, events and places.",
+                  ["map.view", "live.track", "history.view", "events.view", "places.view", "places.manage", "places.arm"]),
+    "configuration": ("Configuration", "Vehicles, users, roles, places, rules and themes. When off, the customer "
+                                       "can't manage these themselves, so you have to do it for them.",
+                      sorted(ADMIN_ONLY - {"maintenance.configure"}) + ["places.view", "places.manage", "places.arm"]),
+    "maintenance": ("Vehicle Maintenance", "Schedules, jobs, costs, breakdowns and fault codes.",
+                    ["maintenance.view", "maintenance.manage", "breakdowns.log", "maintenance.configure"]),
+    "reports": ("Reports", "Standard and custom reports, scheduled reports and analytics.",
+                ["reports.view", "reports.schedule", "reports.design", "analytics.manage"]),
+    "inbox": ("Inbox", "Alerts in the portal and app. When off, nobody in the group receives alerts.", ["inbox.view"]),
+}
+
+
+def blocked_permissions(disabled_modules: Iterable[str]) -> set:
+    """Permissions nobody in the group may use: those whose modules are all off."""
+    disabled = set(disabled_modules)
+    on = {p for key, (_, _, perms) in MODULES.items() if key not in disabled for p in perms}
+    return {p for key in disabled if key in MODULES for p in MODULES[key][2]} - on
+
+
+def disabled_modules(db: Session, usergroup_id) -> set:
+    """The group's modules that are switched off."""
+    return {name for (name,) in db.query(TenantFeature.feature_name).filter(
+        TenantFeature.usergroup_id == usergroup_id, TenantFeature.enabled == False,  # noqa: E712
+        TenantFeature.feature_name.in_(MODULES)).all()}
+
 
 ADMIN_ROLE = "User Group Administrator"
 # name: (description, permissions, is_admin)
@@ -188,15 +225,19 @@ class Access:
     roles: list = field(default_factory=list)
     permissions: set = field(default_factory=set)
     is_admin: bool = False
+    disabled_modules: set = field(default_factory=set)
+    blocked: set = field(default_factory=set)     # permissions the group's modules rule out, even for admins
 
     @property
     def role(self) -> Optional[PortalRole]:
         return self.roles[0] if self.roles else None
 
     def can(self, permission: str) -> bool:
-        return self.is_admin or permission in self.permissions
+        return permission not in self.blocked and (self.is_admin or permission in self.permissions)
 
     def require(self, permission: str) -> None:
+        if permission in self.blocked:
+            raise HTTPException(status_code=403, detail=f"This isn't included in your package ({PERMISSIONS[permission][0].lower()})")
         if not self.can(permission):
             raise HTTPException(status_code=403, detail=f"Your roles don't allow this ({PERMISSIONS[permission][0].lower()})")
 
@@ -256,7 +297,10 @@ def for_user(user: PortalUser, db: Optional[Session] = None) -> Access:
     roles.sort(key=lambda r: (not r.is_admin, r.name.lower()))
     is_admin = bool(user.is_group_admin or any(r.is_admin for r in roles) or (not roles and user.role == "system_admin"))
     perms = set(ALL_PERMISSIONS) if is_admin else {p for r in roles for p in (r.permissions or []) if p in PERMISSIONS and p not in ADMIN_ONLY}
-    return Access(user=user, roles=roles, permissions=perms, is_admin=is_admin)
+    disabled = disabled_modules(db, user.usergroup_id)
+    blocked = blocked_permissions(disabled)
+    return Access(user=user, roles=roles, permissions=perms - blocked, is_admin=is_admin,
+                  disabled_modules=disabled, blocked=blocked)
 
 
 def profile(db: Session, access: Access) -> dict:
@@ -270,6 +314,8 @@ def profile(db: Session, access: Access) -> dict:
         "role_names": names,
         "permissions": sorted(access.permissions),
         "is_admin": access.is_admin,
+        "disabled_modules": sorted(access.disabled_modules),
+        "blocked_permissions": sorted(access.blocked),
         "security_group_id": str(sg.id) if sg else None,
         "security_group_name": sg.name if sg else None,
         "language": user_language(db, access.user),

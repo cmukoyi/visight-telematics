@@ -97,7 +97,17 @@ export const useMe = () =>
 export function useCan() {
   const { data } = useMe();
   const access = data?.access ?? getSession().access;
-  return (permission: string) => !!access && (access.is_admin || (permission !== 'admin' && access.permissions.includes(permission)));
+  return (permission: string) => !!access && !access.blocked_permissions?.includes(permission)
+    && (access.is_admin || (permission !== 'admin' && access.permissions.includes(permission)));
+}
+
+/** Whether a menu section can be shown: the user group has its module, and the user's role allows it. */
+export function useCanOpen() {
+  const { data } = useMe();
+  const can = useCan();
+  const access = data?.access ?? getSession().access;
+  return ({ module, any }: { module: string; any: string[] }) =>
+    !access?.disabled_modules?.includes(module) && (any.length === 0 || any.some(can));
 }
 
 /** The user group's colours, logos and timezone (null until signed in). */

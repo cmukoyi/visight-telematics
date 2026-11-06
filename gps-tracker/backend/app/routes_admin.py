@@ -30,6 +30,7 @@ from app.admin_auth import (
     hash_password, verify_password, create_admin_access_token,
     decode_admin_token, check_role_permission, get_current_admin_user
 )
+from app.services.access_service import MODULES
 from app.services.critical_service_alert_service import CATEGORY_DEFS
 from app.services.login_limiter import LoginLimiter, client_ip
 
@@ -2110,6 +2111,12 @@ class TenantFeatureUpdate(BaseModel):
     features: dict[str, bool]  # feature_name -> enabled mapping
 
 
+@router.get("/tenant-modules")
+def list_tenant_modules():
+    """The modules that can be switched on or off, one per item in the customer portal's menu."""
+    return [{"key": key, "label": label, "description": description} for key, (label, description, _) in MODULES.items()]
+
+
 @router.get("/tenant-features/{usergroup_id}", response_model=List[TenantFeatureOut])
 def get_tenant_features(
     usergroup_id: str,
@@ -2148,17 +2155,13 @@ def update_tenant_features(
     Updates which features are available to ALL users in the tenant.
     Creates/updates TenantFeature records with enabled/disabled status.
     
-    Request body:
-    {
-        "features": {
-            "livemap": true,
-            "history": true,
-            "history-advanced": false,
-            ...
-        }
-    }
+    Request body: {"features": {"dashboard": true, "reports": false, ...}}, keyed by access_service.MODULES.
     """
     admin = get_admin_from_request(request, db)
+
+    unknown = sorted(set(data.features) - set(MODULES))
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"Unknown modules: {', '.join(unknown)}")
     
     # Verify usergroup exists
     usergroup = db.query(UserGroup).filter(UserGroup.id == usergroup_id).first()

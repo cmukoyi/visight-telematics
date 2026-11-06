@@ -25,6 +25,8 @@ export interface Access {
   language?: string;
   permissions: string[];
   is_admin: boolean;
+  disabled_modules?: string[];
+  blocked_permissions?: string[];
   security_group_id: string | null;
   security_group_name: string | null;
 }

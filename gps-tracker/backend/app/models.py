@@ -518,19 +518,8 @@ class PlaceVisit(Base):
 
 
 class TenantFeature(Base):
-    """Tenant-wide feature toggles for customer dashboard.
-    
-    Controls which features are available to ALL users in a tenant.
-    Managed via Admin Portal → Tenant Features page.
-    
-    Logic:
-    - Tenant features = master switch (all users in tenant)
-    - User custom_features = per-user refinement  
-    - effective_features = intersection(tenant_features, user_features)
-    
-    Feature names: livemap, history, history-advanced, alerts, geofences,
-    reports, management, floorplan, settings, hive
-    """
+    """A module (access_service.MODULES) switched on or off for a whole user group, in Admin Portal →
+    Tenant Features. No row means on. Rows named after anything else are from the old dashboard and ignored."""
     __tablename__ = "tenant_features"
     
     id = get_uuid_column()

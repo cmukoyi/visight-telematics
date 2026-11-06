@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { setUnauthorizedHandler } from './api/client';
 import { getSession } from './auth/session';
 import { LoginPage } from './auth/LoginPage';
-import { useCan, useMe } from './api/hooks';
+import { useCanOpen, useMe } from './api/hooks';
 import { AppLayout, NAV } from './layout/AppLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { WorkspacePage } from './pages/WorkspacePage';
@@ -16,18 +16,16 @@ function RequireAuth({ children }: { children: JSX.Element }) {
   return getSession().token ? children : <Navigate to="/login" replace />;
 }
 
-/** Send users to the first section their role allows when they open one it doesn't. */
-function Allowed({ any, children }: { any: string[]; children: JSX.Element }) {
-  const can = useCan();
+/** Send users to the first section they can open when they open one they can't. */
+function Allowed({ to, children }: { to: string; children: JSX.Element }) {
+  const canOpen = useCanOpen();
   const me = useMe();
-  if (any.length === 0 || any.some(can)) return children;
+  if (canOpen(NAV.find((n) => n.to === to)!)) return children;
   // Signed in before roles existed: wait for /me rather than redirecting on missing permissions
   if (!getSession().access && me.isLoading) return null;
-  const first = NAV.find((n) => n.any.some(can));
+  const first = NAV.find(canOpen);
   return <Navigate to={first?.to ?? '/account'} replace />;
 }
-
-const need = (to: string) => NAV.find((n) => n.to === to)!.any;
 
 export function App() {
   const navigate = useNavigate();
@@ -37,13 +35,13 @@ export function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireAuth><AppLayout /></RequireAuth>}>
-        <Route path="/dashboard" element={<Allowed any={need('/dashboard')}><DashboardPage /></Allowed>} />
-        <Route path="/workspace" element={<Allowed any={need('/workspace')}><WorkspacePage /></Allowed>} />
-        <Route path="/configuration/*" element={<Allowed any={need('/configuration')}><ConfigurationPage /></Allowed>} />
+        <Route path="/dashboard" element={<Allowed to="/dashboard"><DashboardPage /></Allowed>} />
+        <Route path="/workspace" element={<Allowed to="/workspace"><WorkspacePage /></Allowed>} />
+        <Route path="/configuration/*" element={<Allowed to="/configuration"><ConfigurationPage /></Allowed>} />
         <Route path="/account" element={<AccountPage />} />
-        <Route path="/reports/*" element={<Allowed any={need('/reports')}><ReportsSection /></Allowed>} />
-        <Route path="/maintenance/*" element={<Allowed any={need('/maintenance')}><MaintenanceSection /></Allowed>} />
-        <Route path="/inbox" element={<Allowed any={need('/inbox')}><InboxPage /></Allowed>} />
+        <Route path="/reports/*" element={<Allowed to="/reports"><ReportsSection /></Allowed>} />
+        <Route path="/maintenance/*" element={<Allowed to="/maintenance"><MaintenanceSection /></Allowed>} />
+        <Route path="/inbox" element={<Allowed to="/inbox"><InboxPage /></Allowed>} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

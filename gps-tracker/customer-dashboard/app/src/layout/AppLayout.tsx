@@ -12,7 +12,7 @@ import {
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCan, useGroupTheme, usePlatformName, useUnreadCount } from '../api/hooks';
+import { useCanOpen, useGroupTheme, usePlatformName, useUnreadCount } from '../api/hooks';
 import { clearSession, getSession } from '../auth/session';
 import { GlobalSearch } from '../components/GlobalSearch';
 import { msg, useT } from '../i18n';
@@ -21,14 +21,15 @@ import { ThemeTrialBanner } from './ThemeTrialBanner';
 
 dayjs.extend(utc);
 
+// `module`: the user group's module that sells the section (MODULES in access_service.py).
 // `any`: the role needs at least one of these permissions to see the section.
 export const NAV = [
-  { to: '/dashboard', label: msg('app.nav.dashboard', 'Dashboard'), icon: IconLayoutDashboard, any: ['map.view'] },
-  { to: '/workspace', label: msg('app.nav.workspace', 'Workspace'), icon: IconMapRoute, any: ['map.view', 'history.view', 'places.view'] },
-  { to: '/configuration', label: msg('app.nav.configuration', 'Configuration'), icon: IconAdjustmentsHorizontal, any: ['admin'] },
-  { to: '/maintenance', label: msg('app.nav.maintenance', 'Vehicle Maintenance'), icon: IconTool, any: ['maintenance.view', 'maintenance.manage'] },
-  { to: '/reports', label: msg('app.nav.reports', 'Reports'), icon: IconChartBar, any: ['reports.view'] },
-  { to: '/inbox', label: msg('app.nav.inbox', 'Inbox'), icon: IconInbox, any: ['inbox.view'] },
+  { to: '/dashboard', module: 'dashboard', label: msg('app.nav.dashboard', 'Dashboard'), icon: IconLayoutDashboard, any: ['map.view'] },
+  { to: '/workspace', module: 'workspace', label: msg('app.nav.workspace', 'Workspace'), icon: IconMapRoute, any: ['map.view', 'history.view', 'places.view'] },
+  { to: '/configuration', module: 'configuration', label: msg('app.nav.configuration', 'Configuration'), icon: IconAdjustmentsHorizontal, any: ['admin'] },
+  { to: '/maintenance', module: 'maintenance', label: msg('app.nav.maintenance', 'Vehicle Maintenance'), icon: IconTool, any: ['maintenance.view', 'maintenance.manage'] },
+  { to: '/reports', module: 'reports', label: msg('app.nav.reports', 'Reports'), icon: IconChartBar, any: ['reports.view'] },
+  { to: '/inbox', module: 'inbox', label: msg('app.nav.inbox', 'Inbox'), icon: IconInbox, any: ['inbox.view'] },
 ];
 
 function Clock({ compact }: { compact?: boolean }) {
@@ -72,8 +73,8 @@ export function AppLayout() {
   const { setColorScheme } = useMantineColorScheme();
   const scheme = useComputedColorScheme('dark');
   const platformName = usePlatformName();
-  const can = useCan();
-  const nav = NAV.filter((n) => n.any.length === 0 || n.any.some(can));
+  const canOpen = useCanOpen();
+  const nav = NAV.filter(canOpen);
   const { data: unread } = useUnreadCount();
   const { data: groupTheme } = useGroupTheme();
   const queryClient = useQueryClient();
