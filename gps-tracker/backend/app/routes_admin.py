@@ -31,6 +31,7 @@ from app.admin_auth import (
     decode_admin_token, check_role_permission, get_current_admin_user
 )
 from app.services.critical_service_alert_service import CATEGORY_DEFS
+from app.services.login_limiter import LoginLimiter, client_ip
 
 # SECURITY: All admin endpoints require authentication by default
 # Public endpoints (login, logs) use separate router below
@@ -43,6 +44,7 @@ router = APIRouter(
 # Public endpoints that should NOT require authentication
 public_router = APIRouter(prefix="/api/admin", tags=["admin-public"])
 logger = logging.getLogger(__name__)
+_login_limiter = LoginLimiter("admin-login")
 
 
 _EMAIL_NOTIFY_FLAG_BY_ALERT = {
@@ -283,10 +285,14 @@ def log_audit(
 @public_router.post("/login", response_model=AdminToken)
 async def admin_login(credentials: AdminLogin, request: Request, db: Session = Depends(get_db)):
     """Admin login endpoint - PUBLIC (no auth required)"""
+    ip = client_ip(request)
+    _login_limiter.check(ip)
+
     admin = db.query(AdminUser).filter(AdminUser.username == credentials.username).first()
     
     if not admin or not verify_password(admin.hashed_password, credentials.password):
-        logger.warning(f"Failed login attempt for username: {credentials.username}")
+        _login_limiter.record_failure(ip)
+        logger.warning(f"Failed login attempt for username: {credentials.username} from {ip}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password"
@@ -298,6 +304,8 @@ async def admin_login(credentials: AdminLogin, request: Request, db: Session = D
             detail="Admin account is inactive"
         )
     
+    _login_limiter.record_success(ip)
+
     # Update last login
     admin.last_login = datetime.utcnow()
     db.commit()
