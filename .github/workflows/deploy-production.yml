@@ -41,7 +41,7 @@ jobs:
     name: Lint — workflow + hygiene
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Reject dangerous Docker commands
         run: |
           # Matches cache-wiping Docker commands via regex pattern (builder|system)+prune
@@ -135,7 +135,7 @@ jobs:
     environment: production
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # ── Resolve all per-tenant values from tenants/<TENANT>/tenant.env ──
       # Exports to $GITHUB_ENV so subsequent steps can use:
