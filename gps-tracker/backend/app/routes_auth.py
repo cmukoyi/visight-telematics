@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from datetime import datetime, timedelta
+from typing import Optional
 import jwt
 import os
 import logging
@@ -12,6 +13,7 @@ import logging
 from app.database import get_db
 from app.models import User, UserGroup, PortalUser
 from app.admin_auth import verify_password
+from app.services import device_tokens
 from app.auth import verify_password as verify_mobile_password
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
@@ -74,6 +76,11 @@ class LoginRequest(BaseModel):
     """Login credentials."""
     email: EmailStr
     password: str
+    remember_device: bool = False  # the mobile app: also return a refresh_token for POST /api/auth/refresh
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
 
 
 class TokenResponse(BaseModel):
@@ -83,9 +90,20 @@ class TokenResponse(BaseModel):
     expires_in: int = PORTAL_TOKEN_EXPIRE_HOURS * 3600
     usergroup_id: str
     portal_user_id: str
+    refresh_token: Optional[str] = None
 
 
-@router.post("/login", response_model=TokenResponse)
+def _access_token(user: PortalUser) -> str:
+    return jwt.encode({
+        "type": "portal",  # Required by _decode_portal_token verification
+        "portal_user_id": str(user.id),
+        "usergroup_id": str(user.usergroup_id),
+        "email": user.email,
+        "exp": datetime.utcnow() + timedelta(hours=PORTAL_TOKEN_EXPIRE_HOURS),
+    }, PORTAL_SECRET_KEY, algorithm=PORTAL_ALGORITHM)
+
+
+@router.post("/login", response_model=TokenResponse, response_model_exclude_none=True)
 def login(
     data: LoginRequest,
     request: Request,
@@ -178,22 +196,41 @@ def login(
             detail="Your organization account is not active"
         )
     
-    # Create JWT token
-    expire = datetime.utcnow() + timedelta(hours=PORTAL_TOKEN_EXPIRE_HOURS)
-    token_data = {
-        "type": "portal",  # Required by _decode_portal_token verification
-        "portal_user_id": str(user.id),
-        "usergroup_id": str(user.usergroup_id),
-        "email": user.email,
-        "exp": expire,
-    }
-    
-    access_token = jwt.encode(token_data, PORTAL_SECRET_KEY, algorithm=PORTAL_ALGORITHM)
-    
+    refresh_token = None
+    if data.remember_device:
+        refresh_token = device_tokens.issue(db, user.id)
+        db.commit()
+
     logger.info("User %s logged in from %s", user.email, ip)
     
     return TokenResponse(
-        access_token=access_token,
+        access_token=_access_token(user),
         usergroup_id=str(user.usergroup_id),
-        portal_user_id=str(user.id)
+        portal_user_id=str(user.id),
+        refresh_token=refresh_token,
     )
+
+
+@router.post("/refresh", response_model=TokenResponse, response_model_exclude_none=True, include_in_schema=False)
+def refresh(data: RefreshRequest, db: Session = Depends(get_db)):
+    """A new access token for the mobile app, without the password, as long as the account can still sign in."""
+    row = device_tokens.find(db, data.refresh_token)
+    user = db.query(PortalUser).filter(PortalUser.id == row.user_id, PortalUser.is_active == True).first() if row else None
+    credential_user = db.query(User).filter(User.id == user.mobile_user_id).first() if user and user.mobile_user_id else None
+    group = db.query(UserGroup).filter(UserGroup.id == user.usergroup_id, UserGroup.is_active == True).first() if user else None
+    expired = bool(user and user.expires_at and user.expires_at < datetime.now(user.expires_at.tzinfo))
+    if not user or not group or expired or (credential_user and not credential_user.is_active):
+        if row:
+            db.delete(row)
+            db.commit()
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Please sign in again")
+    device_tokens.touch(row)
+    db.commit()
+    return TokenResponse(access_token=_access_token(user), usergroup_id=str(user.usergroup_id), portal_user_id=str(user.id))
+
+
+@router.post("/logout", status_code=204, include_in_schema=False)
+def logout(data: RefreshRequest, db: Session = Depends(get_db)):
+    """Forget this phone: its refresh token stops working."""
+    device_tokens.revoke(db, data.refresh_token)
+    db.commit()

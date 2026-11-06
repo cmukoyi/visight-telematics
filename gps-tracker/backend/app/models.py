@@ -612,6 +612,18 @@ class PortalUser(Base):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
+class PortalDeviceToken(Base):
+    """A phone the app is signed in on: it renews its access token with this (see services/device_tokens.py)."""
+    __tablename__ = "portal_device_tokens"
+
+    id           = get_uuid_column()
+    user_id      = Column(UUID(as_uuid=True), ForeignKey("portal_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash   = Column(String(64), nullable=False, unique=True, index=True)   # SHA-256; the token itself is never stored
+    created_at   = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_used_at = Column(DateTime(timezone=True), nullable=False)
+    expires_at   = Column(DateTime(timezone=True), nullable=False)
+
+
 class DevicePosition(Base):
     """GPS history for a device, written by the DataProfiler dashboard ingest.
 

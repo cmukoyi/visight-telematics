@@ -92,6 +92,7 @@ void showAccountSheet(BuildContext context) {
         if (me.roles.isNotEmpty)
           ListTile(leading: const Icon(Icons.badge_outlined), title: const Text('Roles'), subtitle: Text(me.roles.join(', '))),
         const Divider(),
+        const _LockSwitch(),
         ListTile(
           leading: const Icon(Icons.refresh),
           title: const Text('Refresh vehicles'),
@@ -125,6 +126,33 @@ void showAccountSheet(BuildContext context) {
       ]),
     ),
   );
+}
+
+/// Menu → open the app with a fingerprint, face or phone PIN; only on phones that have one.
+class _LockSwitch extends StatelessWidget {
+  const _LockSwitch();
+
+  @override
+  Widget build(BuildContext context) {
+    final session = SessionScope.of(context);
+    return FutureBuilder<bool>(
+      future: session.deviceLock.available(),
+      builder: (context, available) {
+        if (available.data != true) return const SizedBox.shrink();
+        return SwitchListTile(
+          secondary: const Icon(Icons.fingerprint),
+          title: const Text('Unlock with fingerprint'),
+          subtitle: const Text('Or your face or phone PIN, whichever this phone has'),
+          value: session.lockEnabled,
+          onChanged: (on) async {
+            final messenger = ScaffoldMessenger.of(context);
+            final problem = await session.setLockEnabled(on);
+            if (problem != null) messenger.showSnackBar(SnackBar(content: Text(problem)));
+          },
+        );
+      },
+    );
+  }
 }
 
 Color statusColor(String status) => switch (status) {

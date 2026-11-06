@@ -1140,6 +1140,8 @@ def admin_reset_user_password(
         credential_user.hashed_password = get_password_hash(temp_password)
     else:
         target.hashed_password = hash_password(temp_password)
+    from app.services import device_tokens
+    device_tokens.revoke_all(db, target.id)
     db.commit()
 
     return AdminPasswordResetResponse(
@@ -1176,6 +1178,8 @@ def change_password(
         credential_user.hashed_password = get_password_hash(data.new_password)
     else:
         me.hashed_password = hash_password(data.new_password)
+    from app.services import device_tokens
+    device_tokens.revoke_all(db, me.id)
     db.commit()
     return {"detail": "Password updated successfully"}
 
@@ -2607,6 +2611,8 @@ def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
         credential_user.hashed_password = get_password_hash(data.new_password)
     else:
         user.hashed_password = hash_password(data.new_password)
+    from app.services import device_tokens
+    device_tokens.revoke_all(db, user.id)
     db.commit()
     del _portal_reset_pins[email]
     return {"detail": "Password reset successfully"}

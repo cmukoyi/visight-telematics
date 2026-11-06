@@ -1262,6 +1262,8 @@ def reset_portal_user_password(
 
     temp_password = _secrets.token_urlsafe(12)
     target.hashed_password = hash_password(temp_password)
+    from app.services import device_tokens
+    device_tokens.revoke_all(db, target.id)
     db.commit()
 
     log_audit(db, str(admin.id), "reset_portal_password", "PortalUser", str(target.id),

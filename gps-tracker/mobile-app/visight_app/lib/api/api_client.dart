@@ -31,8 +31,16 @@ class ApiClient {
   final http.Client _http;
   String? token;
 
-  /// Called when the token is rejected (expired or the user was deactivated).
+  /// Gets a new [token] when it expires, so a long job (a breakdown overnight) doesn't lose the session.
+  String? refreshToken;
+
+  /// Called when the session is over: the token was rejected and can't be renewed.
   void Function()? onUnauthorized;
+
+  /// Called with a new [token] to keep.
+  void Function()? onTokenRenewed;
+
+  Future<bool>? _renewing;
 
   Uri _uri(String path, Map<String, String?>? query) {
     final q = {for (final e in (query ?? {}).entries) if (e.value != null && e.value!.isNotEmpty) e.key: e.value!};
@@ -49,15 +57,53 @@ class ApiClient {
   /// The server build that last answered (X-Server-Build), logged when it changes.
   static String? serverBuild;
 
-  Future<dynamic> get(String path, [Map<String, String?>? query]) async {
-    final uri = _uri(path, query), took = Stopwatch()..start();
-    return _handle('GET', uri, took, await _send('GET', uri, took, () => _http.get(uri, headers: _headers)));
+  Future<dynamic> get(String path, [Map<String, String?>? query]) {
+    final uri = _uri(path, query);
+    return _request('GET', uri, () => _http.get(uri, headers: _headers));
   }
 
-  Future<dynamic> post(String path, Object body) async {
-    final uri = _uri(path, null), took = Stopwatch()..start();
-    return _handle('POST', uri, took,
-        await _send('POST', uri, took, () => _http.post(uri, headers: _headers, body: jsonEncode(body))));
+  Future<dynamic> post(String path, Object body) {
+    final uri = _uri(path, null);
+    return _request('POST', uri, () => _http.post(uri, headers: _headers, body: jsonEncode(body)));
+  }
+
+  // A 401 did nothing on the server, so the request can safely go again with a new token
+  Future<dynamic> _request(String method, Uri uri, Future<http.Response> Function() call) async {
+    final took = Stopwatch()..start(), sentWith = token;
+    var res = await _send(method, uri, took, call);
+    if (res.statusCode == 401 && sentWith != null && await _renew(sentWith)) {
+      res = await _send(method, uri, took, call);
+    }
+    return _handle(method, uri, took, res);
+  }
+
+  /// A new token after [rejected] was refused: true if there is one to use. Every request refused
+  /// meanwhile shares the one renewal. Throws when the server can't answer: that doesn't end the session.
+  Future<bool> _renew(String rejected) async {
+    if (token == null) return false; // signed out while the request was on its way
+    if (token != rejected) return true; // another request has already renewed it
+    if (refreshToken == null) return false;
+    return _renewing ??= _requestNewToken().whenComplete(() => _renewing = null);
+  }
+
+  Future<bool> _requestNewToken() async {
+    final device = refreshToken, uri = _uri('/api/auth/refresh', null), took = Stopwatch()..start();
+    final res = await _send('POST', uri, took,
+        () => _http.post(uri, headers: _headers, body: jsonEncode({'refresh_token': device})));
+    final body = _tryDecode(res.body), renewed = body is Map ? body['access_token'] : null;
+    if (res.statusCode == 401) {
+      AppLog.warn('Token renewal refused (${took.elapsedMilliseconds} ms)');
+      return false;
+    }
+    if (res.statusCode != 200 || renewed is! String) {
+      AppLog.warn('Token renewal failed: ${res.statusCode} (${took.elapsedMilliseconds} ms)');
+      throw ApiException(res.statusCode, 'Something went wrong (${res.statusCode})');
+    }
+    if (refreshToken != device) return false; // signed out while renewing
+    AppLog.info('Access token renewed (${took.elapsedMilliseconds} ms)');
+    token = renewed;
+    onTokenRenewed?.call();
+    return true;
   }
 
   // Every request goes in the app log (AppLog): method, path, status and time; error answers with their message
