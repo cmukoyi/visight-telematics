@@ -159,7 +159,7 @@ jobs:
     if: always()
     steps:
       - name: Download all reports
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v8
         continue-on-error: true
       
       - name: Generate summary
