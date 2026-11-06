@@ -49,7 +49,7 @@ services:
     env_file:
       - ./backend/.env
     ports:
-      - "0.0.0.0:8001:8000"
+      - "127.0.0.1:8001:8000"   # nginx is the public way in; never publish the API directly
     depends_on:
       db:
         condition: service_healthy
@@ -83,7 +83,7 @@ services:
       dockerfile: Dockerfile
     container_name: __TENANT_PREFIX___admin
     ports:
-      - "3010:80"
+      - "127.0.0.1:3010:80"
     volumes:
       # Shared per-tenant branding dir (same source as the customer portal)
       # so admin/login and customer/login render the same tenant logo. Drop
@@ -108,7 +108,7 @@ services:
       dockerfile: Dockerfile
     container_name: __TENANT_PREFIX___customer
     ports:
-      - "3011:3001"
+      - "127.0.0.1:3011:3001"
     environment:
       - BACKEND_URL=http://backend:8000/api/v1
       - CUSTOMER_TENANT=__TENANT_PREFIX__
