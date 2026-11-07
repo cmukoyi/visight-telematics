@@ -115,11 +115,14 @@ export const FleetMap = forwardRef<FleetMapHandle, Props>(function FleetMap(
 
   const pad = fitPadding ?? { top: 60, bottom: 60, left: 60, right: 60 };
   // A fit asked for before the map has loaded is kept and done on load (else the first view stays at the default)
+  // (map.loaded() is no use here: it's also false while tiles are loading after any move, and onLoad fires only once,
+  // so a fit asked for then was lost.)
   const pendingFit = useRef<[number, number][] | null>(null);
+  const ready = useRef(false);
   const fitTo = (pts: [number, number][]) => {
     const map = mapRef.current;
     if (!pts.length) return;
-    if (!map || !map.loaded()) {
+    if (!map || !ready.current) {
       pendingFit.current = pts;
       return;
     }
@@ -167,7 +170,7 @@ export const FleetMap = forwardRef<FleetMapHandle, Props>(function FleetMap(
     <div className={classes.wrap}>
       <Map
         ref={mapRef}
-        onLoad={() => { if (pendingFit.current) fitTo(pendingFit.current); }}
+        onLoad={() => { ready.current = true; if (pendingFit.current) fitTo(pendingFit.current); }}
         initialViewState={{ latitude: -26.2, longitude: 28.05, zoom: 9 }}
         mapStyle={mapStyle}
         style={{ width: '100%', height: '100%' }}
