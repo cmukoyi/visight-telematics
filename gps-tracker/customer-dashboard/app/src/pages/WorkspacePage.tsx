@@ -181,13 +181,38 @@ export function WorkspacePage() {
     mapPlaces.forEach((p) => pts.push([p.lat, p.lng]));
     if (pts.length) mapRef.current?.fit(pts);
   };
-  useEffect(() => { if (!followImei) fitAll(); }, [plottedTrips.size, plottedEvents.size, plottedVehicles.size, plottedPlaces.size]); // eslint-disable-line react-hooks/exhaustive-deps
+  // What was plotted last: the map zooms to it, not to everything plotted (else a new trip is lost among the others).
+  // Unplotting leaves it null, so the map shows everything still plotted.
+  const focusNext = useRef<{ kind: 'trip' | 'event' | 'vehicle' | 'place'; id: string } | null>(null);
+  const focusPoints = (f: NonNullable<typeof focusNext.current>): [number, number][] => {
+    if (f.kind === 'trip') {
+      return [...(routes.find((r) => r.id === f.id)?.coords ?? []),
+        ...points.filter((p) => p.id.startsWith(`te-${f.id}-`)).map((p) => [p.lat, p.lng] as [number, number])];
+    }
+    if (f.kind === 'event') return points.filter((p) => p.id === `ev-${f.id}`).map((p) => [p.lat, p.lng]);
+    if (f.kind === 'vehicle') return mapVehicles.filter((v) => v.id === f.id).map((v) => [v.lat, v.lng]);
+    const place = mapPlaces.find((p) => p.id === f.id);
+    if (!place) return [];
+    if (place.polygon?.length) return place.polygon;
+    const dLat = place.radius / 111320, dLng = place.radius / (111320 * Math.cos((place.lat * Math.PI) / 180));
+    return [[place.lat - dLat, place.lng - dLng], [place.lat + dLat, place.lng + dLng]];
+  };
+  useEffect(() => {
+    const f = focusNext.current;
+    focusNext.current = null;
+    if (followImei) return;
+    const pts = f ? focusPoints(f) : [];
+    if (pts.length) mapRef.current?.fit(pts); else fitAll();
+  }, [plottedTrips.size, plottedEvents.size, plottedVehicles.size, plottedPlaces.size]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (followImei && livePos) mapRef.current?.panTo(livePos.latitude, livePos.longitude);
   }, [followImei, livePos?.latitude, livePos?.longitude]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── plot / unplot ──
-  const toggleVehicle = (imei: string) => setPlottedVehicles((s) => { const n = new Set(s); n.has(imei) ? n.delete(imei) : n.add(imei); return n; });
+  const toggleVehicle = (imei: string) => {
+    focusNext.current = plottedVehicles.has(imei) ? null : { kind: 'vehicle', id: imei };
+    setPlottedVehicles((s) => { const n = new Set(s); n.has(imei) ? n.delete(imei) : n.add(imei); return n; });
+  };
   const toggleTrip = async (trip: Trip) => {
     if (plottedTrips.has(trip.id)) {
       setPlottedTrips((m) => { const n = new Map(m); n.delete(trip.id); return n; });
@@ -196,13 +221,20 @@ export function WorkspacePage() {
     try {
       const detail = await fetchTrip(trip.id);
       const color = TRIP_COLORS[colorIndex.current++ % TRIP_COLORS.length];
+      focusNext.current = { kind: 'trip', id: trip.id };
       setPlottedTrips((m) => new Map(m).set(trip.id, { ...detail, color }));
     } catch (e) {
       notifications.show({ color: 'red', title: 'Could not plot trip', message: (e as Error).message });
     }
   };
-  const toggleEvent = (e: DeviceEvent) => setPlottedEvents((m) => { const n = new Map(m); n.has(e.id) ? n.delete(e.id) : n.set(e.id, e); return n; });
-  const togglePlace = (id: string) => setPlottedPlaces((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleEvent = (e: DeviceEvent) => {
+    focusNext.current = plottedEvents.has(e.id) ? null : { kind: 'event', id: String(e.id) };
+    setPlottedEvents((m) => { const n = new Map(m); n.has(e.id) ? n.delete(e.id) : n.set(e.id, e); return n; });
+  };
+  const togglePlace = (id: string) => {
+    focusNext.current = plottedPlaces.has(id) ? null : { kind: 'place', id };
+    setPlottedPlaces((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
   const clearMap = () => { setPlottedVehicles(new Set()); setPlottedTrips(new Map()); setPlottedEvents(new Map()); setPlottedPlaces(new Set()); };
   const plotted = plottedVehicles.size + plottedTrips.size + plottedEvents.size + plottedPlaces.size;
 
