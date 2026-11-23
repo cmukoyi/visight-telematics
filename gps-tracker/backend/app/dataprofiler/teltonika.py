@@ -8,6 +8,9 @@ Session on TCP:
        N bytes  data field: codec id (1), number of data 1 (1), records…, number of data 2 (1)
        4 bytes  CRC-16/IBM over the data field
      Server replies with the number of accepted records as a 4-byte big-endian int.
+  3. Server may send a GPRS command (Codec 12, type 0x05) on the same socket; the
+     device answers with a Codec 12 frame of type 0x06 carrying the reply text.
+     Codec 12 frames use the same preamble / length / CRC framing as AVL packets.
 
 Codecs 8 and 8 Extended are decoded; other codecs are stored raw and marked unsupported.
 Reference: https://wiki.teltonika-gps.com/view/Teltonika_Data_Sending_Protocols
@@ -20,6 +23,10 @@ from typing import Optional
 CODEC_8 = 0x08
 CODEC_8E = 0x8E
 SUPPORTED_CODECS = {CODEC_8, CODEC_8E}
+CODEC_12 = 0x0C
+CMD_TYPE_COMMAND = 0x05
+CMD_TYPE_RESPONSE = 0x06
+MAX_COMMAND_LENGTH = 256
 
 MAX_DATA_LENGTH = 1 << 16  # guard against garbage length fields
 
@@ -80,6 +87,47 @@ def frame_avl_packet(raw: bytes) -> AvlPacket:
     if count_1 != count_2:
         raise ProtocolError("Record count mismatch")
     return AvlPacket(raw=raw, codec=codec, record_count=count_1)
+
+
+def packet_codec(raw: bytes) -> int:
+    """The codec id of a complete packet (the first byte of its data field)."""
+    if len(raw) < 9:
+        raise ProtocolError("Packet too short")
+    return raw[8]
+
+
+def encode_command(command: str) -> bytes:
+    """A Codec 12 GPRS command frame (type 0x05) for one ASCII command."""
+    try:
+        text = command.encode("ascii")
+    except UnicodeEncodeError:
+        raise ProtocolError("Command must be ASCII")
+    if not 1 <= len(text) <= MAX_COMMAND_LENGTH:
+        raise ProtocolError("Command must be 1–256 characters")
+    data = bytes([CODEC_12, 1, CMD_TYPE_COMMAND]) + struct.pack(">I", len(text)) + text + b"\x01"
+    return b"\x00\x00\x00\x00" + struct.pack(">I", len(data)) + data + struct.pack(">I", crc16_ibm(data))
+
+
+def parse_command_response(raw: bytes) -> str:
+    """The reply text of a complete Codec 12 response frame (type 0x06) from the device."""
+    length = parse_avl_header(raw[:8])
+    if len(raw) != 8 + length + 4:
+        raise ProtocolError("Packet length mismatch")
+    data = raw[8:8 + length]
+    (crc,) = struct.unpack(">I", raw[8 + length:])
+    if crc16_ibm(data) != crc:
+        raise ProtocolError("CRC mismatch")
+    if len(data) < 8 or data[0] != CODEC_12:
+        raise ProtocolError("Not a Codec 12 frame")
+    count_1, kind, count_2 = data[1], data[2], data[-1]
+    if count_1 != count_2:
+        raise ProtocolError("Response count mismatch")
+    if kind != CMD_TYPE_RESPONSE:
+        raise ProtocolError(f"Unexpected Codec 12 type 0x{kind:02X}")
+    (size,) = struct.unpack(">I", data[3:7])
+    if 7 + size + 1 != len(data):
+        raise ProtocolError("Response size mismatch")
+    return data[7:7 + size].decode("ascii", errors="replace")
 
 
 @dataclass

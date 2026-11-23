@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, Navigate, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ActionIcon, Alert, Anchor, Badge, Breadcrumbs, Button, Code, ColorInput, Group, Modal, Paper, PasswordInput, PinInput, Radio, Select,
-  SimpleGrid, Stack, Text, TextInput, ThemeIcon, Title, Tooltip, UnstyledButton,
+  SimpleGrid, Stack, Table, Text, TextInput, ThemeIcon, Title, Tooltip, UnstyledButton,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { modals } from '@mantine/modals';
@@ -11,7 +11,7 @@ import {
   IconAlertTriangle, IconArrowUpRight, IconBan, IconBolt, IconCar, IconKey, IconUsers, IconMapPin, IconPencil, IconPlugConnected,
   IconSearch, IconTrash, IconPlus, IconShieldLock, IconDots, IconBellRinging, IconChevronRight, IconTool, IconClock, IconCoin,
 } from '@tabler/icons-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { DateInput } from '@mantine/dates';
 import dayjs from 'dayjs';
@@ -160,6 +160,61 @@ function Tiles() {
           </Paper>
         ))}
       </SimpleGrid>
+    </Stack>
+  );
+}
+
+// ── Tracker commands (Edit vehicle → Commands) ──
+interface DeviceCommand {
+  id: string; command: string; status: 'queued' | 'sent' | 'responded' | 'failed' | 'expired';
+  sent_by: string | null; queued_at: string; response: string | null; error: string | null;
+}
+const COMMAND_STATUS: Record<DeviceCommand['status'], string> = {
+  queued: 'gray', sent: 'blue', responded: 'green', failed: 'red', expired: 'orange',
+};
+
+function Commands({ vehicle }: { vehicle: Vehicle }) {
+  const qc = useQueryClient();
+  const key = ['device-commands', vehicle.id];
+  const { data: commands = [] } = useQuery({
+    queryKey: key,
+    queryFn: () => api<DeviceCommand[]>(`/api/portal/tags/${vehicle.id}/commands`),
+    // Poll while a command is still waiting for the device
+    refetchInterval: (q) => (q.state.data?.some((c) => c.status === 'queued' || c.status === 'sent') ? 3000 : false),
+  });
+  const [command, setCommand] = useState('web_connect');
+  const [sending, setSending] = useState(false);
+  const send = async () => {
+    setSending(true);
+    try {
+      await api(`/api/portal/tags/${vehicle.id}/commands`, { method: 'POST', json: { command } });
+      qc.invalidateQueries({ queryKey: key });
+    } catch (e) { notifications.show({ color: 'red', message: (e as Error).message }); }
+    setSending(false);
+  };
+  return (
+    <Stack maw={760}>
+      <Group align="flex-end" wrap="nowrap">
+        <TextInput label="Command" style={{ flex: 1 }} maxLength={256} value={command}
+                   onChange={(e) => setCommand(e.currentTarget.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); send(); } }}
+                   description="Sent to the tracker over GPRS, e.g. web_connect (download pending FOTA WEB updates), getinfo, getver, cpureset. If the tracker is offline it goes when it next connects." />
+        <Button onClick={send} loading={sending} disabled={!command.trim()}>Send</Button>
+      </Group>
+      {commands.length > 0 && (
+        <Table fz="sm" verticalSpacing={6}>
+          <Table.Thead><Table.Tr><Table.Th>Command</Table.Th><Table.Th>Status</Table.Th><Table.Th>Reply</Table.Th><Table.Th>Sent</Table.Th></Table.Tr></Table.Thead>
+          <Table.Tbody>
+            {commands.map((c) => (
+              <Table.Tr key={c.id}>
+                <Table.Td><Code>{c.command}</Code></Table.Td>
+                <Table.Td><Badge size="sm" variant="light" color={COMMAND_STATUS[c.status]}>{c.status}</Badge></Table.Td>
+                <Table.Td style={{ wordBreak: 'break-word' }}>{c.response ?? (c.error ? <Text size="sm" c="red">{c.error}</Text> : '—')}</Table.Td>
+                <Table.Td><Text size="xs" c="dimmed">{ago(c.queued_at)}{c.sent_by ? ` · ${c.sent_by}` : ''}</Text></Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      )}
     </Stack>
   );
 }
@@ -354,6 +409,8 @@ function Devices() {
               <TextInput label="Expires" value={editing.expiry_date ? dateTime(editing.expiry_date).slice(0, 11) : '—'} readOnly />
             </SimpleGrid>
           ) },
+        { id: 'commands', label: 'Commands', keywords: 'command gprs web_connect fota firmware getinfo cpureset',
+          content: <Commands vehicle={editing} /> },
         ...(canDelete ? [{ id: 'delete', label: 'Delete vehicle', danger: true, keywords: 'remove delete',
           content: (
             <Stack maw={620} align="flex-start">

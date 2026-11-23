@@ -263,3 +263,32 @@ class GeocodeCache(Base):
     # {road, suburb, town, province, postal_code, country, poi} for each group's Location Description Format
     parts      = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class DeviceCommand(Base):
+    """A GPRS command (Teltonika Codec 12) queued from the portal for one vehicle's tracker.
+
+    The portal API queues it; the GPRS listener sends it on the device's open
+    TCP session (or when the device next connects) and stores the reply.
+    status: queued → sent → responded | failed; queued → expired after expires_at.
+    """
+    __tablename__ = "device_commands"
+    __table_args__ = (
+        Index("ix_device_commands_queued", "imei", "created_at", postgresql_where=text("status = 'queued'")),
+        Index("ix_device_commands_vehicle", "vehicle_id", "created_at"),
+    )
+
+    id              = get_uuid_column()
+    vehicle_id      = Column(_TagRefType, ForeignKey("ble_tags.id", ondelete="CASCADE"), nullable=False)
+    usergroup_id    = Column(_TagRefType, ForeignKey("user_groups.id", ondelete="CASCADE"), nullable=True)
+    imei            = Column(String(20), nullable=False)
+    command         = Column(String(256), nullable=False)
+    status          = Column(String(12), nullable=False, default="queued")   # queued | sent | responded | failed | expired
+    created_by      = Column(_TagRefType, ForeignKey("portal_users.id", ondelete="SET NULL"), nullable=True)
+    created_by_name = Column(String(200), nullable=True)    # kept for the history if the user is deleted
+    created_at      = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    sent_at         = Column(DateTime(timezone=True), nullable=True)
+    responded_at    = Column(DateTime(timezone=True), nullable=True)
+    response        = Column(Text, nullable=True)
+    expires_at      = Column(DateTime(timezone=True), nullable=False)
+    error           = Column(String(255), nullable=True)
