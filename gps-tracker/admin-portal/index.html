@@ -40,7 +40,16 @@
     <!-- Material Design Roboto Font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      // Theme before first paint: saved choice, else the device setting
+      (function () {
+        var t = null;
+        try { t = localStorage.getItem('adminTheme'); } catch (_) {}
+        if (t !== 'light' && t !== 'dark') t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', t);
+      })();
+    </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         * {
@@ -852,14 +861,6 @@
 
         /* RESPONSIVE */
         @media (max-width: 768px) {
-            .sidebar {
-                width: 240px;
-            }
-
-            .main-content {
-                margin-left: 240px;
-            }
-
             .content {
                 padding: 20px;
             }
@@ -892,31 +893,6 @@
             }
         }
 
-        @media (max-width: 1024px) {
-            .sidebar {
-                width: 80px;
-                padding: 12px;
-            }
-
-            .sidebar-logo {
-                font-size: 16px;
-                justify-content: center;
-                margin-bottom: 24px;
-            }
-
-            .main-content {
-                margin-left: 80px;
-            }
-
-            .sidebar-link span {
-                display: none;
-            }
-
-            .sidebar-link {
-                justify-content: center;
-                padding: 12px;
-            }
-        }
 
         /* Tenant Features - Feature Checkbox Items */
         .feature-checkbox-item {
@@ -956,7 +932,354 @@
             color: var(--text-secondary);
             line-height: 1.4;
         }
+
+        /* ── Navigation (Phase 2) ───────────────────────────────── */
+        .admin-nav { display:flex; flex-direction:column; padding:8px 10px 24px; }
+        .nav-group { margin:18px 10px 6px; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+                     color:rgba(255,255,255,.5); }
+        .admin-nav .nav-link { padding:9px 12px; border-left:0; border-radius:8px; gap:12px; font-size:13.5px; color:rgba(255,255,255,.82); }
+        .admin-nav .nav-link i { font-size:15px; width:20px; opacity:.9; }
+        .admin-nav .nav-link:hover { background:rgba(255,255,255,.08); color:#fff; }
+        .admin-nav .nav-link.active { background:rgba(255,255,255,.16); color:#fff; font-weight:600; }
     </style>
+
+<style id="admin-theme">
+/* ════════════════════════════════════════════════════════════════════
+   Admin theme (Phase 3) — same palette as the customer portal.
+   Every older variable name points at these tokens, so pages and inline
+   styles that use var(--…) follow light / dark automatically.
+   ════════════════════════════════════════════════════════════════════ */
+html {
+    --bg:#F4F6FA; --surface:#FFFFFF; --surface-2:#F8FAFC; --surface-3:#EEF2F7; --hover:#F1F5F9;
+    --line:#E2E8F0; --line-2:#CBD5E1; --text:#0F172A; --text-2:#334155; --text-3:#64748B;
+    --accent:#2563EB; --accent-d:#1D4ED8; --accent-soft:rgba(37,99,235,.10); --on-accent:#FFFFFF;
+    --ok:#059669; --ok-soft:#D1FAE5; --warn-c:#B45309; --warn-soft:#FEF3C7; --bad:#DC2626; --bad-soft:#FEE2E2;
+    --info-c:#0369A1; --info-soft:#E0F2FE;
+    --nav-bg:#0F172A; --nav-text:rgba(226,232,240,.78); --nav-muted:rgba(148,163,184,.75); --nav-hover:rgba(255,255,255,.06); --nav-active:rgba(59,130,246,.22);
+    --shadow-1:0 1px 2px rgba(15,23,42,.05); --shadow-2:0 10px 30px rgba(15,23,42,.12);
+    --radius:12px; --radius-sm:8px;
+    color-scheme: light;
+}
+html[data-theme="dark"] {
+    --bg:#0F1117; --surface:#161B26; --surface-2:#1B2130; --surface-3:#1E2535; --hover:#222A3B;
+    --line:#2A3347; --line-2:#3A4560; --text:#E8EDF8; --text-2:#B4BFD3; --text-3:#8391AD;
+    --accent:#3B82F6; --accent-d:#2563EB; --accent-soft:rgba(59,130,246,.16); --on-accent:#FFFFFF;
+    --ok:#34D399; --ok-soft:rgba(16,185,129,.16); --warn-c:#FBBF24; --warn-soft:rgba(245,158,11,.16); --bad:#F87171; --bad-soft:rgba(239,68,68,.16);
+    --info-c:#38BDF8; --info-soft:rgba(14,165,233,.16);
+    --nav-bg:#0B0E14; --nav-hover:rgba(255,255,255,.05); --nav-active:rgba(59,130,246,.24);
+    --shadow-1:0 1px 2px rgba(0,0,0,.4); --shadow-2:0 12px 32px rgba(0,0,0,.5);
+    color-scheme: dark;
+}
+/* Older names used across the pages (":root" so they beat the Material values in the first stylesheet) */
+:root, :root[data-theme="dark"] {
+    --primary:var(--accent); --primary-dark:var(--accent-d); --primary-light:var(--accent-soft); --primary-color:var(--accent);
+    --secondary:var(--ok); --success-color:var(--ok); --success-light:var(--ok-soft);
+    --danger:var(--bad); --danger-color:var(--bad); --error-color:var(--bad); --warning:var(--warn-c);
+    --dark:var(--text); --text-dark:var(--text); --text-primary:var(--text); --text-secondary:var(--text-3); --gray:var(--text-3);
+    --light:var(--bg); --background:var(--bg); --bg-light:var(--surface-2); --bg-primary:var(--surface); --bg-secondary:var(--surface-2);
+    --border:var(--line); --border-color:var(--line);
+    --sidebar-bg:var(--nav-bg); --sidebar-hover:var(--nav-hover); --sidebar-active:var(--nav-active); --sidebar-accent:var(--accent);
+}
+.sup-wrap, .top-search .sup-results {
+    --s-ok:var(--ok); --s-ok-bg:var(--ok-soft); --s-warn:var(--warn-c); --s-warn-bg:var(--warn-soft); --s-bad:var(--bad); --s-bad-bg:var(--bad-soft);
+    --s-info:var(--text-3); --s-info-bg:var(--surface-3); --s-line:var(--line); --s-text:var(--text); --s-muted:var(--text-3);
+}
+
+/* ── Base ─────────────────────────────────────────────────────────── */
+body { font-family:'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size:14px; line-height:1.5;
+       background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased; }
+h1, h2, h3, h4 { color:var(--text); letter-spacing:-.01em; }
+a { color:var(--accent); }
+::selection { background:var(--accent-soft); }
+
+/* ── Login ────────────────────────────────────────────────────────── */
+.login-container { background:radial-gradient(1200px 600px at 20% -10%, var(--accent-soft), transparent), var(--bg); }
+.login-box { background:var(--surface); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow-2); padding:40px 36px; }
+.login-title { color:var(--text); } .login-subtitle { color:var(--text-3); }
+.login-box .btn { width:100%; }
+
+/* ── Shell ────────────────────────────────────────────────────────── */
+.sidebar { background:var(--nav-bg); box-shadow:none; border-right:1px solid rgba(255,255,255,.04); width:260px; }
+.sidebar-logo { border-bottom:1px solid rgba(255,255,255,.06); padding:18px 20px; font-size:15px; }
+.brand-mark { width:30px; height:30px; border-radius:9px; background:var(--accent); color:#fff; display:inline-flex;
+              align-items:center; justify-content:center; font-size:14px; flex:0 0 auto; }
+.nav-group { color:var(--nav-muted); }
+.admin-nav .nav-link { color:var(--nav-text); }
+.admin-nav .nav-link:hover { background:var(--nav-hover); color:#fff; }
+.admin-nav .nav-link.active { background:var(--nav-active); color:#fff; }
+.admin-nav .nav-link.active i { color:#93C5FD; }
+.main-content { margin-left:260px; background:var(--bg); min-height:100vh; }
+.top-bar { position:sticky; top:0; z-index:40; background:color-mix(in srgb, var(--surface) 88%, transparent);
+           backdrop-filter:blur(8px); border-bottom:1px solid var(--line); padding:12px 32px; min-height:64px; }
+.top-bar .page-title { font-size:20px; font-weight:650; margin:0; color:var(--text); }
+.top-bar .page-subtitle { font-size:12.5px; color:var(--text-3); margin:0; }
+.user-info { gap:10px; }
+.user-info #currentUser { color:var(--text) !important; font-size:13px; }
+.user-info #currentRole { color:var(--text-3) !important; }
+.user-avatar { width:34px; height:34px; font-size:14px; background:var(--accent); }
+.icon-btn { width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:10px;
+            border:1px solid var(--line); background:var(--surface); color:var(--text-2); cursor:pointer; flex:0 0 auto; }
+.icon-btn:hover { border-color:var(--accent); color:var(--accent); }
+.nav-toggle { display:inline-flex; }
+.top-search { background:var(--surface-2); border-color:var(--line); }
+.top-search:focus-within { background:var(--surface); }
+.top-search input { color:var(--text); }
+.subtabs { position:sticky; top:64px; z-index:39; background:var(--surface); border-bottom:1px solid var(--line); padding:0 32px; }
+.subtab { color:var(--text-3); } .subtab:hover { color:var(--text); }
+.subtab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.content { padding:28px 32px 48px; max-width:1480px; }
+
+/* Page headings: the top bar names the section, so the page's own big title is hidden */
+.tab-content .page-title { display:none; }
+.tab-content .page-header { margin-bottom:18px; }
+.tab-content .page-subtitle { color:var(--text-3); font-size:13.5px; margin:0; max-width:900px; }
+
+/* ── Cards, stats ─────────────────────────────────────────────────── */
+.card { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow-1); }
+.card-header { border-bottom-color:var(--line); }
+.card-title { font-size:15px; font-weight:600; color:var(--text); }
+.stat-card { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow-1); }
+.stat-label { color:var(--text-3); font-size:12px; font-weight:500; text-transform:none; letter-spacing:0; }
+.stat-value { color:var(--text); }
+
+/* ── Buttons ──────────────────────────────────────────────────────── */
+.btn { width:auto; padding:9px 16px; border-radius:var(--radius-sm); font-size:13.5px; font-weight:600; border:1px solid transparent;
+       transition:background .15s, border-color .15s, color .15s, box-shadow .15s; }
+.btn:hover { transform:none !important; box-shadow:none; }
+.btn:focus-visible { outline:none; box-shadow:0 0 0 3px var(--accent-soft); }
+.btn-primary { background:var(--accent); color:var(--on-accent); }
+.btn-primary:hover { background:var(--accent-d); }
+.btn-secondary { background:var(--surface); color:var(--text); border:1px solid var(--line-2); }
+.btn-secondary:hover { background:var(--hover); color:var(--text); border-color:var(--line-2); }
+.btn-danger { background:var(--bad); color:#fff; }
+.btn-danger:hover { filter:brightness(.95); background:var(--bad); }
+.btn-small { padding:6px 12px; font-size:12.5px; }
+.btn:disabled { opacity:.55; cursor:not-allowed; }
+
+/* ── Forms ────────────────────────────────────────────────────────── */
+label { color:var(--text-2); font-size:13px; font-weight:500; }
+input[type="text"], input[type="password"], input[type="email"], input[type="number"], input[type="search"], input[type="tel"],
+input[type="url"], input[type="date"], input[type="datetime-local"], input[type="time"], input:not([type]), select, textarea, .form-input {
+    background:var(--surface); color:var(--text); border:1px solid var(--line-2); border-radius:var(--radius-sm);
+    padding:9px 12px; font:inherit; font-size:14px; }
+input:focus, select:focus, textarea:focus, .form-input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+.top-search input, .sup-search input { border:0 !important; box-shadow:none !important; background:transparent !important; padding:10px 0; }
+input::placeholder, textarea::placeholder { color:var(--text-3); opacity:.8; }
+input[type="checkbox"], input[type="radio"] { accent-color:var(--accent); }
+
+/* ── Tables ───────────────────────────────────────────────────────── */
+.table-wrapper { border:1px solid var(--line); border-radius:var(--radius-sm); overflow:auto; background:var(--surface); }
+table { color:var(--text); }
+thead { background:var(--surface-2); }
+th { background:var(--surface-2); color:var(--text-3); font-size:12px; font-weight:600; text-transform:none; letter-spacing:0;
+     border-bottom:1px solid var(--line); padding:10px 12px; }
+td { border-bottom:1px solid var(--line); color:var(--text); padding:10px 12px; }
+tr:hover td { background:var(--hover); }
+
+/* ── Badges, alerts, empty states ─────────────────────────────────── */
+.badge { border-radius:999px; font-weight:600; font-size:11.5px; padding:2px 9px; }
+.badge-success { background:var(--ok-soft); color:var(--ok); }
+.badge-warning { background:var(--warn-soft); color:var(--warn-c); }
+.badge-danger { background:var(--bad-soft); color:var(--bad); }
+.badge-info { background:var(--info-soft); color:var(--info-c); }
+.alert { border-radius:var(--radius-sm); border:1px solid var(--line); }
+.alert-success { background:var(--ok-soft); color:var(--ok); border-color:transparent; }
+.alert-danger { background:var(--bad-soft); color:var(--bad); border-color:transparent; }
+.alert-info { background:var(--info-soft); color:var(--info-c); border-color:transparent; }
+.alert-warning { background:var(--warn-soft); color:var(--warn-c); border-color:transparent; }
+.empty-state { color:var(--text-3); } .empty-state-title { color:var(--text-2); }
+.error { color:var(--bad); } .success { color:var(--ok); }
+
+/* ── In-page tabs, filters, feature toggles ───────────────────────── */
+.tabs { border-bottom:1px solid var(--line); }
+.tab, .subtab-btn { color:var(--text-3); }
+.tab:hover, .subtab-btn:hover { color:var(--text); background:transparent; }
+.tab.active, .subtab-btn.active { color:var(--accent); border-bottom-color:var(--accent); }
+.filters { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); }
+.filter-group label { color:var(--text-2); }
+.feature-toggle-row, .feature-checkbox-item { border-color:var(--line); background:var(--surface); }
+.feature-toggle-row:hover, .feature-checkbox-item:hover { background:var(--hover); }
+.feature-name { color:var(--text); } .feature-desc { color:var(--text-3); }
+
+/* ── Modals ───────────────────────────────────────────────────────── */
+.modal { background:rgba(2,6,23,.55); backdrop-filter:blur(2px); }
+.modal-content { background:var(--surface); color:var(--text); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow-2); }
+.modal-header, .modal-footer { border-color:var(--line); }
+.close-btn { color:var(--text-3); } .close-btn:hover { color:var(--text); background:var(--hover); }
+
+/* ── Translations + Support pages ─────────────────────────────────── */
+.tr-lang { background:var(--surface); border-color:var(--line); color:var(--text); }
+.tr-lang:hover, .tr-lang.active { border-color:var(--accent); }
+.tr-bar { background:var(--surface-3); }
+.tr-cell.missing { background:var(--bad-soft); } .tr-cell.review { background:var(--warn-soft); }
+.tr-review { background:var(--warn-soft); color:var(--warn-c); border-color:transparent; }
+.sup-hero, .sup-tile, .sup-card, .sup-ask, .sup-search, .sup-results, .sup-chip, .sup-picker { background:var(--surface); }
+.sup-actions, .sup-table th { background:var(--surface-2); }
+.sup-res:hover, .sup-res:focus-visible { background:var(--hover); }
+.sup-check + .sup-check, .sup-table td { border-color:var(--line); }
+.sup-ask input { background:var(--surface); color:var(--text); }
+
+/* ── Dark mode: inline styles written with fixed light colours ───── */
+html[data-theme="dark"] [style*="background:#fff"], html[data-theme="dark"] [style*="background: #fff"],
+html[data-theme="dark"] [style*="background:white"], html[data-theme="dark"] [style*="background: white"],
+html[data-theme="dark"] [style*="background-color:#fff"], html[data-theme="dark"] [style*="background-color: #fff"],
+html[data-theme="dark"] [style*="background-color: white"], html[data-theme="dark"] [style*="background-color:white"] {
+    background:var(--surface) !important; color:var(--text); }
+html[data-theme="dark"] [style*="background:#f7fafc"], html[data-theme="dark"] [style*="background:#f8fafc"],
+html[data-theme="dark"] [style*="background: #f7fafc"], html[data-theme="dark"] [style*="background: #f8fafc"],
+html[data-theme="dark"] [style*="background:#f5f5f5"], html[data-theme="dark"] [style*="background: #f5f5f5"],
+html[data-theme="dark"] [style*="background:#f9fafb"], html[data-theme="dark"] [style*="background: #f9fafb"],
+html[data-theme="dark"] [style*="background:#f1f5f9"], html[data-theme="dark"] [style*="background: #f1f5f9"] {
+    background:var(--surface-2) !important; }
+html[data-theme="dark"] [style*="color:#555"], html[data-theme="dark"] [style*="color: #555"],
+html[data-theme="dark"] [style*="color:#333"], html[data-theme="dark"] [style*="color: #333"],
+html[data-theme="dark"] [style*="color:#0f172a"], html[data-theme="dark"] [style*="color:#1e293b"],
+html[data-theme="dark"] [style*="color:#374151"], html[data-theme="dark"] [style*="color: #374151"] { color:var(--text-2) !important; }
+html[data-theme="dark"] [style*="color:#6b7280"], html[data-theme="dark"] [style*="color: #6b7280"],
+html[data-theme="dark"] [style*="color:#64748b"], html[data-theme="dark"] [style*="color: #64748b"] { color:var(--text-3) !important; }
+html[data-theme="dark"] [style*="background:#fef3c7"], html[data-theme="dark"] [style*="background: #fef3c7"] { background:var(--warn-soft) !important; }
+html[data-theme="dark"] [style*="color:#92400e"], html[data-theme="dark"] [style*="color: #92400e"],
+html[data-theme="dark"] [style*="color: #b45309"] { color:var(--warn-c) !important; }
+html[data-theme="dark"] [style*="color: #991b1b"], html[data-theme="dark"] [style*="color:#991b1b"] { color:var(--bad) !important; }
+html[data-theme="dark"] [style*="color:#166534"], html[data-theme="dark"] [style*="color:#155724"] { color:var(--ok) !important; }
+html[data-theme="dark"] [style*="color: #1e40af"] { color:var(--info-c) !important; }
+html[data-theme="dark"] .leaflet-container { background:#0F1117; }
+html[data-theme="dark"] code, html[data-theme="dark"] pre { background:var(--surface-3); color:var(--text); }
+
+/* ── Phones and small tablets: sidebar slides in ──────────────────── */
+@media (max-width: 900px) {
+    .sidebar { transform:translateX(-100%); transition:transform .2s ease; z-index:60; width:270px; }
+    body.nav-open .sidebar { transform:none; box-shadow:var(--shadow-2); }
+    body.nav-open::after { content:""; position:fixed; inset:0; background:rgba(2,6,23,.45); z-index:55; }
+    .main-content { margin-left:0 !important; }
+    .nav-toggle { display:inline-flex; }
+    .top-bar { padding:10px 16px; gap:10px; flex-wrap:wrap; }
+    .top-bar .page-title { font-size:17px; }
+    .top-search { order:5; flex-basis:100%; max-width:none; }
+    .subtabs { top:auto; position:static; padding:0 12px; }
+    .content { padding:16px; }
+    .user-info > div:first-child, .user-info .logout-text { display:none; }
+    .top-bar > div:nth-child(2) { flex:1; min-width:0; }
+    .top-bar .page-title { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .card, .table-wrapper, .tab-content { max-width:100%; overflow-x:auto; }
+    .main-content, .content { min-width:0; overflow-x:hidden; }
+}
+
+/* ── Phase 4: pages fit the screen ────────────────────────────────── */
+.content { max-width:none; }
+.main-content { min-width:0; }   /* flex child: may shrink to the window instead of growing to its widest table */
+.content table { width:100%; }
+.content td { overflow-wrap:break-word; }
+/* Long free text (emails, names, addresses) may break anywhere; codes, badges, dates and buttons never do */
+.lst-wrap, .content td [title*="@"], .content td a[href^="mailto"] { overflow-wrap:anywhere; }
+.content td .badge, .content td .btn, .content td .lst-mono, .content td code { overflow-wrap:normal; white-space:nowrap; }
+.content td [class*="badge"] { white-space:nowrap; }
+.lst-type { overflow-wrap:normal; }
+@media (max-width: 1280px) { .lst-actions .btn .lst-label { display:none; } }
+.content table.stacked .lst-actions .btn .lst-label { display:inline; }
+.table-wrapper { overflow-x:auto; }
+
+/* Top bar: title on the left, account on the right */
+.top-bar { justify-content:flex-start; gap:16px; }
+.top-bar .user-info { margin-left:auto; }
+
+/* Collapsible sidebar (desktop) */
+.sidebar { display:flex; flex-direction:column; transition:width .18s ease; }
+.admin-nav { flex:1 0 auto; }
+.sidebar-logo { position:sticky; top:0; z-index:2; background:var(--nav-bg); }
+.sidebar-logo [data-brand] { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.nav-collapse { display:inline-flex; align-items:center; justify-content:center; margin-left:auto; width:30px; height:30px; padding:0; border:0; border-radius:8px; flex:0 0 auto;
+                background:transparent; color:var(--nav-muted); font:inherit; font-size:13px; cursor:pointer; text-align:left; }
+.nav-collapse:hover { background:var(--nav-hover); color:#fff; }
+.nav-collapse i { width:20px; text-align:center; transition:transform .18s ease; }
+.main-content { transition:margin-left .18s ease; }
+@media (min-width: 901px) {
+    body.nav-collapsed .sidebar { width:68px; }
+    body.nav-collapsed .main-content { margin-left:68px; }
+    body.nav-collapsed .sidebar-logo { flex-direction:column; justify-content:center; gap:10px; padding:14px 0; }
+    body.nav-collapsed .nav-collapse { margin:0; }
+    body.nav-collapsed .sidebar-logo [data-brand], body.nav-collapsed .admin-nav .nav-link span, body.nav-collapsed .nav-collapse span { display:none; }
+    body.nav-collapsed .nav-group { font-size:0; margin:12px 14px; height:1px; background:rgba(255,255,255,.08); }
+    body.nav-collapsed .admin-nav { padding:8px 8px 24px; }
+    body.nav-collapsed .admin-nav .nav-link { justify-content:center; padding:10px 0; }
+    body.nav-collapsed .nav-collapse i { transform:rotate(180deg); }
+}
+@media (max-width: 900px) { .nav-collapse { display:none; } }
+
+/* Lists (Devices, Usergroups) */
+.lst-chips { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+.lst-chip { display:inline-flex; align-items:baseline; gap:6px; padding:6px 12px; border-radius:999px; border:1px solid var(--line);
+            background:var(--surface); color:var(--text-2); font:inherit; font-size:13px; cursor:pointer; }
+.lst-chip b { color:var(--text); font-weight:650; }
+.lst-chip.warn b { color:var(--warn-c); } .lst-chip.bad b { color:var(--bad); } .lst-chip.muted b { color:var(--text-3); }
+.lst-chip:hover { border-color:var(--line-2); }
+.lst-chip.active { border-color:var(--accent); background:var(--accent-soft); color:var(--accent); }
+.lst-card { padding:0; overflow:hidden; }
+.lst-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:12px 16px; border-bottom:1px solid var(--line); }
+.lst-toolbar select { width:auto; min-width:0; max-width:220px; padding:7px 10px; font-size:13px; }
+.lst-search { display:flex; align-items:center; gap:8px; flex:1 1 240px; max-width:420px; padding:0 10px; border:1px solid var(--line-2);
+              border-radius:var(--radius-sm); background:var(--surface); }
+.lst-search:focus-within { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+.lst-search i { color:var(--text-3); font-size:12px; }
+.lst-search input { border:0 !important; box-shadow:none !important; padding:8px 0 !important; flex:1; min-width:0; background:transparent !important; }
+.lst-spacer { flex:1; }
+.lst-bulk { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:8px 16px; background:var(--accent-soft); border-bottom:1px solid var(--line); }
+.lst-bulk[hidden] { display:none; }
+.lst-bulk b { color:var(--accent); font-size:13px; margin-right:6px; }
+.lst-table { width:100%; border-collapse:collapse; }
+.lst-table th { font-size:12px; padding:10px 12px; text-align:left; white-space:nowrap; }
+.lst-table th[data-sort] { cursor:pointer; user-select:none; }
+.lst-table th[data-sort]:hover { color:var(--text); }
+.lst-table th.sorted { color:var(--accent); }
+.lst-table th.sorted::after { content:" ↓"; } .lst-table th.sorted[data-dir="asc"]::after { content:" ↑"; }
+.lst-table td { padding:10px 12px; vertical-align:top; font-size:13.5px; }
+.lst-table .lst-check { width:34px; padding-right:0; }
+.lst-actions { text-align:right; white-space:nowrap; }
+.lst-actions .btn { margin:2px 0 2px 4px; }
+.lst-mono { font-family:ui-monospace, 'SF Mono', Menlo, monospace; font-size:12.5px; }
+.lst-sub { font-size:12px; color:var(--text-3); margin-top:2px; }
+.lst-muted { color:var(--text-3); } .lst-warn { color:var(--warn-c); font-weight:600; } .lst-bad { color:var(--bad); font-weight:600; }
+.lst-type { display:inline-block; font-size:11.5px; padding:2px 8px; border-radius:6px; background:var(--surface-3); color:var(--text-2); margin:1px 0; }
+.lst-badge-muted { background:var(--surface-3); color:var(--text-3); }
+.lst-empty { text-align:center; color:var(--text-3); padding:36px 12px !important; }
+.lst-error { color:var(--bad); }
+.lst-pager { display:flex; align-items:center; justify-content:flex-end; gap:8px; padding:10px 16px; border-top:1px solid var(--line);
+             font-size:13px; color:var(--text-3); }
+.badge-error { background:var(--bad-soft); color:var(--bad); }
+.btn-success { background:var(--ok); color:#fff; }
+
+/* Rows stay on one line. Tables too wide for their card shrink (measured in labelTables). */
+.content td.cell-actions { white-space:nowrap; width:1%; }
+.content td.cell-actions > div, .content td.cell-actions > span { flex-wrap:nowrap !important; }
+.content td.cell-actions .btn, .content td.cell-actions button { display:inline-flex; width:auto; vertical-align:middle; }
+.content table.compact th, .content table.compact td { padding:7px 8px; font-size:12.5px; }
+.content table.compact .btn, .content table.compact td button { padding:5px 9px !important; font-size:12px !important; }
+.content table.compact .badge { font-size:10.5px; padding:2px 7px; }
+.content table.tight th, .content table.tight td { padding:5px 6px; font-size:12px; }
+.content table.squeeze td.cell-long { overflow-wrap:anywhere; }
+.content td span[style*="border-radius"], .content td [class*="badge"] { white-space:nowrap; }
+.content table.tight .btn, .content table.tight td button { padding:3px 7px !important; font-size:11.5px !important; gap:4px; }
+.content table.tight .badge { font-size:10px; padding:1px 6px; }
+.content table.tight .lst-mono { font-size:11.5px; }
+.content table.tiny th, .content table.tiny td { padding:4px 4px; font-size:11px; letter-spacing:-.01em; }
+.content table.tiny .btn, .content table.tiny td button { padding:2px 6px !important; font-size:10.5px !important; gap:3px; border-radius:6px; }
+.content table.tiny .badge, .content table.tiny td [class*="badge"] { font-size:9.5px; padding:1px 5px; }
+/* Phones only: rows become stacked cards, each value labelled with its column */
+@media (max-width: 760px) {
+    .content table:not(.no-stack) thead { display:none; }
+    .content table:not(.no-stack), .content table:not(.no-stack) > tbody, .content table:not(.no-stack) > tbody > tr,
+    .content table:not(.no-stack) > tbody > tr > td { display:block; width:100%; }
+    .content table:not(.no-stack) > tbody > tr { border:1px solid var(--line); border-radius:10px; margin:10px 0; padding:8px 4px; background:var(--surface);
+        display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:2px 0; }
+    .content table:not(.no-stack) > tbody > tr > td[colspan] { grid-column:1 / -1; }
+    .content table:not(.no-stack) > tbody > tr > td { border:0; padding:5px 14px; text-align:left !important; }
+    .content table:not(.no-stack) > tbody > tr > td[data-label]::before { content:attr(data-label); display:block; font-size:11px; font-weight:600;
+        color:var(--text-3); text-transform:uppercase; letter-spacing:.04em; margin-bottom:1px; }
+    .content table:not(.no-stack) > tbody > tr > td[data-label=""]::before { display:none; }
+    .lst-table { padding:0 12px; } .lst-actions { text-align:left; }
+    .lst-table td.lst-check { display:none; }
+}
+</style>
 </head>
 <body>
     <!-- LOGIN PAGE -->
@@ -1001,202 +1324,67 @@
             <!-- SIDEBAR -->
             <div class="sidebar">
                 <div class="sidebar-logo">
-                    <span>🚀</span>
-                    <span style="display: none;">BT Admin</span>
+                    <span class="brand-mark"><i class="fa-solid fa-location-dot"></i></span>
+                    <span data-brand="product">Admin</span>
+                    <button type="button" class="nav-collapse" onclick="toggleNavCollapsed()" title="Collapse / expand the menu" aria-label="Collapse / expand the menu">
+                        <i class="fa-solid fa-angles-left"></i>
+                    </button>
                 </div>
 
-                <ul class="sidebar-menu">
-                    <!-- OVERVIEW -->
-                    <li class="sidebar-category expanded" id="cat-overview">
-                        <button class="sidebar-category-header" onclick="toggleCategory('overview')">
-                            <span><span class="sidebar-category-icon">📊</span>Overview</span>
-                            <span class="sidebar-category-toggle">▶</span>
-                        </button>
-                        <ul class="sidebar-subcategories">
-                            <li class="sidebar-item">
-                                <button class="sidebar-link active" onclick="switchTab('dashboard')">
-                                    <span>📈</span>
-                                    <span>Dashboard</span>
-                                </button>
-                            </li>
-                            <li class="sidebar-item">
-                                <button class="sidebar-link" onclick="switchTab('health')">
-                                    <span>🩺</span>
-                                    <span>System Health</span>
-                                </button>
-                            </li>
-                            <li class="sidebar-item">
-                                <button class="sidebar-link" onclick="switchTab('logs')">
-                                    <span>📝</span>
-                                    <span>Application Logs</span>
-                                </button>
-                            </li>
-                        </ul>
-                    </li>
-
-                    <!-- DATAPROFILER -->
-                    <li class="sidebar-category" id="cat-dataprofiler">
-                        <button class="sidebar-category-header" onclick="toggleCategory('dataprofiler')">
-                            <span><span class="sidebar-category-icon">🔀</span>DataProfiler</span>
-                            <span class="sidebar-category-toggle">▶</span>
-                        </button>
-                        <ul class="sidebar-subcategories">
-                            <li class="sidebar-item">
-                                <button class="sidebar-link" onclick="switchTab('resellers')">
-                                    <span>🤝</span>
-                                    <span>Resellers</span>
-                                </button>
-                            </li>
-                            <li class="sidebar-item">
-                                <button class="sidebar-link" onclick="switchTab('unit-types')">
-                                    <span>📟</span>
-                                    <span>Unit Types</span>
-                                </button>
-                            </li>
-                            <li class="sidebar-item">
-                                <button class="sidebar-link" onclick="switchTab('connections')">
-                                    <span>🟢</span>
-                                    <span>Connections</span>
-                                </button>
-                            </li>
-                            <li class="sidebar-item">
-                                <button class="sidebar-link" onclick="switchTab('dp-events')">
-                                    <span>🧾</span>
-                                    <span>Events</span>
-                                </button>
-                            </li>
-                            <li class="sidebar-item">
-                                <button class="sidebar-link" onclick="switchTab('dictionary')">
-                                    <span>📖</span>
-                                    <span>Dictionary</span>
-                                </button>
-                            </li>
-                            <li class="sidebar-item">
-                                <button class="sidebar-link" onclick="switchTab('pipeline')">
-                                    <span>📈</span>
-                                    <span>Pipeline</span>
-                                </button>
-                            </li>
-                        </ul>
-                    </li>
-
-                    <!-- USERS & TENANTS -->
-                    <li class="sidebar-category" id="cat-users">
-                        <button class="sidebar-category-header" onclick="toggleCategory('users')">
-                            <span><span class="sidebar-category-icon">👥</span>Users & Tenants</span>
-                            <span class="sidebar-category-toggle">▶</span>
-                        </button>
-                        <ul class="sidebar-subcategories">
-                            <li class="sidebar-item">
-                                <button class="sidebar-link" onclick="switchTab('usergroups')">
-                                    <span>🏢</span>
-                                    <span>User Groups</span>
-                                </button>
-                            </li>
-                            <li class="sidebar-item">
-                                <button class="sidebar-link" onclick="switchTab('users')">
-                                    <span>🔑</span>
-                                    <span>Admin Users</span>
-                                </button>
-                            </li>
-                        </ul>
-                    </li>
-
-
-                    <!-- CONFIGURATION -->
-                    <li class="sidebar-category" id="cat-config">
-                        <button class="sidebar-category-header" onclick="toggleCategory('config')">
-                            <span><span class="sidebar-category-icon">⚙️</span>Configuration</span>
-                            <span class="sidebar-category-toggle">▶</span>
-                        </button>
-                        <ul class="sidebar-subcategories">
-                            <li class="sidebar-item">
-                                <button class="sidebar-link" onclick="switchTab('tenant-features')">
-                                    <span>🎯</span>
-                                    <span>Tenant Features</span>
-                                </button>
-                            </li>
-                            <li class="sidebar-item">
-                                <button class="sidebar-link" onclick="switchTab('packages')">
-                                    <span>📦</span>
-                                    <span>Tag Packages</span>
-                                </button>
-                            </li>
-                        </ul>
-                    </li>
-
-                    <!-- ALERTS & NOTIFICATIONS -->
-                    <li class="sidebar-category" id="cat-alerts">
-                        <button class="sidebar-category-header" onclick="toggleCategory('alerts')">
-                            <span><span class="sidebar-category-icon">🔔</span>Alerts & Notifications</span>
-                            <span class="sidebar-category-toggle">▶</span>
-                        </button>
-                        <ul class="sidebar-subcategories">
-                            <li class="sidebar-item">
-                                <button class="sidebar-link" onclick="switchTab('critical-alerts')">
-                                    <span>🚨</span>
-                                    <span>Critical Alerts</span>
-                                </button>
-                            </li>
-                            <li class="sidebar-item">
-                                <button class="sidebar-link" onclick="switchTab('email-alert-stats')">
-                                    <span>📊</span>
-                                    <span>Email Alert Stats</span>
-                                </button>
-                            </li>
-                            <li class="sidebar-item">
-                                <button class="sidebar-link" onclick="switchTab('sendgrid')">
-                                    <span>📧</span>
-                                    <span>SendGrid Stats</span>
-                                </button>
-                            </li>
-                        </ul>
-                    </li>
-
-                    <!-- LOCALIZATION -->
-                    <li class="sidebar-category" id="cat-localization">
-                        <button class="sidebar-category-header" onclick="toggleCategory('localization')">
-                            <span><span class="sidebar-category-icon">🌍</span>Localization</span>
-                            <span class="sidebar-category-toggle">▶</span>
-                        </button>
-                        <ul class="sidebar-subcategories">
-                            <li class="sidebar-item">
-                                <button class="sidebar-link" onclick="switchTab('translations')">
-                                    <span>🔤</span>
-                                    <span>Translations</span>
-                                </button>
-                            </li>
-                            <li class="sidebar-item">
-                                <button class="sidebar-link" onclick="switchTab('languages')">
-                                    <span>🗣️</span>
-                                    <span>Languages</span>
-                                </button>
-                            </li>
-                        </ul>
-                    </li>
-
-                    <!-- OPERATIONS -->
-                    <li class="sidebar-category" id="cat-operations">
-                        <button class="sidebar-category-header" onclick="toggleCategory('operations')">
-                            <span><span class="sidebar-category-icon">⚡</span>Operations</span>
-                            <span class="sidebar-category-toggle">▶</span>
-                        </button>
-                        <ul class="sidebar-subcategories">
-                            <li class="sidebar-item">
-                                <button class="sidebar-link" onclick="switchTab('audit')">
-                                    <span>🔐</span>
-                                    <span>Audit Logs</span>
-                                </button>
-                            </li>
-                        </ul>
-                    </li>
-                </ul>
+                <nav class="admin-nav" aria-label="Admin sections">
+                    <div class="nav-group">Overview</div>
+                    <button type="button" class="sidebar-link nav-link active" data-tab="dashboard" title="Dashboard" onclick="switchTab('dashboard')">
+                        <i class="fa-solid fa-gauge-high"></i><span>Dashboard</span></button>
+                    <button type="button" class="sidebar-link nav-link" data-tab="health" title="System Health" onclick="switchTab('health')">
+                        <i class="fa-solid fa-heart-pulse"></i><span>System Health</span></button>
+                    <button type="button" class="sidebar-link nav-link" data-tab="logs" title="Application Logs" onclick="switchTab('logs')">
+                        <i class="fa-solid fa-file-lines"></i><span>Application Logs</span></button>
+                    <div class="nav-group">DataProfiler</div>
+                    <button type="button" class="sidebar-link nav-link" data-tab="resellers" title="Resellers" onclick="switchTab('resellers')">
+                        <i class="fa-solid fa-handshake"></i><span>Resellers</span></button>
+                    <button type="button" class="sidebar-link nav-link" data-tab="unit-types" title="Unit Types" onclick="switchTab('unit-types')">
+                        <i class="fa-solid fa-microchip"></i><span>Unit Types</span></button>
+                    <button type="button" class="sidebar-link nav-link" data-tab="connections" title="Connections" onclick="switchTab('connections')">
+                        <i class="fa-solid fa-plug"></i><span>Connections</span></button>
+                    <button type="button" class="sidebar-link nav-link" data-tab="dp-events" title="Events" onclick="switchTab('dp-events')">
+                        <i class="fa-solid fa-list-ul"></i><span>Events</span></button>
+                    <button type="button" class="sidebar-link nav-link" data-tab="dictionary" title="Dictionary" onclick="switchTab('dictionary')">
+                        <i class="fa-solid fa-book"></i><span>Dictionary</span></button>
+                    <button type="button" class="sidebar-link nav-link" data-tab="pipeline" title="Pipeline" onclick="switchTab('pipeline')">
+                        <i class="fa-solid fa-diagram-project"></i><span>Pipeline</span></button>
+                    <div class="nav-group">Users & Tenants</div>
+                    <button type="button" class="sidebar-link nav-link" data-tab="usergroups" title="User Groups" onclick="switchTab('usergroups')">
+                        <i class="fa-solid fa-building"></i><span>User Groups</span></button>
+                    <button type="button" class="sidebar-link nav-link" data-tab="users" title="Admin Users" onclick="switchTab('users')">
+                        <i class="fa-solid fa-user-shield"></i><span>Admin Users</span></button>
+                    <div class="nav-group">Configuration</div>
+                    <button type="button" class="sidebar-link nav-link" data-tab="tenant-features" title="Tenant Features" onclick="switchTab('tenant-features')">
+                        <i class="fa-solid fa-toggle-on"></i><span>Tenant Features</span></button>
+                    <button type="button" class="sidebar-link nav-link" data-tab="packages" title="Tag Packages" onclick="switchTab('packages')">
+                        <i class="fa-solid fa-box"></i><span>Tag Packages</span></button>
+                    <div class="nav-group">Alerts & Notifications</div>
+                    <button type="button" class="sidebar-link nav-link" data-tab="critical-alerts" title="Critical Alerts" onclick="switchTab('critical-alerts')">
+                        <i class="fa-solid fa-triangle-exclamation"></i><span>Critical Alerts</span></button>
+                    <button type="button" class="sidebar-link nav-link" data-tab="email-alert-stats" title="Email Alert Stats" onclick="switchTab('email-alert-stats')">
+                        <i class="fa-solid fa-chart-column"></i><span>Email Alert Stats</span></button>
+                    <button type="button" class="sidebar-link nav-link" data-tab="sendgrid" title="SendGrid Stats" onclick="switchTab('sendgrid')">
+                        <i class="fa-solid fa-envelope"></i><span>SendGrid Stats</span></button>
+                    <div class="nav-group">Localization</div>
+                    <button type="button" class="sidebar-link nav-link" data-tab="translations" title="Translations" onclick="switchTab('translations')">
+                        <i class="fa-solid fa-language"></i><span>Translations</span></button>
+                    <button type="button" class="sidebar-link nav-link" data-tab="languages" title="Languages" onclick="switchTab('languages')">
+                        <i class="fa-solid fa-globe"></i><span>Languages</span></button>
+                    <div class="nav-group">Operations</div>
+                    <button type="button" class="sidebar-link nav-link" data-tab="audit" title="Audit Logs" onclick="switchTab('audit')">
+                        <i class="fa-solid fa-clipboard-list"></i><span>Audit Logs</span></button>
+                </nav>
             </div>
 
             <!-- MAIN CONTENT -->
             <div class="main-content">
                 <!-- TOP BAR -->
                 <div class="top-bar">
+                    <button type="button" class="icon-btn nav-toggle" onclick="navMenuButton()" aria-label="Show / hide the menu" title="Show / hide the menu"><i class="fa-solid fa-bars"></i></button>
                     <div>
                         <h1 class="page-title" id="pageTitle">Dashboard</h1>
                         <p class="page-subtitle" id="pageSubtitle">Welcome to <span data-brand="product">ViSight Track</span> Admin</p>
@@ -1206,6 +1394,7 @@
                             <div style="font-weight: 600; color: var(--dark);" id="currentUser">Admin</div>
                             <div style="font-size: 12px; color: var(--gray);" id="currentRole">Administrator</div>
                         </div>
+                        <button type="button" class="icon-btn" id="themeToggle" onclick="toggleAdminTheme()" aria-label="Switch light / dark" title="Switch light / dark"><i class="fa-solid fa-moon"></i></button>
                         <div class="user-avatar" id="userAvatar">A</div>
                         <button class="btn btn-secondary btn-small" onclick="handleLogout()" style="padding:8px 16px;font-size:13px;width:auto;margin-left:8px">
                             Logout
@@ -2633,7 +2822,7 @@
 
                         <!-- Breakdown table -->
                         <div class="card">
-                            <h3 style="font-size:14px;font-weight:700;margin-bottom:12px">📊 Breakdown by period</h3>
+                            <h3 style="font-size:14px;font-weight:700;margin-bottom:12px">Breakdown by period</h3>
                             <div class="table-wrapper">
                                 <table>
                                     <thead>
@@ -2670,7 +2859,7 @@
                     <!-- TRANSLATIONS TAB -->
                     <div id="translations" class="tab-content">
                         <div class="page-header">
-                            <h2 class="page-title">🌍 Translation Manager</h2>
+                            <h2 class="page-title">Translation Manager</h2>
                             <p class="page-subtitle">Manage translations for multi-language support</p>
                         </div>
 
@@ -2729,7 +2918,7 @@
                     <!-- LANGUAGES TAB -->
                     <div id="languages" class="tab-content">
                         <div class="page-header">
-                            <h2 class="page-title">🗣️ Language Manager</h2>
+                            <h2 class="page-title">Language Manager</h2>
                             <p class="page-subtitle">Manage available languages and view translation progress</p>
                         </div>
 
@@ -3061,6 +3250,10 @@ dashboard.welcome,Bienvenue</pre>
             document.getElementById('currentUser').textContent = user.username;
             document.getElementById('currentRole').textContent = user.role.charAt(0).toUpperCase() + user.role.slice(1);
             document.getElementById('userAvatar').textContent = user.username.charAt(0).toUpperCase();
+
+            syncThemeIcon();
+            const navPref = navRead('adminNavCollapsed');
+            if (navPref === '1' || (navPref === null && window.innerWidth < 1200)) document.body.classList.add('nav-collapsed');
         }
 
         // LOGIN
@@ -3108,19 +3301,94 @@ dashboard.welcome,Bienvenue</pre>
         }
 
         // TAB SWITCHING
-        function toggleCategory(categoryId) {
-            const category = document.getElementById('cat-' + categoryId);
-            category.classList.toggle('expanded');
+        function navStore(key, value) { try { value === undefined ? localStorage.removeItem(key) : localStorage.setItem(key, value); } catch (_) {} }
+        function navRead(key) { try { return localStorage.getItem(key); } catch (_) { return null; } }
+
+        function navMenuButton() {
+            if (window.matchMedia('(max-width: 900px)').matches) document.body.classList.toggle('nav-open');
+            else toggleNavCollapsed();
+        }
+        function toggleNavCollapsed(force) {
+            const on = typeof force === 'boolean' ? force : !document.body.classList.contains('nav-collapsed');
+            document.body.classList.toggle('nav-collapsed', on);
+            navStore('adminNavCollapsed', on ? '1' : '0');
+            setTimeout(() => labelTables(), 220);
+        }
+
+        // Tables fit the page: every cell gets its column name, used when rows stack on narrow screens
+        function labelTables(root) {
+            (root || document).querySelectorAll('.content table').forEach(table => {
+                const heads = [...table.querySelectorAll('thead th')].map(th => th.textContent.trim());
+                if (!heads.length) return;
+                table.querySelectorAll('tbody tr').forEach(tr => {
+                    if (tr.dataset.labelled === String(tr.children.length)) return;
+                    [...tr.children].forEach((td, i) => { if (heads[i] && !td.hasAttribute('colspan')) td.setAttribute('data-label', heads[i]); });
+                    tr.dataset.labelled = String(tr.children.length);
+                });
+                // Cells holding only buttons keep them on one line
+                table.querySelectorAll('tbody td').forEach(td => {
+                    if (td.dataset.cellChecked) return;
+                    td.dataset.cellChecked = '1';
+                    const buttons = td.querySelectorAll('button, .btn, a.btn');
+                    if (!buttons.length) return;
+                    let text = td.textContent;
+                    buttons.forEach(b => { text = text.replace(b.textContent, ''); });
+                    if (text.replace(/\s+/g, '').length <= 2) td.classList.add('cell-actions');
+                });
+                table.querySelectorAll('tbody td:not(.cell-actions)').forEach(td => {
+                    if (td.textContent.trim().split(/\s+/).some(w => w.length > 18)) td.classList.add('cell-long');
+                });
+                // Rows stay on one line: a table too wide for its box gets smaller (compact, then tight)
+                if (table.offsetParent === null) return;
+                const box = table.parentElement;
+                table.classList.remove('compact', 'tight', 'tiny', 'squeeze', 'stacked');
+                const fits = () => !box || table.offsetWidth <= box.clientWidth + 1;
+                if (fits()) return;
+                table.classList.add('compact');
+                if (fits()) return;
+                table.classList.add('tight');
+                if (fits()) return;
+                table.classList.add('tiny');
+                if (fits()) return;
+                table.classList.add('squeeze');
+                // Still too wide: give it the sidebar's room (icons only; not saved as a preference)
+                if (!fits() && !document.body.classList.contains('nav-collapsed') && window.matchMedia('(min-width: 901px)').matches) {
+                    document.body.classList.add('nav-collapsed');
+                    setTimeout(() => labelTables(), 220);
+                }
+            });
+        }
+        window.addEventListener('resize', () => { clearTimeout(_labelTimer); _labelTimer = setTimeout(() => labelTables(), 150); });
+        // Re-measure once the sidebar has finished sliding (collapse / expand)
+        document.addEventListener('transitionend', ev => {
+            if (ev.target.classList && ev.target.classList.contains('main-content') && ev.propertyName === 'margin-left') labelTables();
+        });
+        let _labelTimer = null;
+        new MutationObserver(() => { clearTimeout(_labelTimer); _labelTimer = setTimeout(() => labelTables(), 120); })
+            .observe(document.documentElement, { childList: true, subtree: true });
+
+        function syncThemeIcon() {
+            const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+            const icon = document.querySelector('#themeToggle i');
+            if (icon) icon.className = 'fa-solid ' + (dark ? 'fa-sun' : 'fa-moon');
+        }
+        function toggleAdminTheme() {
+            const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            navStore('adminTheme', next);
+            syncThemeIcon();
         }
 
         function switchTab(tabName) {
             // Hide all tabs
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
+            document.querySelectorAll('.admin-nav .nav-link').forEach(l => l.classList.toggle('active', l.dataset.tab === tabName));
 
             // Show selected tab
             document.getElementById(tabName).classList.add('active');
-            event.target.closest('.sidebar-link').classList.add('active');
+            document.getElementById('pageSubtitle').style.display = tabName === 'dashboard' ? '' : 'none';
+            document.body.classList.remove('nav-open');
+            window.scrollTo(0, 0);
 
             // Update page title
             const titles = {
